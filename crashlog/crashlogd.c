@@ -74,6 +74,7 @@
 #define AP_INI_M_RST "APIMR"
 #define M_RST_WN_COREDUMP "MRESET"
 #define FABRIC_ERROR "FABRICERR"
+#define UNALIGNED_BLK_FS "NO_BLANKPHONE"
 // Add Recovery error crash type
 #define RECOVERY_ERROR "RECOVERY_ERROR"
 #define CRASHLOG_ERROR_DEAD "CRASHLOG_DEAD"
@@ -176,6 +177,9 @@
 #define RECOVERY_ERROR_TRIGGER "/cache/recovery/recoveryfail"
 // Add recovery error log path
 #define RECOVERY_ERROR_LOG "/cache/recovery/last_log"
+
+// Add blankphone trigger
+#define BLANKPHONE_FILE "/logs/flashing/blankphone_file"
 
 #define CMDDELETE 1
 
@@ -3137,6 +3141,16 @@ static int crashlog_check_startupreason(char *reason, unsigned int files)
     return 0;
 }
 
+static void crashlog_check_fs(char *filesys, char *type)
+{
+    struct stat info;
+
+    strcpy(type, "UNKNOWN");
+
+    if (stat(filesys, &info) == -1)
+        strcpy(type, UNALIGNED_BLK_FS);
+}
+
 static int swupdated(char *buildname)
 {
     struct stat info;
@@ -3488,6 +3502,7 @@ int main(int argc, char **argv)
 
     // check startup reason and sw update
     char startupreason[32] = { '\0', };
+    char flashtype[32] = { '\0', };
     char encryptstate[16] = { '\0', };
     struct stat st;
     char lastuptime[32];
@@ -3510,6 +3525,7 @@ int main(int argc, char **argv)
         if (swupdated(buildVersion)) {
             strcpy(lastuptime, "0000:00:00");
             strcpy(startupreason,"SWUPDATE");
+            crashlog_check_fs(BLANKPHONE_FILE, flashtype);
             reset_swupdate();
         }
         else {
@@ -3533,6 +3549,7 @@ int main(int argc, char **argv)
         if (swupdated(buildVersion)) {
             strcpy(lastuptime, "0000:00:00");
             strcpy(startupreason,"SWUPDATE");
+            crashlog_check_fs(BLANKPHONE_FILE, flashtype);
             reset_swupdate();
         }
         else {
@@ -3555,6 +3572,12 @@ next:
     compute_key(key, SYS_REBOOT, startupreason);
     LOGE("%-8s%-22s%-20s%s\n", SYS_REBOOT, key, date_tmp, startupreason);
     history_file_write(SYS_REBOOT, startupreason, NULL, NULL, lastuptime, key, date_tmp);
+
+    if (!strncmp(flashtype, UNALIGNED_BLK_FS, sizeof(UNALIGNED_BLK_FS))) {
+        compute_key(key, INFOEVENT, flashtype);
+        LOGE("%-8s%-22s%-20s%s\n", INFOEVENT, key, date_tmp, flashtype);
+        history_file_write(INFOEVENT, flashtype, NULL, NULL, NULL, key, date_tmp);
+    }
 
     compute_key(key, STATEEVENT, encryptstate);
     LOGE("%-8s%-22s%-20s%s\n", STATEEVENT, key, date_tmp, encryptstate);
