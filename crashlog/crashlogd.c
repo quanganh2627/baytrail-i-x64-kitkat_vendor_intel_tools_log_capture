@@ -85,7 +85,7 @@
 #define PROP_CRASH "persist.service.crashlog.enable"
 #define PROP_PROFILE "persist.service.profile.enable"
 #define PROP_COREDUMP "persist.core.enabled"
-#define PROP_ANR_USERSTACK "persist.anr.userstack.enabled"
+#define PROP_ANR_USERSTACK "persist.anr.userstack.disabled"
 #define SYS_PROP "/system/build.prop"
 #define SAVEDLINES  1
 #define MAX_RECORDS 5000
@@ -985,9 +985,9 @@ void backtrace_anr_uiwdt(char *dest, int dir)
 {
     char value[PROPERTY_VALUE_MAX];
     property_get(PROP_ANR_USERSTACK, value, "0");
-    if (strncmp(value, "0", 1)) {
-        process_anr_or_uiwdt(dest, dir, !strncmp(value, "1", 1));
-   }
+    if (strncmp(value, "1", 1)) {
+	    process_anr_or_uiwdt(dest, dir, 0);
+    }
 }
 
 static int do_crashlogd(unsigned int files)
