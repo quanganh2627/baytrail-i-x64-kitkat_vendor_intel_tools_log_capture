@@ -47,6 +47,7 @@
 #define KERNEL_CRASH "IPANIC"
 #define SYSSERVER_WDT "UIWDT"
 #define KERNEL_FORCE_CRASH "IPANIC_FORCED"
+#define KERNEL_FAKE_CRASH "IPANIC_FAKE"
 #define ANR_CRASH "ANR"
 #define JAVA_CRASH "JAVACRASH"
 #define WTF_CRASH "WTF"
@@ -1421,7 +1422,12 @@ static void crashlog_check_panic(char *reason, unsigned int files)
 			compute_key(key, CRASHEVENT, KERNEL_FORCE_CRASH);
 			LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, date_tmp_2, KERNEL_FORCE_CRASH, destion);
 			history_file_write(CRASHEVENT, KERNEL_FORCE_CRASH, NULL, destion, NULL, key, date_tmp_2);
-		} else {
+		} else if (!find_str_in_file(SAVED_CONSOLE_NAME, "EIP is at panic_dbg_set", NULL)) {
+			compute_key(key, CRASHEVENT, KERNEL_FAKE_CRASH);
+			LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, date_tmp_2, KERNEL_FAKE_CRASH, destion);
+			history_file_write(CRASHEVENT, KERNEL_FAKE_CRASH, NULL, destion, NULL, key, date_tmp_2);
+		} else
+		{
 			compute_key(key, CRASHEVENT, KERNEL_CRASH);
 			LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, date_tmp_2, KERNEL_CRASH, destion);
 			history_file_write(CRASHEVENT, KERNEL_CRASH, NULL, destion, NULL, key, date_tmp_2);

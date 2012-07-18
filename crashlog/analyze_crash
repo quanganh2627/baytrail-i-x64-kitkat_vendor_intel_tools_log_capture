@@ -231,7 +231,7 @@ if [ $# -ge 3 ] ; then
     if [ "$tag" == "WDT" ] ; then
       iwdt $crashfilename $wdt
     fi
-    if [ "$tag" == "IPANIC" -o "$tag" == "IPANIC_FORCED" ] ; then
+    if [ "$tag" == "IPANIC" -o "$tag" == "IPANIC_FORCED" -o "$tag" ==  "IPANIC_FAKE" ] ; then
       ipanic $output $crashfilename
     fi
     if [ "$tag" == "JAVACRASH" ] ; then
