@@ -195,6 +195,29 @@ static unsigned int decode_uid(const char *s)
 	return v;
 }
 
+static mode_t get_mode(const char *s)
+{
+	mode_t mode = 0;
+	while (*s) {
+		if (*s >= '0' && *s <= '7') {
+			mode = (mode << 3) | (*s - '0');
+		} else {
+			return -1;
+		}
+		s++;
+	}
+	return mode;
+}
+
+static int do_chmod(char *file, char *mod)
+{
+	mode_t mode = get_mode(mod);
+	if (chmod(file, mode) < 0) {
+		return -errno;
+	}
+	return 0;
+}
+
 static int do_chown(char *file, char *uid, char *gid)
 {
 	if (strstr(file, SDCARD_CRASH_DIR))
@@ -283,11 +306,14 @@ out:
 static void flush_aplog_atboot(char *mode, int dir, char* ts)
 {
 	char cmd[512] = { '\0', };
+	char log_boot_name[512] = { '\0', };
 
-	snprintf(cmd, sizeof(cmd)-1, "/system/bin/logcat -b system -b main -b radio -b events -b kernel -v threadtime -d -f %s%d/%s_%s_%s", CRASH_DIR, dir,strrchr(APLOG_FILE_BOOT,'/')+1,mode,ts);
+	snprintf(log_boot_name, sizeof(log_boot_name)-1, "%s%d/%s_%s_%s", CRASH_DIR, dir, strrchr(APLOG_FILE_BOOT,'/')+1,mode,ts);
+	snprintf(cmd, sizeof(cmd)-1, "/system/bin/logcat -b system -b main -b radio -b events -b kernel -v threadtime -d -f %s", log_boot_name);
 	int status = system(cmd);
 	if (status != 0)
 		LOGE("flush ap log from boot returns status: %d.\n", status);
+	do_chmod(log_boot_name, "644");
 	return ;
 }
 
@@ -321,29 +347,6 @@ static void do_log_copy(char *mode, int dir, char* ts, int type)
 		}
 	}
 	return ;
-}
-
-static mode_t get_mode(const char *s)
-{
-	mode_t mode = 0;
-	while (*s) {
-		if (*s >= '0' && *s <= '7') {
-			mode = (mode << 3) | (*s - '0');
-		} else {
-			return -1;
-		}
-		s++;
-	}
-	return mode;
-}
-
-static int do_chmod(char *file, char *mod)
-{
-	mode_t mode = get_mode(mod);
-	if (chmod(file, mode) < 0) {
-		return -errno;
-	}
-	return 0;
 }
 
 static int write_file(const char *path, const char *value)
