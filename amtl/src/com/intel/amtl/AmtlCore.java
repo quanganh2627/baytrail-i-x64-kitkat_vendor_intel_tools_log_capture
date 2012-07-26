@@ -46,6 +46,8 @@ public class AmtlCore {
     private static final String PLATFORM_VERSION_PROPERTY = "ro.build.product";
     private static final String PLATFORM_MFLD_PR1 = "mfld_pr1";
     private static final String PLATFORM_MFLD_PR2 = "mfld_pr2";
+    private static final String PLATFORM_CTP_PR0 = "ctp_pr0";
+    private static final String PLATFORM_CTP_PR1 = "ctp_pr1";
 
     /* AMTL Core reference: singleton design pattern */
     private static AmtlCore core;
@@ -54,6 +56,8 @@ public class AmtlCore {
 
     /* Platform usbswitch availability flag */
     public static boolean usbswitchEnabled = false;
+    /* Platform logging over USB CDC ACM availability flag */
+    public static boolean usbAcmEnabled = false;
 
     /* Current predefined configuration */
     private PredefinedCfg curCfg;
@@ -122,6 +126,9 @@ public class AmtlCore {
             if ((platformVersion.equals(PLATFORM_MFLD_PR1)) || (platformVersion.equals(PLATFORM_MFLD_PR2))) {
                 this.usbswitchEnabled = true;
             }
+            else if ((platformVersion.equals(PLATFORM_CTP_PR0)) || (platformVersion.equals(PLATFORM_CTP_PR1))) {
+                this.usbAcmEnabled = true;
+            }
         }
         else {
             Log.v(TAG, MODULE + ": platform version cannot be found.");
@@ -183,6 +190,7 @@ public class AmtlCore {
             case OFFLINE_BP_LOG:
             case ONLINE_BP_LOG:
             case TRACE_DISABLE:
+            case OFFLINE_USB_BP_LOG:
                 this.futCfg = cfg;
                 break;
             default:
@@ -242,6 +250,9 @@ public class AmtlCore {
                 case ONLINE_BP_LOG:
                     applyOnlineBpLogCfg();
                     break;
+                case OFFLINE_USB_BP_LOG:
+                    applyOfflineUsbBpLog();
+                    break;
                 case TRACE_DISABLE:
                     applyTraceDisableCfg();
                     break;
@@ -270,6 +281,14 @@ public class AmtlCore {
     private void applyOfflineBpLogCfg() throws IOException {
         this.services.stop_service();
         this.modemCfg.setXsio(this.gsmtty, ModemConfiguration.XSIO_4);
+        this.modemCfg.setTraceLevel(this.gsmtty, CustomCfg.TRACE_LEVEL_BB_3G);
+        this.services.enable_service(Services.MTS_EXTFS);
+    }
+
+    /* Apply green configuration for Clovertrail */
+    private void applyOfflineUsbBpLog() throws IOException {
+        this.services.stop_service();
+        this.modemCfg.setXsio(this.gsmtty, ModemConfiguration.XSIO_1);
         this.modemCfg.setTraceLevel(this.gsmtty, CustomCfg.TRACE_LEVEL_BB_3G);
         this.services.enable_service(Services.MTS_EXTFS);
     }
@@ -314,7 +333,12 @@ public class AmtlCore {
         /* Determine XSIO value to set */
         if (this.futCustomCfg.traceLocation == CustomCfg.TRACE_LOC_EMMC ||
             this.futCustomCfg.traceLocation == CustomCfg.TRACE_LOC_SDCARD) {
-            xsioToSet = (this.futCustomCfg.hsiFrequency == CustomCfg.HSI_FREQ_78_MHZ) ? ModemConfiguration.XSIO_5: ModemConfiguration.XSIO_4;
+            if (this.usbAcmEnabled) {
+                xsioToSet = ModemConfiguration.XSIO_1;
+            }
+            else {
+                xsioToSet = (this.futCustomCfg.hsiFrequency == CustomCfg.HSI_FREQ_78_MHZ) ? ModemConfiguration.XSIO_5: ModemConfiguration.XSIO_4;
+            }
         }
         else if (this.futCustomCfg.traceLocation == CustomCfg.TRACE_LOC_COREDUMP) {
             xsioToSet = ModemConfiguration.XSIO_2;
@@ -382,6 +406,13 @@ public class AmtlCore {
                 (this.traceLevelValue == CustomCfg.TRACE_LEVEL_BB_3G)) {
                 /*Trace in APE log file enabled*/
                 this.curCfg = PredefinedCfg.OFFLINE_BP_LOG;
+            }
+            else if (((this.infoModemReboot == ModemConfiguration.reboot_ok1) ||
+                (this.infoModemReboot == ModemConfiguration.reboot_ko1)) &&
+                (this.serviceValue == Services.MTS_EXTFS) &&
+                (this.traceLevelValue == CustomCfg.TRACE_LEVEL_BB_3G)) {
+                /*Trace via in APE log file via USB enabled*/
+                this.curCfg = PredefinedCfg.OFFLINE_USB_BP_LOG;
             }
             else if (((this.infoModemReboot == ModemConfiguration.reboot_ok0) ||
                 (this.infoModemReboot == ModemConfiguration.reboot_ko0)) &&

@@ -28,6 +28,7 @@ public class ModemConfiguration {
     private static final String MODULE = "ModemConfiguration";
 
     public final static int XSIO_0 = 0;
+    public final static int XSIO_1 = 1;
     public final static int XSIO_2 = 2;
     public final static int XSIO_4 = 4;
     public final static int XSIO_5 = 5;
@@ -70,6 +71,15 @@ public class ModemConfiguration {
     protected final static int xsio_45 = 13;
     protected final static int xsio_52 = 14;
     protected final static int xsio_54 = 15;
+    protected final static int xsio_01 = 16;
+    protected final static int xsio_10 = 17;
+    protected final static int xsio_11 = 18;
+    protected final static int xsio_12 = 19;
+    protected final static int xsio_21 = 20;
+    protected final static int xsio_14 = 21;
+    protected final static int xsio_41 = 22;
+    protected final static int xsio_15 = 23;
+    protected final static int xsio_51 = 24;
     protected final static int reboot_ok0 = 50;
     protected final static int reboot_ko0 = 51;
     protected final static int reboot_ok2 = 52;
@@ -78,6 +88,8 @@ public class ModemConfiguration {
     protected final static int reboot_ko4 = 55;
     protected final static int reboot_ok5 = 56;
     protected final static int reboot_ko5 = 57;
+    protected final static int reboot_ok1 = 58;
+    protected final static int reboot_ko1 = 59;
 
     /* Simplify the modem status : rebooted (ok) or not rebooted(ko) */
     protected int modem_reboot_status(int reboot_value) {
@@ -87,17 +99,30 @@ public class ModemConfiguration {
                 /* xsio = 0 and modem has been rebooted */
                 ret = reboot_ok0;
                 break;
+            case xsio_01:
             case xsio_02:
             case xsio_04:
             case xsio_05:
                 /* xsio = 0 and modem has not been rebooted */
                 ret = reboot_ko0;
                 break;
+            case xsio_11:
+                /* xsio = 1 and modem has been rebooted */
+                ret = reboot_ok1;
+                break;
+            case xsio_10:
+            case xsio_12:
+            case xsio_14:
+            case xsio_15:
+                /* xsio = 1 and modem has not been rebooted */
+                ret = reboot_ko1;
+                break;
             case xsio_22:
                 /* xsio = 2 and modem has been rebooted */
                 ret = reboot_ok2;
                 break;
             case xsio_20:
+            case xsio_21:
             case xsio_24:
             case xsio_25:
                 /* xsio = 2 and modem has not been rebooted */
@@ -108,6 +133,7 @@ public class ModemConfiguration {
                 ret = reboot_ok4;
                 break;
             case xsio_40:
+            case xsio_41:
             case xsio_42:
             case xsio_45:
                 /* xsio = 4 and modem has not been rebooted */
@@ -118,6 +144,7 @@ public class ModemConfiguration {
                 ret = reboot_ok5;
                 break;
             case xsio_50:
+            case xsio_51:
             case xsio_52:
             case xsio_54:
                 /* xsio = 5 and modem has not been rebooted */
@@ -251,6 +278,33 @@ public class ModemConfiguration {
         else if (s.contains("5, *4")) {
             ret = xsio_54;
         }
+        else if (s.contains("0, *1")) {
+            ret = xsio_01;
+        }
+        else if (s.contains("1, *0")) {
+            ret = xsio_10;
+        }
+        else if (s.contains("1, *1")) {
+            ret = xsio_11;
+        }
+        else if (s.contains("1, *2")) {
+            ret = xsio_12;
+        }
+        else if (s.contains("2, *1")) {
+            ret = xsio_21;
+        }
+        else if (s.contains("4, *1")) {
+            ret = xsio_41;
+        }
+        else if (s.contains("1, *4")) {
+            ret = xsio_14;
+        }
+        else if (s.contains("5, *1")) {
+            ret = xsio_51;
+        }
+        else if (s.contains("1, *5")) {
+            ret = xsio_15;
+        }
         else {
             ret= xsio_00;
         }
@@ -261,6 +315,10 @@ public class ModemConfiguration {
     protected void setXsio(RandomAccessFile f, int xsio) {
         String atCmd;
         switch (xsio) {
+            case XSIO_1:
+                /* Enable usb acm */
+                atCmd = String.format(AT_SET_XSIO_FMT, XSIO_1);
+                break;
             case XSIO_2:
                 /* Enable coredump */
                 atCmd = String.format(AT_SET_XSIO_FMT, XSIO_2);

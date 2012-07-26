@@ -14,6 +14,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
+ * ============================================================================
+ * AMTL version:
+ *
+ * The AMTL versioning convention uses three digits as the following scheme:
+ * <project code>.<Major version>.<Minor version>
+ *
+ * 2.1.0  - 2012-07-11 - BZ 34413 - Remove USBswitch on Clovertrail
+ * 2.1.1  - 2012-07-11 - BZ 43865 - Handling of logging over USB CDC ACM
+ * ============================================================================
  */
 
 package com.intel.amtl;
@@ -91,6 +100,7 @@ public class MainActivity extends Activity {
                 button_modem_coredump.setChecked(true);
                 break;
             case OFFLINE_BP_LOG:
+            case OFFLINE_USB_BP_LOG:
                 button_ape_log_file.setChecked(true);
                 break;
             case ONLINE_BP_LOG:
@@ -138,26 +148,37 @@ public class MainActivity extends Activity {
         /* On start, print a warning message */
         UIHelper.message_warning(this, "WARNING","This is a R&D Application. Please do not use unless you are asked to!");
 
-        /* Listener on Modem Coredump button */
-        button_modem_coredump.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if (button_modem_coredump.isChecked()) {
-                    setCfg(PredefinedCfg.COREDUMP);
+        if (!AmtlCore.usbAcmEnabled) {
+            /* Listener on Modem Coredump button */
+            button_modem_coredump.setOnClickListener(new OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (button_modem_coredump.isChecked()) {
+                        setCfg(PredefinedCfg.COREDUMP);
+                    }
+                    else {
+                        /* If user presses again on button_modem_coredump, traces are stopped */
+                        setCfg(PredefinedCfg.TRACE_DISABLE);
+                    }
                 }
-                else {
-                    /* If user presses again on button_modem_coredump, traces are stopped */
-                    setCfg(PredefinedCfg.TRACE_DISABLE);
-                }
-            }
-        });
+            });
+        }
+        else {
+            /*Disable modem coredump button for Clovertrail*/
+            button_modem_coredump.setVisibility(View.GONE);
+        }
 
         /* Listener on APE Log File button */
         button_ape_log_file.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {
                 if (button_ape_log_file.isChecked()) {
-                    setCfg(PredefinedCfg.OFFLINE_BP_LOG);
+                    if (!AmtlCore.usbAcmEnabled) {
+                        setCfg(PredefinedCfg.OFFLINE_BP_LOG);
+                    }
+                    else {
+                        setCfg(PredefinedCfg.OFFLINE_USB_BP_LOG);
+                    }
                 }
                 else {
                     /* If user presses again on button_ape_log_file, traces are stopped */

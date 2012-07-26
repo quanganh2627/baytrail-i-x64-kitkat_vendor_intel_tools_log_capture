@@ -24,5 +24,6 @@ public enum PredefinedCfg {
     COREDUMP,
     OFFLINE_BP_LOG,
     ONLINE_BP_LOG,
-    TRACE_DISABLE
+    TRACE_DISABLE,
+    OFFLINE_USB_BP_LOG
 }

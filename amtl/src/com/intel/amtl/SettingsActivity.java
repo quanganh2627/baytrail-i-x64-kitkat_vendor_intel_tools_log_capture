@@ -283,17 +283,23 @@ public class SettingsActivity extends Activity {
             }
         });
 
-        /* Listener on button_location_coredump */
-        button_location_coredump.setOnCheckedChangeListener(new OnCheckedChangeListener() {
-            @Override
-            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-                if (isChecked) {
-                    unset_trace_file_size();
-                    cfg.traceLocation = CustomCfg.TRACE_LOC_COREDUMP;
-                    invalidate();
+        if (!AmtlCore.usbAcmEnabled) {
+            /* Listener on button_location_coredump */
+            button_location_coredump.setOnCheckedChangeListener(new OnCheckedChangeListener() {
+                @Override
+                public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                    if (isChecked) {
+                        unset_trace_file_size();
+                        cfg.traceLocation = CustomCfg.TRACE_LOC_COREDUMP;
+                        invalidate();
+                    }
                 }
-            }
-        });
+            });
+        }
+        else {
+            /*Disable the coredump button for Clovertrail*/
+            button_location_coredump.setVisibility(View.GONE);
+        }
 
         if (AmtlCore.usbswitchEnabled) {
             /* Listener on button_location_usb_ape */
