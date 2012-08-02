@@ -574,6 +574,7 @@ static void history_file_write(char *event, char *type, char *subtype, char *log
 	FILE *to;
 	char tmp[PATHMAX];
 	char * p;
+	char * p1;
 
 	// compute subtype
 	if (!subtype)
@@ -602,7 +603,12 @@ static void history_file_write(char *event, char *type, char *subtype, char *log
 	}
 
 	if (log != NULL) {
-		snprintf(tmp, sizeof(tmp), "%s", log);
+		p = strstr(log, "/mnt/sdcard");
+		p1 = strstr(log, "/data/logs");
+		if (p && p1)
+			snprintf(tmp, sizeof(tmp), "/storage/sdcard0%s", p1);
+		else
+			snprintf(tmp, sizeof(tmp), "%s", log);
 		if((p = strrchr(tmp,'/'))){
 			p[0] = '\0';
 		}

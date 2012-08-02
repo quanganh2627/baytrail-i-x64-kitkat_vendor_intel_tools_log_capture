@@ -1,4 +1,4 @@
-#!/sbin/ash
+#!/system/xbin/ash
 #
 #
 # Copyright (C) Intel 2010

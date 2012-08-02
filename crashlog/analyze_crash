@@ -1,4 +1,4 @@
-#!/sbin/ash
+#!/system/xbin/ash
 
 help()
 {
