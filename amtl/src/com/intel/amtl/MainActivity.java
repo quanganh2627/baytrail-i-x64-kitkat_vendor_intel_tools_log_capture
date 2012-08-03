@@ -22,6 +22,7 @@
  *
  * 2.1.0  - 2012-07-11 - BZ 34413 - Remove USBswitch on Clovertrail
  * 2.1.1  - 2012-07-11 - BZ 43865 - Handling of logging over USB CDC ACM
+ * 2.1.2  - 2012-08-03 - BZ 47868 - Solve Klockwork critical issues
  * ============================================================================
  */
 
@@ -125,6 +126,12 @@ public class MainActivity extends Activity {
         button_ape_log_file = (ToggleButton) findViewById(R.id.ape_log_file_btn);
         button_disable_modem_trace = (ToggleButton) findViewById(R.id.disable_modem_trace_btn);
         button_online_bp_log = (ToggleButton) findViewById(R.id.online_bp_log_btn);
+
+        /* Check if the buttons are not null*/
+        AmtlCore.exitIfNull(button_modem_coredump, this);
+        AmtlCore.exitIfNull(button_ape_log_file, this);
+        AmtlCore.exitIfNull(button_disable_modem_trace, this);
+        AmtlCore.exitIfNull(button_online_bp_log, this);
 
         button_modem_coredump.setChecked(false);
         button_ape_log_file.setChecked(false);

@@ -57,6 +57,12 @@ public class AdditionalFeaturesActivity extends Activity {
         button_usb_ape = (CompoundButton) findViewById(R.id.additional_features_ape_btn);
         button_toggle_on1 = (Button) findViewById(R.id.additional_features_toggle_on1_btn);
 
+        /* Check if the buttons and header are not null*/
+        AmtlCore.exitIfNull(header_usbswitch, this);
+        AmtlCore.exitIfNull(button_usb_modem, this);
+        AmtlCore.exitIfNull(button_usb_ape, this);
+        AmtlCore.exitIfNull(button_toggle_on1, this);
+
         if (AmtlCore.usbswitchEnabled) {
             /* Read usbswitch.conf file */
             FileInputStream fIn = null;

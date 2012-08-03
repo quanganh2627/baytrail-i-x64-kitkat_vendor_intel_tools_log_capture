@@ -61,7 +61,7 @@ public class SettingsActivity extends Activity {
         button_trace_size_800.setEnabled(false);
         button_hsi_frequencies_78.setEnabled(false);
         button_hsi_frequencies_156.setEnabled(false);
-        button_level_bb_3g.setChecked(cfg.traceLevel == CustomCfg.TRACE_LEVEL_NONE);
+        button_level_bb_3g.setChecked((cfg.traceLevel == CustomCfg.TRACE_LEVEL_NONE) || (cfg.traceLevel == CustomCfg.TRACE_LEVEL_BB_3G));
     }
 
     /* Trace file size is useful in EMMC and SDCARD cases */
@@ -71,7 +71,7 @@ public class SettingsActivity extends Activity {
         button_trace_size_800.setChecked(true);
         button_hsi_frequencies_78.setEnabled(true);
         button_hsi_frequencies_78.setChecked(true);
-        button_level_bb_3g.setChecked(cfg.traceLevel == CustomCfg.TRACE_LEVEL_NONE);
+        button_level_bb_3g.setChecked((cfg.traceLevel == CustomCfg.TRACE_LEVEL_NONE) || (cfg.traceLevel == CustomCfg.TRACE_LEVEL_BB_3G));
     }
 
     /* Set trace level button */
@@ -216,10 +216,27 @@ public class SettingsActivity extends Activity {
 
         /* Activate check box */
         checkbox_activate = (CheckBox) findViewById (R.id.activate_checkBox);
-        checkbox_activate.setChecked(false);
 
         /* MUX traces check box */
         checkbox_mux = (CheckBox) findViewById (R.id.mux_checkBox);
+
+        /* Check if the buttons and checkboxes are not null*/
+        AmtlCore.exitIfNull(button_location_emmc, this);
+        AmtlCore.exitIfNull(button_location_sdcard, this);
+        AmtlCore.exitIfNull(button_location_coredump, this);
+        AmtlCore.exitIfNull(button_location_usb_ape, this);
+        AmtlCore.exitIfNull(button_location_usb_modem, this);
+        AmtlCore.exitIfNull(button_level_bb, this);
+        AmtlCore.exitIfNull(button_level_bb_3g, this);
+        AmtlCore.exitIfNull(button_level_bb_3g_digrf, this);
+        AmtlCore.exitIfNull(button_trace_size_100, this);
+        AmtlCore.exitIfNull(button_trace_size_800, this);
+        AmtlCore.exitIfNull(button_hsi_frequencies_78, this);
+        AmtlCore.exitIfNull(button_hsi_frequencies_156, this);
+        AmtlCore.exitIfNull(checkbox_activate, this);
+        AmtlCore.exitIfNull(checkbox_mux, this);
+
+        checkbox_activate.setChecked(false);
 
         /* Get application core */
         try {
@@ -432,7 +449,7 @@ public class SettingsActivity extends Activity {
                 if (!invalidateFlag) {
                     if (isChecked) {
                         core.setCustomCfg(cfg);
-                        UIHelper.message_pop_up(SettingsActivity.this, "WARNING", "Your board need a HARDWARE REBOOT");
+                        UIHelper.message_pop_up(SettingsActivity.this, "WARNING", "Your board needs a HARDWARE REBOOT");
                     }
                 }
             }

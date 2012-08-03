@@ -18,9 +18,11 @@
 
 package com.intel.amtl;
 
+import android.app.Activity;
 import android.util.Log;
 import android.content.Context;
 import android.os.SystemProperties;
+import android.widget.TextView;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -541,5 +543,13 @@ public class AmtlCore {
     /* Get MUX trace status */
     protected int getMuxTraceValue() {
         return this.muxTraceValue;
+    }
+
+    /* Exit from Amtl if a TextView is null */
+    static protected void exitIfNull (TextView tv, Activity a) {
+        if (tv == null) {
+            Log.e(TAG, MODULE + ": invalid null reference.\nAMTL will exit.");
+            a.finish();
+        }
     }
 }
