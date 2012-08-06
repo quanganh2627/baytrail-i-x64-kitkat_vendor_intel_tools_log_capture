@@ -87,8 +87,8 @@ javacrash()
   javacrash=`ls $1 | grep "system_app_crash.*.txt.gz" | wc -l`
   if [ $javacrash == 1 ] ; then
     pid=`gunzip -c $1/system_app_crash*.txt.gz | grep "Process:" | awk -F":" '{print $2}'`
-    exception=`gunzip -c $1/system_app_crash*.txt.gz | grep -m1 -o "java.lang.*Exception"`
-	stack=`gunzip -c $1/system_app_crash*.txt.gz | grep -m4 -o "at .*" | awk -F"at " '{print $2}' |awk -F"(" '{print $1}' | sed  -e "N;s/\n/ /" | sed -e "N;s/\n/ /"`
+    exception=`gunzip -c $1/system_app_crash*.txt.gz | grep -m1 -o "^java.lang.*"`
+    stack=`gunzip -c $1/system_app_crash*.txt.gz | grep -m4 -o "at .*" | awk -F"at " '{print $2}' |awk -F"(" '{print $1}' | sed  -e "N;s/\n/ /" | sed -e "N;s/\n/ /"`
 
     echo "DATA0=$pid" >> $2
     echo "DATA1=$exception" >> $2
@@ -96,9 +96,9 @@ javacrash()
   else
     javacrash=`ls $1 | grep "system_app_crash.*.txt" | wc -l`
     if [ $javacrash == 1 ] ; then
-       pid=`grep "Process:" $1/system_app_crash*.txt | awk -F":" '{print $2}'`
-       exception=`grep -m1 -o "java.lang.*Exception" $1/system_app_crash*.txt`
-	   stack=`grep -m4 -o "at .*" $1/system_app_crash*.txt | awk -F"at " '{print $2}' |awk -F"(" '{print $1}' | sed  -e "N;s/\n/ /" | sed -e "N;s/\n/ /"`
+       npid=`grep "Process:" $1/system_app_crash*.txt | awk -F":" '{print $2}'`
+       exception=`grep -m1 -o "^java.lang.*" $1/system_app_crash*.txt`
+       stack=`grep -m4 -o "at .*" $1/system_app_crash*.txt | awk -F"at " '{print $2}' |awk -F"(" '{print $1}' | sed  -e "N;s/\n/ /" | sed -e "N;s/\n/ /"`
 
        echo "DATA0=$pid" >> $2
        echo "DATA1=$exception" >> $2
@@ -108,8 +108,8 @@ javacrash()
   systemcrash=`ls $1 | grep "system_server_crash.*.txt.gz" | wc -l`
   if [ $systemcrash == 1 ] ; then
     pid=`gunzip -c $1/system_server_crash*.txt.gz | grep "Process:" | awk -F":" '{print $2}'`
-    exception=`gunzip -c $1/system_server_crash*.txt.gz | grep -m1 -o "java.lang.*Exception"`
-	stack=`gunzip -c $1/system_server_crash*.txt.gz | grep -m4 -o "at .*" | awk -F"at " '{print $2}' |awk -F"(" '{print $1}' | sed  -e "N;s/\n/ /" | sed -e "N;s/\n/ /"`
+    exception=`gunzip -c $1/system_server_crash*.txt.gz | grep -m1 -o "^java.lang.*"`
+    stack=`gunzip -c $1/system_server_crash*.txt.gz | grep -m4 -o "at .*" | awk -F"at " '{print $2}' |awk -F"(" '{print $1}' | sed  -e "N;s/\n/ /" | sed -e "N;s/\n/ /"`
 
     echo "DATA0=$pid" >> $2
     echo "DATA1=$exception" >> $2
@@ -118,8 +118,8 @@ javacrash()
     systemcrash=`ls $1 | grep "system_server_crash.*.txt" | wc -l`
     if [ $systemcrash == 1 ] ; then
        pid=`grep "Process:" $1/system_server_crash*.txt | awk -F":" '{print $2}'`
-       exception=`grep -m1 -o "java.lang.*Exception" $1/system_server_crash*.txt`
-	   stack=`grep -m4 -o "at .*" $1/system_server_crash*.txt | awk -F"at " '{print $2}' |awk -F"(" '{print $1}' | sed  -e "N;s/\n/ /" | sed -e "N;s/\n/ /"`
+       exception=`grep -m1 -o "^java.lang.*" $1/system_server_crash*.txt`
+       stack=`grep -m4 -o "at .*" $1/system_server_crash*.txt | awk -F"at " '{print $2}' |awk -F"(" '{print $1}' | sed  -e "N;s/\n/ /" | sed -e "N;s/\n/ /"`
 
        echo "DATA0=$pid" >> $2
        echo "DATA1=$exception" >> $2
