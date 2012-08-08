@@ -62,6 +62,8 @@
 #define AP_INI_M_RST "APIMR"
 #define M_RST_WN_COREDUMP "MRESET"
 #define FABRIC_ERROR "FABRICERR"
+// Add Recovery error crash type
+#define RECOVERY_ERROR "RECOVERY_ERROR"
 
 #define FILESIZE_MAX  (10*1024*1024)
 #define PATHMAX 512
@@ -126,6 +128,12 @@
 #define FABRIC_ERROR_NAME "ipanic_fabric_err"
 
 #define MODEM_SHUTDOWN_TRIGGER "/data/logs/modemcrash/mshutdown.txt"
+
+// Add recovery error trigger
+#define RECOVERY_ERROR_TRIGGER "/cache/recovery/recoveryfail"
+// Add recovery error log path
+#define RECOVERY_ERROR_LOG "/cache/recovery/last_log"
+
 
 #define TIME_FORMAT_1 "%Y%m%d%H%M%S"
 #define TIME_FORMAT_2 "%Y-%m-%d/%H:%M:%S  "
@@ -778,7 +786,7 @@ static unsigned int find_dir(unsigned int max, int mode)
 		fd = fopen(path, "r");
 		if (fd == NULL){
 			LOGE("can not open file: %s\n", path);
-			return 0;
+                        return -1;
 		}
 		if (fscanf(fd, "%d", &i)==EOF) {
 			i = 0;
@@ -789,7 +797,7 @@ static unsigned int find_dir(unsigned int max, int mode)
 		fd = fopen(path, "w");
 		if (fd == NULL){
 			LOGE("can not open file: %s\n", path);
-			return 0;
+                        return -1;
 		}
 		fprintf(fd, "%d", (i % max));
 		fclose(fd);
@@ -798,7 +806,7 @@ static unsigned int find_dir(unsigned int max, int mode)
 		fd = fopen(path, "w");
 		if (fd == NULL){
 			LOGE("can not open file: %s\n", path);
-			return 0;
+                        return -1;
 		}
 		oldest = 0;
 		fprintf(fd, "%d", 1);
@@ -1004,7 +1012,7 @@ static int do_crashlogd(unsigned int files)
     char date_tmp[32];
     char date_tmp_2[32];
     struct stat info;
-    unsigned int dir;
+    int dir;
     long long tm;
     int hours, seconds, minutes;
     time_t t;
@@ -1087,6 +1095,12 @@ static int do_crashlogd(unsigned int files)
                         /* for modem reset */
                         if(strstr(event->name, wd_array[i].cmp) && (strstr(event->name, "apimr.txt" ) ||strstr(event->name, "mreset.txt" ) )){
                             dir = find_dir(files,CRASH_MODE);
+
+                            if (dir == -1) {
+                                LOGE("find dir %d for modem reset failed\n", files);
+                                goto out_err;
+                            }
+
                             snprintf(path, sizeof(path),"%s/%s",wd_array[i].filename,event->name);
                             if((stat(path, &info) == 0) && (info.st_size != 0)){
                                 snprintf(destion,sizeof(destion),"%s%d/%s", CRASH_DIR,dir,event->name);
@@ -1110,6 +1124,12 @@ static int do_crashlogd(unsigned int files)
                         /* for modem crash */
                         else if(strstr(event->name, wd_array[i].cmp) && strstr(event->name, "mpanic.txt" )){
                             dir = find_dir(files,CRASH_MODE);
+
+                            if (dir == -1) {
+                                LOGE("find dir %d for modem crash failed\n", files);
+                                goto out_err;
+                            }
+
                             snprintf(destion,sizeof(destion),"%s%d", CRASH_DIR,dir);
                             int status = mv_modem_crash(wd_array[i].filename, destion);
                             if (status != 0)
@@ -1145,6 +1165,12 @@ static int do_crashlogd(unsigned int files)
                                 break;
                             snprintf(lostevent_subtype, sizeof(lostevent_subtype), "%s_%s", LOST, lostevent);
                             dir = find_dir(files,CRASH_MODE);
+
+                            if (dir == -1) {
+                                LOGE("find dir %d for lost dropbox failed\n", files);
+                                goto out_err;
+                            }
+
                             snprintf(destion,sizeof(destion),"%s%d/",CRASH_DIR,dir);
                             time(&t);
                             time_tmp = localtime((const time_t *)&t);
@@ -1164,6 +1190,12 @@ static int do_crashlogd(unsigned int files)
                             char *p;
                             char tmp[16];
                             dir = find_dir(files,STATS_MODE);
+
+                            if (dir == -1) {
+                                LOGE("find dir %d for stat trigger failed\n", files);
+                                goto out_err;
+                            }
+
                             /*copy data file*/
                             snprintf(tmp,sizeof(tmp),"%s",event->name);
                             p = strstr(tmp,"trigger");
@@ -1194,6 +1226,11 @@ static int do_crashlogd(unsigned int files)
                         else if (strstr(event->name, wd_array[i].cmp) && ( strstr(event->name, "anr") || strstr(event->name, "system_server_watchdog"))) {
                             dir = find_dir(files,CRASH_MODE);
 
+                            if (dir == -1) {
+                                LOGE("find dir %dfor and and UIwatchdog failed\n", files);
+                                goto out_err;
+                            }
+
                             snprintf(path, sizeof(path),"%s/%s",wd_array[i].filename,event->name);
                             if (stat(path, &info) == 0) {
                                 time(&t);
@@ -1218,6 +1255,11 @@ static int do_crashlogd(unsigned int files)
                         /* for other case */
                         else if (strstr(event->name, wd_array[i].cmp)) {
                             dir = find_dir(files,CRASH_MODE);
+
+                            if (dir == -1) {
+                                LOGE("find dir %d for other crashes failed\n", files);
+                                goto out_err;
+                            }
 
                             snprintf(path, sizeof(path),"%s/%s",wd_array[i].filename,event->name);
                             if (stat(path, &info) == 0) {
@@ -1259,6 +1301,9 @@ static int do_crashlogd(unsigned int files)
     }
 
     return 0;
+
+out_err:
+    return -1;
 }
 
 void do_timeup()
@@ -1336,14 +1381,14 @@ struct fabric_type ft_array[] = {
 	{"DW0:",   "dd", "HWWDTLOGERR"},
 };
 
-static void crashlog_check_fabric(char *reason, unsigned int files)
+static int crashlog_check_fabric(char *reason, unsigned int files)
 {
 	char date_tmp[32];
 	char date_tmp_2[32];
 	struct stat info;
 	time_t t;
 	char destion[PATHMAX];
-	unsigned int dir;
+        int dir;
 	unsigned int i = 0;
 	char key[SHA1_DIGEST_LENGTH+1];
 	struct tm *time_tmp;
@@ -1355,6 +1400,11 @@ static void crashlog_check_fabric(char *reason, unsigned int files)
 		PRINT_TIME(date_tmp, TIME_FORMAT_1, time_tmp);
 		PRINT_TIME(date_tmp_2, TIME_FORMAT_2, time_tmp);
 		dir = find_dir(files,CRASH_MODE);
+
+                if (dir == -1) {
+		    LOGE("find dir %d for check fabric failed\n", files);
+		    return -1;
+		}
 
 		destion[0] = '\0';
 		snprintf(destion, sizeof(destion), "%s%d/%s_%s.txt", CRASH_DIR, dir,
@@ -1379,17 +1429,17 @@ static void crashlog_check_fabric(char *reason, unsigned int files)
 
 		del_file_more_lines(HISTORY_FILE);
 	}
-	return;
+	return 0;
 }
 
-static void crashlog_check_panic(char *reason, unsigned int files)
+static int crashlog_check_panic(char *reason, unsigned int files)
 {
 	char date_tmp[32];
 	char date_tmp_2[32];
 	struct stat info;
 	time_t t;
 	char destion[PATHMAX];
-	unsigned int dir;
+        int dir;
 	char key[SHA1_DIGEST_LENGTH+1];
 	struct tm *time_tmp;
 
@@ -1400,6 +1450,11 @@ static void crashlog_check_panic(char *reason, unsigned int files)
 		PRINT_TIME(date_tmp, TIME_FORMAT_1, time_tmp);
 		PRINT_TIME(date_tmp_2, TIME_FORMAT_2, time_tmp);
 		dir = find_dir(files,CRASH_MODE);
+
+                if (dir == -1) {
+		    LOGE("find dir %d for check panic failed\n", files);
+		    return -1;
+		}
 
 		destion[0] = '\0';
 		snprintf(destion, sizeof(destion), "%s%d/%s_%s.txt", CRASH_DIR, dir,
@@ -1437,17 +1492,17 @@ static void crashlog_check_panic(char *reason, unsigned int files)
 		}
 		del_file_more_lines(HISTORY_FILE);
 	}
-	return;
+	return 0;
 }
 
-static void crashlog_check_modem_shutdown(char *reason, unsigned int files)
+static int crashlog_check_modem_shutdown(char *reason, unsigned int files)
 {
 	char date_tmp[32];
 	char date_tmp_2[32];
 	struct stat info;
 	time_t t;
 	char destion[PATHMAX];
-	unsigned int dir;
+        int dir;
 	struct tm *time_tmp;
 	char key[SHA1_DIGEST_LENGTH+1];
 
@@ -1459,6 +1514,11 @@ static void crashlog_check_modem_shutdown(char *reason, unsigned int files)
 		PRINT_TIME(date_tmp_2, TIME_FORMAT_2, time_tmp);
 		dir = find_dir(files,CRASH_MODE);
 
+                if (dir == -1) {
+		    LOGE("find dir %d for check modem shutdown failed\n", files);
+		    return -1;
+		}
+
 		destion[0] = '\0';
 		snprintf(destion, sizeof(destion), "%s%d/", CRASH_DIR, dir);
 		compute_key(key, CRASHEVENT, MODEM_SHUTDOWN);
@@ -1469,16 +1529,62 @@ static void crashlog_check_modem_shutdown(char *reason, unsigned int files)
 		del_file_more_lines(HISTORY_FILE);
 		remove(MODEM_SHUTDOWN_TRIGGER);
 	}
-	return;
+	return 0;
 }
 
-static void crashlog_check_startupreason(char *reason, unsigned int files)
+static int crashlog_check_recovery(unsigned int files)
+{
+	char date_tmp[32];
+	char date_tmp_2[32];
+	struct stat info;
+	time_t t;
+	char destion[PATHMAX];
+	char destion2[PATHMAX];
+        int dir;
+	struct tm *time_tmp;
+	char key[SHA1_DIGEST_LENGTH+1];
+
+	//Check if trigger file exists
+	if (stat(RECOVERY_ERROR_TRIGGER, &info) == 0) {
+		// compute dates
+		time(&t);
+		time_tmp = localtime((const time_t *)&t);
+		PRINT_TIME(date_tmp, TIME_FORMAT_1, time_tmp);
+		PRINT_TIME(date_tmp_2, TIME_FORMAT_2, time_tmp);
+
+		// get output crash dir
+		dir = find_dir(files,CRASH_MODE);
+
+                if (dir == -1) {
+		    LOGE("find dir %d for check recovery failed\n", files);
+		    return -1;
+		}
+
+		destion[0] = '\0';
+		snprintf(destion, sizeof(destion), "%s%d/", CRASH_DIR, dir);
+		// compute crash id
+		compute_key(key, CRASHEVENT, RECOVERY_ERROR);
+		LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, date_tmp_2, RECOVERY_ERROR, destion);
+		//copy log
+		destion2[0] = '\0';
+		snprintf(destion2, sizeof(destion2), "%s%s", destion, "recovery_last_log");
+		do_copy(RECOVERY_ERROR_LOG, destion2, FILESIZE_MAX);
+		//Write event in history_event
+		history_file_write(CRASHEVENT, RECOVERY_ERROR, NULL, destion, NULL, key, date_tmp_2);
+		del_file_more_lines(HISTORY_FILE);
+		// remove trigger file
+		remove(RECOVERY_ERROR_TRIGGER);
+	}
+	return 0;
+}
+
+static int crashlog_check_startupreason(char *reason, unsigned int files)
 {
 	char date_tmp[32];
 	char date_tmp_2[32];
 	time_t t;
 	char destion[PATHMAX];
-	unsigned int dir;
+        int dir;
 	char key[SHA1_DIGEST_LENGTH+1];
 	struct tm *time_tmp;
 
@@ -1490,6 +1596,12 @@ static void crashlog_check_startupreason(char *reason, unsigned int files)
 		PRINT_TIME(date_tmp_2, TIME_FORMAT_2, time_tmp);
 
 		dir = find_dir(files,CRASH_MODE);
+
+                if (dir == -1) {
+		    LOGE("find dir %d for check startup reason failed\n", files);
+		    return -1;
+		}
+
 		destion[0] = '\0';
 		snprintf(destion, sizeof(destion), "%s%d/", CRASH_DIR, dir);
 		compute_key(key, CRASHEVENT, "WDT");
@@ -1500,7 +1612,7 @@ static void crashlog_check_startupreason(char *reason, unsigned int files)
 		history_file_write(CRASHEVENT, "WDT", reason, destion, NULL, key, date_tmp_2);
 		del_file_more_lines(HISTORY_FILE);
 	}
-	return;
+	return 0;
 }
 
 static int file_read_value(const char *path, char *value, const char *default_value)
@@ -1789,6 +1901,7 @@ int main(int argc, char **argv)
 		}
 	}
 
+	do_chown(HISTORY_FILE_DIR, "root", "log");
 
 	property_get(PROP_CRASH, value, "");
 	if (strncmp(value, "1", 1)){
@@ -1874,10 +1987,14 @@ int main(int argc, char **argv)
 	}
 
 next:
-	crashlog_check_fabric(startupreason, files);
-	crashlog_check_panic(startupreason, files);
-	crashlog_check_modem_shutdown(startupreason, files);
-	crashlog_check_startupreason(startupreason, files);
+	if ( (crashlog_check_fabric(startupreason, files) == -1) ||
+	     (crashlog_check_panic(startupreason, files) == -1) ||
+	      (crashlog_check_modem_shutdown(startupreason, files) == -1) ||
+	      (crashlog_check_startupreason(startupreason, files) == -1) ||
+	      (crashlog_check_recovery(files) == -1))
+	{
+	    return -1;
+	}
 
 	time(&t);
 	time_tmp = localtime((const time_t *)&t);
