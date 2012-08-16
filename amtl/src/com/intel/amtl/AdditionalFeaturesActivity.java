@@ -63,6 +63,8 @@ public class AdditionalFeaturesActivity extends Activity {
         AmtlCore.exitIfNull(button_usb_ape, this);
         AmtlCore.exitIfNull(button_toggle_on1, this);
 
+        button_toggle_on1.setEnabled(false);
+
         if (AmtlCore.usbswitchEnabled) {
             /* Read usbswitch.conf file */
             FileInputStream fIn = null;
