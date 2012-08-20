@@ -1901,8 +1901,6 @@ int main(int argc, char **argv)
 		}
 	}
 
-	do_chown(HISTORY_FILE_DIR, "root", "log");
-
 	property_get(PROP_CRASH, value, "");
 	if (strncmp(value, "1", 1)){
 		if (stat(PANIC_CONSOLE_NAME, &info) == 0){
