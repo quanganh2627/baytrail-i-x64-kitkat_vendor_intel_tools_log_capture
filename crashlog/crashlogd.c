@@ -824,6 +824,13 @@ static unsigned int find_dir(unsigned int max, int mode)
         fprintf(fd, "%d", (i % max));
         fclose(fd);
     } else {
+        if (errno == ENOENT){
+            LOGE("File %s does not exist, returning to crashlog folder 0.\n",path);
+        } else {
+            LOGE("Other error : %d.\n", errno);
+            //need to return -1 to avoid overwrite old log folder
+            return -1;
+        }
 
         fd = fopen(path, "w");
         if (fd == NULL){
@@ -1124,11 +1131,20 @@ static int do_crashlogd(unsigned int files)
                     else{
                         /* for modem reset */
                         if(strstr(event->name, wd_array[i].cmp) && (strstr(event->name, "apimr.txt" ) ||strstr(event->name, "mreset.txt" ) )){
-                            dir = find_dir(files,CRASH_MODE);
+                            time(&t);
+                            time_tmp = localtime((const time_t *)&t);
+                            PRINT_TIME(date_tmp, TIME_FORMAT_1, time_tmp);
+                            PRINT_TIME(date_tmp_2, TIME_FORMAT_2, time_tmp);
+                            compute_key(key, CRASHEVENT, wd_array[i].eventname);
 
+                            dir = find_dir(files,CRASH_MODE);
                             if (dir == -1) {
                                 LOGE("find dir %d for modem reset failed\n", files);
-                                goto out_err;
+                                LOGE("%-8s%-22s%-20s%s\n", CRASHEVENT, key, date_tmp_2, wd_array[i].eventname);
+                                history_file_write(CRASHEVENT, wd_array[i].eventname, NULL, NULL, NULL, key, date_tmp_2);
+                                del_file_more_lines(HISTORY_FILE);
+                                notify_crashreport();
+                                break;
                             }
 
                             snprintf(path, sizeof(path),"%s/%s",wd_array[i].filename,event->name);
@@ -1137,11 +1153,6 @@ static int do_crashlogd(unsigned int files)
                                 do_copy(path, destion, FILESIZE_MAX);
                             }
                             snprintf(destion,sizeof(destion),"%s%d/", CRASH_DIR,dir);
-                            time(&t);
-                            time_tmp = localtime((const time_t *)&t);
-                            PRINT_TIME(date_tmp, TIME_FORMAT_1, time_tmp);
-                            PRINT_TIME(date_tmp_2, TIME_FORMAT_2, time_tmp);
-                            compute_key(key, CRASHEVENT, wd_array[i].eventname);
                             LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, date_tmp_2, wd_array[i].eventname, destion);
                             usleep(TIMEOUT_VALUE);
                             do_log_copy(wd_array[i].eventname,dir,date_tmp,APLOG_TYPE);
@@ -1153,11 +1164,20 @@ static int do_crashlogd(unsigned int files)
                         }
                         /* for modem crash */
                         else if(strstr(event->name, wd_array[i].cmp) && strstr(event->name, "mpanic.txt" )){
-                            dir = find_dir(files,CRASH_MODE);
+                            time(&t);
+                            time_tmp = localtime((const time_t *)&t);
+                            PRINT_TIME(date_tmp, TIME_FORMAT_1, time_tmp);
+                            PRINT_TIME(date_tmp_2, TIME_FORMAT_2, time_tmp);
+                            compute_key(key, CRASHEVENT, wd_array[i].eventname);
 
+                            dir = find_dir(files,CRASH_MODE);
                             if (dir == -1) {
                                 LOGE("find dir %d for modem crash failed\n", files);
-                                goto out_err;
+                                LOGE("%-8s%-22s%-20s%s\n", CRASHEVENT, key, date_tmp_2, wd_array[i].eventname);
+                                history_file_write(CRASHEVENT, wd_array[i].eventname, NULL, NULL, NULL, key, date_tmp_2);
+                                del_file_more_lines(HISTORY_FILE);
+                                notify_crashreport();
+                                break;
                             }
 
                             snprintf(destion,sizeof(destion),"%s%d", CRASH_DIR,dir);
@@ -1168,11 +1188,7 @@ static int do_crashlogd(unsigned int files)
                             snprintf(destion,sizeof(destion),"%s%d/%s", CRASH_DIR,dir,event->name);
                             do_copy(path, destion, 0);
                             snprintf(destion,sizeof(destion),"%s%d/", CRASH_DIR,dir);
-                            time(&t);
-                            time_tmp = localtime((const time_t *)&t);
-                            PRINT_TIME(date_tmp, TIME_FORMAT_1, time_tmp);
-                            PRINT_TIME(date_tmp_2, TIME_FORMAT_2, time_tmp);
-                            compute_key(key, CRASHEVENT, wd_array[i].eventname);
+
                             LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, date_tmp_2, wd_array[i].eventname, destion);
                             usleep(TIMEOUT_VALUE);
                             do_log_copy(wd_array[i].eventname,dir,date_tmp,APLOG_TYPE);
@@ -1194,19 +1210,24 @@ static int do_crashlogd(unsigned int files)
                             else
                                 break;
                             snprintf(lostevent_subtype, sizeof(lostevent_subtype), "%s_%s", LOST, lostevent);
-                            dir = find_dir(files,CRASH_MODE);
 
-                            if (dir == -1) {
-                                LOGE("find dir %d for lost dropbox failed\n", files);
-                                goto out_err;
-                            }
-
-                            snprintf(destion,sizeof(destion),"%s%d/",CRASH_DIR,dir);
                             time(&t);
                             time_tmp = localtime((const time_t *)&t);
                             PRINT_TIME(date_tmp, TIME_FORMAT_1, time_tmp);
                             PRINT_TIME(date_tmp_2, TIME_FORMAT_2, time_tmp);
                             compute_key(key, CRASHEVENT, lostevent);
+
+                            dir = find_dir(files,CRASH_MODE);
+                            if (dir == -1) {
+                                LOGE("find dir %d for lost dropbox failed\n", files);
+                                LOGE("%-8s%-22s%-20s%s\n", CRASHEVENT, key, date_tmp_2, lostevent);
+                                history_file_write(CRASHEVENT, lostevent, lostevent_subtype, NULL, NULL, key, date_tmp_2);
+                                del_file_more_lines(HISTORY_FILE);
+                                notify_crashreport();
+                                break;
+                            }
+
+                            snprintf(destion,sizeof(destion),"%s%d/",CRASH_DIR,dir);
                             LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, date_tmp_2, lostevent, destion);
                             usleep(TIMEOUT_VALUE);
                             do_log_copy(lostevent,dir,date_tmp,APLOG_TYPE);
@@ -1240,20 +1261,21 @@ static int do_crashlogd(unsigned int files)
                                 dir=-1;
                                 for(k=0;k < aplogDepth ; k++) {
                                     aplogIsPresent = 1;
-                                    if (0 == j && 0 == k)
+                                    if ((j == 0) && (k == 0))
                                         snprintf(path, sizeof(path),"%s",APLOG_FILE_0);
                                     else
                                         snprintf(path, sizeof(path),"%s.%d",APLOG_FILE_0,(j*aplogDepth)+k);
 
                                     if(stat(path, &info) == 0){
-                                        if(0 == k){
+                                        if(k == 0){
                                             dir = find_dir(files,APLOGS_MODE);
                                             if (dir == -1) {
                                                 LOGE("find dir %d for aplog trigger failed\n", files);
-                                                goto out_err;
+                                                //No need to write in the history event in this case
+                                                break;
                                              }
                                         }
-                                        if (0 == j && 0 == k)
+                                        if ((j == 0) && (k == 0))
                                             snprintf(destion,sizeof(destion),"%s%d/aplog", APLOGS_DIR,dir);
                                         else
                                             snprintf(destion,sizeof(destion),"%s%d/aplog.%d", APLOGS_DIR,dir,(j*aplogDepth)+k);
@@ -1265,7 +1287,7 @@ static int do_crashlogd(unsigned int files)
                                     }
                                 }
 
-                                if(0!=k) {
+                                if((k != 0) && (dir != -1)) {
                                     time(&t);
                                     time_tmp = localtime((const time_t *)&t);
                                     PRINT_TIME(date_tmp_2, TIME_FORMAT_2, time_tmp);
@@ -1276,7 +1298,7 @@ static int do_crashlogd(unsigned int files)
                                     del_file_more_lines(HISTORY_FILE);
                                     notify_crashreport();
                                 }
-                                if(0 == aplogIsPresent)
+                                if(aplogIsPresent == 0)
                                     break;
                             }
                             /*delete trigger file*/
@@ -1287,13 +1309,26 @@ static int do_crashlogd(unsigned int files)
                         else if((strcmp(wd_array[i].eventname,STATSTRIGGER)==0) && (strstr(event->name, "trigger" ))){
                             char *p;
                             char tmp[16];
+
+                            snprintf(tmp,sizeof(tmp),"%s",event->name);
+                            time(&t);
+                            time_tmp = localtime((const time_t *)&t);
+                            PRINT_TIME(date_tmp_2, TIME_FORMAT_2, time_tmp);
                             dir = find_dir(files,STATS_MODE);
                             if (dir == -1) {
                                 LOGE("find dir %d for stat trigger failed\n", files);
-                                goto out_err;
+                                p = strstr(tmp,"trigger");
+                                if ( p ){
+                                    strcpy(p,"data");
+                                }
+                                compute_key(key, STATSEVENT, tmp);
+                                LOGE("%-8s%-22s%-20s%s\n", STATSEVENT, key, date_tmp_2, tmp);
+                                history_file_write(STATSEVENT, tmp, NULL, NULL, NULL, key, date_tmp_2);
+                                del_file_more_lines(HISTORY_FILE);
+                                notify_crashreport();
+                                break;
                             }
                             /*copy data file*/
-                            snprintf(tmp,sizeof(tmp),"%s",event->name);
                             p = strstr(tmp,"trigger");
                             if ( p ){
                                 strcpy(p,"data");
@@ -1308,9 +1343,6 @@ static int do_crashlogd(unsigned int files)
                             do_copy(path, destion, 0);
                             remove(path);
                             snprintf(destion,sizeof(destion),"%s%d/", STATS_DIR,dir);
-                            time(&t);
-                            time_tmp = localtime((const time_t *)&t);
-                            PRINT_TIME(date_tmp_2, TIME_FORMAT_2, time_tmp);
                             compute_key(key, STATSEVENT, tmp);
                             LOGE("%-8s%-22s%-20s%s %s\n", STATSEVENT, key, date_tmp_2, tmp, destion);
                             history_file_write(STATSEVENT, tmp, NULL, destion, NULL, key, date_tmp_2);
@@ -1320,22 +1352,27 @@ static int do_crashlogd(unsigned int files)
                         }
                         /* for anr and UIwatchdog */
                         else if (strstr(event->name, wd_array[i].cmp) && ( strstr(event->name, "anr") || strstr(event->name, "system_server_watchdog"))) {
-                            dir = find_dir(files,CRASH_MODE);
+                            time(&t);
+                            time_tmp = localtime((const time_t *)&t);
+                            PRINT_TIME(date_tmp, TIME_FORMAT_1, time_tmp);
+                            PRINT_TIME(date_tmp_2, TIME_FORMAT_2, time_tmp);
+                            compute_key(key, CRASHEVENT, wd_array[i].eventname);
 
+                            dir = find_dir(files,CRASH_MODE);
                             if (dir == -1) {
                                 LOGE("find dir %dfor and and UIwatchdog failed\n", files);
-                                goto out_err;
+                                LOGE("%-8s%-22s%-20s%s\n", CRASHEVENT, key, date_tmp_2, wd_array[i].eventname);
+                                del_file_more_lines(HISTORY_FILE);
+                                history_file_write(CRASHEVENT, wd_array[i].eventname, NULL, NULL, NULL, key, date_tmp_2);
+                                notify_crashreport();
+                                restart_profile1_srv();
+                                break;
                             }
 
                             snprintf(path, sizeof(path),"%s/%s",wd_array[i].filename,event->name);
                             if (stat(path, &info) == 0) {
-                                time(&t);
-                                time_tmp = localtime((const time_t *)&t);
-                                PRINT_TIME(date_tmp, TIME_FORMAT_1, time_tmp);
-                                PRINT_TIME(date_tmp_2, TIME_FORMAT_2, time_tmp);
                                 snprintf(destion,sizeof(destion),"%s%d/%s",CRASH_DIR,dir,event->name);
                                 do_copy(path, destion, FILESIZE_MAX);
-                                compute_key(key, CRASHEVENT, wd_array[i].eventname);
 
                                 LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, date_tmp_2, wd_array[i].eventname, destion);
                                 usleep(TIMEOUT_VALUE);
@@ -1350,19 +1387,24 @@ static int do_crashlogd(unsigned int files)
                         }
                         /* for other case */
                         else if (strstr(event->name, wd_array[i].cmp)) {
-                            dir = find_dir(files,CRASH_MODE);
+                            time(&t);
+                            time_tmp = localtime((const time_t *)&t);
+                            PRINT_TIME(date_tmp, TIME_FORMAT_1, time_tmp);
+                            PRINT_TIME(date_tmp_2, TIME_FORMAT_2, time_tmp);
+                            compute_key(key, CRASHEVENT, wd_array[i].eventname);
 
+                            dir = find_dir(files,CRASH_MODE);
                             if (dir == -1) {
                                 LOGE("find dir %d for other crashes failed\n", files);
-                                goto out_err;
+                                LOGE("%-8s%-22s%-20s%s\n", CRASHEVENT, key, date_tmp_2, wd_array[i].eventname);
+                                history_file_write(CRASHEVENT, wd_array[i].eventname, NULL, NULL, NULL, key, date_tmp_2);
+                                del_file_more_lines(HISTORY_FILE);
+                                notify_crashreport();
+                                break;
                             }
 
                             snprintf(path, sizeof(path),"%s/%s",wd_array[i].filename,event->name);
                             if (stat(path, &info) == 0) {
-                                time(&t);
-                                time_tmp = localtime((const time_t *)&t);
-                                PRINT_TIME(date_tmp, TIME_FORMAT_1, time_tmp);
-                                PRINT_TIME(date_tmp_2, TIME_FORMAT_2, time_tmp);
                                 if (strstr(event->name, ".core" ))
                                     backup_apcoredump(dir, event->name, path);
                                 else
@@ -1376,7 +1418,6 @@ static int do_crashlogd(unsigned int files)
                                     }
                                 }
                                 snprintf(destion,sizeof(destion),"%s%d/",CRASH_DIR,dir);
-                                compute_key(key, CRASHEVENT, wd_array[i].eventname);
                                 LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, date_tmp_2, wd_array[i].eventname, destion);
                                 usleep(TIMEOUT_VALUE);
                                 do_log_copy(wd_array[i].eventname,dir,date_tmp,APLOG_TYPE);
@@ -1397,9 +1438,6 @@ static int do_crashlogd(unsigned int files)
     }
 
     return 0;
-
-out_err:
-    return -1;
 }
 
 void do_timeup()
@@ -1499,7 +1537,12 @@ static int crashlog_check_fabric(char *reason, unsigned int files)
 
         if (dir == -1) {
             LOGE("find dir %d for check fabric failed\n", files);
-            return -1;
+            compute_key(key, CRASHEVENT, FABRIC_ERROR);
+            LOGE("%-8s%-22s%-20s%s\n", CRASHEVENT, key, date_tmp_2, FABRIC_ERROR);
+            history_file_write(CRASHEVENT, FABRIC_ERROR, NULL, NULL, NULL, key, date_tmp_2);
+            del_file_more_lines(HISTORY_FILE);
+            //Need to return 0 to avoid closing crashlogd
+            return 0;
         }
 
         destion[0] = '\0';
@@ -1549,7 +1592,12 @@ static int crashlog_check_panic(char *reason, unsigned int files)
 
         if (dir == -1) {
             LOGE("find dir %d for check panic failed\n", files);
-            return -1;
+            compute_key(key, CRASHEVENT, KERNEL_CRASH);
+            LOGE("%-8s%-22s%-20s%s\n", CRASHEVENT, key, date_tmp_2, KERNEL_CRASH);
+            history_file_write(CRASHEVENT, KERNEL_CRASH, NULL, NULL, NULL, key, date_tmp_2);
+            del_file_more_lines(HISTORY_FILE);
+            //Need to return 0 to avoid closing crashlogd
+            return 0;
         }
 
         destion[0] = '\0';
@@ -1608,16 +1656,22 @@ static int crashlog_check_modem_shutdown(char *reason, unsigned int files)
         time_tmp = localtime((const time_t *)&t);
         PRINT_TIME(date_tmp, TIME_FORMAT_1, time_tmp);
         PRINT_TIME(date_tmp_2, TIME_FORMAT_2, time_tmp);
-        dir = find_dir(files,CRASH_MODE);
+        compute_key(key, CRASHEVENT, MODEM_SHUTDOWN);
 
+        dir = find_dir(files,CRASH_MODE);
         if (dir == -1) {
             LOGE("find dir %d for check modem shutdown failed\n", files);
-            return -1;
+            LOGE("%-8s%-22s%-20s%s\n", CRASHEVENT, key, date_tmp_2, MODEM_SHUTDOWN);
+            history_file_write(CRASHEVENT, MODEM_SHUTDOWN, NULL, NULL, NULL, key, date_tmp_2);
+            del_file_more_lines(HISTORY_FILE);
+            remove(MODEM_SHUTDOWN_TRIGGER);
+            //Need to return 0 to avoid closing crashlogd
+            return 0;
         }
 
         destion[0] = '\0';
         snprintf(destion, sizeof(destion), "%s%d/", CRASH_DIR, dir);
-        compute_key(key, CRASHEVENT, MODEM_SHUTDOWN);
+
         LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, date_tmp_2, MODEM_SHUTDOWN, destion);
         usleep(TIMEOUT_VALUE);
         do_log_copy(MODEM_SHUTDOWN, dir, date_tmp, APLOG_TYPE);
@@ -1647,19 +1701,26 @@ static int crashlog_check_recovery(unsigned int files)
         time_tmp = localtime((const time_t *)&t);
         PRINT_TIME(date_tmp, TIME_FORMAT_1, time_tmp);
         PRINT_TIME(date_tmp_2, TIME_FORMAT_2, time_tmp);
+        // compute crash id
+        compute_key(key, CRASHEVENT, RECOVERY_ERROR);
 
         // get output crash dir
         dir = find_dir(files,CRASH_MODE);
 
         if (dir == -1) {
             LOGE("find dir %d for check recovery failed\n", files);
-            return -1;
+            LOGE("%-8s%-22s%-20s%s\n", CRASHEVENT, key, date_tmp_2, RECOVERY_ERROR);
+            history_file_write(CRASHEVENT, RECOVERY_ERROR, NULL, NULL, NULL, key, date_tmp_2);
+            del_file_more_lines(HISTORY_FILE);
+            // remove trigger file
+            remove(RECOVERY_ERROR_TRIGGER);
+            //Need to return 0 to avoid closing crashlogd
+            return 0;
         }
 
         destion[0] = '\0';
         snprintf(destion, sizeof(destion), "%s%d/", CRASH_DIR, dir);
-        // compute crash id
-        compute_key(key, CRASHEVENT, RECOVERY_ERROR);
+
         LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, date_tmp_2, RECOVERY_ERROR, destion);
         //copy log
         destion2[0] = '\0';
@@ -1690,17 +1751,20 @@ static int crashlog_check_startupreason(char *reason, unsigned int files)
         time_tmp = localtime((const time_t *)&t);
         PRINT_TIME(date_tmp, TIME_FORMAT_1, time_tmp);
         PRINT_TIME(date_tmp_2, TIME_FORMAT_2, time_tmp);
+        compute_key(key, CRASHEVENT, "WDT");
 
         dir = find_dir(files,CRASH_MODE);
-
         if (dir == -1) {
             LOGE("find dir %d for check startup reason failed\n", files);
-            return -1;
+            LOGE("%-8s%-22s%-20s%s\n", CRASHEVENT, key, date_tmp_2, "WDT");
+            history_file_write(CRASHEVENT, "WDT", reason, NULL, NULL, key, date_tmp_2);
+            del_file_more_lines(HISTORY_FILE);
+            //Need to return 0 to avoid closing crashlogd
+            return 0;
         }
 
         destion[0] = '\0';
         snprintf(destion, sizeof(destion), "%s%d/", CRASH_DIR, dir);
-        compute_key(key, CRASHEVENT, "WDT");
         LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, date_tmp_2, "WDT", destion);
         flush_aplog_atboot("WDT", dir, date_tmp);
         usleep(TIMEOUT_VALUE);
