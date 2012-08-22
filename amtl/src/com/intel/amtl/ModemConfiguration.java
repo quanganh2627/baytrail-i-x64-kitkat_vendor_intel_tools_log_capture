@@ -408,5 +408,4 @@ public class ModemConfiguration {
     protected int getMuxTraceState(RandomAccessFile f) throws IOException {
         return read_write_modem(f, AT_GET_MUX_TRACE);
     }
-
 }

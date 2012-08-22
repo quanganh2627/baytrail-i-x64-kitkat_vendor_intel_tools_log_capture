@@ -442,22 +442,22 @@ public class AmtlCore {
                         (this.traceLevelValue == CustomCfg.TRACE_LEVEL_NONE) ? CustomCfg.TRACE_LOC_NONE: CustomCfg.TRACE_LOC_COREDUMP;
                     break;
                 case Services.MTS_FS:
-                    this.curCustomCfg.hsiFrequency = CustomCfg.HSI_FREQ_78_MHZ;
+                    this.curCustomCfg.hsiFrequency = (this.usbAcmEnabled) ? CustomCfg.HSI_FREQ_NONE : CustomCfg.HSI_FREQ_78_MHZ;
                     this.curCustomCfg.traceLocation = CustomCfg.TRACE_LOC_EMMC;
                     this.curCustomCfg.traceFileSize = CustomCfg.LOG_SIZE_100_MB;
                     break;
                 case Services.MTS_EXTFS:
-                    this.curCustomCfg.hsiFrequency = CustomCfg.HSI_FREQ_78_MHZ;
+                    this.curCustomCfg.hsiFrequency = (this.usbAcmEnabled) ? CustomCfg.HSI_FREQ_NONE : CustomCfg.HSI_FREQ_78_MHZ;
                     this.curCustomCfg.traceLocation = CustomCfg.TRACE_LOC_EMMC;
                     this.curCustomCfg.traceFileSize = CustomCfg.LOG_SIZE_800_MB;
                     break;
                 case Services.MTS_SD:
-                    this.curCustomCfg.hsiFrequency = CustomCfg.HSI_FREQ_78_MHZ;
+                    this.curCustomCfg.hsiFrequency = (this.usbAcmEnabled) ? CustomCfg.HSI_FREQ_NONE : CustomCfg.HSI_FREQ_78_MHZ;
                     this.curCustomCfg.traceLocation = CustomCfg.TRACE_LOC_SDCARD;
                     this.curCustomCfg.traceFileSize = CustomCfg.LOG_SIZE_100_MB;
                     break;
                 case Services.MTS_EXTSD:
-                    this.curCustomCfg.hsiFrequency = CustomCfg.HSI_FREQ_78_MHZ;
+                    this.curCustomCfg.hsiFrequency = (this.usbAcmEnabled) ? CustomCfg.HSI_FREQ_NONE : CustomCfg.HSI_FREQ_78_MHZ;
                     this.curCustomCfg.traceLocation = CustomCfg.TRACE_LOC_SDCARD;
                     this.curCustomCfg.traceFileSize = CustomCfg.LOG_SIZE_800_MB;
                     break;

@@ -24,6 +24,7 @@
  * 2.1.1  - 2012-07-11 - BZ 43865 - Handling of logging over USB CDC ACM
  * 2.1.2  - 2012-08-03 - BZ 47868 - Solve Klockwork critical issues
  * 2.1.3  - 2012-08-16 - BZ 46497 - Disable TOGGLE_PIN_ON1 button
+ * 2.1.4  - 2012-08-22 - BZ 53487 - Configuration suggested in SettingsActivity
  * ============================================================================
  */
 

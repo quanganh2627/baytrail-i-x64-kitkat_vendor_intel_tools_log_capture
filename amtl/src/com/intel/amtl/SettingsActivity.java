@@ -69,8 +69,8 @@ public class SettingsActivity extends Activity {
         button_trace_size_100.setEnabled(true);
         button_trace_size_800.setEnabled(true);
         button_trace_size_800.setChecked(true);
-        button_hsi_frequencies_78.setEnabled(true);
-        button_hsi_frequencies_78.setChecked(true);
+        button_hsi_frequencies_78.setEnabled(!AmtlCore.usbAcmEnabled);
+        button_hsi_frequencies_78.setChecked(!AmtlCore.usbAcmEnabled);
         button_level_bb_3g.setChecked((cfg.traceLevel == CustomCfg.TRACE_LEVEL_NONE) || (cfg.traceLevel == CustomCfg.TRACE_LEVEL_BB_3G));
     }
 
@@ -246,14 +246,15 @@ public class SettingsActivity extends Activity {
             this.core.invalidate();
             if (core.getCurCfg() == PredefinedCfg.TRACE_DISABLE) {
                 /* There is no way to disable logs from advanced settings menu */
-                /* Suggest a default configuration : blue configuration */
+                /* Suggest a default configuration : blue configuration for Medfield*/
+                /* green configuration for Clovertrail */
                 UIHelper.message_pop_up(this,
                     "INFO","Currently, traces are disabled.\n" +
                     "We suggest you a default configuration.\n" +
                     "Don't forget to confirm with ACTIVATE checkbox");
-                cfg.traceLocation = CustomCfg.TRACE_LOC_COREDUMP;
+                cfg.traceLocation = (AmtlCore.usbAcmEnabled) ? CustomCfg.TRACE_LOC_EMMC : CustomCfg.TRACE_LOC_COREDUMP;
                 cfg.traceLevel = CustomCfg.TRACE_LEVEL_BB_3G;
-                cfg.traceFileSize = CustomCfg.LOG_SIZE_NONE;
+                cfg.traceFileSize = (AmtlCore.usbAcmEnabled) ? CustomCfg.LOG_SIZE_800_MB : CustomCfg.LOG_SIZE_NONE;
                 cfg.hsiFrequency = CustomCfg.HSI_FREQ_NONE;
                 cfg.muxTrace = CustomCfg.MUX_TRACE_OFF;
             }
