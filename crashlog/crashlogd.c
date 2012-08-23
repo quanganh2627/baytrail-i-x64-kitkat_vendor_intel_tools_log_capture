@@ -1527,7 +1527,7 @@ struct fabric_type ft_array[] = {
     {"DW0:", "f501", "MEMERR"},
     {"DW0:", "f502", "INSTERR"},
     {"DW0:", "f504", "SRAMECCERR"},
-    {"DW0:",   "dd", "HWWDTLOGERR"},
+    {"DW0:", "00dd", "HWWDTLOGERR"},
 };
 
 static int crashlog_check_fabric(char *reason, unsigned int files)
