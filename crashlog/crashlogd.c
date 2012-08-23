@@ -882,13 +882,23 @@ static unsigned int find_dir(unsigned int max, int mode)
     return oldest;
 }
 
-static void restart_profile_srv(void)
+static void restart_profile1_srv(void)
 {
     char value[PROPERTY_VALUE_MAX];
 
     property_get(PROP_PROFILE, value, "");
     if (!strncmp(value, "1", 1)){
-        property_set("ctl.start", "profile_svc_rest");
+        property_set("ctl.start", "profile1_rest");
+    }
+}
+
+static void restart_profile2_srv(void)
+{
+    char value[PROPERTY_VALUE_MAX];
+
+    property_get(PROP_PROFILE, value, "");
+    if (!strncmp(value, "2", 1)){
+        property_set("ctl.start", "profile2_rest");
     }
 }
 
@@ -898,7 +908,10 @@ static void init_profile_srv(void)
 
     property_get(PROP_PROFILE, value, "");
     if (!strncmp(value, "1", 1)){
-        property_set("ctl.start", "profile_svc_init");
+        property_set("ctl.start", "profile1_init");
+    }
+    if (!strncmp(value, "2", 1)){
+        property_set("ctl.start", "profile2_init");
     }
 }
 
@@ -1123,6 +1136,7 @@ static int do_crashlogd(unsigned int files)
                                     del_file_more_lines(HISTORY_FILE);
                                     loop_uptime_event = (hours / UPTIME_HOUR_FREQUENCY) + 1;
                                     notify_crashreport();
+                                    restart_profile2_srv();
                                 }
                             }
                         }
@@ -1297,6 +1311,7 @@ static int do_crashlogd(unsigned int files)
                                     history_file_write(APLOGEVENT, APLOGTRIGGER, NULL, destion, NULL, key, date_tmp_2);
                                     del_file_more_lines(HISTORY_FILE);
                                     notify_crashreport();
+                                    restart_profile2_srv();
                                 }
                                 if(aplogIsPresent == 0)
                                     break;
@@ -1381,7 +1396,7 @@ static int do_crashlogd(unsigned int files)
                                 backtrace_anr_uiwdt(destion, dir);
                                 history_file_write(CRASHEVENT, wd_array[i].eventname, NULL, destion, NULL, key, date_tmp_2);
                                 notify_crashreport();
-                                restart_profile_srv();
+                                restart_profile1_srv();
                             }
                             break;
                         }
@@ -1414,7 +1429,7 @@ static int do_crashlogd(unsigned int files)
                                     /* parse anr file */
                                     if (strstr(event->name, "anr") || strstr(event->name, "system_server_watchdog")){
                                         backtrace_anr_uiwdt(destion, dir);
-                                        restart_profile_srv();
+                                        restart_profile1_srv();
                                     }
                                 }
                                 snprintf(destion,sizeof(destion),"%s%d/",CRASH_DIR,dir);
