@@ -914,6 +914,14 @@ static void init_profile_srv(void)
     }
 }
 
+static void start_dumpstate_srv(char* crash_dir, int crashseq) {
+    char dumpstate_dir[PATHMAX];
+    if (crash_dir == NULL) return;
+    snprintf(dumpstate_dir, sizeof(dumpstate_dir), "%s%d/", crash_dir, crashseq);
+    property_set("crashlogd.storage.path", dumpstate_dir);
+    property_set("ctl.start", "logsystemstate");
+}
+
 static int mv_modem_crash(char *spath, char *dpath)
 {
 
@@ -1394,6 +1402,9 @@ static int do_crashlogd(unsigned int files)
                                 del_file_more_lines(HISTORY_FILE);
                                 backtrace_anr_uiwdt(destion, dir);
                                 history_file_write(CRASHEVENT, wd_array[i].eventname, NULL, destion, NULL, key, date_tmp_2);
+                                if (strstr(event->name, "anr")) {
+                                    start_dumpstate_srv(CRASH_DIR, dir);
+                                }
                                 notify_crashreport();
                                 restart_profile1_srv();
                             }
@@ -1437,6 +1448,9 @@ static int do_crashlogd(unsigned int files)
                                 do_log_copy(wd_array[i].eventname,dir,date_tmp,APLOG_TYPE);
                                 history_file_write(CRASHEVENT, wd_array[i].eventname, NULL, destion, NULL, key, date_tmp_2);
                                 del_file_more_lines(HISTORY_FILE);
+                                if (strstr(event->name, "crash") || strstr(event->name, "tombstone")) {
+                                    start_dumpstate_srv(CRASH_DIR, dir);
+                                }
                                 notify_crashreport();
                             }
                             break;
