@@ -298,9 +298,9 @@ int unwind_backtrace_with_stack64( unsigned long eip[], unsigned int ebp, mapinf
 			sym = symbol_tables_lookup64(mi->symbols, rel_pc);
 		}
 		if (sym) {
-			printf("[%016lx]  %s (%s)\n", ip, mi ? mi->name : "", sym->name);
+			printf("[%016lx]  %s (%s+%u)\n", rel_pc, mi ? mi->name : "", sym->name, rel_pc - sym->addr);
 		} else {
-			printf("[%016lx]  %s\n", ip, mi ? mi->name : "");
+			printf("[%016lx]  %s\n", rel_pc, mi ? mi->name : "");
 		}
 		stack_level++;
 		if (stack_level >= STACK_DEPTH )
