@@ -46,8 +46,7 @@ public class ShutdownService extends Service {
         try {
             core = AmtlCore.get();
             this.core.setContext(this.getApplicationContext());
-        }
-        catch (AmtlCoreException e) {
+        } catch (AmtlCoreException e) {
             Log.e(AmtlCore.TAG, MODULE + ": failed to get Amtl core");
             this.stopSelf();
         }
@@ -63,8 +62,7 @@ public class ShutdownService extends Service {
                     this.core.applyCfg();
                     Toast toast = Toast.makeText(ShutdownService.this, "New Amtl configuration applied", Toast.LENGTH_LONG);
                     toast.show();
-                }
-                catch (AmtlCoreException e) {
+                } catch (AmtlCoreException e) {
                     Toast toast = Toast.makeText(ShutdownService.this, e.getMessage(), Toast.LENGTH_LONG);
                     toast.show();
                 }

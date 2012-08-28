@@ -25,6 +25,7 @@
  * 2.1.2  - 2012-08-03 - BZ 47868 - Solve Klockwork critical issues
  * 2.1.3  - 2012-08-16 - BZ 46497 - Disable TOGGLE_PIN_ON1 button
  * 2.1.4  - 2012-08-22 - BZ 53487 - Configuration suggested in SettingsActivity
+ * 2.1.5  - 2012-08-28 - BZ 46162 - Identation problem
  * ============================================================================
  */
 
@@ -146,8 +147,7 @@ public class MainActivity extends Activity {
             this.core.setContext(this.getApplicationContext());
             this.core.invalidate();
             setUI(this.core.getCurCfg());
-        }
-        catch (AmtlCoreException e) {
+        } catch (AmtlCoreException e) {
             /* Failed to initialize application core */
             this.core = null;
             Log.e(AmtlCore.TAG, MODULE + ": " + e.getMessage());
@@ -164,15 +164,13 @@ public class MainActivity extends Activity {
                 public void onClick(View v) {
                     if (button_modem_coredump.isChecked()) {
                         setCfg(PredefinedCfg.COREDUMP);
-                    }
-                    else {
+                    } else {
                         /* If user presses again on button_modem_coredump, traces are stopped */
                         setCfg(PredefinedCfg.TRACE_DISABLE);
                     }
                 }
             });
-        }
-        else {
+        } else {
             /*Disable modem coredump button for Clovertrail*/
             button_modem_coredump.setVisibility(View.GONE);
         }
@@ -184,12 +182,10 @@ public class MainActivity extends Activity {
                 if (button_ape_log_file.isChecked()) {
                     if (!AmtlCore.usbAcmEnabled) {
                         setCfg(PredefinedCfg.OFFLINE_BP_LOG);
-                    }
-                    else {
+                    } else {
                         setCfg(PredefinedCfg.OFFLINE_USB_BP_LOG);
                     }
-                }
-                else {
+                } else {
                     /* If user presses again on button_ape_log_file, traces are stopped */
                     setCfg(PredefinedCfg.TRACE_DISABLE);
                 }
@@ -203,15 +199,13 @@ public class MainActivity extends Activity {
                 public void onClick(View v) {
                     if (button_online_bp_log.isChecked()) {
                         setCfg(PredefinedCfg.ONLINE_BP_LOG);
-                    }
-                    else {
+                    } else {
                         /* If user presses again on button_ape_log_file, traces are stopped */
                         setCfg(PredefinedCfg.TRACE_DISABLE);
                     }
                 }
             });
-        }
-        else {
+        } else {
             /*Disable online bp log button for Clovertrail and Lexington*/
             button_online_bp_log.setVisibility(View.GONE);
         }

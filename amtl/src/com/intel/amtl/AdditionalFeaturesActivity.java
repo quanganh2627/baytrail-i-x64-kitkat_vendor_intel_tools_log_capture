@@ -83,18 +83,15 @@ public class AdditionalFeaturesActivity extends Activity {
                 else {
                     button_usb_ape.setChecked(true);
                 }
-            }
-            catch (Exception e1) {
+            } catch (Exception e1) {
                 Log.e(AmtlCore.TAG, MODULE + ": can't read the file usbswitch.conf");
-            }
-            finally {
+            } finally {
                 try {
                     if (fIn != null)
                         fIn.close();
                     if (isr != null)
                         isr.close();
-                }
-                catch (IOException e) {
+                } catch (IOException e) {
                     Log.e(AmtlCore.TAG, MODULE + ": " + e.getMessage());
                 }
             }
@@ -107,8 +104,7 @@ public class AdditionalFeaturesActivity extends Activity {
                         try {
                             AmtlCore.rtm.exec("start usb_to_modem");
                             android.os.SystemClock.sleep(USB_TO_MODEM_WAIT);
-                        }
-                        catch (IOException e) {
+                        } catch (IOException e) {
                             Log.e(AmtlCore.TAG, MODULE + ": can't enable usbswitch MODEM");
                         }
                     }
@@ -123,15 +119,13 @@ public class AdditionalFeaturesActivity extends Activity {
                         try {
                             AmtlCore.rtm.exec("start usb_to_ape");
                             android.os.SystemClock.sleep(USB_TO_APE_WAIT);
-                        }
-                        catch (IOException e) {
+                        } catch (IOException e) {
                             Log.e(AmtlCore.TAG, MODULE + ": can't enable usbswitch APE");
                         }
                     }
                 }
             });
-        }
-        else {
+        } else {
             /*Disable the usbswitch buttons for Clovertrail and Lexington*/
             header_usbswitch.setVisibility(View.GONE);
             button_usb_modem.setVisibility(View.GONE);
@@ -146,8 +140,7 @@ public class AdditionalFeaturesActivity extends Activity {
                     AmtlCore.rtm.exec("start toggle_on1");
                     Toast toast = Toast.makeText(AdditionalFeaturesActivity.this, "Toggle pin on1 DONE", Toast.LENGTH_LONG);
                     toast.show();
-                }
-                catch (IOException e) {
+                } catch (IOException e) {
                     Log.e(AmtlCore.TAG, MODULE + ": toggle pin can't apply");
                 }
             }

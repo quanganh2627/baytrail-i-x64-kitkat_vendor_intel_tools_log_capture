@@ -84,30 +84,24 @@ public class Services {
         if (SystemProperties.get("init.svc.mtsfs").equals("running")) {
             /* emmc 100MB persistent */
             service_val = MTS_FS;
-        }
-        else if (SystemProperties.get("init.svc.mtsextfs").equals("running")) {
+        } else if (SystemProperties.get("init.svc.mtsextfs").equals("running")) {
             /* emmc 800MB persistent */
             service_val = MTS_EXTFS;
-        }
-        else if (SystemProperties.get("init.svc.mtssd").equals("running")) {
+        } else if (SystemProperties.get("init.svc.mtssd").equals("running")) {
             /* sdcard 100MB persistent */
             service_val = MTS_SD;
-        }
-        else if (SystemProperties.get("init.svc.mtsextsd").equals("running")) {
+        } else if (SystemProperties.get("init.svc.mtsextsd").equals("running")) {
             /* sdcard 800MB persistent */
             service_val = MTS_EXTSD;
-        }
-        else if (SystemProperties.get("persist.service.usbmodem.enable").equals("1")) {
+        } else if (SystemProperties.get("persist.service.usbmodem.enable").equals("1")) {
             /* Online BP logging => persistent USB to modem service */
             /* USB modem is done by a script starting and exiting continuously,
                we can't rely on init.svc.... property */
             service_val = ONLINE_BP_LOG;
-        }
-        else if (SystemProperties.get("init.svc.mtsusb").equals("running")) {
+        } else if (SystemProperties.get("init.svc.mtsusb").equals("running")) {
             /* USB oneshot */
             service_val = MTS_USB;
-        }
-        else {
+        } else {
             /* No service enabled */
             service_val = MTS_DISABLE;
         }
@@ -151,8 +145,7 @@ public class Services {
                 break;
             }
             SystemProperties.set("persist.service.mts.name", "disable");
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
             Log.e(AmtlCore.TAG, MODULE + ": can't stop current running MTS");
         }
     }

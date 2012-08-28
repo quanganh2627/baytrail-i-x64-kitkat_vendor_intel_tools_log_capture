@@ -257,8 +257,7 @@ public class SettingsActivity extends Activity {
                 cfg.traceFileSize = (AmtlCore.usbAcmEnabled) ? CustomCfg.LOG_SIZE_800_MB : CustomCfg.LOG_SIZE_NONE;
                 cfg.hsiFrequency = CustomCfg.HSI_FREQ_NONE;
                 cfg.muxTrace = CustomCfg.MUX_TRACE_OFF;
-            }
-            else {
+            } else {
                 CustomCfg curCfg = core.getCurCustomCfg();
                 /* Get current custom configuration */
                 cfg.traceLocation = curCfg.traceLocation;
@@ -269,8 +268,7 @@ public class SettingsActivity extends Activity {
             }
 
             update_settings_menu();
-        }
-        catch (AmtlCoreException e) {
+        } catch (AmtlCoreException e) {
             /* Failed to initialize application core */
             this.core = null;
             Log.e(AmtlCore.TAG, MODULE + ": " + e.getMessage());
@@ -313,8 +311,7 @@ public class SettingsActivity extends Activity {
                     }
                 }
             });
-        }
-        else {
+        } else {
             /*Disable the coredump button for Clovertrail*/
             button_location_coredump.setVisibility(View.GONE);
         }
@@ -344,14 +341,12 @@ public class SettingsActivity extends Activity {
                         unset_trace_file_size();
                         cfg.traceLocation = CustomCfg.TRACE_LOC_USB_MODEM;
                         invalidate();
-                    }
-                    else {
+                    } else {
                         button_level_bb_3g_digrf.setEnabled(true);
                     }
                 }
             });
-        }
-        else {
+        } else {
             /*Disable the usbswitch buttons for Clovertrail and Lexington*/
             button_location_usb_ape.setVisibility(View.GONE);
             button_location_usb_modem.setVisibility(View.GONE);

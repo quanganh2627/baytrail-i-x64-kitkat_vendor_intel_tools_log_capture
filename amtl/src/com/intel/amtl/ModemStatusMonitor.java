@@ -70,8 +70,7 @@ public class ModemStatusMonitor implements Runnable {
         this.cleanUp();
         try {
             this.thread.join();
-        }
-        catch (InterruptedException e) {
+        } catch (InterruptedException e) {
             Log.e(AmtlCore.TAG, MODULE + ": " + e.getMessage());
         }
     }
@@ -87,8 +86,7 @@ public class ModemStatusMonitor implements Runnable {
         try {
             this.clientSocket.connect(this.getSocketAddress());
             inputStream = this.clientSocket.getInputStream();
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             Log.e(AmtlCore.TAG, MODULE + ": " + e.getMessage());
             this.cleanUp();
             return;
@@ -98,8 +96,7 @@ public class ModemStatusMonitor implements Runnable {
             try {
                 readCount = inputStream.read(recvBuffer);
                 this.handleResponse(recvBuffer, readCount);
-            }
-            catch (IOException ex) {
+            } catch (IOException ex) {
                 Log.e(AmtlCore.TAG, MODULE + ": " + ex.toString());
                 this.cleanUp();
                 return;
@@ -142,8 +139,7 @@ public class ModemStatusMonitor implements Runnable {
             try {
                 this.clientSocket.shutdownInput();
                 this.clientSocket.close();
-            }
-            catch (IOException e) {
+            } catch (IOException e) {
                 Log.e(AmtlCore.TAG, MODULE + ": " + e.getMessage());
             }
             this.clientSocket = null;

@@ -191,19 +191,15 @@ public class ModemConfiguration {
 
         if (ival.equals(AT_GET_XSIO)) {
             ret = getXsioValue(modem_value);
-        }
-        else if (ival.equals(AT_GET_TRACE_LEVEL)) {
+        } else if (ival.equals(AT_GET_TRACE_LEVEL)) {
             ret = getTraceLevelValue(modem_value);
-        }
-        else if (ival.equals(AT_GET_MUX_TRACE)) {
+        } else if (ival.equals(AT_GET_MUX_TRACE)) {
             if ((modem_value.contains("1,3,-1"))) {
                 ret = CustomCfg.MUX_TRACE_ON;
-            }
-            else {
+            } else {
                 ret = CustomCfg.MUX_TRACE_OFF;
             }
-        }
-        else {
+        } else {
             ret = -1;
         }
         return ret;
@@ -214,14 +210,11 @@ public class ModemConfiguration {
         int ret = CustomCfg.TRACE_LEVEL_NONE;
         if ((s.contains("bb_sw: Oct")) && (s.contains("3g_sw: Oct")) && (s.contains("digrf: Oct"))) {
             ret = CustomCfg.TRACE_LEVEL_BB_3G_DIGRF;
-        }
-        else if ((s.contains("bb_sw: Oct")) && (s.contains("3g_sw: Oct"))) {
+        } else if ((s.contains("bb_sw: Oct")) && (s.contains("3g_sw: Oct"))) {
             ret = CustomCfg.TRACE_LEVEL_BB_3G;
-        }
-        else if (s.contains("bb_sw: Oct")) {
+        } else if (s.contains("bb_sw: Oct")) {
             ret = CustomCfg.TRACE_LEVEL_BB;
-        }
-        else {
+        } else {
             ret = CustomCfg.TRACE_LEVEL_NONE;
         }
         return ret;
@@ -232,80 +225,55 @@ public class ModemConfiguration {
         int ret = xsio_00;
         if (s.contains("0, *0")) {
             ret = xsio_00;
-        }
-        else if (s.contains("2, *0")) {
+        } else if (s.contains("2, *0")) {
             ret = xsio_20;
-        }
-        else if (s.contains("2, *2")) {
+        } else if (s.contains("2, *2")) {
             ret = xsio_22;
-        }
-        else if (s.contains("0, *2")) {
+        } else if (s.contains("0, *2")) {
             ret = xsio_02;
-        }
-        else if (s.contains("4, *0")) {
+        } else if (s.contains("4, *0")) {
             ret = xsio_40;
-        }
-        else if (s.contains("4, *4")) {
+        } else if (s.contains("4, *4")) {
             ret = xsio_44;
-        }
-        else if (s.contains("0, *4")) {
+        } else if (s.contains("0, *4")) {
             ret = xsio_04;
-        }
-        else if (s.contains("5, *0")) {
+        } else if (s.contains("5, *0")) {
             ret = xsio_50;
-        }
-        else if (s.contains("5, *5")) {
+        } else if (s.contains("5, *5")) {
             ret = xsio_55;
-        }
-        else if (s.contains("0, *5")) {
+        } else if (s.contains("0, *5")) {
             ret = xsio_05;
-        }
-        else if (s.contains("2, *4")) {
+        } else if (s.contains("2, *4")) {
             ret = xsio_24;
-        }
-        else if (s.contains("2, *5")) {
+        } else if (s.contains("2, *5")) {
             ret = xsio_25;
-        }
-        else if (s.contains("4, *2")) {
+        } else if (s.contains("4, *2")) {
             ret = xsio_42;
-        }
-        else if (s.contains("4, *5")) {
+        } else if (s.contains("4, *5")) {
             ret = xsio_45;
-        }
-        else if (s.contains("5, *2")) {
+        } else if (s.contains("5, *2")) {
             ret = xsio_52;
-        }
-        else if (s.contains("5, *4")) {
+        } else if (s.contains("5, *4")) {
             ret = xsio_54;
-        }
-        else if (s.contains("0, *1")) {
+        } else if (s.contains("0, *1")) {
             ret = xsio_01;
-        }
-        else if (s.contains("1, *0")) {
+        } else if (s.contains("1, *0")) {
             ret = xsio_10;
-        }
-        else if (s.contains("1, *1")) {
+        } else if (s.contains("1, *1")) {
             ret = xsio_11;
-        }
-        else if (s.contains("1, *2")) {
+        } else if (s.contains("1, *2")) {
             ret = xsio_12;
-        }
-        else if (s.contains("2, *1")) {
+        } else if (s.contains("2, *1")) {
             ret = xsio_21;
-        }
-        else if (s.contains("4, *1")) {
+        } else if (s.contains("4, *1")) {
             ret = xsio_41;
-        }
-        else if (s.contains("1, *4")) {
+        } else if (s.contains("1, *4")) {
             ret = xsio_14;
-        }
-        else if (s.contains("5, *1")) {
+        } else if (s.contains("5, *1")) {
             ret = xsio_51;
-        }
-        else if (s.contains("1, *5")) {
+        } else if (s.contains("1, *5")) {
             ret = xsio_15;
-        }
-        else {
+        } else {
             ret= xsio_00;
         }
         return ret;
@@ -338,8 +306,7 @@ public class ModemConfiguration {
         }
         try {
             read_write_modem(f, atCmd);
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
             Log.e(AmtlCore.TAG, MODULE + ": can't enable_frequency");
         }
     }
@@ -369,8 +336,7 @@ public class ModemConfiguration {
                 read_write_modem(f, AT_SET_XSYSTRACE_LEVEL_DISABLE);
                 break;
             }
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
             Log.e(AmtlCore.TAG, MODULE + ": can't set trace level");
         }
     }
@@ -379,8 +345,7 @@ public class ModemConfiguration {
     protected void setMuxTraceOn(RandomAccessFile f) {
         try {
             read_write_modem(f, AT_SET_MUX_TRACE_ON);
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
             Log.e(AmtlCore.TAG, MODULE + ": can't set MUX trace ON");
         }
     }
@@ -389,8 +354,7 @@ public class ModemConfiguration {
     protected void setMuxTraceOff(RandomAccessFile f) {
         try {
             read_write_modem(f, AT_SET_MUX_TRACE_OFF);
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
             Log.e(AmtlCore.TAG, MODULE + ": can't set MUX trace OFF");
         }
     }

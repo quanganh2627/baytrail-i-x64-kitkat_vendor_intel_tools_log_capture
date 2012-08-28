@@ -101,11 +101,9 @@ public class AmtlCore {
             this.ttyManager = new SynchronizeSTMD();
             this.ttyManager.openTty();
             this.gsmtty = new RandomAccessFile(this.ttyManager.getTtyName(), "rw");
-        }
-        catch (ExceptionInInitializerError ex) {
+        } catch (ExceptionInInitializerError ex) {
             throw new AmtlCoreException("AMTL library not found, please install it first");
-        }
-        catch (Exception ex) {
+        } catch (Exception ex) {
             throw new AmtlCoreException(String.format("Error while opening %s", this.ttyManager.getTtyName()));
         }
 
@@ -125,14 +123,14 @@ public class AmtlCore {
         /*Get the platform version*/
         platformVersion = SystemProperties.get(PLATFORM_VERSION_PROPERTY, null);
         if (platformVersion != null) {
-            if ((platformVersion.equals(PLATFORM_MFLD_PR1)) || (platformVersion.equals(PLATFORM_MFLD_PR2))) {
+            if ((platformVersion.equals(PLATFORM_MFLD_PR1)) ||
+                (platformVersion.equals(PLATFORM_MFLD_PR2))) {
                 this.usbswitchEnabled = true;
-            }
-            else if ((platformVersion.equals(PLATFORM_CTP_PR0)) || (platformVersion.equals(PLATFORM_CTP_PR1))) {
+            } else if ((platformVersion.equals(PLATFORM_CTP_PR0)) ||
+                (platformVersion.equals(PLATFORM_CTP_PR1))) {
                 this.usbAcmEnabled = true;
             }
-        }
-        else {
+        } else {
             Log.v(TAG, MODULE + ": platform version cannot be found.");
         }
 
@@ -144,8 +142,7 @@ public class AmtlCore {
         do {
             nbTry++;
             android.os.SystemClock.sleep(MODEM_STATUS_RETRY_INTERVAL);
-        }
-        while (!this.modemStatusMonitor.isModemUp() && nbTry < MAX_MODEM_STATUS_RETRY);
+        } while (!this.modemStatusMonitor.isModemUp() && nbTry < MAX_MODEM_STATUS_RETRY);
 
         if (nbTry >= MAX_MODEM_STATUS_RETRY) {
             throw new AmtlCoreException(ERR_MODEM_NOT_READY);
@@ -171,8 +168,7 @@ public class AmtlCore {
         if (this.gsmtty != null) {
             try {
                 this.gsmtty.close();
-            }
-            catch (IOException ex) {
+            } catch (IOException ex) {
                 Log.e(TAG, MODULE + ": " + ex.toString());
             }
         }
@@ -218,8 +214,7 @@ public class AmtlCore {
                 this.curCustomCfg.traceLevel != this.futCustomCfg.traceLevel ||
                 this.curCustomCfg.traceFileSize != this.futCustomCfg.traceFileSize ||
                 this.curCustomCfg.hsiFrequency != this.futCustomCfg.hsiFrequency);
-        }
-        else {
+        } else {
             return (this.curCfg != this.futCfg);
         }
     }
@@ -265,8 +260,7 @@ public class AmtlCore {
                     Log.e(TAG, MODULE + ": unknown configuration to apply");
                     break;
             }
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
             Log.e(TAG, MODULE + ": can't apply configuration");
             throw new AmtlCoreException(ERR_APPLY_CFG);
         }
@@ -318,17 +312,13 @@ public class AmtlCore {
         /* Determine service to configure */
         if (this.futCustomCfg.traceLocation == CustomCfg.TRACE_LOC_EMMC) {
             serviceToStart = (this.futCustomCfg.traceFileSize == CustomCfg.LOG_SIZE_100_MB) ? Services.MTS_FS: Services.MTS_EXTFS;
-        }
-        else if (this.futCustomCfg.traceLocation == CustomCfg.TRACE_LOC_SDCARD) {
+        } else if (this.futCustomCfg.traceLocation == CustomCfg.TRACE_LOC_SDCARD) {
             serviceToStart = (this.futCustomCfg.traceFileSize == CustomCfg.LOG_SIZE_100_MB) ? Services.MTS_SD: Services.MTS_EXTSD;
-        }
-        else if (this.futCustomCfg.traceLocation == CustomCfg.TRACE_LOC_USB_APE) {
+        } else if (this.futCustomCfg.traceLocation == CustomCfg.TRACE_LOC_USB_APE) {
             serviceToStart = Services.MTS_USB;
-        }
-        else if (this.futCustomCfg.traceLocation == CustomCfg.TRACE_LOC_USB_MODEM) {
+        } else if (this.futCustomCfg.traceLocation == CustomCfg.TRACE_LOC_USB_MODEM) {
             serviceToStart = Services.ONLINE_BP_LOG;
-        }
-        else {
+        } else {
             serviceToStart = Services.MTS_DISABLE;
         }
 
@@ -337,15 +327,12 @@ public class AmtlCore {
             this.futCustomCfg.traceLocation == CustomCfg.TRACE_LOC_SDCARD) {
             if (this.usbAcmEnabled) {
                 xsioToSet = ModemConfiguration.XSIO_1;
-            }
-            else {
+            } else {
                 xsioToSet = (this.futCustomCfg.hsiFrequency == CustomCfg.HSI_FREQ_78_MHZ) ? ModemConfiguration.XSIO_5: ModemConfiguration.XSIO_4;
             }
-        }
-        else if (this.futCustomCfg.traceLocation == CustomCfg.TRACE_LOC_COREDUMP) {
+        } else if (this.futCustomCfg.traceLocation == CustomCfg.TRACE_LOC_COREDUMP) {
             xsioToSet = ModemConfiguration.XSIO_2;
-        }
-        else {
+        } else {
             xsioToSet = ModemConfiguration.XSIO_0;
         }
 
@@ -360,8 +347,7 @@ public class AmtlCore {
     protected void setMuxTrace(int muxTrace) {
         if (muxTrace == CustomCfg.MUX_TRACE_ON) {
             this.modemCfg.setMuxTraceOn(this.gsmtty);
-        }
-        else {
+        } else {
             this.modemCfg.setMuxTraceOff(this.gsmtty);
         }
     }
@@ -401,36 +387,31 @@ public class AmtlCore {
                 (this.traceLevelValue == CustomCfg.TRACE_LEVEL_BB_3G)) {
                 /* Trace in coredump enabled */
                 this.curCfg = PredefinedCfg.COREDUMP;
-            }
-            else if (((this.infoModemReboot == ModemConfiguration.reboot_ok4) ||
+            } else if (((this.infoModemReboot == ModemConfiguration.reboot_ok4) ||
                 (this.infoModemReboot == ModemConfiguration.reboot_ko4)) &&
                 (this.serviceValue == Services.MTS_EXTFS) &&
                 (this.traceLevelValue == CustomCfg.TRACE_LEVEL_BB_3G)) {
                 /*Trace in APE log file enabled*/
                 this.curCfg = PredefinedCfg.OFFLINE_BP_LOG;
-            }
-            else if (((this.infoModemReboot == ModemConfiguration.reboot_ok1) ||
+            } else if (((this.infoModemReboot == ModemConfiguration.reboot_ok1) ||
                 (this.infoModemReboot == ModemConfiguration.reboot_ko1)) &&
                 (this.serviceValue == Services.MTS_EXTFS) &&
                 (this.traceLevelValue == CustomCfg.TRACE_LEVEL_BB_3G)) {
                 /*Trace via in APE log file via USB enabled*/
                 this.curCfg = PredefinedCfg.OFFLINE_USB_BP_LOG;
-            }
-            else if (((this.infoModemReboot == ModemConfiguration.reboot_ok0) ||
+            } else if (((this.infoModemReboot == ModemConfiguration.reboot_ok0) ||
                 (this.infoModemReboot == ModemConfiguration.reboot_ko0)) &&
                 (this.serviceValue == Services.ONLINE_BP_LOG) &&
                 (this.traceLevelValue == CustomCfg.TRACE_LEVEL_BB_3G)) {
                 /* Online BP logging */
                 this.curCfg = PredefinedCfg.ONLINE_BP_LOG;
-            }
-            else if (((this.infoModemReboot == ModemConfiguration.reboot_ok0) ||
+            } else if (((this.infoModemReboot == ModemConfiguration.reboot_ok0) ||
                 (this.infoModemReboot == ModemConfiguration.reboot_ko0)) &&
                 (this.serviceValue == Services.MTS_DISABLE) &&
                 (this.traceLevelValue == CustomCfg.TRACE_LEVEL_NONE)) {
                 /*Trace disabled*/
                 this.curCfg = PredefinedCfg.TRACE_DISABLE;
-            }
-            else {
+            } else {
                 this.curCfg = PredefinedCfg.UNKNOWN_CFG;
             }
 
@@ -478,8 +459,7 @@ public class AmtlCore {
                 this.firstCfgSet = false;
             }
 
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
             Log.e(TAG, MODULE + ": can't retreive current configuration => " + e.getMessage());
             throw new AmtlCoreException(ERR_UPDATE_CFG);
         }
@@ -491,20 +471,16 @@ public class AmtlCore {
         try {
             if (ctx != null) {
                 usbswitch = this.ctx.openFileOutput(OUTPUT_FILE, Context.MODE_APPEND);
-            }
-            else {
+            } else {
                 Log.e(TAG, MODULE + ": failed to open " + OUTPUT_FILE + " (NULL context)");
             }
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
             Log.e(TAG, MODULE + ": can't create the file usbswitch.conf");
-        }
-        finally {
+        } finally {
             try {
                 if (usbswitch != null)
                     usbswitch.close();
-            }
-            catch (IOException e) {
+            } catch (IOException e) {
                 Log.e(TAG, MODULE + ": " + e.getMessage());
             }
         }
@@ -514,8 +490,7 @@ public class AmtlCore {
         * 1: usb modem */
         try {
             this.rtm.exec("start usbswitch_status");
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
             Log.e(TAG, MODULE + ": can't start the service usbswitch_status");
         }
     }

@@ -45,32 +45,25 @@ public class BootService extends Service {
         Log.i(AmtlCore.TAG, MODULE + ": start " + service_name + " service");
 
         /* Test if requested service is already running */
-        if (SystemProperties.get("init.svc."+service_name).equals("running")) {
-            Log.i(AmtlCore.TAG, MODULE + ": "+service_name+" service already running");
-        }
-        else {
+        if (SystemProperties.get("init.svc." + service_name).equals("running")) {
+            Log.i(AmtlCore.TAG, MODULE + ": " + service_name + " service already running");
+        } else {
             /* Remove old running service if necessary */
             if (SystemProperties.get("init.svc.mtsfs").equals("running")) {
                 SystemProperties.set("persist.service.mtsfs", "0");
-            }
-            else if (SystemProperties.get("init.svc.mtsextfs").equals("running")) {
+            } else if (SystemProperties.get("init.svc.mtsextfs").equals("running")) {
                 SystemProperties.set("persist.service.mtsextfs.enable", "0");
-            }
-            else if (SystemProperties.get("init.svc.mtssd").equals("running")) {
+            } else if (SystemProperties.get("init.svc.mtssd").equals("running")) {
                 SystemProperties.set("persist.service.mtssd.enable", "0");
-            }
-            else if (SystemProperties.get("init.svc.mtsextsd").equals("running")) {
+            } else if (SystemProperties.get("init.svc.mtsextsd").equals("running")) {
                 SystemProperties.set("persist.service.mtsextsd.enable", "0");
-            }
-            else if (service_name.equals("usbmodem")) {
+            } else if (service_name.equals("usbmodem")) {
                 if (SystemProperties.get("init.svc.usb_to_modem").equals("running")) {
                     SystemProperties.set("persist.service.usbmodem.enable", "0");
                 }
-            }
-            else if (SystemProperties.get("init.svc.mtsusb").equals("running")) {
+            } else if (SystemProperties.get("init.svc.mtsusb").equals("running")) {
                 SystemProperties.set("persist.service.mtsusb.enable", "0");
-            }
-            else {
+            } else {
                 /* No service enabled */
             }
         }
@@ -79,15 +72,12 @@ public class BootService extends Service {
             try {
                 Log.i(AmtlCore.TAG, MODULE + ": start mtsusb service");
                 AmtlCore.rtm.exec("start mtsusb");
-            }
-            catch (IOException e) {
+            } catch (IOException e) {
                 Log.e(AmtlCore.TAG, MODULE + ": can't start mtsusb service");
             }
-        }
-        else if (service_name.equals("disable") || service_name.equals("")) {
+        } else if (service_name.equals("disable") || service_name.equals("")) {
             Log.i(AmtlCore.TAG, MODULE + ": MTS service disabled");
-        }
-        else {
+        } else {
             Log.i(AmtlCore.TAG, MODULE + ": start " + service_name + " service");
             SystemProperties.set("persist.service." + service_name + ".enable", "1");
         }
