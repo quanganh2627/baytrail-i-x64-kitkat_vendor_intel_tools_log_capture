@@ -94,6 +94,7 @@
 #define PROP_APLOG_NB_PACKET "persist.crashreport.packet"
 #define PROP_APLOG_DEPTH_DEF "3"
 #define PROP_APLOG_NB_PACKET_DEF "1"
+#define PROP_LOGSYSTEMSTATE "init.svc.logsystemstate"
 #define SYS_PROP "/system/build.prop"
 #define SAVEDLINES  1
 #define MAX_RECORDS 5000
@@ -576,6 +577,16 @@ static void analyze_crash(char* type, char* path, char* key, char* uptime, char*
     int status = system(cmd);
     if (status != 0)
         LOGE("analyze crash status: %d.\n", status);
+}
+
+static void notify_crash_to_upload(char* event_id)
+{
+    char cmd[512];
+    snprintf(cmd,sizeof(cmd)-1,"am broadcast -n com.intel.crashreport/.NotificationReceiver -a com.intel.crashreport.intent.CRASH_LOGS_COPY_FINISHED -c android.intent.category.ALTERNATIVE --es %s %s",
+             "com.intel.crashreport.extra.EVENT_ID",event_id);
+    int status = system(cmd);
+    if (status != 0)
+        LOGI("notify crashreport status: %d.\n", status);
 }
 
 static void notify_crashreport()
@@ -1075,6 +1086,7 @@ static int do_crashlogd(unsigned int files)
     time_t t;
     char cmd[512] = { '\0', };
     char key[SHA1_DIGEST_LENGTH+1];
+    char current_key[SHA1_DIGEST_LENGTH+1];
     struct tm *time_tmp;
 
     fd = inotify_init();
@@ -1403,7 +1415,19 @@ static int do_crashlogd(unsigned int files)
                                 backtrace_anr_uiwdt(destion, dir);
                                 history_file_write(CRASHEVENT, wd_array[i].eventname, NULL, destion, NULL, key, date_tmp_2);
                                 if (strstr(event->name, "anr")) {
-                                    start_dumpstate_srv(CRASH_DIR, dir);
+                                    snprintf(destion,sizeof(destion),"%s%d",CRASH_DIR,dir);
+                                    wd = inotify_add_watch(fd, destion, IN_CLOSE_WRITE);
+                                    if (wd < 0) {
+                                        LOGE("Can't add watch for %s.\n", destion);
+                                    }
+                                    char value[PROPERTY_VALUE_MAX];
+                                    property_get(PROP_LOGSYSTEMSTATE, value, "stopped");
+                                    if(strcmp(value,"running") == 0){
+                                        LOGE("Can't launch dumpstate for %s.\n", destion);
+                                    }else{
+                                        strcpy(current_key,key);
+                                        start_dumpstate_srv(CRASH_DIR, dir);
+                                    }
                                 }
                                 notify_crashreport();
                                 restart_profile1_srv();
@@ -1449,13 +1473,30 @@ static int do_crashlogd(unsigned int files)
                                 history_file_write(CRASHEVENT, wd_array[i].eventname, NULL, destion, NULL, key, date_tmp_2);
                                 del_file_more_lines(HISTORY_FILE);
                                 if (strstr(event->name, "crash") || strstr(event->name, "tombstone")) {
-                                    start_dumpstate_srv(CRASH_DIR, dir);
+                                    snprintf(destion,sizeof(destion),"%s%d",CRASH_DIR,dir);
+                                    wd = inotify_add_watch(fd, destion, IN_CLOSE_WRITE);
+                                    if (wd < 0) {
+                                        LOGE("Can't add watch for %s.\n", destion);
+                                        return -1;
+                                    }
+                                    char value[PROPERTY_VALUE_MAX];
+                                    property_get(PROP_LOGSYSTEMSTATE, value, "stopped");
+                                    if(strcmp(value,"running") == 0){
+                                        LOGE("Can't launch dumpstate for %s.\n", destion);
+                                    }else{
+                                        strcpy(current_key,key);
+                                        start_dumpstate_srv(CRASH_DIR, dir);
+                                    }
                                 }
                                 notify_crashreport();
                             }
                             break;
                         }
                     }
+                }
+                if(strstr(event->name, "dropbox-")){
+                    inotify_rm_watch(fd, event->wd);
+                    notify_crash_to_upload(current_key);
                 }
             }
             tmp_len = sizeof(struct inotify_event) + event->len;
