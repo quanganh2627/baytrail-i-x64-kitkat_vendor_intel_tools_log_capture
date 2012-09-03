@@ -25,5 +25,6 @@ public enum PredefinedCfg {
     OFFLINE_BP_LOG,
     ONLINE_BP_LOG,
     TRACE_DISABLE,
-    OFFLINE_USB_BP_LOG
+    OFFLINE_USB_BP_LOG,
+    PTI_BP_LOG
 }

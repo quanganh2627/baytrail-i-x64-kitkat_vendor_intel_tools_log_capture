@@ -27,6 +27,7 @@ public class CustomCfg {
     public static final int TRACE_LOC_COREDUMP = 2;
     public static final int TRACE_LOC_USB_APE = 3;
     public static final int TRACE_LOC_USB_MODEM = 4;
+    public static final int TRACE_LOC_PTI_MODEM = 5;
 
     /* Maximum logs size */
     public static final int LOG_SIZE_NONE = -1;

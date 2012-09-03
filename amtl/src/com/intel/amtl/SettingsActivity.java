@@ -39,6 +39,7 @@ public class SettingsActivity extends Activity {
     private CompoundButton button_location_coredump;
     private CompoundButton button_location_usb_ape;
     private CompoundButton button_location_usb_modem;
+    private CompoundButton button_location_pti_modem;
     private CompoundButton button_level_bb;
     private CompoundButton button_level_bb_3g;
     private CompoundButton button_level_bb_3g_digrf;
@@ -58,7 +59,7 @@ public class SettingsActivity extends Activity {
     /* Local selected values */
     private CustomCfg cfg;
 
-    /* Trace file size not useful in coredump, usb ape and usb modem cases */
+    /* Trace file size not useful in coredump,pti,usb ape and usb modem cases */
     private void unset_trace_file_size() {
         button_trace_size_100.setEnabled(false);
         button_trace_size_800.setEnabled(false);
@@ -120,6 +121,10 @@ public class SettingsActivity extends Activity {
             break;
         case CustomCfg.TRACE_LOC_USB_MODEM:
             button_location_usb_modem.setChecked(true);
+            unset_trace_file_size();
+            break;
+        case CustomCfg.TRACE_LOC_PTI_MODEM:
+            button_location_pti_modem.setChecked(true);
             unset_trace_file_size();
             break;
         default:
@@ -209,6 +214,7 @@ public class SettingsActivity extends Activity {
         button_location_coredump = (CompoundButton) findViewById (R.id.settings_location_coredump_btn);
         button_location_usb_ape = (CompoundButton) findViewById (R.id.settings_location_usb_ape_btn);
         button_location_usb_modem = (CompoundButton) findViewById (R.id.settings_location_usb_modem_btn);
+        button_location_pti_modem = (CompoundButton) findViewById (R.id.settings_location_pti_modem_btn);
 
         /* Trace level buttons */
         button_level_bb = (CompoundButton) findViewById (R.id.settings_level_bb_btn);
@@ -239,6 +245,7 @@ public class SettingsActivity extends Activity {
         AmtlCore.exitIfNull(button_location_coredump, this);
         AmtlCore.exitIfNull(button_location_usb_ape, this);
         AmtlCore.exitIfNull(button_location_usb_modem, this);
+        AmtlCore.exitIfNull(button_location_pti_modem, this);
         AmtlCore.exitIfNull(button_level_bb, this);
         AmtlCore.exitIfNull(button_level_bb_3g, this);
         AmtlCore.exitIfNull(button_level_bb_3g_digrf, this);
@@ -369,6 +376,23 @@ public class SettingsActivity extends Activity {
             /*Disable the usbswitch buttons for Clovertrail and Lexington*/
             button_location_usb_ape.setVisibility(View.GONE);
             button_location_usb_modem.setVisibility(View.GONE);
+        }
+
+        if (AmtlCore.ptiEnabled) {
+            /* Listener on button_location_pti_modem */
+            button_location_pti_modem.setOnCheckedChangeListener(new OnCheckedChangeListener() {
+                @Override
+                public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                    if (isChecked) {
+                        unset_trace_file_size();
+                        cfg.traceLocation = CustomCfg.TRACE_LOC_PTI_MODEM;
+                        invalidate();
+                    }
+                }
+            });
+        } else {
+            /*Disable the pti button for Medfield*/
+            button_location_pti_modem.setVisibility(View.GONE);
         }
 
         /* Listener on button_level_bb */

@@ -47,6 +47,11 @@
                 android:layout_height="wrap_content"
                 android:text="@string/settings_location_usb_modem_button" />
             <RadioButton
+                android:id="@+id/settings_location_pti_modem_btn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/settings_location_pti_modem_button" />
+            <RadioButton
                 android:id="@+id/settings_location_not_enable_btn"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"

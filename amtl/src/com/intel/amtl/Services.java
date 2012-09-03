@@ -37,6 +37,7 @@ public class Services {
     protected final static int MTS_EXTSD = 4;
     protected final static int MTS_USB = 5;
     protected final static int ONLINE_BP_LOG = 6;
+    protected final static int MTS_PTI = 7;
 
     private int service_val;
 
@@ -67,6 +68,10 @@ public class Services {
         case MTS_USB:
             /* USB oneshot */
             service_name = "mtsusb";
+            break;
+        case MTS_PTI:
+            /* PTI BP logging => PTI */
+            service_name = "mtspti";
             break;
         case MTS_DISABLE:
             service_name = "disable";
@@ -101,6 +106,9 @@ public class Services {
         } else if (SystemProperties.get("init.svc.mtsusb").equals("running")) {
             /* USB oneshot */
             service_val = MTS_USB;
+        } else if (SystemProperties.get("persist.service.mtspti.enable").equals("1")) {
+            /* PTI persistent */
+            service_val = MTS_PTI;
         } else {
             /* No service enabled */
             service_val = MTS_DISABLE;
@@ -139,6 +147,10 @@ public class Services {
             case MTS_USB:
                 /* USB oneshot */
                 AmtlCore.rtm.exec("stop mtsusb");
+                break;
+            case MTS_PTI:
+                /* PTI persistent */
+                SystemProperties.set("persist.service.mtspti.enable", "0");
                 break;
             default:
                 /* Do nothing */

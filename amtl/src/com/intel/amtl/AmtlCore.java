@@ -60,6 +60,8 @@ public class AmtlCore {
     public static boolean usbswitchEnabled = false;
     /* Platform logging over USB CDC ACM availability flag */
     public static boolean usbAcmEnabled = false;
+    /* Platform logging over PTI availability flag */
+    public static boolean ptiEnabled = false;
 
     /* AT command for additional is not persisent */
     /* and there is no at command to check its state */
@@ -134,6 +136,7 @@ public class AmtlCore {
             } else if ((platformVersion.equals(PLATFORM_CTP_PR0)) ||
                 (platformVersion.equals(PLATFORM_CTP_PR1))) {
                 this.usbAcmEnabled = true;
+                this.ptiEnabled = true;
             }
         } else {
             Log.v(TAG, MODULE + ": platform version cannot be found.");
@@ -194,6 +197,7 @@ public class AmtlCore {
             case ONLINE_BP_LOG:
             case TRACE_DISABLE:
             case OFFLINE_USB_BP_LOG:
+            case PTI_BP_LOG:
                 this.futCfg = cfg;
                 break;
             default:
@@ -253,7 +257,10 @@ public class AmtlCore {
                     applyOnlineBpLogCfg();
                     break;
                 case OFFLINE_USB_BP_LOG:
-                    applyOfflineUsbBpLog();
+                    applyOfflineUsbBpLogCfg();
+                    break;
+                case PTI_BP_LOG:
+                    applyPtiBpLogCfg();
                     break;
                 case TRACE_DISABLE:
                     applyTraceDisableCfg();
@@ -287,7 +294,7 @@ public class AmtlCore {
     }
 
     /* Apply green configuration for Clovertrail */
-    private void applyOfflineUsbBpLog() throws IOException {
+    private void applyOfflineUsbBpLogCfg() throws IOException {
         this.services.stop_service();
         this.modemCfg.setXsio(this.gsmtty, ModemConfiguration.XSIO_1);
         this.modemCfg.setTraceLevel(this.gsmtty, CustomCfg.TRACE_LEVEL_BB_3G);
@@ -300,6 +307,14 @@ public class AmtlCore {
         this.modemCfg.setXsio(this.gsmtty, ModemConfiguration.XSIO_0);
         this.modemCfg.setTraceLevel(this.gsmtty, CustomCfg.TRACE_LEVEL_BB_3G);
         this.services.enable_service(Services.ONLINE_BP_LOG);
+    }
+
+    /* Apply purple configuration for Clovertrail */
+    private void applyPtiBpLogCfg() throws IOException {
+        this.services.stop_service();
+        this.modemCfg.setXsio(this.gsmtty, ModemConfiguration.XSIO_1);
+        this.modemCfg.setTraceLevel(this.gsmtty, CustomCfg.TRACE_LEVEL_BB_3G);
+        this.services.enable_service(Services.MTS_PTI);
     }
 
     /* Apply yellow configuration */
@@ -323,6 +338,8 @@ public class AmtlCore {
             serviceToStart = Services.MTS_USB;
         } else if (this.futCustomCfg.traceLocation == CustomCfg.TRACE_LOC_USB_MODEM) {
             serviceToStart = Services.ONLINE_BP_LOG;
+        } else if (this.futCustomCfg.traceLocation == CustomCfg.TRACE_LOC_PTI_MODEM) {
+            serviceToStart = Services.MTS_PTI;
         } else {
             serviceToStart = Services.MTS_DISABLE;
         }
@@ -337,6 +354,8 @@ public class AmtlCore {
             }
         } else if (this.futCustomCfg.traceLocation == CustomCfg.TRACE_LOC_COREDUMP) {
             xsioToSet = ModemConfiguration.XSIO_2;
+        } else if (this.futCustomCfg.traceLocation == CustomCfg.TRACE_LOC_PTI_MODEM) {
+            xsioToSet = ModemConfiguration.XSIO_1;
         } else {
             xsioToSet = ModemConfiguration.XSIO_0;
         }
@@ -427,6 +446,12 @@ public class AmtlCore {
                 (this.traceLevelValue == CustomCfg.TRACE_LEVEL_BB_3G)) {
                 /* Online BP logging */
                 this.curCfg = PredefinedCfg.ONLINE_BP_LOG;
+            } else if (((this.infoModemReboot == ModemConfiguration.reboot_ok1) ||
+                (this.infoModemReboot == ModemConfiguration.reboot_ko1)) &&
+                (this.serviceValue == Services.MTS_PTI) &&
+                (this.traceLevelValue == CustomCfg.TRACE_LEVEL_BB_3G)) {
+                /* PTI BP logging */
+                this.curCfg = PredefinedCfg.PTI_BP_LOG;
             } else if (((this.infoModemReboot == ModemConfiguration.reboot_ok0) ||
                 (this.infoModemReboot == ModemConfiguration.reboot_ko0)) &&
                 (this.serviceValue == Services.MTS_DISABLE) &&
@@ -442,7 +467,7 @@ public class AmtlCore {
                     this.curCustomCfg.hsiFrequency = CustomCfg.HSI_FREQ_NONE;
                     this.curCustomCfg.traceFileSize = CustomCfg.LOG_SIZE_NONE;
                     this.curCustomCfg.traceLocation =
-                        (this.traceLevelValue == CustomCfg.TRACE_LEVEL_NONE) ? CustomCfg.TRACE_LOC_NONE: CustomCfg.TRACE_LOC_COREDUMP;
+                        (this.traceLevelValue == CustomCfg.TRACE_LEVEL_NONE) ? CustomCfg.TRACE_LOC_NONE : CustomCfg.TRACE_LOC_COREDUMP;
                     break;
                 case Services.MTS_FS:
                     this.curCustomCfg.hsiFrequency = (this.usbAcmEnabled) ? CustomCfg.HSI_FREQ_NONE : CustomCfg.HSI_FREQ_78_MHZ;
@@ -474,6 +499,11 @@ public class AmtlCore {
                     this.curCustomCfg.traceLocation = CustomCfg.TRACE_LOC_USB_MODEM;
                     this.curCustomCfg.traceFileSize = CustomCfg.LOG_SIZE_800_MB;
                     break;
+                case Services.MTS_PTI:
+                    this.curCustomCfg.hsiFrequency = CustomCfg.HSI_FREQ_NONE;
+                    this.curCustomCfg.traceLocation = CustomCfg.TRACE_LOC_PTI_MODEM;
+                    this.curCustomCfg.traceFileSize = CustomCfg.LOG_SIZE_NONE;
+                    break;
             }
 
             if (this.firstCfgSet) {
@@ -482,7 +512,7 @@ public class AmtlCore {
             }
 
         } catch (IOException e) {
-            Log.e(TAG, MODULE + ": can't retreive current configuration => " + e.getMessage());
+            Log.e(TAG, MODULE + ": can't retrieve current configuration => " + e.getMessage());
             throw new AmtlCoreException(ERR_UPDATE_CFG);
         }
     }
@@ -540,6 +570,16 @@ public class AmtlCore {
     /* Get MUX trace status */
     protected int getMuxTraceValue() {
         return this.muxTraceValue;
+    }
+
+    /* Check if SIGUSR1 signal has to be sent to mts to unconfigure the ldisc */
+    protected boolean signalToSend() {
+        boolean SignalToSend = false;
+        if ((this.futCfg != PredefinedCfg.PTI_BP_LOG) &&
+            (this.futCustomCfg.traceLocation != CustomCfg.TRACE_LOC_PTI_MODEM) &&
+            (this.serviceValue == Services.MTS_PTI))
+            SignalToSend = true;
+        return SignalToSend;
     }
 
     /* Exit from Amtl if a TextView is null */

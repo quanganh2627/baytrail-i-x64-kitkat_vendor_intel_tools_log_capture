@@ -34,6 +34,8 @@ public class ShutdownService extends Service {
 
     private AmtlCore core;
 
+    private static final int PTI_KILL_WAIT = 1000;
+
     @Override
     public IBinder onBind(Intent intent) {
         return null;
@@ -59,6 +61,14 @@ public class ShutdownService extends Service {
             if (this.core.rebootNeeded()) {
                 Log.i(AmtlCore.TAG, MODULE + ": apply new configuration");
                 try {
+                    if (this.core.signalToSend()) {
+                        try {
+                            AmtlCore.rtm.exec("start pti_sigusr1");
+                            android.os.SystemClock.sleep(PTI_KILL_WAIT);
+                        } catch (IOException e) {
+                            Log.e(AmtlCore.TAG, MODULE + ": can't send sigusr1 signal");
+                        }
+                    }
                     this.core.applyCfg();
                     Toast toast = Toast.makeText(ShutdownService.this, "New Amtl configuration applied", Toast.LENGTH_LONG);
                     toast.show();

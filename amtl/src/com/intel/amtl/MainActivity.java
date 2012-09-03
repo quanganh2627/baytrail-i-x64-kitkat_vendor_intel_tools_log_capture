@@ -27,6 +27,7 @@
  * 2.1.4  - 2012-08-22 - BZ 53487 - Configuration suggested in SettingsActivity
  * 2.1.5  - 2012-08-28 - BZ 46162 - Identation problem
  * 2.1.6  - 2012-09-05 - BZ 46849 - Activate additional traces
+ * 2.1.7  - 2012-09-03 - BZ 23105 - PTI logging support in AMTL
  * ============================================================================
  */
 
@@ -54,6 +55,7 @@ public class MainActivity extends Activity {
     private ToggleButton button_modem_coredump;
     private ToggleButton button_ape_log_file;
     private ToggleButton button_online_bp_log;
+    private ToggleButton button_pti_bp_log;
     private ToggleButton button_disable_modem_trace;
 
     private AmtlCore core;
@@ -97,6 +99,7 @@ public class MainActivity extends Activity {
         button_modem_coredump.setChecked(false);
         button_ape_log_file.setChecked(false);
         button_online_bp_log.setChecked(false);
+        button_pti_bp_log.setChecked(false);
         button_disable_modem_trace.setChecked(false);
 
         /* Check selected button */
@@ -110,6 +113,9 @@ public class MainActivity extends Activity {
                 break;
             case ONLINE_BP_LOG:
                 button_online_bp_log.setChecked(true);
+                break;
+            case PTI_BP_LOG:
+                button_pti_bp_log.setChecked(true);
                 break;
             case TRACE_DISABLE:
                 button_disable_modem_trace.setChecked(true);
@@ -129,17 +135,20 @@ public class MainActivity extends Activity {
         button_modem_coredump = (ToggleButton) findViewById(R.id.modem_coredump_btn);
         button_ape_log_file = (ToggleButton) findViewById(R.id.ape_log_file_btn);
         button_disable_modem_trace = (ToggleButton) findViewById(R.id.disable_modem_trace_btn);
+        button_pti_bp_log = (ToggleButton) findViewById(R.id.pti_bp_log_btn);
         button_online_bp_log = (ToggleButton) findViewById(R.id.online_bp_log_btn);
 
         /* Check if the buttons are not null*/
         AmtlCore.exitIfNull(button_modem_coredump, this);
         AmtlCore.exitIfNull(button_ape_log_file, this);
         AmtlCore.exitIfNull(button_disable_modem_trace, this);
+        AmtlCore.exitIfNull(button_pti_bp_log, this);
         AmtlCore.exitIfNull(button_online_bp_log, this);
 
         button_modem_coredump.setChecked(false);
         button_ape_log_file.setChecked(false);
         button_disable_modem_trace.setChecked(false);
+        button_pti_bp_log.setChecked(false);
         button_online_bp_log.setChecked(false);
 
         /* Get application core */
@@ -201,7 +210,7 @@ public class MainActivity extends Activity {
                     if (button_online_bp_log.isChecked()) {
                         setCfg(PredefinedCfg.ONLINE_BP_LOG);
                     } else {
-                        /* If user presses again on button_ape_log_file, traces are stopped */
+                        /* If user presses again on button_bp_log_file, traces are stopped */
                         setCfg(PredefinedCfg.TRACE_DISABLE);
                     }
                 }
@@ -209,6 +218,24 @@ public class MainActivity extends Activity {
         } else {
             /*Disable online bp log button for Clovertrail and Lexington*/
             button_online_bp_log.setVisibility(View.GONE);
+        }
+
+        if (AmtlCore.ptiEnabled) {
+            /* Listener on PTI BP logging  button */
+            button_pti_bp_log.setOnClickListener(new OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (button_pti_bp_log.isChecked()) {
+                        setCfg(PredefinedCfg.PTI_BP_LOG);
+                    } else {
+                        /* If user presses again on button_pti_bp_log_file, traces are stopped */
+                        setCfg(PredefinedCfg.TRACE_DISABLE);
+                    }
+                }
+            });
+        } else {
+            /*Disable online bp log button for Clovertrail and Lexington*/
+            button_pti_bp_log.setVisibility(View.GONE);
         }
 
         /* Listener on Disable button */

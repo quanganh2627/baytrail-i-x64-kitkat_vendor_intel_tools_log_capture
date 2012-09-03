@@ -57,6 +57,8 @@ public class BootService extends Service {
                 SystemProperties.set("persist.service.mtssd.enable", "0");
             } else if (SystemProperties.get("init.svc.mtsextsd").equals("running")) {
                 SystemProperties.set("persist.service.mtsextsd.enable", "0");
+            } else if (SystemProperties.get("init.svc.mtspti").equals("running")) {
+                SystemProperties.set("persist.service.mtspti.enable", "0");
             } else if (service_name.equals("usbmodem")) {
                 if (SystemProperties.get("init.svc.usb_to_modem").equals("running")) {
                     SystemProperties.set("persist.service.usbmodem.enable", "0");
