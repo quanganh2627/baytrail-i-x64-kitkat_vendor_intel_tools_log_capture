@@ -66,6 +66,7 @@
 #define FABRIC_ERROR "FABRICERR"
 // Add Recovery error crash type
 #define RECOVERY_ERROR "RECOVERY_ERROR"
+#define USBBOGUS "USBBOGUS"
 
 #define FILESIZE_MAX  (10*1024*1024)
 #define PATHMAX 512
@@ -111,6 +112,7 @@
 #define BPLOG_FILE_1    "/data/logs/bplog.1"
 #define APLOG_TYPE       0
 #define BPLOG_TYPE       1
+#define APLOG_STATS_TYPE 2
 #define SDCARD_CRASH_DIR "/mnt/sdcard/data/logs/crashlog"
 #define EMMC_CRASH_DIR "/data/logs/crashlog"
 #define SDCARD_STATS_DIR "/mnt/sdcard/data/logs/stats"
@@ -365,6 +367,18 @@ static void do_log_copy(char *mode, int dir, char* ts, int type)
             if(info.st_size < 1*1024*1024){
                 if(stat(APLOG_FILE_1, &info) == 0){
                     snprintf(destion,sizeof(destion), "%s%d/%s_%s_%s", CRASH_DIR, dir,strrchr(APLOG_FILE_1,'/')+1,mode,ts);
+                    do_copy(APLOG_FILE_1,destion, FILESIZE_MAX);
+                }
+            }
+        }
+    }
+    if(type == APLOG_STATS_TYPE){
+        if(stat(APLOG_FILE_0, &info) == 0){
+            snprintf(destion,sizeof(destion), "%s%d/%s_%s_%s", STATS_DIR, dir,strrchr(APLOG_FILE_0,'/')+1,mode,ts);
+            do_copy(APLOG_FILE_0,destion, FILESIZE_MAX);
+            if(info.st_size < 1*1024*1024){
+                if(stat(APLOG_FILE_1, &info) == 0){
+                    snprintf(destion,sizeof(destion), "%s%d/%s_%s_%s", STATS_DIR, dir,strrchr(APLOG_FILE_1,'/')+1,mode,ts);
                     do_copy(APLOG_FILE_1,destion, FILESIZE_MAX);
                 }
             }
@@ -1140,6 +1154,7 @@ static int do_crashlogd(unsigned int files)
     struct inotify_event *event;
     int len, tmp_len;
     int i = 0;
+    unsigned int j = 0;
     char path[PATHMAX];
     char destion[PATHMAX];
     char date_tmp[32];
@@ -1407,11 +1422,13 @@ static int do_crashlogd(unsigned int files)
                         // for STATS trigger
                         else if((strcmp(wd_array[i].eventname,STATSTRIGGER)==0) && (strstr(event->name, "trigger" ))){
                             char *p;
-                            char tmp[16];
+                            char tmp[32];
+                            char type[20] = { '\0', };
 
                             snprintf(tmp,sizeof(tmp),"%s",event->name);
                             time(&t);
                             time_tmp = localtime((const time_t *)&t);
+                            PRINT_TIME(date_tmp, TIME_FORMAT_1, time_tmp);
                             PRINT_TIME(date_tmp_2, TIME_FORMAT_2, time_tmp);
                             dir = find_dir(files,STATS_MODE);
                             if (dir == -1) {
@@ -1443,8 +1460,23 @@ static int do_crashlogd(unsigned int files)
                             remove(path);
                             snprintf(destion,sizeof(destion),"%s%d/", STATS_DIR,dir);
                             compute_key(key, STATSEVENT, tmp);
-                            LOGE("%-8s%-22s%-20s%s %s\n", STATSEVENT, key, date_tmp_2, tmp, destion);
-                            history_file_write(STATSEVENT, tmp, NULL, destion, NULL, key, date_tmp_2);
+                            /*create type */
+                            snprintf(tmp,sizeof(tmp),"%s",event->name);
+                            p = strstr(tmp,"_trigger");
+                            if (p) {
+                                for (j=0;j<sizeof(type)-1;j++) {
+                                    if (p == (tmp+j))
+                                        break;
+                                    type[j]=toupper(tmp[j]);
+                                }
+                            } else
+                                snprintf(type,sizeof(type),"%s",event->name);
+                            LOGE("%-8s%-22s%-20s%s %s\n", STATSEVENT, key, date_tmp_2, type, destion);
+                            if (!strncmp(type, USBBOGUS, sizeof(USBBOGUS))) {
+                                usleep(TIMEOUT_VALUE);
+                                do_log_copy(type,dir,date_tmp,APLOG_STATS_TYPE);
+                            }
+                            history_file_write(STATSEVENT, type, NULL, destion, NULL, key, date_tmp_2);
                             del_file_more_lines(HISTORY_FILE);
                             notify_crashreport();
                             break;
@@ -1472,7 +1504,6 @@ static int do_crashlogd(unsigned int files)
                             if (stat(path, &info) == 0) {
                                 snprintf(destion,sizeof(destion),"%s%d/%s",CRASH_DIR,dir,event->name);
                                 do_copy(path, destion, FILESIZE_MAX);
-
                                 LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, date_tmp_2, wd_array[i].eventname, destion);
                                 usleep(TIMEOUT_VALUE);
                                 do_log_copy(wd_array[i].eventname,dir,date_tmp,APLOG_TYPE);
