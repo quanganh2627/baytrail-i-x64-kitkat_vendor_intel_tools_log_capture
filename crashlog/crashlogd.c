@@ -2069,11 +2069,6 @@ static void update_logs_permission(void)
         chmod(HISTORY_FILE_DIR,0777);
         chmod(HISTORY_CORE_DIR,0777);
     }
-    else {
-        LOGI("Folders /data/logs and /data/logs/core set to 0750\n");
-        chmod(HISTORY_FILE_DIR,0750);
-        chmod(HISTORY_CORE_DIR,0750);
-    }
 }
 
 int main(int argc, char **argv)
