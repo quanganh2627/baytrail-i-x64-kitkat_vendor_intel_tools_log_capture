@@ -96,7 +96,7 @@ javacrash()
   else
     javacrash=`ls $1 | grep "system_app_crash.*.txt" | wc -l`
     if [ $javacrash == 1 ] ; then
-       npid=`grep "Process:" $1/system_app_crash*.txt | awk -F":" '{print $2}'`
+       pid=`grep "Process:" $1/system_app_crash*.txt | awk -F":" '{print $2}'`
        exception=`grep -m1 -o "^java.lang.*" $1/system_app_crash*.txt`
        stack=`grep -m4 -o "at .*" $1/system_app_crash*.txt | awk -F"at " '{print $2}' |awk -F"(" '{print $1}' | sed  -e "N;s/\n/ /" | sed -e "N;s/\n/ /"`
 
