@@ -37,6 +37,10 @@ public class ModemConfiguration {
     private static final String AT_SET_XSIO_FMT = "at+xsio=%d\r\n";
     private static final String AT_GET_XSIO = "at+xsio?\r\n";
 
+    /* Additional trace AT commands */
+    private static final String AT_SET_ADD_TRACES_ON = "at+xl1set=\"L6L7L8L9\"\r\n";
+    private static final String AT_SET_ADD_TRACES_OFF = "at+xl1set=\"\"\r\n";
+
     /* MUX trace AT commands */
     private static final String AT_GET_MUX_TRACE = "at+xmux?\r\n";
     private static final String AT_SET_MUX_TRACE_ON = "at+xmux=1,3,-1\r\n";
@@ -356,6 +360,24 @@ public class ModemConfiguration {
             read_write_modem(f, AT_SET_MUX_TRACE_OFF);
         } catch (IOException e) {
             Log.e(AmtlCore.TAG, MODULE + ": can't set MUX trace OFF");
+        }
+    }
+
+    /* Set Additional traces on */
+    protected void setAdditionalTracesOn(RandomAccessFile f) {
+        try {
+            read_write_modem(f, AT_SET_ADD_TRACES_ON);
+        } catch (IOException e) {
+            Log.e(AmtlCore.TAG, MODULE + ": can't set Additional traces ON");
+        }
+    }
+
+    /* Set Additional traces off */
+    protected void setAdditionalTracesOff(RandomAccessFile f) {
+        try {
+            read_write_modem(f, AT_SET_ADD_TRACES_OFF);
+        } catch (IOException e) {
+            Log.e(AmtlCore.TAG, MODULE + ": can't set Additional traces OFF");
         }
     }
 

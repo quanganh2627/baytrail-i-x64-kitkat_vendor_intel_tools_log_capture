@@ -27,4 +27,5 @@
     <string name="settings_hsi_frequencies_156_button">156MHz</string>
     <string name="settings_activate_txt">ACTIVATE</string>
     <string name="settings_mux_txt">Enable MUX traces</string>
+    <string name="settings_add_traces_txt">Enable additional traces \n (LG1 LLT)</string>
 </resources>

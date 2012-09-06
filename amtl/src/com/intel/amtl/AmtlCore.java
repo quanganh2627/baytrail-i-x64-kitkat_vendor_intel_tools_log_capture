@@ -61,6 +61,10 @@ public class AmtlCore {
     /* Platform logging over USB CDC ACM availability flag */
     public static boolean usbAcmEnabled = false;
 
+    /* AT command for additional is not persisent */
+    /* and there is no at command to check its state */
+    protected static boolean isAddTracesEnabled = false;
+
     /* Current predefined configuration */
     private PredefinedCfg curCfg;
     /* Future predefined configuration to set */
@@ -81,6 +85,7 @@ public class AmtlCore {
     private int xsioValue;
     private int infoModemReboot;
     private int muxTraceValue;
+    private int addTracesValue;
 
     private Services services;
     private ModemConfiguration modemCfg;
@@ -352,6 +357,17 @@ public class AmtlCore {
         }
     }
 
+    /* Enable/Disable Additional traces */
+    protected void setAdditionalTraces(int addTraces) {
+        if (addTraces == CustomCfg.ADD_TRACES_ON) {
+            this.modemCfg.setAdditionalTracesOn(this.gsmtty);
+            this.isAddTracesEnabled = true;
+        } else {
+            this.modemCfg.setAdditionalTracesOff(this.gsmtty);
+            this.isAddTracesEnabled = false;
+        }
+    }
+
     /* Force AMTL Core to update its internal modem configuration values */
     protected void invalidate() throws AmtlCoreException {
         if (!this.modemStatusMonitor.isModemUp()) {
@@ -373,10 +389,16 @@ public class AmtlCore {
             this.xsioValue = this.modemCfg.getXsio(this.gsmtty);
             /* Current MUX trace state */
             this.muxTraceValue = this.modemCfg.getMuxTraceState(this.gsmtty);
-
+            /* Current Additional traces state */
+            if (isAddTracesEnabled) {
+                this.addTracesValue = CustomCfg.ADD_TRACES_ON;
+            } else {
+                this.addTracesValue = CustomCfg.ADD_TRACES_OFF;
+            }
             /* Update custom configuration for settings activity */
             this.curCustomCfg.traceLevel = this.traceLevelValue;
             this.curCustomCfg.muxTrace = this.muxTraceValue;
+            this.curCustomCfg.addTraces = this.addTracesValue;
 
             /* Recover the modem reboot information */
             this.infoModemReboot = this.modemCfg.modem_reboot_status(xsioValue);

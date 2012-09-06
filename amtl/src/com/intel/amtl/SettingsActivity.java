@@ -26,6 +26,7 @@ import android.widget.CheckBox;
 import android.widget.CompoundButton;
 import android.widget.CompoundButton.OnCheckedChangeListener;
 import android.widget.RadioButton;
+import android.widget.TextView;
 
 import java.io.IOException;
 
@@ -47,6 +48,8 @@ public class SettingsActivity extends Activity {
     private CompoundButton button_hsi_frequencies_156;
     private CheckBox checkbox_activate;
     private CheckBox checkbox_mux;
+    private CheckBox checkbox_additional_traces;
+    private TextView header_additional_traces;
 
     private boolean invalidateFlag;
 
@@ -164,6 +167,11 @@ public class SettingsActivity extends Activity {
         checkbox_mux.setChecked(cfg.muxTrace == CustomCfg.MUX_TRACE_ON);
     }
 
+    /* Set Additional traces checkbox state */
+    private void set_checkbox_add_traces() {
+        checkbox_additional_traces.setChecked(cfg.addTraces == CustomCfg.ADD_TRACES_ON);
+    }
+
     /* Update settings menu buttons */
     private void update_settings_menu() {
         set_location_button();
@@ -171,6 +179,7 @@ public class SettingsActivity extends Activity {
         set_log_size_button();
         set_hsi_frequency_button();
         set_checkbox_mux();
+        set_checkbox_add_traces();
         invalidate();
     }
 
@@ -220,6 +229,10 @@ public class SettingsActivity extends Activity {
         /* MUX traces check box */
         checkbox_mux = (CheckBox) findViewById (R.id.mux_checkBox);
 
+        /* Additional traces check box and header*/
+        checkbox_additional_traces = (CheckBox) findViewById (R.id.additional_traces_checkBox);
+        header_additional_traces = (TextView) findViewById (R.id.textView7);
+
         /* Check if the buttons and checkboxes are not null*/
         AmtlCore.exitIfNull(button_location_emmc, this);
         AmtlCore.exitIfNull(button_location_sdcard, this);
@@ -235,6 +248,8 @@ public class SettingsActivity extends Activity {
         AmtlCore.exitIfNull(button_hsi_frequencies_156, this);
         AmtlCore.exitIfNull(checkbox_activate, this);
         AmtlCore.exitIfNull(checkbox_mux, this);
+        AmtlCore.exitIfNull(checkbox_additional_traces, this);
+        AmtlCore.exitIfNull(header_additional_traces, this);
 
         checkbox_activate.setChecked(false);
 
@@ -257,6 +272,9 @@ public class SettingsActivity extends Activity {
                 cfg.traceFileSize = (AmtlCore.usbAcmEnabled) ? CustomCfg.LOG_SIZE_800_MB : CustomCfg.LOG_SIZE_NONE;
                 cfg.hsiFrequency = CustomCfg.HSI_FREQ_NONE;
                 cfg.muxTrace = CustomCfg.MUX_TRACE_OFF;
+                cfg.addTraces = CustomCfg.ADD_TRACES_OFF;
+                checkbox_additional_traces.setEnabled(false);
+                header_additional_traces.setTextColor(android.graphics.Color.GRAY);
             } else {
                 CustomCfg curCfg = core.getCurCustomCfg();
                 /* Get current custom configuration */
@@ -265,6 +283,7 @@ public class SettingsActivity extends Activity {
                 cfg.traceFileSize = curCfg.traceFileSize;
                 cfg.hsiFrequency = curCfg.hsiFrequency;
                 cfg.muxTrace = curCfg.muxTrace;
+                cfg.addTraces = curCfg.addTraces;
             }
 
             update_settings_menu();
@@ -435,6 +454,21 @@ public class SettingsActivity extends Activity {
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
                 cfg.muxTrace = (isChecked) ? CustomCfg.MUX_TRACE_ON: CustomCfg.MUX_TRACE_OFF;
                 core.setMuxTrace(cfg.muxTrace);
+            }
+        });
+
+        /* Listener on Additional traces Checkbox */
+        checkbox_additional_traces.setOnCheckedChangeListener(new OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                cfg.addTraces = (isChecked) ? CustomCfg.ADD_TRACES_ON: CustomCfg.ADD_TRACES_OFF;
+                core.isAddTracesEnabled = isChecked;
+                core.setAdditionalTraces(cfg.addTraces);
+                if (isChecked) {
+                    UIHelper.message_pop_up(SettingsActivity.this, "WARNING", "Traces are not persistent");
+                } else {
+                    UIHelper.message_pop_up(SettingsActivity.this, "WARNING", "To disable additional traces please reboot");
+                }
             }
         });
 

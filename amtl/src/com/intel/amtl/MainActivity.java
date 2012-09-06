@@ -26,6 +26,7 @@
  * 2.1.3  - 2012-08-16 - BZ 46497 - Disable TOGGLE_PIN_ON1 button
  * 2.1.4  - 2012-08-22 - BZ 53487 - Configuration suggested in SettingsActivity
  * 2.1.5  - 2012-08-28 - BZ 46162 - Identation problem
+ * 2.1.6  - 2012-09-05 - BZ 46849 - Activate additional traces
  * ============================================================================
  */
 

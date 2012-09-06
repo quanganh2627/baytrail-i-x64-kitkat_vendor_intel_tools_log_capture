@@ -42,6 +42,10 @@ public class CustomCfg {
     public static final int MUX_TRACE_OFF = 0;
     public static final int MUX_TRACE_ON = 1;
 
+    /* Additional traces state */
+    public static final int ADD_TRACES_OFF = 0;
+    public static final int ADD_TRACES_ON = 1;
+
     /* Modem traces levels */
     public static final int TRACE_LEVEL_NONE = 0;
     public static final int TRACE_LEVEL_BB = 1;
@@ -53,4 +57,5 @@ public class CustomCfg {
     public int traceFileSize = LOG_SIZE_800_MB;
     public int hsiFrequency = HSI_FREQ_78_MHZ;
     public int muxTrace = MUX_TRACE_OFF;
+    public int addTraces = ADD_TRACES_OFF;
 }
