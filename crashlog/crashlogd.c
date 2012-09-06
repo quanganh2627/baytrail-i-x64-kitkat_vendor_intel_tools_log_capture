@@ -126,6 +126,8 @@
 #define PANIC_CONSOLE_NAME "/proc/emmc_ipanic_console"
 #define PROC_FABRIC_ERROR_NAME "/proc/ipanic_fabric_err"
 #define PROC_UUID  "/proc/emmc0_id_entry"
+#define LAST_KMSG "/proc/last_kmsg"
+#define LAST_KMSG_FILE "last_kmsg"
 
 #define SAVED_CONSOLE_NAME "/data/dontpanic/emmc_ipanic_console"
 #define SAVED_THREAD_NAME "/data/dontpanic/emmc_ipanic_threads"
@@ -335,6 +337,18 @@ static void flush_aplog_atboot(char *mode, int dir, char* ts)
     return ;
 }
 
+static void do_last_kmsg_copy(int dir)
+{
+    char destion[PATHMAX];
+    struct stat info;
+
+    if(stat(LAST_KMSG, &info) == 0) {
+        snprintf(destion, sizeof(destion), "%s%d/%s", CRASH_DIR, dir, LAST_KMSG_FILE);
+        do_copy(LAST_KMSG, destion, FILESIZE_MAX);
+    }
+
+}
+
 static void do_log_copy(char *mode, int dir, char* ts, int type)
 {
     char destion[PATHMAX];
@@ -364,6 +378,7 @@ static void do_log_copy(char *mode, int dir, char* ts, int type)
             }
         }
     }
+
     return ;
 }
 
@@ -1618,6 +1633,7 @@ static int crashlog_check_fabric(char *reason, unsigned int files)
         snprintf(destion, sizeof(destion), "%s%d/%s_%s.txt", CRASH_DIR, dir,
                 FABRIC_ERROR_NAME, date_tmp);
         do_copy(SAVED_FABRIC_ERROR_NAME, destion, FILESIZE_MAX);
+        do_last_kmsg_copy(dir);
 
         for (i = 0; i < sizeof(ft_array)/sizeof(struct fabric_type); i++){
             if (!find_str_in_file(destion, ft_array[i].keyword, ft_array[i].tail)){
@@ -1684,6 +1700,7 @@ static int crashlog_check_panic(char *reason, unsigned int files)
         snprintf(destion, sizeof(destion), "%s%d/%s_%s.txt", CRASH_DIR, dir,
                 LOGCAT_NAME, date_tmp);
         do_copy(SAVED_LOGCAT_NAME, destion, FILESIZE_MAX);
+        do_last_kmsg_copy(dir);
 
         write_file(PANIC_CONSOLE_NAME, "1");
 
@@ -1744,6 +1761,7 @@ static int crashlog_check_modem_shutdown(char *reason, unsigned int files)
         LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, date_tmp_2, MODEM_SHUTDOWN, destion);
         usleep(TIMEOUT_VALUE);
         do_log_copy(MODEM_SHUTDOWN, dir, date_tmp, APLOG_TYPE);
+        do_last_kmsg_copy(dir);
         history_file_write(CRASHEVENT, MODEM_SHUTDOWN, NULL, destion, NULL, key, date_tmp_2);
         del_file_more_lines(HISTORY_FILE);
         remove(MODEM_SHUTDOWN_TRIGGER);
@@ -1795,6 +1813,7 @@ static int crashlog_check_recovery(unsigned int files)
         destion2[0] = '\0';
         snprintf(destion2, sizeof(destion2), "%s%s", destion, "recovery_last_log");
         do_copy(RECOVERY_ERROR_LOG, destion2, FILESIZE_MAX);
+        do_last_kmsg_copy(dir);
         //Write event in history_event
         history_file_write(CRASHEVENT, RECOVERY_ERROR, NULL, destion, NULL, key, date_tmp_2);
         del_file_more_lines(HISTORY_FILE);
@@ -1838,6 +1857,7 @@ static int crashlog_check_startupreason(char *reason, unsigned int files)
         flush_aplog_atboot("WDT", dir, date_tmp);
         usleep(TIMEOUT_VALUE);
         do_log_copy("WDT", dir, date_tmp, APLOG_TYPE);
+        do_last_kmsg_copy(dir);
         history_file_write(CRASHEVENT, "WDT", reason, destion, NULL, key, date_tmp_2);
         del_file_more_lines(HISTORY_FILE);
     }
