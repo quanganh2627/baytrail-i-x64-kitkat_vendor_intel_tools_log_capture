@@ -137,6 +137,7 @@
 #define THREAD_NAME "emmc_ipanic_threads"
 #define LOGCAT_NAME "emmc_ipanic_logcat"
 #define FABRIC_ERROR_NAME "ipanic_fabric_err"
+#define CRASHFILE_NAME "crashfile"
 
 #define MODEM_SHUTDOWN_TRIGGER "/data/logs/modemcrash/mshutdown.txt"
 
@@ -578,6 +579,26 @@ static void build_footprint(char *id)
     strncat(id, prop, SIZE_FOOTPRINT_MAX);
 }
 
+static void create_first_crashfile(char* type, char* path, char* key, char* uptime, char* footprint, char* boardVersion, char* date, char* imei)
+{
+	FILE *fp;
+	char fullpath[PATHMAX];
+	snprintf(fullpath, sizeof(fullpath)-1, "%s/%s", path, CRASHFILE_NAME);
+	fp = fopen(fullpath,"w");
+	fprintf(fp,"EVENT=CRASH\n");
+	fprintf(fp,"ID=%s\n", key);
+	fprintf(fp,"SN=%s\n", uuid);
+	fprintf(fp,"DATE=%s\n", date);
+	fprintf(fp,"UPTIME=%s\n", uptime);
+	fprintf(fp,"BUILD=%s\n", footprint);
+	fprintf(fp,"BOARD=%s\n", boardVersion);
+	fprintf(fp,"IMEI=%s\n", imei);
+	fprintf(fp,"TYPE=%s\n", type);
+	fprintf(fp,"_END\n");
+	fclose(fp);
+}
+
+
 static void analyze_crash(char* type, char* path, char* key, char* uptime, char* date)
 {
     char cmd[512] = { '\0', };
@@ -590,8 +611,10 @@ static void analyze_crash(char* type, char* path, char* key, char* uptime, char*
 
     snprintf(cmd, sizeof(cmd)-1, "/system/bin/analyze_crash %s %s %s %s %s %s %s %s", type, path, key, uptime, footprint, boardVersion, date, imei);
     int status = system(cmd);
-    if (status != 0)
+    if (status != 0){
         LOGE("analyze crash status: %d.\n", status);
+        create_first_crashfile(type, path, key, uptime, footprint, boardVersion, date, imei);
+     }
 }
 
 static void notify_crash_to_upload(char* event_id)
@@ -2111,8 +2134,12 @@ static void read_startupreason(char *startupreason)
                 reason=strtoul(p, &endptr, 16);
                 if ((errno != ERANGE) &&
                     (endptr != p) &&
-                    (reason < (sizeof(bootmode_reason)/sizeof(char*))))
+                    (reason >= 0) &&
+                    (reason < (sizeof(bootmode_reason)/sizeof(char*)))) {
                     strcpy(startupreason, bootmode_reason[reason]);
+                }else {
+                    strcpy(startupreason, "UNKNOWN");
+                }
             }
         }
     }
