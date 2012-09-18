@@ -621,31 +621,56 @@ static void build_footprint(char *id)
 
 static void create_first_crashfile(char* type, char* path, char* key, char* uptime, char* footprint, char* boardVersion, char* date, char* imei)
 {
-	FILE *fp;
-	char fullpath[PATHMAX];
-	snprintf(fullpath, sizeof(fullpath)-1, "%s/%s", path, CRASHFILE_NAME);
-	fp = fopen(fullpath,"w");
-	if (strstr(type,BZEVENT)) {
-		fprintf(fp,"EVENT=BZ\n");
-	}
-	else {
-		fprintf(fp,"EVENT=CRASH\n");
-	}
-	fprintf(fp,"ID=%s\n", key);
-	fprintf(fp,"SN=%s\n", uuid);
-	fprintf(fp,"DATE=%s\n", date);
-	fprintf(fp,"UPTIME=%s\n", uptime);
-	fprintf(fp,"BUILD=%s\n", footprint);
-	fprintf(fp,"BOARD=%s\n", boardVersion);
-	fprintf(fp,"IMEI=%s\n", imei);
-	if (strstr(type,BZEVENT)) {
-		fprintf(fp,"TYPE=MANUAL\n");
-	}
-	else {
-		fprintf(fp,"TYPE=%s\n", type);
-	}
-	fprintf(fp,"_END\n");
-	fclose(fp);
+    FILE *fp;
+    char fullpath[PATHMAX];
+    char mpanicpath[PATHMAX];
+    snprintf(fullpath, sizeof(fullpath)-1, "%s/%s", path, CRASHFILE_NAME);
+    fp = fopen(fullpath,"w");
+    if (strstr(type,BZEVENT)) {
+        fprintf(fp,"EVENT=BZ\n");
+    }
+    else {
+        fprintf(fp,"EVENT=CRASH\n");
+    }
+    fprintf(fp,"ID=%s\n", key);
+    fprintf(fp,"SN=%s\n", uuid);
+    fprintf(fp,"DATE=%s\n", date);
+    fprintf(fp,"UPTIME=%s\n", uptime);
+    fprintf(fp,"BUILD=%s\n", footprint);
+    fprintf(fp,"BOARD=%s\n", boardVersion);
+    fprintf(fp,"IMEI=%s\n", imei);
+    if (strstr(type,BZEVENT)) {
+        fprintf(fp,"TYPE=MANUAL\n");
+    }
+    else {
+        fprintf(fp,"TYPE=%s\n", type);
+    }
+    if (!strcmp(MODEM_CRASH,type)){
+        LOGI("Modem panic detected : generating DATA0\n");
+        FILE *fd_panic;
+        DIR *d;
+        struct dirent* de;
+        d = opendir(path);
+        while ((de = readdir(d))) {
+            const char *name = de->d_name;
+            if (strstr(name, "mpanic")){
+                snprintf(mpanicpath, sizeof(mpanicpath)-1, "%s/%s", path, name);
+                fd_panic = fopen(mpanicpath, "r");
+                if (fd_panic == NULL){
+                    LOGE("can not open file: %s\n", mpanicpath);
+                    break;
+                }
+                char value[PATHMAX] = "";
+                fscanf(fd_panic, "%s", value);
+                fclose(fd_panic);
+                fprintf(fp,"DATA0=%s\n", value);
+                break;
+            }
+        }
+        closedir(d);
+    }
+    fprintf(fp,"_END\n");
+    fclose(fp);
 }
 
 
