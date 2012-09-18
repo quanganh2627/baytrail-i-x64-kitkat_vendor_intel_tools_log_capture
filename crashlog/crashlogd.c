@@ -99,6 +99,8 @@
 #define SAVEDLINES  1
 #define MAX_RECORDS 5000
 #define MAX_DIR 1000
+#define PERM_USER "system"
+#define PERM_GROUP "log"
 #define HISTORY_FILE_DIR  "/data/logs"
 #define HISTORY_CORE_DIR  "/data/logs/core"
 #define APLOG_FILE_BOOT   "/data/logs/aplog_boot"
@@ -320,7 +322,7 @@ out:
     if (fd2 >= 0)
         close(fd2);
 
-    do_chown(des, "root", "log");
+    do_chown(des, PERM_USER, PERM_GROUP);
     return rc;
 }
 
@@ -334,7 +336,7 @@ static void flush_aplog_atboot(char *mode, int dir, char* ts)
     int status = system(cmd);
     if (status != 0)
         LOGE("flush ap log from boot returns status: %d.\n", status);
-    do_chmod(log_boot_name, "644");
+    do_chown(log_boot_name, PERM_USER, PERM_GROUP);
     return ;
 }
 
@@ -666,7 +668,7 @@ static void history_file_write(char *event, char *type, char *subtype, char *log
             return;
         }
         do_chmod(HISTORY_FILE, "644");
-        do_chown(HISTORY_FILE, "root", "log");
+        do_chown(HISTORY_FILE, PERM_USER, PERM_GROUP);
         fprintf(to, "#V1.0 %-16s%-24s\n", CURRENT_UPTIME, uptime);
         fprintf(to, "#EVENT  ID                    DATE                 TYPE\n");
         fclose(to);
@@ -926,7 +928,14 @@ static unsigned int find_dir(unsigned int max, int mode)
         snprintf(path, sizeof(path),  "%s%d", dir, oldest);
         mkdir(path, 0777);
     }
+    if (!strstr(path, "sdcard")) {
+         char cmd[512] = { '\0', };
 
+         snprintf(cmd, sizeof(cmd)-1, "/system/bin/chown %s %s", PERM_USER, path);
+         int status = system(cmd);
+         if (status != 0)
+            LOGE("status chown %s: %d\n", cmd, status);
+   }
     return oldest;
 }
 
@@ -1040,6 +1049,7 @@ void process_anr_or_uiwdt(char *destion, int dir, int remove_path)
     char cmd[PATHMAX];
     int src, dest;
     char dest_path[PATHMAX];
+    char dest_path_symb[PATHMAX];
     struct stat stat_buf;
     char *tracefile;
     FILE *fp;
@@ -1050,6 +1060,7 @@ void process_anr_or_uiwdt(char *destion, int dir, int remove_path)
         snprintf(cmd, sizeof(cmd), "gunzip %s", destion);
         system(cmd);
         destion[strlen(destion) - 3] = 0;
+        do_chown(destion, PERM_USER, PERM_GROUP);
     }
     fp = fopen(destion, "r");
     if (fp == NULL) {
@@ -1093,6 +1104,9 @@ void process_anr_or_uiwdt(char *destion, int dir, int remove_path)
         }
     }
     fclose(fp);
+    do_chown(dest_path, PERM_USER, PERM_GROUP);
+    snprintf(dest_path_symb, sizeof(dest_path_symb), "%s_symbol", dest_path);
+    do_chown(dest_path_symb, PERM_USER, PERM_GROUP);
 }
 
 void backtrace_anr_uiwdt(char *dest, int dir)
@@ -1923,8 +1937,7 @@ static void write_uuid(char *uuid_value)
     }
     fprintf(fd, "%s", uuid_value);
     fclose(fd);
-    do_chmod(LOG_UUID, "644");
-    do_chown(LOG_UUID, "root", "log");
+    do_chown(LOG_UUID, PERM_USER, PERM_GROUP);
 }
 
 static void read_uuid(void)
@@ -1998,8 +2011,7 @@ static void reset_history(void)
         LOGE("can not open file: %s\n", HISTORY_FILE);
         return;
     }
-    do_chmod(HISTORY_FILE, "644");
-    do_chown(HISTORY_FILE, "root", "log");
+    do_chown(HISTORY_FILE, PERM_USER, PERM_GROUP);
     fprintf(to, "#V1.0 %-16s%-24s\n", CURRENT_UPTIME, "0000:00:00");
     fprintf(to, "#EVENT  ID                    DATE                 TYPE\n");
     fclose(to);

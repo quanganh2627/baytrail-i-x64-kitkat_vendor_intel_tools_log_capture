@@ -24,8 +24,8 @@ sleep 1
 # make files readable
 ispathinsdcard=`echo $storagePath | grep "mnt.*sdcard" | wc -l`
 if [ $ispathinsdcard == 0 ] ; then
-  chown root.log $dumpstate.txt
-  chown root.log $dropbox
+  chown system.log $dumpstate.txt
+  chown system.log $dropbox
 else
   chown root.sdcard_rw $dumpstate.txt
   chown root.sdcard_rw $dropbox

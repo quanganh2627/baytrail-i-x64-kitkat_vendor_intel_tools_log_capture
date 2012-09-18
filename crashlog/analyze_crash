@@ -28,7 +28,7 @@ finish_crashfile()
   echo "_END" >> $1
   ispathinsdcard=`echo $1 | grep "mnt.*sdcard" | wc -l`
   if [ $ispathinsdcard == 0 ] ; then
-	chown root.log $1
+	chown system.log $1
   fi
 }
 
