@@ -20,6 +20,8 @@ package com.intel.amtl;
 
 import android.app.Service;
 import android.content.Intent;
+import android.os.AsyncTask;
+import android.os.Handler;
 import android.os.IBinder;
 import android.util.Log;
 import android.widget.Toast;
@@ -31,6 +33,7 @@ import java.lang.RuntimeException;
 public class ShutdownService extends Service {
 
     private static final String MODULE = "ShutdownService";
+    private final Handler handler = new Handler();
 
     private AmtlCore core;
 
@@ -56,6 +59,10 @@ public class ShutdownService extends Service {
 
     @Override
     public void onStart(Intent intent, int startId) {
+        new AsyncShutdownServiceInitTask().execute((Void)null);
+    }
+
+    private synchronized void init() {
         if (this.core != null) {
             /* If configuration has changed, tells AmtlCore to apply the new configuration */
             if (this.core.rebootNeeded()) {
@@ -70,13 +77,43 @@ public class ShutdownService extends Service {
                         }
                     }
                     this.core.applyCfg();
-                    Toast toast = Toast.makeText(ShutdownService.this, "New Amtl configuration applied", Toast.LENGTH_LONG);
-                    toast.show();
-                } catch (AmtlCoreException e) {
-                    Toast toast = Toast.makeText(ShutdownService.this, e.getMessage(), Toast.LENGTH_LONG);
-                    toast.show();
+                    Runnable displayToast = new Runnable() {
+                        @Override
+                        public void run() {
+                            Toast toast = Toast.makeText(ShutdownService.this, "New Amtl configuration applied", Toast.LENGTH_LONG);
+                            toast.show();
+                        }
+                    };
+                    this.handler.post(displayToast);
+                } catch (final AmtlCoreException e) {
+                    Runnable displayToast = new Runnable() {
+                        @Override
+                        public void run() {
+                            Toast toast = Toast.makeText(ShutdownService.this, e.getMessage(), Toast.LENGTH_LONG);
+                            toast.show();
+                        }
+                    };
+                    this.handler.post(displayToast);
                 }
             }
+        }
+    }
+
+    private class AsyncShutdownServiceInitTask extends AsyncTask<Void, Integer, Void> {
+
+        protected Void doInBackground(Void... parms) {
+
+            try {
+                Log.i(AmtlCore.TAG, MODULE + ": ShutdownService init starting...");
+                ShutdownService.this.init();
+            } catch (Exception ex) {
+                Log.e(AmtlCore.TAG, MODULE + ": " + ex.getMessage(), ex);
+            }
+            return null;
+        }
+
+        protected void onPostExecute(Void result) {
+            Log.i(AmtlCore.TAG, MODULE + ": ShutdownService init done.");
         }
     }
 }

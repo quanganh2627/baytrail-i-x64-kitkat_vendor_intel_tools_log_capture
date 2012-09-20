@@ -20,9 +20,11 @@ package com.intel.amtl;
 
 import android.app.Service;
 import android.content.Intent;
+import android.os.AsyncTask;
 import android.os.IBinder;
 import android.os.SystemProperties;
 import android.util.Log;
+import java.lang.Void;
 
 import java.io.IOException;
 
@@ -37,6 +39,11 @@ public class BootService extends Service {
 
     @Override
     public void onStart(Intent intent, int startId) {
+
+        new AsyncBootServiceInitTask().execute((Void)null);
+    }
+
+    private synchronized void init() {
 
         // Get selected service name
         String service_name = "";
@@ -82,6 +89,24 @@ public class BootService extends Service {
         } else {
             Log.i(AmtlCore.TAG, MODULE + ": start " + service_name + " service");
             SystemProperties.set("persist.service." + service_name + ".enable", "1");
+        }
+    }
+
+    private class AsyncBootServiceInitTask extends AsyncTask<Void, Integer, Void> {
+
+        protected Void doInBackground(Void... parms) {
+            try {
+                Log.i(AmtlCore.TAG, MODULE + ": BootService init starting...");
+
+                BootService.this.init();
+            } catch (Exception ex) {
+                Log.e(AmtlCore.TAG, MODULE + ": " + ex.getMessage(), ex);
+            }
+            return null;
+        }
+
+        protected void onPostExecute(Void result) {
+            Log.i(AmtlCore.TAG, MODULE + ": BootService init done.");
         }
     }
 }

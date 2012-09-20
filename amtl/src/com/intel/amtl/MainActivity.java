@@ -28,6 +28,7 @@
  * 2.1.5  - 2012-08-28 - BZ 46162 - Identation problem
  * 2.1.6  - 2012-09-05 - BZ 46849 - Activate additional traces
  * 2.1.7  - 2012-09-03 - BZ 23105 - PTI logging support in AMTL
+ * 2.1.8  - 2012-09-25 - BZ 55058 - Fix ANR on services and main activity
  * ============================================================================
  */
 
@@ -36,6 +37,7 @@ package com.intel.amtl;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.Menu;
@@ -57,6 +59,8 @@ public class MainActivity extends Activity {
     private ToggleButton button_online_bp_log;
     private ToggleButton button_pti_bp_log;
     private ToggleButton button_disable_modem_trace;
+
+    private AsyncMainActivityInitTask initTask = null;
 
     private AmtlCore core;
 
@@ -155,8 +159,10 @@ public class MainActivity extends Activity {
         try {
             this.core = AmtlCore.get();
             this.core.setContext(this.getApplicationContext());
-            this.core.invalidate();
-            setUI(this.core.getCurCfg());
+            this.initTask = new AsyncMainActivityInitTask();
+            // let's init our AmtlCore in a background thread to release the UI thread asap.
+            this.initTask.execute((Void)null);
+
         } catch (AmtlCoreException e) {
             /* Failed to initialize application core */
             this.core = null;
@@ -261,9 +267,45 @@ public class MainActivity extends Activity {
     @Override
     protected void onDestroy() {
         Log.d(AmtlCore.TAG, MODULE + ": onDestroy() call");
+
+        if (this.initTask != null) {
+            this.initTask.cancel(true);
+        }
         if (this.core != null) {
             this.core.destroy();
         }
         super.onDestroy();
+    }
+
+    private class AsyncMainActivityInitTask extends AsyncTask<Void, Integer, Boolean> {
+
+        private volatile Exception lastException = null;
+
+        protected Boolean doInBackground(Void... parms) {
+
+            Boolean ret = false;
+
+            Log.i(AmtlCore.TAG, MODULE + ": MainActivity init starting...");
+
+            try {
+                MainActivity.this.core.invalidate();
+                ret = true;
+            } catch (AmtlCoreException e) {
+                this.lastException = e;
+                /* Failed to initialize application core */
+                MainActivity.this.core = null;
+                Log.e(AmtlCore.TAG, MODULE + ": " + e.getMessage());
+            }
+            return ret;
+        }
+
+        protected void onPostExecute(Boolean result) {
+            Log.i(AmtlCore.TAG, MODULE + ": MainActivity init done.");
+            if (result) {
+                MainActivity.this.setUI(MainActivity.this.core.getCurCfg());
+            } else {
+                UIHelper.exitDialog(MainActivity.this, "ERROR", this.lastException.getMessage() + "\nAMTL will exit.");
+            }
+        }
     }
 }
