@@ -95,6 +95,7 @@
 #define PROP_APLOG_DEPTH_DEF "3"
 #define PROP_APLOG_NB_PACKET_DEF "1"
 #define PROP_LOGSYSTEMSTATE "init.svc.logsystemstate"
+#define BOOT_STATUS "sys.boot_completed"
 #define SYS_PROP "/system/build.prop"
 #define SAVEDLINES  1
 #define MAX_RECORDS 5000
@@ -622,6 +623,12 @@ static void analyze_crash(char* type, char* path, char* key, char* uptime, char*
 static void notify_crash_to_upload(char* event_id)
 {
     char cmd[512];
+    char boot_state[PROPERTY_VALUE_MAX];
+
+    property_get(BOOT_STATUS, boot_state, "-1");
+    if (strcmp(boot_state, "1"))
+        return;
+
     snprintf(cmd,sizeof(cmd)-1,"am broadcast -n com.intel.crashreport/.NotificationReceiver -a com.intel.crashreport.intent.CRASH_LOGS_COPY_FINISHED -c android.intent.category.ALTERNATIVE --es %s %s",
              "com.intel.crashreport.extra.EVENT_ID",event_id);
     int status = system(cmd);
@@ -631,6 +638,12 @@ static void notify_crash_to_upload(char* event_id)
 
 static void notify_crashreport()
 {
+    char boot_state[PROPERTY_VALUE_MAX];
+
+    property_get(BOOT_STATUS, boot_state, "-1");
+    if (strcmp(boot_state, "1"))
+        return;
+
     int status = system("am broadcast -n com.intel.crashreport/.NotificationReceiver -a com.intel.crashreport.intent.CRASH_NOTIFY -c android.intent.category.ALTERNATIVE");
     if (status != 0)
         LOGI("notify crashreport status: %d.\n", status);
@@ -1561,11 +1574,25 @@ static int do_crashlogd(unsigned int files)
     return 0;
 }
 
+void check_running_logs_service()
+{
+    char logservice[PROPERTY_VALUE_MAX];
+    char logenable[PROPERTY_VALUE_MAX];
+
+    property_get("init.svc.apk_logfs", logservice, "");
+    property_get("persist.service.apklogfs.enable", logenable, "");
+    if (strcmp(logservice, "running") && !strcmp(logenable, "1")) {
+      LOGE("log service stopped whereas property is set .. restarting\n");
+      property_set("ctl.start", "apk_logfs");
+    }
+}
+
 void do_timeup()
 {
     int fd;
 
     while (1) {
+        check_running_logs_service();
         sleep(UPTIME_FREQUENCY);
         fd = open(HISTORY_UPTIME, O_RDWR | O_CREAT, 0666);
         if (fd < 0)
@@ -2275,13 +2302,7 @@ int main(int argc, char **argv)
         goto next2;
     }
 
-    if ((!strcmp(crypt_state, "encrypted")) && strcmp(decrypt, "trigger_post_fs_data")){
-        LOGI("phone enter state: encrypted start.\n");
-        strcpy(encryptstate,"ENCRYPTED");
-        goto next2;
-    }
-
-    if (!strcmp(decrypt, "trigger_post_fs_data")){
+   if ((!strcmp(crypt_state, "encrypted")) && !strcmp(decrypt, "trigger_restart_framework")){
         LOGI("phone enter state: phone encrypted.\n");
         strcpy(encryptstate,"ENCRYPTED");
         if (swupdated(buildVersion)) {
