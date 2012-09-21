@@ -525,6 +525,23 @@ static void compute_key(char* key, char *event, char *type)
     *tmp_key=0;
 }
 
+static void find_file_in_dir(char *name_file_found, char *dir_to_search, char *name_file_to_match)
+{
+    DIR *d;
+    struct dirent* de;
+    d = opendir(dir_to_search);
+    while ((de = readdir(d))) {
+        const char *name = de->d_name;
+        if (strstr(name, name_file_to_match)){
+            sprintf(name_file_found, "%s", name);
+            break;
+        }
+    }
+    LOGE("find_file_in_dir END");
+    closedir(d);
+}
+
+
 static void backup_apcoredump(unsigned int dir, char* name, char* path)
 {
     char src[512] = { '\0', };
@@ -1424,6 +1441,7 @@ static int do_crashlogd(unsigned int files)
                             char *p;
                             char tmp[32];
                             char type[20] = { '\0', };
+                            char tmp_data_name[PATHMAX];
 
                             snprintf(tmp,sizeof(tmp),"%s",event->name);
                             time(&t);
@@ -1448,8 +1466,9 @@ static int do_crashlogd(unsigned int files)
                             p = strstr(tmp,"trigger");
                             if ( p ){
                                 strcpy(p,"data");
-                                snprintf(path, sizeof(path),"%s/%s",wd_array[i].filename,tmp);
-                                snprintf(destion,sizeof(destion),"%s%d/%s", STATS_DIR,dir,tmp);
+                                find_file_in_dir(tmp_data_name,wd_array[i].filename,tmp);
+                                snprintf(path, sizeof(path),"%s/%s",wd_array[i].filename,tmp_data_name);
+                                snprintf(destion,sizeof(destion),"%s%d/%s", STATS_DIR,dir,tmp_data_name);
                                 do_copy(path, destion, 0);
                                 remove(path);
                             }
