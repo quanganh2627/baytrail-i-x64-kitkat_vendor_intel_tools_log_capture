@@ -7,7 +7,11 @@ help()
 
 prepare_crashfile()
 {
-  echo "EVENT=CRASH" > $2
+  if [ "$1" == "BZ" ] ; then
+    echo "EVENT=BZ" > $2
+  else
+    echo "EVENT=CRASH" > $2
+  fi
   echo "ID=$3" >> $2
   echo "SN=`cat /data/logs/uuid.txt`" >> $2
   echo "DATE=$7" >> $2
@@ -15,7 +19,12 @@ prepare_crashfile()
   echo "BUILD=$5" >> $2
   echo "BOARD=$6" >> $2
   echo "IMEI=$8" >> $2
-  echo "TYPE=$1" >> $2
+  if [ "$1" == "BZ" ] ; then
+    echo "TYPE=MANUAL" >> $2
+  else
+    echo "TYPE=$1" >> $2
+  fi
+
 }
 
 fulldropbox()

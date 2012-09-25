@@ -46,6 +46,8 @@
 #define APLOGEVENT "APLOG"
 #define STATSTRIGGER "STTRIG"
 #define APLOGTRIGGER "APLOGTRIG"
+#define BZEVENT "BZ"
+#define BZMANUAL "MANUAL"
 #define KERNEL_CRASH "IPANIC"
 #define SYSSERVER_WDT "UIWDT"
 #define KERNEL_FORCE_CRASH "IPANIC_FORCED"
@@ -119,9 +121,12 @@
 #define EMMC_STATS_DIR "/data/logs/stats"
 #define SDCARD_APLOGS_DIR "/mnt/sdcard/data/logs/aplogs"
 #define EMMC_APLOGS_DIR "/data/logs/aplogs"
+#define SDCARD_BZ_DIR "/mnt/sdcard/data/logs/bz"
+#define EMMC_BZ_DIR "/data/logs/bz"
 #define CRASH_CURRENT_LOG "/data/logs/currentcrashlog"
 #define STATS_CURRENT_LOG "/data/logs/currentstatslog"
 #define APLOGS_CURRENT_LOG "/data/logs/currentaplogslog"
+#define BZ_CURRENT_LOG "/data/logs/currentbzlog"
 #define HISTORY_FILE  "/data/logs/history_event"
 #define HISTORY_UPTIME "/data/logs/uptime"
 #define LOG_UUID "/data/logs/uuid.txt"
@@ -163,6 +168,7 @@
 char *CRASH_DIR = NULL;
 char *STATS_DIR = NULL;
 char *APLOGS_DIR = NULL;
+char *BZ_DIR = NULL;
 
 char buildVersion[PROPERTY_VALUE_MAX];
 char boardVersion[PROPERTY_VALUE_MAX];
@@ -619,7 +625,12 @@ static void create_first_crashfile(char* type, char* path, char* key, char* upti
 	char fullpath[PATHMAX];
 	snprintf(fullpath, sizeof(fullpath)-1, "%s/%s", path, CRASHFILE_NAME);
 	fp = fopen(fullpath,"w");
-	fprintf(fp,"EVENT=CRASH\n");
+	if (strstr(type,BZEVENT)) {
+		fprintf(fp,"EVENT=BZ\n");
+	}
+	else {
+		fprintf(fp,"EVENT=CRASH\n");
+	}
 	fprintf(fp,"ID=%s\n", key);
 	fprintf(fp,"SN=%s\n", uuid);
 	fprintf(fp,"DATE=%s\n", date);
@@ -627,7 +638,12 @@ static void create_first_crashfile(char* type, char* path, char* key, char* upti
 	fprintf(fp,"BUILD=%s\n", footprint);
 	fprintf(fp,"BOARD=%s\n", boardVersion);
 	fprintf(fp,"IMEI=%s\n", imei);
-	fprintf(fp,"TYPE=%s\n", type);
+	if (strstr(type,BZEVENT)) {
+		fprintf(fp,"TYPE=MANUAL\n");
+	}
+	else {
+		fprintf(fp,"TYPE=%s\n", type);
+	}
 	fprintf(fp,"_END\n");
 	fclose(fp);
 }
@@ -737,6 +753,8 @@ static void history_file_write(char *event, char *type, char *subtype, char *log
         fclose(to);
         if (!strncmp(event, CRASHEVENT, sizeof(CRASHEVENT)))
             analyze_crash(subtype, tmp, key, uptime, date_tmp_2);
+        else if(!strncmp(event, BZEVENT, sizeof(BZEVENT)))
+            analyze_crash(event, tmp, key, uptime, date_tmp_2);
     } else if (type != NULL) {
 
         to = fopen(HISTORY_FILE, "a");
@@ -854,6 +872,7 @@ static void sdcard_exist(void)
         CRASH_DIR = SDCARD_CRASH_DIR;
         STATS_DIR = SDCARD_STATS_DIR;
         APLOGS_DIR = SDCARD_APLOGS_DIR;
+        BZ_DIR = SDCARD_BZ_DIR;
     } else {
         mkdir("/mnt/sdcard/data/", 0777);
         mkdir("/mnt/sdcard/data/logs", 0777);
@@ -861,10 +880,12 @@ static void sdcard_exist(void)
             CRASH_DIR = SDCARD_CRASH_DIR;
             STATS_DIR = SDCARD_STATS_DIR;
             APLOGS_DIR = SDCARD_APLOGS_DIR;
+            BZ_DIR = SDCARD_BZ_DIR;
         } else {
             CRASH_DIR = EMMC_CRASH_DIR;
             STATS_DIR = EMMC_STATS_DIR;
             APLOGS_DIR = EMMC_APLOGS_DIR;
+            BZ_DIR = EMMC_BZ_DIR;
         }
     }
     return;
@@ -873,6 +894,7 @@ static void sdcard_exist(void)
 #define CRASH_MODE 0
 #define STATS_MODE 1
 #define APLOGS_MODE 2
+#define BZ_MODE 3
 static unsigned int find_dir(unsigned int max, int mode)
 {
     struct stat sb;
@@ -892,6 +914,9 @@ static unsigned int find_dir(unsigned int max, int mode)
         break;
     case APLOGS_MODE:
         snprintf(path, sizeof(path), APLOGS_CURRENT_LOG);
+        break;
+    case BZ_MODE:
+        snprintf(path, sizeof(path), BZ_CURRENT_LOG);
         break;
     default:
         snprintf(path, sizeof(path), STATS_CURRENT_LOG);
@@ -943,6 +968,9 @@ static unsigned int find_dir(unsigned int max, int mode)
         break;
     case APLOGS_MODE:
         dir = APLOGS_DIR;
+        break;
+    case BZ_MODE:
+        dir = BZ_DIR;
         break;
     default:
         dir = STATS_DIR;
@@ -1083,6 +1111,7 @@ struct wd_name wd_array[] = {
     {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, AP_COREDUMP ,"/data/logs/core", ".core"},
     {0, IN_MOVED_TO|IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, LOST ,"/data/system/dropbox", ".lost"}, /* for full dropbox */
     {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, STATSTRIGGER, "/data/logs/stats", "_trigger"},
+    {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, BZEVENT, "/data/logs/aplogs", "bz_trigger"},
     {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, APLOGTRIGGER, "/data/logs/aplogs", "_trigger"},
 };
 
@@ -1153,6 +1182,46 @@ void process_anr_or_uiwdt(char *destion, int dir, int remove_path)
     do_chown(dest_path_symb, PERM_USER, PERM_GROUP);
 }
 
+static int get_str_in_file(char *file, char *keyword, char *result)
+{
+    char buffer[PATHMAX];
+    int rc = 0;
+    FILE *fd1;
+    struct stat info;
+    int filelen,buflen;
+
+    if (stat(file, &info) < 0)
+        return -1;
+
+    if (keyword == NULL)
+        return -1;
+
+    fd1 = fopen(file,"r");
+    if(fd1 == NULL){
+        LOGE("can not open file: %s\n", file);
+        return -1;
+    }
+
+    while(!feof(fd1)){
+        if (fgets(buffer, sizeof(buffer), fd1) != NULL){
+            if (keyword && strstr(buffer,keyword)){
+                int buflen = strlen(buffer);
+                strcpy(result,buffer+strlen(keyword));
+                result[strlen(result)-1]= '\0';
+                rc = 0;
+                break;
+
+            }
+        }
+    }
+
+    if (fd1 != NULL)
+        fclose(fd1);
+
+    return rc;
+}
+
+
 void backtrace_anr_uiwdt(char *dest, int dir)
 {
     char value[PROPERTY_VALUE_MAX];
@@ -1162,6 +1231,7 @@ void backtrace_anr_uiwdt(char *dest, int dir)
     }
 }
 
+#define SCREENSHOT_PATTERN "SCREENSHOT="
 static int do_crashlogd(unsigned int files)
 {
     int fd, fd1;
@@ -1366,6 +1436,85 @@ static int do_crashlogd(unsigned int files)
                             notify_crashreport();
                             break;
                         }
+                         //for BZ trigger
+                        else if((strcmp(wd_array[i].eventname, BZEVENT)==0) && (strstr(event->name, "bz_trigger" ))){
+                            char *p;
+                            char tmp[PATHMAX] = {'\0',};
+                            int nbPacket,aplogDepth;
+                            int aplogIsPresent;
+
+                            char value[PROPERTY_VALUE_MAX];
+
+                            property_get(PROP_APLOG_DEPTH, value, PROP_APLOG_DEPTH_DEF);
+                            aplogDepth = atoi(value);
+                            if (aplogDepth < 0)
+                                aplogDepth = 0;
+                            property_get(PROP_APLOG_NB_PACKET, value, PROP_APLOG_NB_PACKET_DEF);
+                            nbPacket = atoi(value);
+                            if (nbPacket < 0)
+                                nbPacket = 0;
+
+                            int j,k;
+                            aplogIsPresent = 0;
+                            dir=-1;
+                            /*copy data file*/
+                            for( j=0; j < nbPacket ; j++){
+
+                                for(k=0;k < aplogDepth ; k++) {
+                                    aplogIsPresent = 1;
+                                    if ((j == 0) && (k == 0))
+                                        snprintf(path, sizeof(path),"%s",APLOG_FILE_0);
+                                    else
+                                        snprintf(path, sizeof(path),"%s.%d",APLOG_FILE_0,(j*aplogDepth)+k);
+
+                                    if(stat(path, &info) == 0){
+                                        if ((j == 0) && (k == 0)) {
+                                            dir = find_dir(files,BZ_MODE);
+                                            if (dir == -1) {
+                                                LOGE("find dir %d for BZ trigger failed\n", files);
+                                                //No need to write in the history event in this case
+                                                break;
+                                            }
+                                            snprintf(destion,sizeof(destion),"%s%d/aplog", BZ_DIR,dir);
+                                        }
+                                        else
+                                            snprintf(destion,sizeof(destion),"%s%d/aplog.%d", BZ_DIR,dir,(j*aplogDepth)+k);
+                                        do_copy(path, destion, 0);
+                                    }
+                                    else {
+                                        aplogIsPresent = 0;
+                                        break;
+                                    }
+                                }
+
+                                if(aplogIsPresent == 0)
+                                    break;
+                            }
+                            if(dir != -1) {
+                                    snprintf(destion,sizeof(destion),"%s%d/bz_description", BZ_DIR,dir);
+                                    snprintf(path, sizeof(path),"%s/%s",wd_array[i].filename,event->name);
+                                    do_copy(path,destion,0);
+                                    if (!get_str_in_file(path,SCREENSHOT_PATTERN,tmp)) {
+                                        snprintf(destion,sizeof(destion),"%s%d/bz_screenshot.png", BZ_DIR,dir);
+                                        LOGE("copy result %d\n",do_copy(tmp,destion,0));
+                                    }
+                                    time(&t);
+                                    time_tmp = localtime((const time_t *)&t);
+                                    PRINT_TIME(date_tmp_2, TIME_FORMAT_2, time_tmp);
+                                    compute_key(key, BZEVENT, BZMANUAL);
+                                    snprintf(destion,sizeof(destion),"%s%d/", BZ_DIR,dir);
+                                    LOGE("%-8s%-22s%-20s%s %s\n", BZEVENT, key, date_tmp_2, BZMANUAL, destion);
+                                    history_file_write(BZEVENT, BZMANUAL, NULL, destion, NULL, key, date_tmp_2);
+                                    del_file_more_lines(HISTORY_FILE);
+                                    notify_crashreport();
+                                    restart_profile2_srv();
+                            }
+
+                            /*delete trigger file*/
+                            snprintf(path, sizeof(path),"%s/%s",wd_array[i].filename,event->name);
+                            remove(path);
+                            break;
+                        }
                         // for aplog trigger
                         else if((strcmp(wd_array[i].eventname, APLOGTRIGGER)==0) && (strstr(event->name, "aplog_trigger" ))){
                             char *p;
@@ -1435,6 +1584,7 @@ static int do_crashlogd(unsigned int files)
                             /*delete trigger file*/
                             snprintf(path, sizeof(path),"%s/%s",wd_array[i].filename,event->name);
                             remove(path);
+                            break;
                         }
                         // for STATS trigger
                         else if((strcmp(wd_array[i].eventname,STATSTRIGGER)==0) && (strstr(event->name, "trigger" ))){
@@ -2143,6 +2293,20 @@ static void reset_aplogslog(void)
     fclose(fd);
 }
 
+static void reset_bzlog(void)
+{
+    char path[PATHMAX];
+    FILE *fd;
+    snprintf(path, sizeof(path), BZ_CURRENT_LOG);
+    fd = fopen(path, "w");
+    if (fd == NULL){
+        LOGE("can not open file: %s\n", path);
+        return;
+    }
+    fprintf(fd, "%d", 0);
+    fclose(fd);
+}
+
 static void uptime_history(char *lastuptime)
 {
     FILE *to;
@@ -2361,6 +2525,7 @@ int main(int argc, char **argv)
             reset_crashlog();
             reset_statslog();
             reset_aplogslog();
+            reset_bzlog();
             reset_history();
         }
         else {
