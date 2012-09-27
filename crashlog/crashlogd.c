@@ -47,6 +47,7 @@
 #define STATSTRIGGER "STTRIG"
 #define APLOGTRIGGER "APLOGTRIG"
 #define BZEVENT "BZ"
+#define BZTRIGGER "bz_trigger"
 #define BZMANUAL "MANUAL"
 #define KERNEL_CRASH "IPANIC"
 #define SYSSERVER_WDT "UIWDT"
@@ -629,7 +630,7 @@ static void create_first_crashfile(char* type, char* path, char* key, char* upti
     fclose(fp);
     do_chown(fullpath, PERM_USER, PERM_GROUP);
     fp = fopen(fullpath,"w");
-    if (strstr(type,BZEVENT)) {
+    if (!strncmp(type,BZEVENT,sizeof(BZEVENT))) {
         fprintf(fp,"EVENT=BZ\n");
     }
     else {
@@ -642,7 +643,7 @@ static void create_first_crashfile(char* type, char* path, char* key, char* upti
     fprintf(fp,"BUILD=%s\n", footprint);
     fprintf(fp,"BOARD=%s\n", boardVersion);
     fprintf(fp,"IMEI=%s\n", imei);
-    if (strstr(type,BZEVENT)) {
+    if (!strncmp(type,BZEVENT,sizeof(BZEVENT))) {
         fprintf(fp,"TYPE=MANUAL\n");
     }
     else {
@@ -1139,7 +1140,6 @@ struct wd_name wd_array[] = {
     {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, AP_COREDUMP ,"/data/logs/core", ".core"},
     {0, IN_MOVED_TO|IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, LOST ,"/data/system/dropbox", ".lost"}, /* for full dropbox */
     {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, STATSTRIGGER, "/data/logs/stats", "_trigger"},
-    {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, BZEVENT, "/data/logs/aplogs", "bz_trigger"},
     {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, APLOGTRIGGER, "/data/logs/aplogs", "_trigger"},
 };
 
@@ -1473,15 +1473,14 @@ static int do_crashlogd(unsigned int files)
                             notify_crashreport();
                             break;
                         }
-                         //for BZ trigger
-                        else if((strcmp(wd_array[i].eventname, BZEVENT)==0) && (strstr(event->name, "bz_trigger" ))){
+                        // for aplog and bz trigger
+                        else if((strcmp(wd_array[i].eventname, APLOGTRIGGER)==0) && (strstr(event->name, "_trigger" ))){
                             char *p;
                             char tmp[PATHMAX] = {'\0',};
                             int nbPacket,aplogDepth;
                             int aplogIsPresent;
 
                             char value[PROPERTY_VALUE_MAX];
-
                             property_get(PROP_APLOG_DEPTH, value, PROP_APLOG_DEPTH_DEF);
                             aplogDepth = atoi(value);
                             if (aplogDepth < 0)
@@ -1493,10 +1492,11 @@ static int do_crashlogd(unsigned int files)
 
                             int j,k;
                             aplogIsPresent = 0;
-                            dir=-1;
+                            dir = -1;
                             /*copy data file*/
                             for( j=0; j < nbPacket ; j++){
-
+                                if(strstr(event->name, "aplog_trigger" ))
+                                    dir=-1;
                                 for(k=0;k < aplogDepth ; k++) {
                                     aplogIsPresent = 1;
                                     if ((j == 0) && (k == 0))
@@ -1505,17 +1505,33 @@ static int do_crashlogd(unsigned int files)
                                         snprintf(path, sizeof(path),"%s.%d",APLOG_FILE_0,(j*aplogDepth)+k);
 
                                     if(stat(path, &info) == 0){
-                                        if ((j == 0) && (k == 0)) {
-                                            dir = find_dir(files,BZ_MODE);
+                                        if(k == 0 && strstr(event->name, "aplog_trigger" )){
+                                            dir = find_dir(files,APLOGS_MODE);
                                             if (dir == -1) {
-                                                LOGE("find dir %d for BZ trigger failed\n", files);
+                                                LOGE("find dir %d for aplog trigger failed\n", files);
                                                 //No need to write in the history event in this case
                                                 break;
-                                            }
-                                            snprintf(destion,sizeof(destion),"%s%d/aplog", BZ_DIR,dir);
+                                             }
                                         }
-                                        else
-                                            snprintf(destion,sizeof(destion),"%s%d/aplog.%d", BZ_DIR,dir,(j*aplogDepth)+k);
+                                        if ((j == 0) && (k == 0)) {
+                                            if(!strncmp(event->name, BZTRIGGER, sizeof(BZTRIGGER))) {
+                                                dir = find_dir(files,BZ_MODE);
+                                                if (dir == -1) {
+                                                    LOGE("find dir %d for BZ trigger failed\n", files);
+                                                    //No need to write in the history event in this case
+                                                    break;
+                                                }
+                                                snprintf(destion,sizeof(destion),"%s%d/aplog", BZ_DIR,dir);
+                                            }
+                                            else if(strstr(event->name, "aplog_trigger" ))
+                                                snprintf(destion,sizeof(destion),"%s%d/aplog", APLOGS_DIR,dir);
+                                        }
+                                        else{
+                                            if(!strncmp(event->name, BZTRIGGER, sizeof(BZTRIGGER)))
+                                                snprintf(destion,sizeof(destion),"%s%d/aplog.%d", BZ_DIR,dir,(j*aplogDepth)+k);
+                                            else if(strstr(event->name, "aplog_trigger" ))
+                                                snprintf(destion,sizeof(destion),"%s%d/aplog.%d", APLOGS_DIR,dir,(j*aplogDepth)+k);
+                                        }
                                         do_copy(path, destion, 0);
                                     }
                                     else {
@@ -1524,16 +1540,29 @@ static int do_crashlogd(unsigned int files)
                                     }
                                 }
 
+                                if((k != 0) && (dir != -1) && strstr(event->name, "aplog_trigger" )) {
+                                    time(&t);
+                                    time_tmp = localtime((const time_t *)&t);
+                                    PRINT_TIME(date_tmp_2, TIME_FORMAT_2, time_tmp);
+                                    compute_key(key, APLOGEVENT, APLOGTRIGGER);
+                                    snprintf(destion,sizeof(destion),"%s%d/", APLOGS_DIR,dir);
+                                    LOGE("%-8s%-22s%-20s%s %s\n", APLOGEVENT, key, date_tmp_2, event->name, destion);
+                                    history_file_write(APLOGEVENT, APLOGTRIGGER, NULL, destion, NULL, key, date_tmp_2);
+                                    del_file_more_lines(HISTORY_FILE);
+                                    notify_crashreport();
+                                    restart_profile2_srv();
+                                }
                                 if(aplogIsPresent == 0)
                                     break;
                             }
-                            if(dir != -1) {
+
+                            if(-1!=dir && !strncmp(event->name, BZTRIGGER, sizeof(BZTRIGGER))) {
                                     snprintf(destion,sizeof(destion),"%s%d/bz_description", BZ_DIR,dir);
                                     snprintf(path, sizeof(path),"%s/%s",wd_array[i].filename,event->name);
                                     do_copy(path,destion,0);
                                     if (!get_str_in_file(path,SCREENSHOT_PATTERN,tmp)) {
                                         snprintf(destion,sizeof(destion),"%s%d/bz_screenshot.png", BZ_DIR,dir);
-                                        LOGE("copy result %d\n",do_copy(tmp,destion,0));
+                                        do_copy(tmp,destion,0);
                                     }
                                     time(&t);
                                     time_tmp = localtime((const time_t *)&t);
@@ -1545,78 +1574,6 @@ static int do_crashlogd(unsigned int files)
                                     del_file_more_lines(HISTORY_FILE);
                                     notify_crashreport();
                                     restart_profile2_srv();
-                            }
-
-                            /*delete trigger file*/
-                            snprintf(path, sizeof(path),"%s/%s",wd_array[i].filename,event->name);
-                            remove(path);
-                            break;
-                        }
-                        // for aplog trigger
-                        else if((strcmp(wd_array[i].eventname, APLOGTRIGGER)==0) && (strstr(event->name, "aplog_trigger" ))){
-                            char *p;
-                            char tmp[20];
-                            int nbPacket,aplogDepth;
-                            int aplogIsPresent;
-
-                            char value[PROPERTY_VALUE_MAX];
-                            snprintf(tmp,sizeof(tmp),"%s",event->name);
-                            property_get(PROP_APLOG_DEPTH, value, PROP_APLOG_DEPTH_DEF);
-                            aplogDepth = atoi(value);
-                            if (aplogDepth < 0)
-                                aplogDepth = 0;
-                            property_get(PROP_APLOG_NB_PACKET, value, PROP_APLOG_NB_PACKET_DEF);
-                            nbPacket = atoi(value);
-                            if (nbPacket < 0)
-                                nbPacket = 0;
-
-                            int j,k;
-                            aplogIsPresent = 0;
-                            /*copy data file*/
-                            for( j=0; j < nbPacket ; j++){
-                                dir=-1;
-                                for(k=0;k < aplogDepth ; k++) {
-                                    aplogIsPresent = 1;
-                                    if ((j == 0) && (k == 0))
-                                        snprintf(path, sizeof(path),"%s",APLOG_FILE_0);
-                                    else
-                                        snprintf(path, sizeof(path),"%s.%d",APLOG_FILE_0,(j*aplogDepth)+k);
-
-                                    if(stat(path, &info) == 0){
-                                        if(k == 0){
-                                            dir = find_dir(files,APLOGS_MODE);
-                                            if (dir == -1) {
-                                                LOGE("find dir %d for aplog trigger failed\n", files);
-                                                //No need to write in the history event in this case
-                                                break;
-                                             }
-                                        }
-                                        if ((j == 0) && (k == 0))
-                                            snprintf(destion,sizeof(destion),"%s%d/aplog", APLOGS_DIR,dir);
-                                        else
-                                            snprintf(destion,sizeof(destion),"%s%d/aplog.%d", APLOGS_DIR,dir,(j*aplogDepth)+k);
-                                        do_copy(path, destion, 0);
-                                    }
-                                    else {
-                                        aplogIsPresent = 0;
-                                        break;
-                                    }
-                                }
-
-                                if((k != 0) && (dir != -1)) {
-                                    time(&t);
-                                    time_tmp = localtime((const time_t *)&t);
-                                    PRINT_TIME(date_tmp_2, TIME_FORMAT_2, time_tmp);
-                                    compute_key(key, APLOGEVENT, APLOGTRIGGER);
-                                    snprintf(destion,sizeof(destion),"%s%d/", APLOGS_DIR,dir);
-                                    LOGE("%-8s%-22s%-20s%s %s\n", APLOGEVENT, key, date_tmp_2, tmp, destion);
-                                    history_file_write(APLOGEVENT, APLOGTRIGGER, NULL, destion, NULL, key, date_tmp_2);
-                                    del_file_more_lines(HISTORY_FILE);
-                                    notify_crashreport();
-                                    restart_profile2_srv();
-                                }
-                                if(aplogIsPresent == 0)
-                                    break;
                             }
                             /*delete trigger file*/
                             snprintf(path, sizeof(path),"%s/%s",wd_array[i].filename,event->name);
