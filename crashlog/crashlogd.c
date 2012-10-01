@@ -626,6 +626,9 @@ static void create_first_crashfile(char* type, char* path, char* key, char* upti
     char mpanicpath[PATHMAX];
     snprintf(fullpath, sizeof(fullpath)-1, "%s/%s", path, CRASHFILE_NAME);
     fp = fopen(fullpath,"w");
+    fclose(fp);
+    do_chown(fullpath, PERM_USER, PERM_GROUP);
+    fp = fopen(fullpath,"w");
     if (strstr(type,BZEVENT)) {
         fprintf(fp,"EVENT=BZ\n");
     }
@@ -1161,6 +1164,9 @@ void process_anr_or_uiwdt(char *destion, int dir, int remove_path)
         do_chown(destion, PERM_USER, PERM_GROUP);
     }
     fp = fopen(destion, "r");
+    fclose(fp);
+    do_chown(destion, PERM_USER, PERM_GROUP);
+    fp = fopen(destion, "r");
     if (fp == NULL) {
         LOGE("Failed to open file %s:%s\n", destion, strerror(errno));
         return;
@@ -1174,12 +1180,18 @@ void process_anr_or_uiwdt(char *destion, int dir, int remove_path)
                 // copy
                 snprintf(dest_path,sizeof(dest_path),"%s%d/trace_all_stack.txt", CRASH_DIR, dir);
                 src = open(tracefile, O_RDONLY);
+                close(src);
+                do_chown(tracefile, PERM_USER, PERM_GROUP);
+                src = open(tracefile, O_RDONLY);
                 fstat(src, &stat_buf);
                 if (src < 0) {
                     LOGE("Failed to open file %s:%s\n", tracefile, strerror(errno));
                     break;
                 }
-                dest = open(dest_path, O_WRONLY|O_CREAT, stat_buf.st_mode);
+                dest = open(dest_path, O_WRONLY|O_CREAT);
+                close(dest);
+                do_chown(dest_path, PERM_USER, PERM_GROUP);
+                dest = open(dest_path, O_WRONLY, stat_buf.st_mode);
                 if (dest < 0) {
                     LOGE("Failed to open file %s:%s\n", dest_path, strerror(errno));
                     close(src);
@@ -1700,10 +1712,10 @@ static int do_crashlogd(unsigned int files)
                                 do_copy(path, destion, FILESIZE_MAX);
                                 LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, date_tmp_2, wd_array[i].eventname, destion);
                                 usleep(TIMEOUT_VALUE);
+                                history_file_write(CRASHEVENT, wd_array[i].eventname, NULL, destion, NULL, key, date_tmp_2);
                                 do_log_copy(wd_array[i].eventname,dir,date_tmp,APLOG_TYPE);
                                 del_file_more_lines(HISTORY_FILE);
                                 backtrace_anr_uiwdt(destion, dir);
-                                history_file_write(CRASHEVENT, wd_array[i].eventname, NULL, destion, NULL, key, date_tmp_2);
                                 if (strstr(event->name, "anr")) {
                                     snprintf(destion,sizeof(destion),"%s%d",CRASH_DIR,dir);
                                     wd = inotify_add_watch(fd, destion, IN_CLOSE_WRITE);
