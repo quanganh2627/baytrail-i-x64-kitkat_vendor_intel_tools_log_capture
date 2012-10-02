@@ -70,6 +70,31 @@ anr()
   fi
 }
 
+uiwdt()
+{
+  uiwdt=`ls $1 | grep "system_server_watchdog.*txt.gz" | wc -l`
+  if [ $uiwdt == 1 ] ; then
+    pid=`gunzip -c $1/system_server_watchdog*.txt.gz | grep "Process:" | awk -F":" '{print $2}'`
+    type=`gunzip -c $1/system_server_watchdog*.txt.gz | grep "Subject:" | awk -F":" '{print $2}'`
+    stack=`gunzip -c $1/system_server_watchdog*.txt.gz | grep -m8 -o "^  at.*(" | awk -F"at " '{print $2}' | awk -F"(" '{print $1}' | sed  -e "N;s/\n/ /" | sed -e "N;s/\n/ /" | sed -e "N;s/\n/ /"`
+
+    echo "DATA0=$pid" >> $2
+    echo "DATA1=$type" >> $2
+    echo "DATA2=$stack" >> $2
+  else
+    uiwdt=`ls $1 | grep "system_server_watchdog.*txt" | wc -l`
+    if [ $uiwdt == 1 ] ; then
+      pid=`grep "Process:" $1/system_server_watchdog*.txt | awk -F":" '{print $2}'`
+      type=`grep "Subject:" $1/system_server_watchdog*.txt | awk -F":" '{print $2}'`
+      stack=`grep -m8 -o "^  at.*(" $1/system_server_watchdog*.txt | awk -F"at " '{print $2}' |awk -F"(" '{print $1}' | sed  -e "N;s/\n/ /" | sed -e "N;s/\n/ /" | sed -e "N;s/\n/ /"`
+
+      echo "DATA0=$pid" >> $2
+      echo "DATA1=$type" >> $2
+      echo "DATA2=$stack" >> $2
+    fi
+  fi
+}
+
 wtf()
 {
   wtf=`ls $1 | grep "wtf.*.gz" | wc -l`
@@ -250,7 +275,10 @@ if [ $# -ge 3 ] ; then
     if [ "$tag" == "ANR" ] ; then
       anr $output $crashfilename
     fi
-	if [ "$tag" == "WTF" ] ; then
+    if [ "$tag" == "UIWDT" ] ; then
+      uiwdt $output $crashfilename
+    fi
+    if [ "$tag" == "WTF" ] ; then
       wtf $output $crashfilename
     fi
     if [ "$tag" == "TOMBSTONE" ] ; then
