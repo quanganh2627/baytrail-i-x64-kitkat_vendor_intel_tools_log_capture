@@ -1164,9 +1164,6 @@ void process_anr_or_uiwdt(char *destion, int dir, int remove_path)
         do_chown(destion, PERM_USER, PERM_GROUP);
     }
     fp = fopen(destion, "r");
-    fclose(fp);
-    do_chown(destion, PERM_USER, PERM_GROUP);
-    fp = fopen(destion, "r");
     if (fp == NULL) {
         LOGE("Failed to open file %s:%s\n", destion, strerror(errno));
         return;
@@ -1179,9 +1176,6 @@ void process_anr_or_uiwdt(char *destion, int dir, int remove_path)
                 tracefile[strlen(tracefile) - 1] = 0; /* eliminate trailing \n */
                 // copy
                 snprintf(dest_path,sizeof(dest_path),"%s%d/trace_all_stack.txt", CRASH_DIR, dir);
-                src = open(tracefile, O_RDONLY);
-                close(src);
-                do_chown(tracefile, PERM_USER, PERM_GROUP);
                 src = open(tracefile, O_RDONLY);
                 fstat(src, &stat_buf);
                 if (src < 0) {
