@@ -106,32 +106,32 @@
 #define MAX_DIR 1000
 #define PERM_USER "system"
 #define PERM_GROUP "log"
-#define HISTORY_FILE_DIR  "/data/logs"
-#define HISTORY_CORE_DIR  "/data/logs/core"
-#define APLOG_FILE_BOOT   "/data/logs/aplog_boot"
-#define APLOG_FILE_0        "/data/logs/aplog"
-#define APLOG_FILE_1    "/data/logs/aplog.1"
-#define BPLOG_FILE_0    "/data/logs/bplog"
-#define BPLOG_FILE_1    "/data/logs/bplog.1"
+#define HISTORY_FILE_DIR  "/logs"
+#define HISTORY_CORE_DIR  "/logs/core"
+#define APLOG_FILE_BOOT   "/logs/aplog_boot"
+#define APLOG_FILE_0        "/logs/aplog"
+#define APLOG_FILE_1    "/logs/aplog.1"
+#define BPLOG_FILE_0    "/logs/bplog"
+#define BPLOG_FILE_1    "/logs/bplog.1"
 #define APLOG_TYPE       0
 #define BPLOG_TYPE       1
 #define APLOG_STATS_TYPE 2
-#define SDCARD_CRASH_DIR "/mnt/sdcard/data/logs/crashlog"
-#define EMMC_CRASH_DIR "/data/logs/crashlog"
-#define SDCARD_STATS_DIR "/mnt/sdcard/data/logs/stats"
-#define EMMC_STATS_DIR "/data/logs/stats"
-#define SDCARD_APLOGS_DIR "/mnt/sdcard/data/logs/aplogs"
-#define EMMC_APLOGS_DIR "/data/logs/aplogs"
-#define SDCARD_BZ_DIR "/mnt/sdcard/data/logs/bz"
-#define EMMC_BZ_DIR "/data/logs/bz"
-#define CRASH_CURRENT_LOG "/data/logs/currentcrashlog"
-#define STATS_CURRENT_LOG "/data/logs/currentstatslog"
-#define APLOGS_CURRENT_LOG "/data/logs/currentaplogslog"
-#define BZ_CURRENT_LOG "/data/logs/currentbzlog"
-#define HISTORY_FILE  "/data/logs/history_event"
-#define HISTORY_UPTIME "/data/logs/uptime"
-#define LOG_UUID "/data/logs/uuid.txt"
-#define LOG_BUILDID "/data/logs/buildid.txt"
+#define SDCARD_CRASH_DIR "/mnt/sdcard/logs/crashlog"
+#define EMMC_CRASH_DIR "/logs/crashlog"
+#define SDCARD_STATS_DIR "/mnt/sdcard/logs/stats"
+#define EMMC_STATS_DIR "/logs/stats"
+#define SDCARD_APLOGS_DIR "/mnt/sdcard/logs/aplogs"
+#define EMMC_APLOGS_DIR "/logs/aplogs"
+#define SDCARD_BZ_DIR "/mnt/sdcard/logs/bz"
+#define EMMC_BZ_DIR "/logs/bz"
+#define BZ_CURRENT_LOG "/logs/currentbzlog"
+#define CRASH_CURRENT_LOG "/logs/currentcrashlog"
+#define STATS_CURRENT_LOG "/logs/currentstatslog"
+#define APLOGS_CURRENT_LOG "/logs/currentaplogslog"
+#define HISTORY_FILE  "/logs/history_event"
+#define HISTORY_UPTIME "/logs/uptime"
+#define LOG_UUID "/logs/uuid.txt"
+#define LOG_BUILDID "/logs/buildid.txt"
 #define KERNEL_CMDLINE "/proc/cmdline"
 #define STARTUP_STR "androidboot.wakesrc="
 #define PANIC_CONSOLE_NAME "/proc/emmc_ipanic_console"
@@ -150,7 +150,7 @@
 #define FABRIC_ERROR_NAME "ipanic_fabric_err"
 #define CRASHFILE_NAME "crashfile"
 
-#define MODEM_SHUTDOWN_TRIGGER "/data/logs/modemcrash/mshutdown.txt"
+#define MODEM_SHUTDOWN_TRIGGER "/logs/modemcrash/mshutdown.txt"
 
 // Add recovery error trigger
 #define RECOVERY_ERROR_TRIGGER "/cache/recovery/recoveryfail"
@@ -765,7 +765,7 @@ static void history_file_write(char *event, char *type, char *subtype, char *log
 
     if (log != NULL) {
         p = strstr(log, "/mnt/sdcard");
-        p1 = strstr(log, "/data/logs");
+        p1 = strstr(log, "/logs");
         if (p && p1)
             snprintf(tmp, sizeof(tmp), "/storage/sdcard0%s", p1);
         else
@@ -897,15 +897,14 @@ static void sdcard_exist(void)
 {
     struct stat info;
 
-    if (stat("/mnt/sdcard/data/logs", &info) == 0){
+    if (stat("/mnt/sdcard/logs", &info) == 0){
         CRASH_DIR = SDCARD_CRASH_DIR;
         STATS_DIR = SDCARD_STATS_DIR;
         APLOGS_DIR = SDCARD_APLOGS_DIR;
         BZ_DIR = SDCARD_BZ_DIR;
     } else {
-        mkdir("/mnt/sdcard/data/", 0777);
-        mkdir("/mnt/sdcard/data/logs", 0777);
-        if (stat("/mnt/sdcard/data/logs", &info) == 0){
+        mkdir("/mnt/sdcard/logs", 0777);
+        if (stat("/mnt/sdcard/logs", &info) == 0){
             CRASH_DIR = SDCARD_CRASH_DIR;
             STATS_DIR = SDCARD_STATS_DIR;
             APLOGS_DIR = SDCARD_APLOGS_DIR;
@@ -1127,20 +1126,21 @@ struct wd_name {
 };
 
 struct wd_name wd_array[] = {
-    {0, IN_CLOSE_WRITE, CURRENT_UPTIME, "/data/logs/uptime", ""},
+    {0, IN_CLOSE_WRITE, CURRENT_UPTIME, "/logs/uptime", ""},
     /* -------------------------above is file, below is dir---------------------------------------------------------------- */
-    {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, MODEM_CRASH ,"/data/logs/modemcrash", "mpanic.txt"},/*for modem crash */
-    {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, AP_INI_M_RST ,"/data/logs/modemcrash", "apimr.txt"},
-    {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, M_RST_WN_COREDUMP ,"/data/logs/modemcrash", "mreset.txt"},
+    {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, MODEM_CRASH ,"/logs/modemcrash", "mpanic.txt"},/*for modem crash */
+    {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, AP_INI_M_RST ,"/logs/modemcrash", "apimr.txt"},
+    {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, M_RST_WN_COREDUMP ,"/logs/modemcrash", "mreset.txt"},
     /* -------------------------above is modem, below is AP---------------------------------------------------------------- */
     {0, IN_MOVED_TO|IN_DELETE_SELF|IN_MOVE_SELF, SYSSERVER_WDT, "/data/system/dropbox", "system_server_watchdog"},
     {0, IN_MOVED_TO|IN_DELETE_SELF|IN_MOVE_SELF, ANR_CRASH, "/data/system/dropbox", "anr"},
     {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, TOMB_CRASH, "/data/tombstones", "tombstone"},
     {0, IN_MOVED_TO|IN_DELETE_SELF|IN_MOVE_SELF, JAVA_CRASH, "/data/system/dropbox", "crash"},
-    {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, AP_COREDUMP ,"/data/logs/core", ".core"},
+    {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, AP_COREDUMP ,"/logs/core", ".core"},
     {0, IN_MOVED_TO|IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, LOST ,"/data/system/dropbox", ".lost"}, /* for full dropbox */
-    {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, STATSTRIGGER, "/data/logs/stats", "_trigger"},
-    {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, APLOGTRIGGER, "/data/logs/aplogs", "_trigger"},
+    {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, STATSTRIGGER, "/logs/stats", "_trigger"},
+    {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, BZEVENT, "/logs/aplogs", "bz_trigger"},
+    {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, APLOGTRIGGER, "/logs/aplogs", "_trigger"},
 };
 
 int WDCOUNT = ((int)(sizeof(wd_array)/sizeof(struct wd_name)));
@@ -2394,7 +2394,7 @@ static void update_logs_permission(void)
     }
 
     if (!strncmp(value, "1", 1)) {
-        LOGI("Folders /data/logs and /data/logs/core set to 0777\n");
+        LOGI("Folders /logs and /logs/core set to 0777\n");
         chmod(HISTORY_FILE_DIR,0777);
         chmod(HISTORY_CORE_DIR,0777);
     }

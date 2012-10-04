@@ -19,8 +19,8 @@
 
 if [ $# -eq 1 ] ; then
 
-  diremmc="/data/logs"
-  dirsd="/mnt/sdcard/data/logs"
+  diremmc="/logs"
+  dirsd="/mnt/sdcard/logs"
   num=$1
 
   tmp=$diremmc"/crashlog"$num
