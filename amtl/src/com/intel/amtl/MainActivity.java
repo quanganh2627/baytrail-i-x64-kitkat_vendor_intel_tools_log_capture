@@ -29,6 +29,7 @@
  * 2.1.6  - 2012-09-05 - BZ 46849 - Activate additional traces
  * 2.1.7  - 2012-09-03 - BZ 23105 - PTI logging support in AMTL
  * 2.1.8  - 2012-09-25 - BZ 55058 - Fix ANR on services and main activity
+ * 2.1.9  - 2012-10-05 - BZ 60711 - Check modem status before opening gsmtty
  * ============================================================================
  */
 
@@ -259,7 +260,7 @@ public class MainActivity extends Activity {
         super.onResume();
         if (this.core != null) {
             if (this.core.rebootNeeded()) {
-                UIHelper.message_pop_up(this, "WARNING", "Your board need a HARDWARE REBOOT");
+                UIHelper.message_pop_up(this, "WARNING", "Your board needs a HARDWARE REBOOT");
             }
         }
     }

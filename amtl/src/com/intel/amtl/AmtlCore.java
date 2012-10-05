@@ -106,12 +106,8 @@ public class AmtlCore {
             /* Create status monitor and open gsmtty device */
             this.modemStatusMonitor = new ModemStatusMonitor();
             this.ttyManager = new SynchronizeSTMD();
-            this.ttyManager.openTty();
-            this.gsmtty = new RandomAccessFile(this.ttyManager.getTtyName(), "rw");
         } catch (ExceptionInInitializerError ex) {
             throw new AmtlCoreException("AMTL library not found, please install it first");
-        } catch (Exception ex) {
-            throw new AmtlCoreException(String.format("Error while opening %s", this.ttyManager.getTtyName()));
         }
 
         this.firstCfgSet = true;
@@ -154,6 +150,13 @@ public class AmtlCore {
 
         if (nbTry >= MAX_MODEM_STATUS_RETRY) {
             throw new AmtlCoreException(ERR_MODEM_NOT_READY);
+        } else {
+            try {
+                this.ttyManager.openTty();
+                this.gsmtty = new RandomAccessFile(this.ttyManager.getTtyName(), "rw");
+            } catch (Exception ex) {
+                throw new AmtlCoreException(String.format("Error while opening %s", this.ttyManager.getTtyName()));
+            }
         }
     }
 

@@ -176,7 +176,7 @@ public class ModemConfiguration {
         }
 
         if (ival.startsWith("at+") || ival.startsWith("AT+")) {
-            Log.d(AmtlCore.TAG, ival);
+            Log.d(AmtlCore.TAG, MODULE + ": sent command: " + ival);
         }
 
         f.writeBytes(ival);
@@ -192,6 +192,7 @@ public class ModemConfiguration {
         while (rsp_byte[bCount-4] != 0x4f || rsp_byte[bCount-3] != 0x4b || rsp_byte[bCount-2] != 0x0d || rsp_byte[bCount-1] != 0x0a);
 
         modem_value = new String(rsp_byte);
+        logAtCommand(modem_value, ival);
 
         if (ival.equals(AT_GET_XSIO)) {
             ret = getXsioValue(modem_value);
@@ -207,6 +208,46 @@ public class ModemConfiguration {
             ret = -1;
         }
         return ret;
+    }
+
+    /* Log the response of the modem to an AT command */
+    private void logAtCommand(String modemVal,String ival){
+        String subModemValue;
+        int indexOk = modemVal.indexOf("OK");
+
+        if (indexOk == -1) {
+            Log.e(AmtlCore.TAG, MODULE + ": cannot find OK in AT command response");
+        } else {
+            subModemValue = modemVal.substring(0, indexOk + 3);
+            subModemValue = subModemValue.replace("\r\n\r\n", "  ");
+            subModemValue = subModemValue.replace("\r\n", "  ");
+
+            if (ival == AT_GET_TRACE_LEVEL) {
+                int indexOfBb;
+                int indexOf3g;
+                int indexOfDigrf;
+                String modemResponse;
+
+                /* Only the states of bb_sw, 3g_sw and digrf are needed */
+                indexOfBb = subModemValue.indexOf("0)");
+                indexOf3g = subModemValue.indexOf("4)");
+                indexOfDigrf = subModemValue.indexOf("10)");
+                /* the index has changed because carriage return has been replaced by spaces */
+                indexOk = subModemValue.indexOf("OK");
+
+                if ((indexOfBb == -1) || (indexOf3g == -1) || (indexOfDigrf == -1)) {
+                    Log.e(AmtlCore.TAG, MODULE + ": cannot find at+systrace=10 response");
+                } else {
+                    modemResponse = subModemValue.substring(indexOfBb,indexOfBb + 13);
+                    modemResponse += " " + subModemValue.substring(indexOf3g,indexOf3g + 13);
+                    modemResponse += " " + subModemValue.substring(indexOfDigrf,indexOfDigrf + 14);
+                    modemResponse += "  " + subModemValue.substring(indexOk,indexOk + 2);
+                    Log.d(AmtlCore.TAG, MODULE + ": modem response : " + modemResponse);
+                }
+            } else {
+                Log.d(AmtlCore.TAG, MODULE + ": modem response : " + subModemValue);
+            }
+        }
     }
 
     /* Get trace level from string */
