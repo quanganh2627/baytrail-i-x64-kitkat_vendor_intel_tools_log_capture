@@ -1139,7 +1139,6 @@ struct wd_name wd_array[] = {
     {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, AP_COREDUMP ,"/logs/core", ".core"},
     {0, IN_MOVED_TO|IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, LOST ,"/data/system/dropbox", ".lost"}, /* for full dropbox */
     {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, STATSTRIGGER, "/logs/stats", "_trigger"},
-    {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, BZEVENT, "/logs/aplogs", "bz_trigger"},
     {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, APLOGTRIGGER, "/logs/aplogs", "_trigger"},
 };
 
