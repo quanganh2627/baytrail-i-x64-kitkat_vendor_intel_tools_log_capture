@@ -1353,6 +1353,7 @@ static int do_crashlogd(unsigned int files)
                                     loop_uptime_event = (hours / UPTIME_HOUR_FREQUENCY) + 1;
                                     notify_crashreport();
                                     restart_profile2_srv();
+                                    check_running_power_service();
                                 }
                             }
                         }
@@ -1769,8 +1770,21 @@ void check_running_logs_service()
     property_get("init.svc.apk_logfs", logservice, "");
     property_get("persist.service.apklogfs.enable", logenable, "");
     if (strcmp(logservice, "running") && !strcmp(logenable, "1")) {
-      LOGE("log service stopped whereas property is set .. restarting\n");
-      property_set("ctl.start", "apk_logfs");
+        LOGE("log service stopped whereas property is set .. restarting\n");
+        property_set("ctl.start", "apk_logfs");
+    }
+}
+
+void check_running_power_service()
+{
+    char powerservice[PROPERTY_VALUE_MAX];
+    char powerenable[PROPERTY_VALUE_MAX];
+
+    property_get("init.svc.profile_power", powerservice, "");
+    property_get("persist.service.power.enable", powerenable, "");
+    if (strcmp(powerservice, "running") && !strcmp(powerenable, "1")) {
+        LOGE("power service stopped whereas property is set .. restarting\n");
+        property_set("ctl.start", "profile_power");
     }
 }
 
