@@ -47,6 +47,7 @@
 #define STATSTRIGGER "STTRIG"
 #define APLOGTRIGGER "APLOGTRIG"
 #define BZEVENT "BZ"
+#define ERROREVENT "ERROR"
 #define BZTRIGGER "bz_trigger"
 #define BZMANUAL "MANUAL"
 #define KERNEL_CRASH "IPANIC"
@@ -69,6 +70,7 @@
 #define FABRIC_ERROR "FABRICERR"
 // Add Recovery error crash type
 #define RECOVERY_ERROR "RECOVERY_ERROR"
+#define CRASHLOG_ERROR_DEAD "CRASHLOG_DEAD"
 #define USBBOGUS "USBBOGUS"
 
 #define FILESIZE_MAX  (10*1024*1024)
@@ -1261,6 +1263,38 @@ void backtrace_anr_uiwdt(char *dest, int dir)
     }
 }
 
+static int crashlog_raise_error(char *reason)
+{
+    char date_tmp_2[32];
+    time_t t;
+    struct tm *time_tmp;
+    char key[SHA1_DIGEST_LENGTH+1];
+
+    time(&t);
+    time_tmp = localtime((const time_t *)&t);
+    PRINT_TIME(date_tmp_2, TIME_FORMAT_2, time_tmp);
+    // compute crash id
+    compute_key(key, CRASHEVENT, reason);
+
+    LOGE("%-8s%-22s%-20s%s\n", ERROREVENT, key, date_tmp_2, reason);
+    history_file_write(ERROREVENT, reason, NULL, NULL, NULL, key, date_tmp_2);
+    del_file_more_lines(HISTORY_FILE);
+    notify_crashreport();
+    return 0;
+}
+
+void check_crashlog_dead()
+{
+    char token[PROPERTY_VALUE_MAX];
+    property_get("crashlogd.token", token, "");
+    if ((strlen(token) < 4)) {
+         strcat(token, "1");
+         property_set("crashlogd.token", token);
+         if (!strncmp(token, "11", 2))
+             crashlog_raise_error(CRASHLOG_ERROR_DEAD);
+    }
+}
+
 #define SCREENSHOT_PATTERN "SCREENSHOT="
 static int do_crashlogd(unsigned int files)
 {
@@ -1286,6 +1320,7 @@ static int do_crashlogd(unsigned int files)
     char current_key[SHA1_DIGEST_LENGTH+1];
     struct tm *time_tmp;
 
+    check_crashlog_dead();
     fd = inotify_init();
     if (fd < 0) {
         LOGE("inotify_init failed, %s\n", strerror(errno));
@@ -2487,14 +2522,18 @@ int main(int argc, char **argv)
     char crypt_state[PROPERTY_VALUE_MAX];
     char encrypt_progress[PROPERTY_VALUE_MAX];
     char decrypt[PROPERTY_VALUE_MAX];
+    char token[PROPERTY_VALUE_MAX];
 
     strcpy(encryptstate,"DECRYPTED");
 
     property_get("ro.crypto.state", crypt_state, "unencrypted");
     property_get("vold.encrypt_progress",encrypt_progress,"");
     property_get("vold.decrypt", decrypt, "");
+    property_get("crashlogd.token", token, "");
 
     if ((!strcmp(crypt_state, "unencrypted")) && ( !encrypt_progress[0])){
+        if (strcmp(token, ""))
+            goto next2;
         LOGI("phone enter state: normal start.\n");
         if (swupdated(buildVersion)) {
             strcpy(lastuptime, "0000:00:00");
@@ -2518,6 +2557,8 @@ int main(int argc, char **argv)
     }
 
    if ((!strcmp(crypt_state, "encrypted")) && !strcmp(decrypt, "trigger_restart_framework")){
+        if (strcmp(token, ""))
+            goto next2;
         LOGI("phone enter state: phone encrypted.\n");
         strcpy(encryptstate,"ENCRYPTED");
         if (swupdated(buildVersion)) {
