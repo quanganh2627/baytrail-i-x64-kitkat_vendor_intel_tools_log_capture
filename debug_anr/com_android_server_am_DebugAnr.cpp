@@ -17,6 +17,7 @@
 #include <sys/stat.h>
 #include <dirent.h>
 #include <linux/rtc.h>
+#include <errno.h>
 
 
 
@@ -36,6 +37,7 @@ static void android_server_am_DebugAnr_logToFile(JNIEnv* env, jobject obj, jstri
 
     FILE *fp = fopen(name, "w");
     if (fp == NULL) {
+	    ALOGE("Create file failed %s:%s\n", name, strerror(errno));
 	    return;
     }
     env->ReleaseStringUTFChars(idObj, name);

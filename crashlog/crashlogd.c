@@ -1222,11 +1222,11 @@ void process_anr_or_uiwdt_tracefile(char *destion, int dir, int remove_path)
                 // copy
                 snprintf(dest_path,sizeof(dest_path),"%s%d/trace_all_stack.txt", CRASH_DIR, dir);
                 src = open(tracefile, O_RDONLY);
-                fstat(src, &stat_buf);
                 if (src < 0) {
                     LOGE("Failed to open file %s:%s\n", tracefile, strerror(errno));
                     break;
                 }
+                fstat(src, &stat_buf);
                 dest = open(dest_path, O_WRONLY|O_CREAT);
                 close(dest);
                 do_chmod(dest_path, "600");
