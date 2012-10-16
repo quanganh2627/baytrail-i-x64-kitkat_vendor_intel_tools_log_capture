@@ -19,16 +19,26 @@
 package com.intel.amtl;
 
 import android.app.Activity;
-import android.util.Log;
 import android.content.Context;
+import android.os.Handler.Callback;
+import android.os.Handler;
+import android.os.Message;
 import android.os.SystemProperties;
+import android.util.Log;
 import android.widget.TextView;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 
-public class AmtlCore {
+import com.intel.internal.telephony.MmgrClientException;
+import com.intel.internal.telephony.ModemEventListener;
+import com.intel.internal.telephony.ModemNotification;
+import com.intel.internal.telephony.ModemNotificationArgs;
+import com.intel.internal.telephony.ModemStatus;
+import com.intel.internal.telephony.ModemStatusManager;
+
+public class AmtlCore implements ModemEventListener {
 
     /* AMTL log tag */
     public static final String TAG = "AMTL";
@@ -42,17 +52,18 @@ public class AmtlCore {
     private static final String ERR_APPLY_CFG = "Failed to apply configuration";
     private static final String ERR_UPDATE_CFG = "Failed to get current configuration";
 
-    private static final int MAX_MODEM_STATUS_RETRY = 5;
-    private static final int MODEM_STATUS_RETRY_INTERVAL = 1000;
-
     private static final String PLATFORM_VERSION_PROPERTY = "ro.build.product";
     private static final String PLATFORM_MFLD_PR1 = "mfld_pr1";
     private static final String PLATFORM_MFLD_PR2 = "mfld_pr2";
     private static final String PLATFORM_VICTORIABAY = "victoriabay";
     private static final String PLATFORM_CTP_PR1 = "ctp_pr1";
 
+    private static final long MODEM_STATUS_TIMEOUT_MS = 2000;
+
     /* AMTL Core reference: singleton design pattern */
     private static AmtlCore core;
+
+    private ModemStatus currentStatus = ModemStatus.NONE;
 
     public static final Runtime rtm = java.lang.Runtime.getRuntime();
 
@@ -91,12 +102,14 @@ public class AmtlCore {
 
     private Services services;
     private ModemConfiguration modemCfg;
-    private ModemStatusMonitor modemStatusMonitor;
+    private ModemStatusManager modemStatusManager;
     private SynchronizeSTMD ttyManager;
 
     private Context ctx;
 
     private RandomAccessFile gsmtty;
+
+    protected Activity main;
 
     /* Constructor */
     private AmtlCore() throws AmtlCoreException {
@@ -104,8 +117,14 @@ public class AmtlCore {
 
         try {
             /* Create status monitor and open gsmtty device */
-            this.modemStatusMonitor = new ModemStatusMonitor();
+            this.modemStatusManager = ModemStatusManager.getInstance();
+            this.modemStatusManager.subscribeToEvent(this, ModemStatus.ALL, ModemNotification.ALL);
             this.ttyManager = new SynchronizeSTMD();
+        } catch (InstantiationException ex) {
+            throw new AmtlCoreException("Modem Status Manager client could not be instantiated." +
+                " Make sur his device has STMD or MMGR deployed.");
+        } catch (MmgrClientException ex) {
+            throw new AmtlCoreException(ex.getMessage());
         } catch (ExceptionInInitializerError ex) {
             throw new AmtlCoreException("AMTL library not found, please install it first");
         }
@@ -138,20 +157,23 @@ public class AmtlCore {
             Log.v(TAG, MODULE + ": platform version cannot be found.");
         }
 
-        /* Don't forget to start modem status monitoring */
-        this.modemStatusMonitor.start();
+        try {
+            /* Don't forget to start modem status monitoring */
+            this.modemStatusManager.connect("Amtl");
 
-        /* Wait for modem readiness to avoid writing on modem device too early */
-        int nbTry = 0;
-        do {
-            nbTry++;
-            android.os.SystemClock.sleep(MODEM_STATUS_RETRY_INTERVAL);
-        } while (!this.modemStatusMonitor.isModemUp() && nbTry < MAX_MODEM_STATUS_RETRY);
+            if (!this.modemStatusManager.waitForModemStatus(ModemStatus.UP, MODEM_STATUS_TIMEOUT_MS)) {
+                throw new AmtlCoreException("Modem is not ready.");
+            }
+            this.currentStatus = ModemStatus.UP;
+        } catch (MmgrClientException ex) {
+            throw new AmtlCoreException("Could not connect to Modem Status Monitor service.");
+        }
+    }
 
-        if (nbTry >= MAX_MODEM_STATUS_RETRY) {
-            throw new AmtlCoreException(ERR_MODEM_NOT_READY);
-        } else {
+    protected void openGsmtty () throws AmtlCoreException {
+        if (this.gsmtty == null) {
             try {
+                Log.d(TAG, MODULE + ": openGsmtty");
                 this.ttyManager.openTty();
                 this.gsmtty = new RandomAccessFile(this.ttyManager.getTtyName(), "rw");
             } catch (Exception ex) {
@@ -176,17 +198,11 @@ public class AmtlCore {
     /* Destructor */
     protected void destroy() {
         /* Close gsmtty device */
-        if (this.gsmtty != null) {
-            try {
-                this.gsmtty.close();
-            } catch (IOException ex) {
-                Log.e(TAG, MODULE + ": " + ex.toString());
-            }
-        }
+        closeGsmtty();
         /* Stop modem status monitoring */
-        if (this.modemStatusMonitor != null) {
-            this.modemStatusMonitor.stop();
-            this.modemStatusMonitor = null;
+        if (this.modemStatusManager != null) {
+            this.modemStatusManager.disconnect();
+            this.modemStatusManager = null;
         }
         /* Core is not available anymore */
         this.core = null;
@@ -243,7 +259,7 @@ public class AmtlCore {
 
     /* Apply selected configuration */
     protected void applyCfg() throws AmtlCoreException {
-        if (!modemStatusMonitor.isModemUp()) {
+        if (this.currentStatus != ModemStatus.UP) {
             throw new AmtlCoreException(ERR_MODEM_NOT_READY);
         }
         try {
@@ -392,7 +408,7 @@ public class AmtlCore {
 
     /* Force AMTL Core to update its internal modem configuration values */
     protected void invalidate() throws AmtlCoreException {
-        if (!this.modemStatusMonitor.isModemUp()) {
+        if (this.currentStatus != ModemStatus.UP) {
             throw new AmtlCoreException(ERR_MODEM_NOT_READY);
         }
         try {
@@ -401,7 +417,7 @@ public class AmtlCore {
                 /* If necessary Create and Update usbswitch.conf file */
                 usbswitch_update();
             }
-
+            this.openGsmtty();
             /* Recover the current configuration */
             /* Current service */
             this.serviceValue = this.services.service_status();
@@ -591,5 +607,66 @@ public class AmtlCore {
             Log.e(TAG, MODULE + ": invalid null reference.\nAMTL will exit.");
             a.finish();
         }
+    }
+
+    private void closeGsmtty() {
+        ttyManager.closeTty();
+        if (this.gsmtty != null) {
+            try {
+                this.gsmtty.close();
+            } catch (IOException ex) {
+                Log.e(TAG, MODULE + ": " + ex.toString());
+            }
+        }
+    }
+
+    @Override
+    public void onModemWarmReset(ModemNotificationArgs args) { }
+
+    @Override
+    public void onModemColdReset(ModemNotificationArgs args) { }
+
+    @Override
+    public void onModemShutdown(ModemNotificationArgs args) { }
+
+    @Override
+    public void onPlatformReboot(ModemNotificationArgs args) { }
+
+    @Override
+    public void onModemCoreDump(ModemNotificationArgs args) { }
+
+    @Override
+    public void onModemUp() {
+        this.currentStatus = ModemStatus.UP;
+
+        try {
+            this.ttyManager.openTty();
+            this.gsmtty = new RandomAccessFile(this.ttyManager.getTtyName(), "rw");
+        } catch (Exception ex) {
+            Log.e(TAG, MODULE + String.format("Error while opening %s", this.ttyManager.getTtyName()));
+        }
+    }
+
+    @Override
+    public void onModemDown() {
+        this.currentStatus = ModemStatus.DOWN;
+
+        if (this.ttyManager != null) {
+            try {
+                this.ttyManager.closeTty();
+                if (this.gsmtty != null) {
+                    this.gsmtty.close();
+                    this.gsmtty = null;
+                }
+            } catch (Exception ex) {
+                Log.e(TAG, MODULE + String.format("Error while opening %s", this.ttyManager.getTtyName()));
+            }
+        }
+    }
+
+    @Override
+    public void onModemDead() {
+        this.onModemDown();
+        this.currentStatus = ModemStatus.DEAD;
     }
 }

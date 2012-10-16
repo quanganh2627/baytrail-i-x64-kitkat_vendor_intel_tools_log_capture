@@ -30,6 +30,7 @@
  * 2.1.7  - 2012-09-03 - BZ 23105 - PTI logging support in AMTL
  * 2.1.8  - 2012-09-25 - BZ 55058 - Fix ANR on services and main activity
  * 2.1.9  - 2012-10-05 - BZ 60711 - Check modem status before opening gsmtty
+ * 2.2.0 - 2012-10-12 - BZ 52786 - WA to handle MMGR
  * ============================================================================
  */
 
@@ -160,6 +161,7 @@ public class MainActivity extends Activity {
         try {
             this.core = AmtlCore.get();
             this.core.setContext(this.getApplicationContext());
+            this.core.main = this;
             this.initTask = new AsyncMainActivityInitTask();
             // let's init our AmtlCore in a background thread to release the UI thread asap.
             this.initTask.execute((Void)null);
@@ -271,6 +273,9 @@ public class MainActivity extends Activity {
 
         if (this.initTask != null) {
             this.initTask.cancel(true);
+        }
+        if (this.core.main != null) {
+            this.core.main = null;
         }
         if (this.core != null) {
             this.core.destroy();
