@@ -45,6 +45,7 @@
 #define STATEEVENT "STATE"
 #define APLOGEVENT "APLOG"
 #define STATSTRIGGER "STTRIG"
+#define HPROF "HPROF"
 #define APLOGTRIGGER "APLOGTRIG"
 #define BZEVENT "BZ"
 #define ERROREVENT "ERROR"
@@ -1140,6 +1141,7 @@ struct wd_name wd_array[] = {
     {0, IN_MOVED_TO|IN_DELETE_SELF|IN_MOVE_SELF, JAVA_CRASH, "/data/system/dropbox", "crash"},
     {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, AP_COREDUMP ,"/logs/core", ".core"},
     {0, IN_MOVED_TO|IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, LOST ,"/data/system/dropbox", ".lost"}, /* for full dropbox */
+    {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, HPROF, "/logs/core", ".hprof"},
     {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, STATSTRIGGER, "/logs/stats", "_trigger"},
     {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, APLOGTRIGGER, "/logs/aplogs", "_trigger"},
 };
@@ -1498,6 +1500,31 @@ static int do_crashlogd(unsigned int files)
                             usleep(TIMEOUT_VALUE);
                             do_log_copy(lostevent,dir,date_tmp,APLOG_TYPE);
                             history_file_write(CRASHEVENT, lostevent, lostevent_subtype, destion, NULL, key, date_tmp_2);
+                            del_file_more_lines(HISTORY_FILE);
+                            notify_crashreport();
+                            break;
+                        }
+                        /* for hprof */
+                        else if(strstr(event->name, wd_array[i].cmp) && (strstr(event->name, ".hprof" ))){
+                            time(&t);
+                            time_tmp = localtime((const time_t *)&t);
+                            PRINT_TIME(date_tmp, TIME_FORMAT_1, time_tmp);
+                            PRINT_TIME(date_tmp_2, TIME_FORMAT_2, time_tmp);
+                            compute_key(key, CRASHEVENT, HPROF);
+
+                            dir = find_dir(files,CRASH_MODE);
+                            if (dir == -1) {
+                                LOGE("find dir %d for hprof failed\n", files);
+                                break;
+                            }
+                            /*copy hprof file*/
+                            snprintf(path, sizeof(path),"%s/%s",wd_array[i].filename,event->name);
+                            snprintf(destion,sizeof(destion),"%s%d/%s", CRASH_DIR,dir,event->name);
+                            do_copy(path, destion, 0);
+                            remove(path);
+                            snprintf(destion,sizeof(destion),"%s%d/",CRASH_DIR,dir);
+                            LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, date_tmp_2, HPROF, destion);
+                            history_file_write(CRASHEVENT, HPROF, NULL, destion, NULL, key, date_tmp_2);
                             del_file_more_lines(HISTORY_FILE);
                             notify_crashreport();
                             break;
