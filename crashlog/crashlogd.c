@@ -180,6 +180,7 @@ char uuid[256];
 int loop_uptime_event = 1;
 int test_flag = 0;
 int index_cons = 0;
+int WDCOUNT_START = 0;
 
 static int do_mv(char *src, char *des)
 {
@@ -1129,12 +1130,7 @@ struct wd_name {
 };
 
 struct wd_name wd_array[] = {
-    {0, IN_CLOSE_WRITE, CURRENT_UPTIME, "/logs/uptime", ""},
-    /* -------------------------above is file, below is dir---------------------------------------------------------------- */
-    {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, MODEM_CRASH ,"/logs/modemcrash", "mpanic.txt"},/*for modem crash */
-    {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, AP_INI_M_RST ,"/logs/modemcrash", "apimr.txt"},
-    {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, M_RST_WN_COREDUMP ,"/logs/modemcrash", "mreset.txt"},
-    /* -------------------------above is modem, below is AP---------------------------------------------------------------- */
+    /* -------------Warning: if table is updated, don't forget to update also WDCOUNT and WDCOUNT_START in main function--- */
     {0, IN_MOVED_TO|IN_DELETE_SELF|IN_MOVE_SELF, SYSSERVER_WDT, "/data/system/dropbox", "system_server_watchdog"},
     {0, IN_MOVED_TO|IN_DELETE_SELF|IN_MOVE_SELF, ANR_CRASH, "/data/system/dropbox", "anr"},
     {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, TOMB_CRASH, "/data/tombstones", "tombstone"},
@@ -1144,6 +1140,12 @@ struct wd_name wd_array[] = {
     {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, HPROF, "/logs/core", ".hprof"},
     {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, STATSTRIGGER, "/logs/stats", "_trigger"},
     {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, APLOGTRIGGER, "/logs/aplogs", "_trigger"},
+    /* -----------------------------above is dir, below is file------------------------------------------------------------ */
+    {0, IN_CLOSE_WRITE, CURRENT_UPTIME, "/logs/uptime", ""},
+    /* -------------------------above is AP, below is modem---------------------------------------------------------------- */
+    {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, MODEM_CRASH ,"/logs/modemcrash", "mpanic.txt"},/*for modem crash */
+    {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, AP_INI_M_RST ,"/logs/modemcrash", "apimr.txt"},
+    {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, M_RST_WN_COREDUMP ,"/logs/modemcrash", "mreset.txt"},
 };
 
 int WDCOUNT = ((int)(sizeof(wd_array)/sizeof(struct wd_name)));
@@ -1330,7 +1332,7 @@ static int do_crashlogd(unsigned int files)
         return 1;
     }
 
-    for (i = 0; i < WDCOUNT; i++) {
+    for (i = WDCOUNT_START; i < WDCOUNT; i++) {
         wd = inotify_add_watch(fd, wd_array[i].filename,
                 wd_array[i].mask);
         if (wd < 0) {
@@ -1349,7 +1351,7 @@ static int do_crashlogd(unsigned int files)
         while (((char *)event - buffer) < len) {
             /* for dir to be delete */
             if((event->mask & IN_DELETE_SELF) ||(event->mask & IN_MOVE_SELF)){
-                for (i = 0; i < WDCOUNT; i++) {
+                for (i = WDCOUNT_START; i < WDCOUNT; i++) {
                     if (event->wd != wd_array[i].wd)
                         continue;
                     mkdir(wd_array[i].filename, 0777);
@@ -1363,7 +1365,7 @@ static int do_crashlogd(unsigned int files)
                 }
             }
             if (!(event->mask & IN_ISDIR)) {
-                for (i = 0; i < WDCOUNT; i++) {
+                for (i = WDCOUNT_START; i < WDCOUNT; i++) {
                     if (event->wd != wd_array[i].wd)
                         continue;
                     if(!event->len){
@@ -2530,11 +2532,16 @@ int main(int argc, char **argv)
 
     if (argc == 2) {
         if(!memcmp(argv[1], "-modem", 6)){
-            WDCOUNT=4;
+            WDCOUNT_START = 8;
+            WDCOUNT = WDCOUNT_START + 4;
             LOGI(" crashlogd only snoop modem \n");
         }
         else if(!memcmp(argv[1], "-test", 5)){
             test_flag = 1;
+        }
+        else if(!memcmp(argv[1], "-nomodem", 8)){
+            WDCOUNT = (WDCOUNT - 3);
+            LOGI(" crashlogd only snoop AP \n");
         }
         else{
             errno = 0;
