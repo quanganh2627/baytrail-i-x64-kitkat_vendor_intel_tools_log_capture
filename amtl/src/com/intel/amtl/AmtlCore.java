@@ -48,7 +48,7 @@ public class AmtlCore {
     private static final String PLATFORM_VERSION_PROPERTY = "ro.build.product";
     private static final String PLATFORM_MFLD_PR1 = "mfld_pr1";
     private static final String PLATFORM_MFLD_PR2 = "mfld_pr2";
-    private static final String PLATFORM_CTP_PR0 = "ctp_pr0";
+    private static final String PLATFORM_VICTORIABAY = "victoriabay";
     private static final String PLATFORM_CTP_PR1 = "ctp_pr1";
 
     /* AMTL Core reference: singleton design pattern */
@@ -129,7 +129,7 @@ public class AmtlCore {
             if ((platformVersion.equals(PLATFORM_MFLD_PR1)) ||
                 (platformVersion.equals(PLATFORM_MFLD_PR2))) {
                 this.usbswitchEnabled = true;
-            } else if ((platformVersion.equals(PLATFORM_CTP_PR0)) ||
+            } else if ((platformVersion.equals(PLATFORM_VICTORIABAY)) ||
                 (platformVersion.equals(PLATFORM_CTP_PR1))) {
                 this.usbAcmEnabled = true;
                 this.ptiEnabled = true;
