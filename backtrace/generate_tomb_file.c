@@ -42,9 +42,10 @@ int dump_binder_info(FILE* f, unsigned int pid)
 		 }
 
 		fprintf(f,"----binder info end: pid %d----\n\n",  pid);
-		fclose(fp);
-
    }
+   if (fp)
+	   fclose(fp);
+
    return 0;
 }
 int dump_binder_transaction(FILE* f)
@@ -60,10 +61,10 @@ int dump_binder_transaction(FILE* f)
 		while(fgets(buf, PATH_LENGTH, fp)) {
 		    fputs(buf ,f);
 		 }
-
-		fclose(fp);
-
    }
+   if (fp)
+      fclose(fp);
+
    return 0;
 }
 
@@ -82,8 +83,10 @@ int read_process_maps(FILE *f, unsigned int pid)
 		    fputs(buf,f);
 		 }
 		fprintf(f,"----maps end: pid %d----\n\n",  pid);
-		fclose(fp);
 	}
+	if (fp)
+		fclose(fp);
+
 	return 0;
 }
 int read_process_stack(FILE *f, unsigned int pid)
@@ -103,8 +106,9 @@ int read_process_stack(FILE *f, unsigned int pid)
 		    fputs(buf ,f);
 		 }
 		fprintf(f,"----process stack end: pid %d----\n\n", pid);
-		fclose(fp);
 	}
+	if (fp)
+		fclose(fp);
 
 	sprintf(path, "/proc/%d/task/", pid);
 	dp = opendir(path);
@@ -114,7 +118,8 @@ int read_process_stack(FILE *f, unsigned int pid)
 		while((filename = readdir(dp))) {
 			if (filename->d_name[0] > '0' && filename->d_name[0] <= '9') {
 				tid = atoi(filename->d_name);
-				read_thread_stack(f, pid, tid);
+				if (tid != pid)
+					read_thread_stack(f, pid, tid);
 			}
 
 		}
@@ -130,20 +135,14 @@ int read_thread_stack(FILE *f, unsigned int pid, int tid)
 	char str[PATH_LENGTH] = {0, };
 	FILE * fp = NULL;
 
-        char comm[PATH_LENGTH] = {0,};
-        char name[PATH_LENGTH] = {0,};
-        sprintf(name,"/proc/%d/comm",tid);
-        FILE *fpfile = fopen(name,"r");
-        if (fpfile)
-           fgets(comm,PATH_LENGTH,fpfile);
-        //fprintf(f, "--------PID START: %d ,process name %s--------\n", pid,comm);
-        if( fpfile )
-           fclose(fpfile);
-
-
-
-	if (pid == tid)
-		return 0;
+	char comm[PATH_LENGTH] = {0,};
+	char name[PATH_LENGTH] = {0,};
+	sprintf(name,"/proc/%d/comm",tid);
+	FILE *fpfile = fopen(name,"r");
+	if (fpfile)
+	   fgets(comm,PATH_LENGTH,fpfile);
+	if( fpfile )
+	   fclose(fpfile);
 
 	sprintf(path, "/proc/%d/task/%d/stack", pid, tid);
 
@@ -156,12 +155,10 @@ int read_thread_stack(FILE *f, unsigned int pid, int tid)
 		    fputs(str ,f);
 		 }
 		fprintf(f,"		----thread stack end: pid %d tid %d, thread name %s\n\n",  pid, tid, comm);
-		fclose(fp);
-                
-                if( fpfile )
-                  fclose(fpfile);
-
 	}
+	if (fp)
+		fclose(fp);
+
 	return 0;
 }
 
