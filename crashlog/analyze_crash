@@ -207,11 +207,18 @@ tombstone()
     process=`grep ">>>" $1/tombstone_* | awk -F">>>" '{print $2}' | awk -F"<" '{print $1}'`
     signal=`grep -A4 "Build fingerprint" $1/tombstone_* | grep "signal" | awk -F"(" '{print $2}' | awk -F")" '{print $1}'`
     flag=`grep -m1 -o "flags .*" $1/tombstone_* | awk -F" " '{print $2}'`
-    stack=`grep -A14 "Build fingerprint" $1/tombstone_* | grep "#0[0-7]" | awk -F"(" '{print $2}'| awk -F")" '{print $1}' | sed  -e "N;s/\n/ /" | sed -e "N;s/\n/ /" | sed -e "N;s/\n/ /"`
+    symbols=`grep -A14 "Build fingerprint" $1/tombstone_* | grep "#0[0-7]"| awk -F"(" '{print $2}'| awk -F")" '{print $1}'|sed ':a;N;$!ba;s/\n/ /g'|sed 's/^ $//'`
+    libs=`grep -A14 "Build fingerprint" $1/tombstone_* | grep "#0[0-7]"| awk -F" " '{print $4}'|sed ':a;N;$!ba;s/\n/ /g'|sed 's/^ $//'`
 
     echo "DATA0=$process" >> $2
     echo "DATA1=$signal" >> $2
-    echo "DATA2=$stack" >> $2
+
+    if [ "$symbols" == "" ] ; then
+      # No symbols found, print the libs with offset if found
+      echo "DATA2=$libs" >> $2
+    else
+      echo "DATA2=$symbols" >> $2
+    fi
   fi
 }
 
