@@ -1473,11 +1473,12 @@ static int do_crashlogd(unsigned int files)
                         else if(strstr(event->name, wd_array[i].cmp) && (strstr(event->name, ".lost" ))){
                             char lostevent[32] = { '\0', };
                             char lostevent_subtype[32] = { '\0', };
-                            if (strstr(event->name, "anr")) {
+                            if (strstr(event->name, "anr"))
                                 strcpy(lostevent, ANR_CRASH);
-                            }
                             else if (strstr(event->name, "crash"))
                                 strcpy(lostevent, JAVA_CRASH);
+                            else if (strstr(event->name, "watchdog"))
+                                strcpy(lostevent, SYSSERVER_WDT);
                             else
                                 break;
                             snprintf(lostevent_subtype, sizeof(lostevent_subtype), "%s_%s", LOST, lostevent);

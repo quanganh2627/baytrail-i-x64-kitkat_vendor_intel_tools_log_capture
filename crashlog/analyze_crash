@@ -257,7 +257,10 @@ if [ $# -ge 3 ] ; then
       tag="ANR"
       dropbox="full"
   fi
-
+  if [ "$tag" == "LOST_DROPBOX_UIWDT" ] ; then
+      tag="UIWDT"
+      dropbox="full"
+  fi
   if [ "$tag" == "LOST_DROPBOX_WTF" ] ; then
       tag="WTF"
       dropbox="full"
