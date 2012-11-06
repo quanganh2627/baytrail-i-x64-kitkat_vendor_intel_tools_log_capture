@@ -99,7 +99,7 @@
 #define PROP_ANR_USERSTACK "persist.anr.userstack.disabled"
 #define PROP_APLOG_DEPTH "persist.crashreport.aplogdepth"
 #define PROP_APLOG_NB_PACKET "persist.crashreport.packet"
-#define PROP_APLOG_DEPTH_DEF "3"
+#define PROP_APLOG_DEPTH_DEF "5"
 #define PROP_APLOG_NB_PACKET_DEF "1"
 #define PROP_LOGSYSTEMSTATE "init.svc.logsystemstate"
 #define BOOT_STATUS "sys.boot_completed"
