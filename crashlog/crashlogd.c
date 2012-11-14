@@ -628,16 +628,40 @@ static void build_footprint(char *id)
     strncat(id, prop, SIZE_FOOTPRINT_MAX);
 }
 
-static void create_first_crashfile(char* type, char* path, char* key, char* uptime, char* footprint, char* boardVersion, char* date, char* imei)
+//This function creates a minimal crashfile (without DATA0, DATA1 and DATA2 fields)
+//Note:DATA0 is filled for Modem Panic case only
+static void create_minimal_crashfile(char* type, char* path, char* key, char* uptime, char* date)
 {
     FILE *fp;
     char fullpath[PATHMAX];
     char mpanicpath[PATHMAX];
+    char footprint[SIZE_FOOTPRINT_MAX] = { '\0', };
+    char imei[PROPERTY_VALUE_MAX];
+
+    property_get(IMEI_FIELD, imei, "");
+
+    build_footprint(footprint);
+
     snprintf(fullpath, sizeof(fullpath)-1, "%s/%s", path, CRASHFILE_NAME);
+
+    //Create crashfile
     fp = fopen(fullpath,"w");
+    if (fp == NULL)
+    {
+        LOGE("can not create file: %s\n", fullpath);
+        return;
+    }
     fclose(fp);
     do_chown(fullpath, PERM_USER, PERM_GROUP);
+
     fp = fopen(fullpath,"w");
+    if (fp == NULL)
+    {
+        LOGE("can not open file: %s\n", fullpath);
+        return;
+    }
+
+    //Fill crashfile
     if (!strncmp(type,BZEVENT,sizeof(BZEVENT))) {
         fprintf(fp,"EVENT=BZ\n");
     }
@@ -657,6 +681,7 @@ static void create_first_crashfile(char* type, char* path, char* key, char* upti
     else {
         fprintf(fp,"TYPE=%s\n", type);
     }
+    //MPANIC crash : fill DATA0 field
     if (!strcmp(MODEM_CRASH,type)){
         LOGI("Modem panic detected : generating DATA0\n");
         FILE *fd_panic;
@@ -683,25 +708,6 @@ static void create_first_crashfile(char* type, char* path, char* key, char* upti
     }
     fprintf(fp,"_END\n");
     fclose(fp);
-}
-
-
-static void analyze_crash(char* type, char* path, char* key, char* uptime, char* date)
-{
-    char cmd[512] = { '\0', };
-    char footprint[SIZE_FOOTPRINT_MAX] = { '\0', };
-    char imei[PROPERTY_VALUE_MAX];
-
-    property_get(IMEI_FIELD, imei, "");
-
-    build_footprint(footprint);
-
-    snprintf(cmd, sizeof(cmd)-1, "/system/bin/analyze_crash %s %s %s %s %s %s %s %s", type, path, key, uptime, footprint, boardVersion, date, imei);
-    int status = system(cmd);
-    if (status != 0){
-        LOGE("analyze crash status: %d.\n", status);
-        create_first_crashfile(type, path, key, uptime, footprint, boardVersion, date, imei);
-     }
 }
 
 static void notify_crash_to_upload(char* event_id)
@@ -789,9 +795,9 @@ static void history_file_write(char *event, char *type, char *subtype, char *log
         fprintf(to, "%-8s%-22s%-20s%s %s\n", event, key, date_tmp_2, type, tmp);
         fclose(to);
         if (!strncmp(event, CRASHEVENT, sizeof(CRASHEVENT)))
-            analyze_crash(subtype, tmp, key, uptime, date_tmp_2);
+            create_minimal_crashfile(subtype, tmp, key, uptime, date_tmp_2);
         else if(!strncmp(event, BZEVENT, sizeof(BZEVENT)))
-            analyze_crash(event, tmp, key, uptime, date_tmp_2);
+            create_minimal_crashfile(event, tmp, key, uptime, date_tmp_2);
     } else if (type != NULL) {
 
         to = fopen(HISTORY_FILE, "a");
