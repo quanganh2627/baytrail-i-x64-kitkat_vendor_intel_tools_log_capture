@@ -42,6 +42,7 @@
 
 #define CRASHEVENT "CRASH"
 #define STATSEVENT "STATS"
+#define INFOEVENT "INFO"
 #define STATEEVENT "STATE"
 #define APLOGEVENT "APLOG"
 #define STATSTRIGGER "STTRIG"
@@ -1686,7 +1687,8 @@ static int do_crashlogd(unsigned int files)
                             break;
                         }
                         // for STATS trigger
-                        else if((strcmp(wd_array[i].eventname,STATSTRIGGER)==0) && (strstr(event->name, "trigger" ))){
+                        // TO DO add code for INFO and ERROR here
+                        else if((strcmp(wd_array[i].eventname,STATSTRIGGER)==0) && (strstr(event->name, "_trigger" ))){
                             char *p;
                             char tmp[32];
                             char type[20] = { '\0', };
@@ -1745,6 +1747,78 @@ static int do_crashlogd(unsigned int files)
                                 do_log_copy(type,dir,date_tmp,APLOG_STATS_TYPE);
                             }
                             history_file_write(STATSEVENT, type, NULL, destion, NULL, key, date_tmp_2);
+                            del_file_more_lines(HISTORY_FILE);
+                            notify_crashreport();
+                            break;
+                        }
+                        // for INFO & ERROR (using STATS watcher)
+                        else if((strcmp(wd_array[i].eventname,STATSTRIGGER)==0) && ((strstr(event->name, "_infoevent" )) || (strstr(event->name, "_errorevent" )))){
+                            char *p;
+                            char tmp[32];
+                            char name_event[10];
+                            char file_ext[20];
+                            char type[20] = { '\0', };
+                            char tmp_data_name[PATHMAX];
+                            if (strstr(event->name, "_infoevent" )){
+                                snprintf(name_event,sizeof(name_event),"%s",INFOEVENT);
+                                snprintf(file_ext,sizeof(file_ext),"%s","_infoevent");
+                            }else if (strstr(event->name, "_errorevent" )){
+                                snprintf(name_event,sizeof(name_event),"%s",ERROREVENT);
+                                snprintf(file_ext,sizeof(file_ext),"%s","_errorevent");
+                            }else{
+                                LOGE("Unknown stats trigger file\n");
+                                break;
+                            }
+                            snprintf(tmp,sizeof(tmp),"%s",event->name);
+                            time(&t);
+                            time_tmp = localtime((const time_t *)&t);
+                            PRINT_TIME(date_tmp, TIME_FORMAT_1, time_tmp);
+                            PRINT_TIME(date_tmp_2, TIME_FORMAT_2, time_tmp);
+                            dir = find_dir(files,STATS_MODE);
+                            if (dir == -1) {
+                                LOGE("find dir %d for stat trigger failed\n", files);
+                                p = strstr(tmp,"trigger");
+                                if ( p ){
+                                    strcpy(p,"data");
+                                }
+                                compute_key(key, name_event, tmp);
+                                LOGE("%-8s%-22s%-20s%s\n", name_event, key, date_tmp_2, tmp);
+                                history_file_write(name_event, tmp, NULL, NULL, NULL, key, date_tmp_2);
+                                del_file_more_lines(HISTORY_FILE);
+                                notify_crashreport();
+                                break;
+                            }
+                            /*copy data file*/
+                            p = strstr(tmp,file_ext);
+                            if ( p ){
+                                strcpy(p,"_data");
+                                find_file_in_dir(tmp_data_name,wd_array[i].filename,tmp);
+                                snprintf(path, sizeof(path),"%s/%s",wd_array[i].filename,tmp_data_name);
+                                snprintf(destion,sizeof(destion),"%s%d/%s", STATS_DIR,dir,tmp_data_name);
+                                do_copy(path, destion, 0);
+                                remove(path);
+                            }
+                            /*copy trigger file*/
+                            snprintf(path, sizeof(path),"%s/%s",wd_array[i].filename,event->name);
+                            snprintf(destion,sizeof(destion),"%s%d/%s", STATS_DIR,dir,event->name);
+                            do_copy(path, destion, 0);
+                            remove(path);
+                            snprintf(destion,sizeof(destion),"%s%d/", STATS_DIR,dir);
+                            compute_key(key, name_event, tmp);
+                            /*create type */
+                            snprintf(tmp,sizeof(tmp),"%s",event->name);
+                            // manage _ problem??
+                            p = strstr(tmp,file_ext);
+                            if (p) {
+                                for (j=0;j<sizeof(type)-1;j++) {
+                                    if (p == (tmp+j))
+                                        break;
+                                    type[j]=toupper(tmp[j]);
+                                }
+                            } else
+                                snprintf(type,sizeof(type),"%s",event->name);
+                            LOGE("%-8s%-22s%-20s%s %s\n", name_event, key, date_tmp_2, type, destion);
+                            history_file_write(name_event, type, NULL, destion, NULL, key, date_tmp_2);
                             del_file_more_lines(HISTORY_FILE);
                             notify_crashreport();
                             break;
