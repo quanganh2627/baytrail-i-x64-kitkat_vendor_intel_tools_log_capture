@@ -141,6 +141,7 @@
 #define LOG_UUID "/logs/uuid.txt"
 #define LOG_BUILDID "/logs/buildid.txt"
 #define KERNEL_CMDLINE "/proc/cmdline"
+#define CMDLINE_NAME "cmdline"
 #define STARTUP_STR "androidboot.wakesrc="
 #define PANIC_CONSOLE_NAME "/proc/emmc_ipanic_console"
 #define PROC_FABRIC_ERROR_NAME "/proc/ipanic_fabric_err"
@@ -173,6 +174,11 @@
     strftime(var_tmp, 32, format_time, local_time);    \
     var_tmp[31]=0;                                     \
 }
+
+//Variables containing paths of files triggering IPANIC & FABRICERR & WDT treatment
+char CURRENT_PANIC_CONSOLE_NAME[PATHMAX]={PANIC_CONSOLE_NAME};
+char CURRENT_PROC_FABRIC_ERROR_NAME[PATHMAX]={PROC_FABRIC_ERROR_NAME};
+char CURRENT_KERNEL_CMDLINE[PATHMAX]={KERNEL_CMDLINE};
 
 char *CRASH_DIR = NULL;
 char *STATS_DIR = NULL;
@@ -2069,7 +2075,7 @@ static int crashlog_check_fabric(char *reason, unsigned int files)
     char key[SHA1_DIGEST_LENGTH+1];
     struct tm *time_tmp;
 
-    if ((stat(PROC_FABRIC_ERROR_NAME, &info) == 0)  || (test_flag == 1)) {
+    if ((stat(CURRENT_PROC_FABRIC_ERROR_NAME, &info) == 0)  || (test_flag == 1)) {
 
         strcpy(crashtype, FABRIC_ERROR);
         for (i = 0; i < sizeof(ft_array)/sizeof(struct fabric_type); i++)
@@ -2125,7 +2131,7 @@ static int crashlog_check_panic(char *reason, unsigned int files)
     char key[SHA1_DIGEST_LENGTH+1];
     struct tm *time_tmp;
 
-    if ((stat(PANIC_CONSOLE_NAME, &info) == 0) || (test_flag == 1)) {
+    if ((stat(CURRENT_PANIC_CONSOLE_NAME, &info) == 0) || (test_flag == 1)) {
 
         if (!find_str_in_file(SAVED_CONSOLE_NAME, "Kernel panic - not syncing: Kernel Watchdog", NULL)) {
             strcpy(crashtype, KERNEL_FORCE_CRASH);
@@ -2169,7 +2175,7 @@ static int crashlog_check_panic(char *reason, unsigned int files)
         do_copy(SAVED_LOGCAT_NAME, destion, FILESIZE_MAX);
         do_last_kmsg_copy(dir);
 
-        write_file(PANIC_CONSOLE_NAME, "1");
+        write_file(CURRENT_PANIC_CONSOLE_NAME, "1");
 
         destion[0] = '\0';
         snprintf(destion, sizeof(destion), "%s%d/", CRASH_DIR, dir);
@@ -2563,10 +2569,10 @@ static void read_startupreason(char *startupreason)
 
     strcpy(startupreason, bootmode_reason[7]);
 
-    if (stat(KERNEL_CMDLINE, &info) == 0) {
-        fd = fopen(KERNEL_CMDLINE, "r");
+    if (stat(CURRENT_KERNEL_CMDLINE, &info) == 0) {
+        fd = fopen(CURRENT_KERNEL_CMDLINE, "r");
         if (fd == NULL){
-            LOGE("can not open file: %s\n", KERNEL_CMDLINE);
+            LOGE("can not open file: %s\n", CURRENT_KERNEL_CMDLINE);
             return;
         }
         fread(cmdline, 1, sizeof(cmdline)-1, fd);
@@ -2579,7 +2585,6 @@ static void read_startupreason(char *startupreason)
                 reason=strtoul(p, &endptr, 16);
                 if ((errno != ERANGE) &&
                     (endptr != p) &&
-                    (reason >= 0) &&
                     (reason < (sizeof(bootmode_reason)/sizeof(char*)))) {
                     strcpy(startupreason, bootmode_reason[reason]);
                 }else {
@@ -2601,6 +2606,21 @@ static void update_logs_permission(void)
         LOGI("Folders /logs and /logs/core set to 0777\n");
         chmod(HISTORY_FILE_DIR,0777);
         chmod(HISTORY_CORE_DIR,0777);
+    }
+}
+
+//This function manages the path containing files triggering IPANIC, FABRICERR and WDT events treatment
+//with a value read from a debug propertie
+static void manage_ipanic_fabricerr_wdt_trigger_path(void)
+{
+    char debug_proc_path[PROPERTY_VALUE_MAX];
+
+    if( property_get("crashlogd.debug.proc_path", debug_proc_path, NULL)!= 0)
+    {
+        snprintf(CURRENT_PROC_FABRIC_ERROR_NAME, sizeof(CURRENT_PROC_FABRIC_ERROR_NAME), "%s/%s", debug_proc_path, FABRIC_ERROR_NAME);
+        snprintf(CURRENT_PANIC_CONSOLE_NAME, sizeof(CURRENT_PANIC_CONSOLE_NAME), "%s/%s", debug_proc_path, CONSOLE_NAME);
+        snprintf(CURRENT_KERNEL_CMDLINE, sizeof(CURRENT_KERNEL_CMDLINE), "%s/%s", debug_proc_path, CMDLINE_NAME);
+        LOGI("Test Mode : ipanic, fabricerr and wdt trigger path is %s\n", debug_proc_path);
     }
 }
 
@@ -2651,6 +2671,9 @@ int main(int argc, char **argv)
             }
         }
     }
+
+    //Manage the path containing files triggering IPANIC and FABRICERR and WDT events
+    manage_ipanic_fabricerr_wdt_trigger_path();
 
     property_get(PROP_CRASH, value, "");
     if (strncmp(value, "1", 1)){
