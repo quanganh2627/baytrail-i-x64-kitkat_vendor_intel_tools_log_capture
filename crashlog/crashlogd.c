@@ -1831,8 +1831,6 @@ static int do_crashlogd(unsigned int files)
                                         index_prod = (index_prod + 1) % 2;
                                         start_dumpstate_srv(CRASH_DIR, dir);
                                     }
-
-
                                 }
                                 notify_crashreport();
                             }
@@ -1840,7 +1838,7 @@ static int do_crashlogd(unsigned int files)
                         }
                     }
                 }
-                if(strstr(event->name, "dropbox-")){
+                if(event->len && !strncmp(event->name, "dropbox-", 8) && (i==WDCOUNT)){
                     inotify_rm_watch(fd, event->wd);
                     notify_crash_to_upload(current_key[index_cons]);
                     index_cons = (index_cons + 1) % 2;
