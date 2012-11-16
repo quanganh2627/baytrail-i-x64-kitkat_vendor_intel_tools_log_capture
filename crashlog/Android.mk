@@ -28,13 +28,5 @@ LOCAL_MODULE:= crashlogd
 
 LOCAL_UNSTRIPPED_PATH := $(TARGET_ROOT_OUT_UNSTRIPPED)
 
-#LOCAL_STATIC_LIBRARIES:= libc libcutils
-
 LOCAL_SHARED_LIBRARIES:= libparse_stack libc libcutils
 include $(BUILD_EXECUTABLE)
-
-$(info WARNING: PRODUCT_COPY_FILES disabled in $(LOCAL_PATH))
-#PRODUCT_COPY_FILES += \
-#        $(LOCAL_PATH)/analyze_crash:system/bin/analyze_crash \
-#        $(LOCAL_PATH)/del_hist.sh:system/bin/del_hist.sh \
-#        $(LOCAL_PATH)/del_log.sh:system/bin/del_log.sh

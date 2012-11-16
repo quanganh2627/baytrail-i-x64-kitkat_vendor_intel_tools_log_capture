@@ -72,6 +72,7 @@
 // Add Recovery error crash type
 #define RECOVERY_ERROR "RECOVERY_ERROR"
 #define CRASHLOG_ERROR_DEAD "CRASHLOG_DEAD"
+#define CRASHLOG_ERROR_PATH "CRASHLOG_PATH"
 #define USBBOGUS "USBBOGUS"
 
 #define FILESIZE_MAX  (10*1024*1024)
@@ -127,6 +128,8 @@
 #define EMMC_APLOGS_DIR "/logs/aplogs"
 #define SDCARD_BZ_DIR "/mnt/sdcard/logs/bz"
 #define EMMC_BZ_DIR "/logs/bz"
+#define LOGINFO_DIR "/logs/info/"
+#define LOGRESERVED "/logs/reserved"
 #define BZ_CURRENT_LOG "/logs/currentbzlog"
 #define CRASH_CURRENT_LOG "/logs/currentcrashlog"
 #define STATS_CURRENT_LOG "/logs/currentstatslog"
@@ -901,14 +904,14 @@ static void sdcard_exist(void)
 {
     struct stat info;
 
-    if (stat("/mnt/sdcard/logs", &info) == 0){
+    if ((stat("/mnt/sdcard/logs", &info) == 0) && (opendir("/mnt/sdcard/logs"))){
         CRASH_DIR = SDCARD_CRASH_DIR;
         STATS_DIR = SDCARD_STATS_DIR;
         APLOGS_DIR = SDCARD_APLOGS_DIR;
         BZ_DIR = SDCARD_BZ_DIR;
     } else {
         mkdir("/mnt/sdcard/logs", 0777);
-        if (stat("/mnt/sdcard/logs", &info) == 0){
+        if ((stat("/mnt/sdcard/logs", &info) == 0) && (opendir("/mnt/sdcard/logs"))){
             CRASH_DIR = SDCARD_CRASH_DIR;
             STATS_DIR = SDCARD_STATS_DIR;
             APLOGS_DIR = SDCARD_APLOGS_DIR;
@@ -921,126 +924,6 @@ static void sdcard_exist(void)
         }
     }
     return;
-}
-
-#define CRASH_MODE 0
-#define STATS_MODE 1
-#define APLOGS_MODE 2
-#define BZ_MODE 3
-static unsigned int find_dir(unsigned int max, int mode)
-{
-    struct stat sb;
-    char path[PATHMAX];
-    unsigned int i, oldest = 0;
-    FILE *fd;
-    DIR *d;
-    struct dirent *de;
-    struct stat st;
-    char *dir;
-
-    sdcard_exist();
-
-    switch(mode){
-    case CRASH_MODE:
-        snprintf(path, sizeof(path), CRASH_CURRENT_LOG);
-        break;
-    case APLOGS_MODE:
-        snprintf(path, sizeof(path), APLOGS_CURRENT_LOG);
-        break;
-    case BZ_MODE:
-        snprintf(path, sizeof(path), BZ_CURRENT_LOG);
-        break;
-    default:
-        snprintf(path, sizeof(path), STATS_CURRENT_LOG);
-        break;
-    }
-
-    if ((!stat(path, &sb))) {
-        fd = fopen(path, "r");
-        if (fd == NULL){
-            LOGE("can not open file: %s\n", path);
-            return -1;
-        }
-        if (fscanf(fd, "%d", &i)==EOF) {
-            i = 0;
-        }
-        fclose(fd);
-        i = i % MAX_DIR;
-        oldest = i++;
-        fd = fopen(path, "w");
-        if (fd == NULL){
-            LOGE("can not open file: %s\n", path);
-            return -1;
-        }
-        fprintf(fd, "%d", (i % max));
-        fclose(fd);
-    } else {
-        if (errno == ENOENT){
-            LOGE("File %s does not exist, returning to crashlog folder 0.\n",path);
-        } else {
-            LOGE("Other error : %d.\n", errno);
-            //need to return -1 to avoid overwrite old log folder
-            return -1;
-        }
-
-        fd = fopen(path, "w");
-        if (fd == NULL){
-            LOGE("can not open file: %s\n", path);
-            return -1;
-        }
-        oldest = 0;
-        fprintf(fd, "%d", 1);
-        fclose(fd);
-    }
-
-    /* we didn't find an available file, so we clobber the oldest one */
-    switch(mode){
-    case CRASH_MODE:
-        dir = CRASH_DIR;
-        break;
-    case APLOGS_MODE:
-        dir = APLOGS_DIR;
-        break;
-    case BZ_MODE:
-        dir = BZ_DIR;
-        break;
-    default:
-        dir = STATS_DIR;
-        break;
-    }
-    snprintf(path, sizeof(path),  "%s%d", dir, oldest);
-    if (stat(path, &st) < 0)
-        mkdir(path, 0777);
-    else{
-        d = opendir(path);
-        if (d == 0) {
-            LOGE("opendir failed, %s\n", strerror(errno));
-            return -1;
-        }
-        while ((de = readdir(d)) != 0) {
-            if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, ".."))
-                continue;
-            snprintf(path, sizeof(path),  "%s%d/%s", dir, oldest,
-                    de->d_name);
-            remove(path);
-        }
-        if (closedir(d) < 0){
-            LOGE("closedir failed, %s\n", strerror(errno));
-            return -1;
-        }
-        rmdir(path);
-        snprintf(path, sizeof(path),  "%s%d", dir, oldest);
-        mkdir(path, 0777);
-    }
-    if (!strstr(path, "sdcard")) {
-         char cmd[512] = { '\0', };
-
-         snprintf(cmd, sizeof(cmd)-1, "/system/bin/chown %s %s", PERM_USER, path);
-         int status = system(cmd);
-         if (status != 0)
-            LOGE("status chown %s: %d\n", cmd, status);
-   }
-    return oldest;
 }
 
 static void restart_profile1_srv(void)
@@ -1189,6 +1072,7 @@ void process_anr_or_uiwdt(char *destion, int dir, int remove_path)
                 }
                 dest = open(dest_path, O_WRONLY|O_CREAT);
                 close(dest);
+                do_chmod(dest_path, "600");
                 do_chown(dest_path, PERM_USER, PERM_GROUP);
                 dest = open(dest_path, O_WRONLY, stat_buf.st_mode);
                 if (dest < 0) {
@@ -1267,7 +1151,15 @@ void backtrace_anr_uiwdt(char *dest, int dir)
     }
 }
 
-static int crashlog_raise_error(char *reason)
+void monitor_crashenv(void)
+{
+    int status = system("/system/bin/monitor_crashenv");
+    if (status != 0)
+        LOGE("monitor_crashenv status: %d.\n", status);
+    return ;
+}
+
+static int crashlog_raise_infoerror(char *type, char *subtype)
 {
     char date_tmp_2[32];
     time_t t;
@@ -1278,11 +1170,13 @@ static int crashlog_raise_error(char *reason)
     time_tmp = localtime((const time_t *)&t);
     PRINT_TIME(date_tmp_2, TIME_FORMAT_2, time_tmp);
     // compute crash id
-    compute_key(key, CRASHEVENT, reason);
+    compute_key(key, type, subtype);
 
-    LOGE("%-8s%-22s%-20s%s\n", ERROREVENT, key, date_tmp_2, reason);
-    history_file_write(ERROREVENT, reason, NULL, NULL, NULL, key, date_tmp_2);
+    LOGE("%-8s%-22s%-20s%s\n", type, key, date_tmp_2, subtype);
+    unlink(LOGRESERVED);
+    history_file_write(type, subtype, NULL, LOGINFO_DIR, NULL, key, date_tmp_2);
     del_file_more_lines(HISTORY_FILE);
+    monitor_crashenv();
     notify_crashreport();
     return 0;
 }
@@ -1295,8 +1189,138 @@ void check_crashlog_dead()
          strcat(token, "1");
          property_set("crashlogd.token", token);
          if (!strncmp(token, "11", 2))
-             crashlog_raise_error(CRASHLOG_ERROR_DEAD);
+             crashlog_raise_infoerror(ERROREVENT, CRASHLOG_ERROR_DEAD);
     }
+}
+
+#define CRASH_MODE 0
+#define STATS_MODE 1
+#define APLOGS_MODE 2
+#define BZ_MODE 3
+static unsigned int find_dir(unsigned int max, int mode)
+{
+    struct stat sb;
+    char path[PATHMAX];
+    unsigned int i, oldest = 0;
+    FILE *fd;
+    DIR *d;
+    struct dirent *de;
+    struct stat st;
+    char *dir;
+
+    sdcard_exist();
+
+    switch(mode){
+    case CRASH_MODE:
+        snprintf(path, sizeof(path), CRASH_CURRENT_LOG);
+        break;
+    case APLOGS_MODE:
+        snprintf(path, sizeof(path), APLOGS_CURRENT_LOG);
+        break;
+    case BZ_MODE:
+        snprintf(path, sizeof(path), BZ_CURRENT_LOG);
+        break;
+    default:
+        snprintf(path, sizeof(path), STATS_CURRENT_LOG);
+        break;
+    }
+
+    if ((!stat(path, &sb))) {
+        fd = fopen(path, "r");
+        if (fd == NULL){
+            LOGE("can not open file: %s\n", path);
+            goto out_err;
+        }
+        if (fscanf(fd, "%d", &i)==EOF) {
+            i = 0;
+        }
+        fclose(fd);
+        i = i % MAX_DIR;
+        oldest = i++;
+        fd = fopen(path, "w");
+        if (fd == NULL){
+            LOGE("can not open file: %s\n", path);
+             goto out_err;
+        }
+        fprintf(fd, "%d", (i % max));
+        fclose(fd);
+    } else {
+        if (errno == ENOENT){
+            LOGE("File %s does not exist, returning to crashlog folder 0.\n",path);
+        } else {
+            LOGE("Other error : %d.\n", errno);
+            //need to return -1 to avoid overwrite old log folder
+            goto out_err;
+        }
+
+        fd = fopen(path, "w");
+        if (fd == NULL){
+            LOGE("can not open file: %s\n", path);
+            goto out_err;
+        }
+        oldest = 0;
+        fprintf(fd, "%d", 1);
+        fclose(fd);
+    }
+
+    /* we didn't find an available file, so we clobber the oldest one */
+    switch(mode){
+    case CRASH_MODE:
+        dir = CRASH_DIR;
+        break;
+    case APLOGS_MODE:
+        dir = APLOGS_DIR;
+        break;
+    case BZ_MODE:
+        dir = BZ_DIR;
+        break;
+    default:
+        dir = STATS_DIR;
+        break;
+    }
+    snprintf(path, sizeof(path),  "%s%d", dir, oldest);
+    if (stat(path, &st) < 0)
+        mkdir(path, 0777);
+    else{
+        d = opendir(path);
+        if (d == 0) {
+            LOGE("opendir failed, %s\n", strerror(errno));
+            goto out_err;
+       }
+        while ((de = readdir(d)) != 0) {
+            if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, ".."))
+                continue;
+            snprintf(path, sizeof(path),  "%s%d/%s", dir, oldest,
+                    de->d_name);
+            remove(path);
+        }
+        if (closedir(d) < 0){
+            LOGE("closedir failed, %s\n", strerror(errno));
+            goto out_err;
+        }
+        rmdir(path);
+        snprintf(path, sizeof(path),  "%s%d", dir, oldest);
+        mkdir(path, 0777);
+    }
+    if (opendir(path) == 0) {
+       LOGE("Can not create dir %s", path);
+       goto out_err;
+    }
+    if (!strstr(path, "sdcard")) {
+         char cmd[512] = { '\0', };
+
+         snprintf(cmd, sizeof(cmd)-1, "/system/bin/chown %s %s", PERM_USER, path);
+         int status = system(cmd);
+         if (status != 0)
+            LOGE("status chown %s: %d\n", cmd, status);
+   }
+   goto out;
+
+out_err:
+    oldest = -1;
+    crashlog_raise_infoerror(ERROREVENT, CRASHLOG_ERROR_PATH);
+out:
+    return oldest;
 }
 
 #define SCREENSHOT_PATTERN "SCREENSHOT="
@@ -1325,6 +1349,7 @@ static int do_crashlogd(unsigned int files)
     char current_key[2][SHA1_DIGEST_LENGTH+1];
     struct tm *time_tmp;
 
+    monitor_crashenv();
     check_crashlog_dead();
     fd = inotify_init();
     if (fd < 0) {
