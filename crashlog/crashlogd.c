@@ -54,6 +54,7 @@
 #define KERNEL_CRASH "IPANIC"
 #define SYSSERVER_WDT "UIWDT"
 #define KERNEL_FORCE_CRASH "IPANIC_FORCED"
+#define FABRIC_FAKE_CRASH "FABRIC_FAKE"
 #define KERNEL_FAKE_CRASH "IPANIC_FAKE"
 #define ANR_CRASH "ANR"
 #define JAVA_CRASH "JAVACRASH"
@@ -1181,6 +1182,19 @@ static int crashlog_raise_infoerror(char *type, char *subtype)
     return 0;
 }
 
+void check_running_power_service()
+{
+    char powerservice[PROPERTY_VALUE_MAX];
+    char powerenable[PROPERTY_VALUE_MAX];
+
+    property_get("init.svc.profile_power", powerservice, "");
+    property_get("persist.service.power.enable", powerenable, "");
+    if (strcmp(powerservice, "running") && !strcmp(powerenable, "1")) {
+        LOGE("power service stopped whereas property is set .. restarting\n");
+        property_set("ctl.start", "profile_power");
+    }
+}
+
 void check_crashlog_dead()
 {
     char token[PROPERTY_VALUE_MAX];
@@ -1892,19 +1906,6 @@ void check_running_logs_service()
     }
 }
 
-void check_running_power_service()
-{
-    char powerservice[PROPERTY_VALUE_MAX];
-    char powerenable[PROPERTY_VALUE_MAX];
-
-    property_get("init.svc.profile_power", powerservice, "");
-    property_get("persist.service.power.enable", powerenable, "");
-    if (strcmp(powerservice, "running") && !strcmp(powerenable, "1")) {
-        LOGE("power service stopped whereas property is set .. restarting\n");
-        property_set("ctl.start", "profile_power");
-    }
-}
-
 void do_timeup()
 {
     int fd;
@@ -1980,6 +1981,10 @@ struct fabric_type ft_array[] = {
     {"DW0:", "f504", "SRAMECCERR"},
     {"DW0:", "00dd", "HWWDTLOGERR"},
 };
+struct fabric_type fake[] = {
+    {"DW2:", "02608002", "FABRIC_FAKE"},
+    {"DW3:", "40102ff4", "FABRIC_FAKE"},
+};
 
 static int crashlog_check_fabric(char *reason, unsigned int files)
 {
@@ -1988,6 +1993,7 @@ static int crashlog_check_fabric(char *reason, unsigned int files)
     struct stat info;
     time_t t;
     char destion[PATHMAX];
+    char crashtype[32] = {'\0'};
     int dir;
     unsigned int i = 0;
     char key[SHA1_DIGEST_LENGTH+1];
@@ -1995,6 +2001,16 @@ static int crashlog_check_fabric(char *reason, unsigned int files)
 
     if ((stat(PROC_FABRIC_ERROR_NAME, &info) == 0)  || (test_flag == 1)) {
 
+        strcpy(crashtype, FABRIC_ERROR);
+        for (i = 0; i < sizeof(ft_array)/sizeof(struct fabric_type); i++)
+            if (!find_str_in_file(SAVED_FABRIC_ERROR_NAME, ft_array[i].keyword, ft_array[i].tail))
+                   strcpy(crashtype, ft_array[i].name);
+        if ((!find_str_in_file(SAVED_FABRIC_ERROR_NAME, fake[0].keyword, fake[0].tail)) &&
+          (!find_str_in_file(SAVED_FABRIC_ERROR_NAME, fake[1].keyword, fake[1].tail))) {
+                   strcpy(crashtype, fake[0].name);
+                   if (!strncmp(reason, "HWWDT_RESET", 11))
+                       strcat(reason,"_FAKE");
+        }
         time(&t);
         time_tmp = localtime((const time_t *)&t);
         PRINT_TIME(date_tmp, TIME_FORMAT_1, time_tmp);
@@ -2003,9 +2019,9 @@ static int crashlog_check_fabric(char *reason, unsigned int files)
 
         if (dir == -1) {
             LOGE("find dir %d for check fabric failed\n", files);
-            compute_key(key, CRASHEVENT, FABRIC_ERROR);
-            LOGE("%-8s%-22s%-20s%s\n", CRASHEVENT, key, date_tmp_2, FABRIC_ERROR);
-            history_file_write(CRASHEVENT, FABRIC_ERROR, NULL, NULL, NULL, key, date_tmp_2);
+            compute_key(key, CRASHEVENT, crashtype);
+            LOGE("%-8s%-22s%-20s%s\n", CRASHEVENT, key, date_tmp_2, crashtype);
+            history_file_write(CRASHEVENT, crashtype, NULL, NULL, NULL, key, date_tmp_2);
             del_file_more_lines(HISTORY_FILE);
             //Need to return 0 to avoid closing crashlogd
             return 0;
@@ -2017,22 +2033,11 @@ static int crashlog_check_fabric(char *reason, unsigned int files)
         do_copy(SAVED_FABRIC_ERROR_NAME, destion, FILESIZE_MAX);
         do_last_kmsg_copy(dir);
 
-        for (i = 0; i < sizeof(ft_array)/sizeof(struct fabric_type); i++){
-            if (!find_str_in_file(destion, ft_array[i].keyword, ft_array[i].tail)){
-                snprintf(destion,sizeof(destion),"%s%d/",CRASH_DIR,dir);
-                compute_key(key, CRASHEVENT, ft_array[i].name);
-                LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, date_tmp_2,  ft_array[i].name, destion);
-                history_file_write(CRASHEVENT, ft_array[i].name, NULL, destion, NULL, key, date_tmp_2);
-                break;
-            }
-        }
-        if (i == sizeof(ft_array)/sizeof(struct fabric_type)){
-            snprintf(destion,sizeof(destion),"%s%d/",CRASH_DIR,dir);
-            compute_key(key, CRASHEVENT, FABRIC_ERROR);
-            LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, date_tmp_2, FABRIC_ERROR, destion);
-            history_file_write(CRASHEVENT, FABRIC_ERROR, NULL, destion, NULL, key, date_tmp_2);
-        }
-
+        destion[0] = '\0';
+        snprintf(destion,sizeof(destion),"%s%d/",CRASH_DIR,dir);
+        compute_key(key, CRASHEVENT, crashtype);
+        LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, date_tmp_2, crashtype, destion);
+        history_file_write(CRASHEVENT, crashtype, NULL, destion, NULL, key, date_tmp_2);
         del_file_more_lines(HISTORY_FILE);
     }
     return 0;
@@ -2045,11 +2050,21 @@ static int crashlog_check_panic(char *reason, unsigned int files)
     struct stat info;
     time_t t;
     char destion[PATHMAX];
+    char crashtype[32] = {'\0'};
     int dir;
     char key[SHA1_DIGEST_LENGTH+1];
     struct tm *time_tmp;
 
     if ((stat(PANIC_CONSOLE_NAME, &info) == 0) || (test_flag == 1)) {
+
+        if (!find_str_in_file(SAVED_CONSOLE_NAME, "Kernel panic - not syncing: Kernel Watchdog", NULL)) {
+            strcpy(crashtype, KERNEL_FORCE_CRASH);
+        } else if (!find_str_in_file(SAVED_CONSOLE_NAME, "EIP is at panic_dbg_set", NULL)) {
+            if (!strncmp(reason, "SWWDT_RESET", 11))
+                  strcat(reason,"_FAKE");
+            strcpy(crashtype, KERNEL_FAKE_CRASH);
+        } else
+            strcpy(crashtype, KERNEL_CRASH);
 
         time(&t);
         time_tmp = localtime((const time_t *)&t);
@@ -2059,9 +2074,9 @@ static int crashlog_check_panic(char *reason, unsigned int files)
 
         if (dir == -1) {
             LOGE("find dir %d for check panic failed\n", files);
-            compute_key(key, CRASHEVENT, KERNEL_CRASH);
-            LOGE("%-8s%-22s%-20s%s\n", CRASHEVENT, key, date_tmp_2, KERNEL_CRASH);
-            history_file_write(CRASHEVENT, KERNEL_CRASH, NULL, NULL, NULL, key, date_tmp_2);
+            compute_key(key, CRASHEVENT, crashtype);
+            LOGE("%-8s%-22s%-20s%s\n", CRASHEVENT, key, date_tmp_2, crashtype);
+            history_file_write(CRASHEVENT, crashtype, NULL, NULL, NULL, key, date_tmp_2);
             del_file_more_lines(HISTORY_FILE);
             //Need to return 0 to avoid closing crashlogd
             return 0;
@@ -2088,20 +2103,9 @@ static int crashlog_check_panic(char *reason, unsigned int files)
 
         destion[0] = '\0';
         snprintf(destion, sizeof(destion), "%s%d/", CRASH_DIR, dir);
-        if (!find_str_in_file(SAVED_CONSOLE_NAME, "Kernel panic - not syncing: Kernel Watchdog", NULL)) {
-            compute_key(key, CRASHEVENT, KERNEL_FORCE_CRASH);
-            LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, date_tmp_2, KERNEL_FORCE_CRASH, destion);
-            history_file_write(CRASHEVENT, KERNEL_FORCE_CRASH, NULL, destion, NULL, key, date_tmp_2);
-        } else if (!find_str_in_file(SAVED_CONSOLE_NAME, "EIP is at panic_dbg_set", NULL)) {
-            compute_key(key, CRASHEVENT, KERNEL_FAKE_CRASH);
-            LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, date_tmp_2, KERNEL_FAKE_CRASH, destion);
-            history_file_write(CRASHEVENT, KERNEL_FAKE_CRASH, NULL, destion, NULL, key, date_tmp_2);
-        } else
-        {
-            compute_key(key, CRASHEVENT, KERNEL_CRASH);
-            LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, date_tmp_2, KERNEL_CRASH, destion);
-            history_file_write(CRASHEVENT, KERNEL_CRASH, NULL, destion, NULL, key, date_tmp_2);
-        }
+        compute_key(key, CRASHEVENT, crashtype);
+        LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, date_tmp_2, crashtype, destion);
+        history_file_write(CRASHEVENT, crashtype, NULL, destion, NULL, key, date_tmp_2);
         del_file_more_lines(HISTORY_FILE);
     }
     return 0;
@@ -2215,7 +2219,7 @@ static int crashlog_check_startupreason(char *reason, unsigned int files)
     char key[SHA1_DIGEST_LENGTH+1];
     struct tm *time_tmp;
 
-    if (strstr(reason, "WDT_RESET")) {
+    if ((strstr(reason, "WDT_RESET")) && (!strstr(reason, "FAKE"))) {
 
         time(&t);
         time_tmp = localtime((const time_t *)&t);
@@ -2598,7 +2602,7 @@ int main(int argc, char **argv)
     sdcard_exist();
 
     // check startup reason and sw update
-    char startupreason[16] = { '\0', };
+    char startupreason[32] = { '\0', };
     char encryptstate[16] = { '\0', };
     struct stat st;
     char lastuptime[32];
