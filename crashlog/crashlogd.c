@@ -1041,6 +1041,19 @@ struct wd_name wd_array[] = {
 
 int WDCOUNT = ((int)(sizeof(wd_array)/sizeof(struct wd_name)));
 
+void prepare_anr_or_uiwdt(char *destion)
+{
+    char cmd[PATHMAX];
+
+    if (!strcmp(".gz", &destion[strlen(destion) - 3])) {
+        /* extract gzip file */
+        snprintf(cmd, sizeof(cmd), "gunzip %s", destion);
+        system(cmd);
+        destion[strlen(destion) - 3] = 0;
+        do_chown(destion, PERM_USER, PERM_GROUP);
+    }
+}
+
 void process_anr_or_uiwdt(char *destion, int dir, int remove_path)
 {
     char cmd[PATHMAX];
@@ -1052,13 +1065,6 @@ void process_anr_or_uiwdt(char *destion, int dir, int remove_path)
     FILE *fp;
     int i;
 
-    if (!strcmp(".gz", &destion[strlen(destion) - 3])) {
-        /* extract gzip file */
-        snprintf(cmd, sizeof(cmd), "gunzip %s", destion);
-        system(cmd);
-        destion[strlen(destion) - 3] = 0;
-        do_chown(destion, PERM_USER, PERM_GROUP);
-    }
     fp = fopen(destion, "r");
     if (fp == NULL) {
         LOGE("Failed to open file %s:%s\n", destion, strerror(errno));
@@ -1844,14 +1850,17 @@ static int do_crashlogd(unsigned int files)
 
                             snprintf(path, sizeof(path),"%s/%s",wd_array[i].filename,event->name);
                             if (stat(path, &info) == 0) {
+                                snprintf(destion,sizeof(destion),"%s%d/",CRASH_DIR,dir);
+                                LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, date_tmp_2, wd_array[i].eventname, destion);
                                 snprintf(destion,sizeof(destion),"%s%d/%s",CRASH_DIR,dir,event->name);
                                 do_copy(path, destion, FILESIZE_MAX);
-                                LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, date_tmp_2, wd_array[i].eventname, destion);
-                                usleep(TIMEOUT_VALUE);
+                                prepare_anr_or_uiwdt(destion);
                                 history_file_write(CRASHEVENT, wd_array[i].eventname, NULL, destion, NULL, key, date_tmp_2);
-                                do_log_copy(wd_array[i].eventname,dir,date_tmp,APLOG_TYPE);
                                 del_file_more_lines(HISTORY_FILE);
+                                usleep(TIMEOUT_VALUE);
+                                do_log_copy(wd_array[i].eventname,dir,date_tmp,APLOG_TYPE);
                                 backtrace_anr_uiwdt(destion, dir);
+                                restart_profile1_srv();
                                 if (strstr(event->name, "anr")) {
                                     snprintf(destion,sizeof(destion),"%s%d",CRASH_DIR,dir);
                                     char value[PROPERTY_VALUE_MAX];
@@ -1873,7 +1882,6 @@ static int do_crashlogd(unsigned int files)
 
                                 }
                                 notify_crashreport();
-                                restart_profile1_srv();
                             }
                             break;
                         }
@@ -1891,49 +1899,31 @@ static int do_crashlogd(unsigned int files)
                                 LOGE("%-8s%-22s%-20s%s\n", CRASHEVENT, key, date_tmp_2, wd_array[i].eventname);
                                 history_file_write(CRASHEVENT, wd_array[i].eventname, NULL, NULL, NULL, key, date_tmp_2);
                                 del_file_more_lines(HISTORY_FILE);
+                                if (strstr(event->name, "anr") || strstr(event->name, "system_server_watchdog"))
+                                    restart_profile1_srv();
                                 notify_crashreport();
                                 break;
                             }
 
                             snprintf(path, sizeof(path),"%s/%s",wd_array[i].filename,event->name);
                             if (stat(path, &info) == 0) {
-                                if (strstr(event->name, ".core" ))
-                                    backup_apcoredump(dir, event->name, path);
-                                else
-                                {
-                                    snprintf(destion,sizeof(destion),"%s%d/%s",CRASH_DIR,dir,event->name);
-                                    do_copy(path, destion, FILESIZE_MAX);
-                                    /* parse anr file */
-                                    if (strstr(event->name, "anr") || strstr(event->name, "system_server_watchdog")){
-                                        backtrace_anr_uiwdt(destion, dir);
-                                        restart_profile1_srv();
-                                        if(strstr(event->name, "anr")){
-                                            snprintf(destion,sizeof(destion),"%s%d",CRASH_DIR,dir);
-                                            char value[PROPERTY_VALUE_MAX];
-                                            property_get(PROP_LOGSYSTEMSTATE, value, "stopped");
-                                            if(strcmp(value,"running") == 0){
-                                                LOGE("Can't launch dumpstate for %s.\n", destion);
-                                            }else{
-                                                wd = inotify_add_watch(fd, destion, IN_CLOSE_WRITE);
-                                                if (wd < 0) {
-                                                    LOGE("Can't add watch for %s.\n", destion);
-                                                    notify_crashreport();
-                                                    break;
-                                                }
-                                                strcpy(current_key[index_prod],key);
-                                                index_prod = (index_prod + 1) % 2;
-                                                start_dumpstate_srv(CRASH_DIR, dir);
-                                            }
-                                        }
-                                    }
-                                }
                                 snprintf(destion,sizeof(destion),"%s%d/",CRASH_DIR,dir);
                                 LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, date_tmp_2, wd_array[i].eventname, destion);
+                                snprintf(destion,sizeof(destion),"%s%d/%s",CRASH_DIR,dir,event->name);
+                                do_copy(path, destion, FILESIZE_MAX);
+                                if (strstr(event->name, ".core" ))
+                                    backup_apcoredump(dir, event->name, path);
+                                if (strstr(event->name, "anr") || strstr(event->name, "system_server_watchdog"))
+                                    prepare_anr_or_uiwdt(destion);
                                 usleep(TIMEOUT_VALUE);
                                 do_log_copy(wd_array[i].eventname,dir,date_tmp,APLOG_TYPE);
                                 history_file_write(CRASHEVENT, wd_array[i].eventname, NULL, destion, NULL, key, date_tmp_2);
                                 del_file_more_lines(HISTORY_FILE);
-                                if (strstr(event->name, "crash") || strstr(event->name, "tombstone")) {
+                                if (strstr(event->name, "anr") || strstr(event->name, "system_server_watchdog")){
+                                    backtrace_anr_uiwdt(destion, dir);
+                                    restart_profile1_srv();
+                                }
+                                if(strstr(event->name, "anr") || strstr(event->name, "crash") || strstr(event->name, "tombstone")){
                                     snprintf(destion,sizeof(destion),"%s%d",CRASH_DIR,dir);
                                     char value[PROPERTY_VALUE_MAX];
                                     property_get(PROP_LOGSYSTEMSTATE, value, "stopped");
