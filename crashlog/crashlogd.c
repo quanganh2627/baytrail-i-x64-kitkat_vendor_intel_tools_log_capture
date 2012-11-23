@@ -1201,10 +1201,18 @@ void process_anr_or_uiwdt(char *destion, int dir, int remove_path)
     do_chown(dest_path_symb, PERM_USER, PERM_GROUP);
 }
 
+void compress_aplog_folder(char *folder_path)
+{
+    char cmd[PATHMAX];
+
+    snprintf(cmd, sizeof(cmd), "gzip %s/aplog*", folder_path);
+    system(cmd);
+}
+
 static int get_str_in_file(char *file, char *keyword, char *result)
 {
     char buffer[PATHMAX];
-    int rc = 0;
+    int rc = -1;
     FILE *fd1;
     struct stat info;
     int filelen,buflen;
@@ -1717,6 +1725,7 @@ static int do_crashlogd(unsigned int files)
                             char tmp[PATHMAX] = {'\0',};
                             int nbPacket,aplogDepth;
                             int aplogIsPresent;
+                            struct stat sb;
 
                             char value[PROPERTY_VALUE_MAX];
                             property_get(PROP_APLOG_DEPTH, value, PROP_APLOG_DEPTH_DEF);
@@ -1727,7 +1736,14 @@ static int do_crashlogd(unsigned int files)
                             nbPacket = atoi(value);
                             if (nbPacket < 0)
                                 nbPacket = 0;
-
+                            //if a value is specified inside trigger file, it overrides property value
+                            snprintf(path, sizeof(path),"%s/%s",wd_array[i].filename,event->name);
+                            if ((!stat(path, &sb))) {
+                                if (!get_str_in_file(path,"APLOG=",tmp)) {
+                                    aplogDepth = atoi(tmp);
+                                    nbPacket = 1;
+                                }
+                            }
                             int j,k;
                             aplogIsPresent = 0;
                             dir = -1;
@@ -1784,6 +1800,7 @@ static int do_crashlogd(unsigned int files)
                                     PRINT_TIME(date_tmp_2, TIME_FORMAT_2, time_tmp);
                                     compute_key(key, APLOGEVENT, APLOGTRIGGER);
                                     snprintf(destion,sizeof(destion),"%s%d/", APLOGS_DIR,dir);
+                                    compress_aplog_folder(destion);
                                     LOGE("%-8s%-22s%-20s%s %s\n", APLOGEVENT, key, date_tmp_2, event->name, destion);
                                     history_file_write(APLOGEVENT, APLOGTRIGGER, NULL, destion, NULL, key, date_tmp_2);
                                     del_file_more_lines(HISTORY_FILE);
@@ -1795,6 +1812,8 @@ static int do_crashlogd(unsigned int files)
                             }
 
                             if(-1!=dir && !strncmp(event->name, BZTRIGGER, sizeof(BZTRIGGER))) {
+                                    snprintf(destion,sizeof(destion),"%s%d/", BZ_DIR,dir);
+                                    compress_aplog_folder(destion);
                                     snprintf(destion,sizeof(destion),"%s%d/bz_description", BZ_DIR,dir);
                                     snprintf(path, sizeof(path),"%s/%s",wd_array[i].filename,event->name);
                                     do_copy(path,destion,0);
@@ -1817,7 +1836,6 @@ static int do_crashlogd(unsigned int files)
                             break;
                         }
                         // for STATS trigger
-                        // TO DO add code for INFO and ERROR here
                         else if((strcmp(wd_array[i].eventname,STATSTRIGGER)==0) && (strstr(event->name, "_trigger" ))){
                             char *p;
                             char tmp[32];
