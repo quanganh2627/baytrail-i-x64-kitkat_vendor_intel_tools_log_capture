@@ -1498,13 +1498,14 @@ static int do_crashlogd(unsigned int files)
                             PRINT_TIME(date_tmp, TIME_FORMAT_1, time_tmp);
                             PRINT_TIME(date_tmp_2, TIME_FORMAT_2, time_tmp);
                             compute_key(key, CRASHEVENT, wd_array[i].eventname);
-
+                            snprintf(path, sizeof(path),"%s/%s",wd_array[i].filename,event->name);
                             dir = find_dir(files,CRASH_MODE);
                             if (dir == -1) {
                                 LOGE("find dir %d for modem crash failed\n", files);
                                 LOGE("%-8s%-22s%-20s%s\n", CRASHEVENT, key, date_tmp_2, wd_array[i].eventname);
                                 history_file_write(CRASHEVENT, wd_array[i].eventname, NULL, NULL, NULL, key, date_tmp_2);
                                 del_file_more_lines(HISTORY_FILE);
+                                remove(path);
                                 notify_crashreport();
                                 break;
                             }
@@ -1513,7 +1514,6 @@ static int do_crashlogd(unsigned int files)
                             int status = mv_modem_crash(wd_array[i].filename, destion);
                             if (status != 0)
                                 LOGE("backup modem core dump status: %d.\n", status);
-                            snprintf(path, sizeof(path),"%s/%s",wd_array[i].filename,event->name);
                             snprintf(destion,sizeof(destion),"%s%d/%s", CRASH_DIR,dir,event->name);
                             do_copy(path, destion, 0);
                             snprintf(destion,sizeof(destion),"%s%d/", CRASH_DIR,dir);
@@ -1524,6 +1524,7 @@ static int do_crashlogd(unsigned int files)
                             do_log_copy(wd_array[i].eventname,dir,date_tmp,BPLOG_TYPE);
                             history_file_write(CRASHEVENT, wd_array[i].eventname, NULL, destion, NULL, key, date_tmp_2);
                             del_file_more_lines(HISTORY_FILE);
+                            remove(path);
                             notify_crashreport();
                             break;
                         }
@@ -2080,10 +2081,10 @@ static int crashlog_check_fabric(char *reason, unsigned int files)
         strcpy(crashtype, FABRIC_ERROR);
         for (i = 0; i < sizeof(ft_array)/sizeof(struct fabric_type); i++)
             if (!find_str_in_file(SAVED_FABRIC_ERROR_NAME, ft_array[i].keyword, ft_array[i].tail))
-                   strcpy(crashtype, ft_array[i].name);
+                   strncpy(crashtype, ft_array[i].name, sizeof(crashtype)-1);
         if ((!find_str_in_file(SAVED_FABRIC_ERROR_NAME, fake[0].keyword, fake[0].tail)) &&
           (!find_str_in_file(SAVED_FABRIC_ERROR_NAME, fake[1].keyword, fake[1].tail))) {
-                   strcpy(crashtype, fake[0].name);
+                   strncpy(crashtype, fake[0].name, sizeof(crashtype)-1);
                    if (!strncmp(reason, "HWWDT_RESET", 11))
                        strcat(reason,"_FAKE");
         }
