@@ -140,6 +140,7 @@
 #define HISTORY_UPTIME "/logs/uptime"
 #define LOG_UUID "/logs/uuid.txt"
 #define LOG_BUILDID "/logs/buildid.txt"
+#define MODEM_UUID "/logs/modemid.txt"
 #define KERNEL_CMDLINE "/proc/cmdline"
 #define CMDLINE_NAME "cmdline"
 #define STARTUP_STR "androidboot.wakesrc="
@@ -577,6 +578,84 @@ static void backup_apcoredump(unsigned int dir, char* name, char* path)
         remove(path);
 }
 
+static int file_read_value(const char *path, char *value, const char *default_value)
+{
+    struct stat info;
+    FILE *fd;
+    int ret = -1;
+
+    if ( stat(path, &info) == 0 ) {
+        fd = fopen(path, "r");
+        if (fd == NULL){
+            LOGE("can not open file: %s\n", path);
+            return -1;
+        }
+        ret = fscanf(fd, "%s", value);
+        fclose(fd);
+        if (ret == 1)
+            return 0;
+    }
+    if (default_value) {
+        strcpy(value, default_value);
+        return ret;
+    } else {
+        return ret;
+    }
+}
+
+static void write_uid(char* filename, char *uuid_value)
+{
+    FILE *fd;
+
+    fd = fopen(filename, "w");
+    if (fd == NULL){
+        LOGE("can not open file: %s\n", filename);
+        return;
+    }
+    fprintf(fd, "%s", uuid_value);
+    fclose(fd);
+    do_chown(filename, PERM_USER, PERM_GROUP);
+}
+
+static void read_proc_uid(char* source, char *filename, char *uid, char* pattern)
+{
+    char temp_uid[256];
+    struct stat info;
+    FILE *fd;
+
+    if ((source && filename && uid && pattern) == 0)
+        return;
+
+    if (file_read_value(source, uid, pattern) != 0) {
+        write_uid(filename, uid);
+        LOGE("%s error\n", source);
+        return;
+    }
+    file_read_value(filename, temp_uid, "");
+    if (strcmp(uid, temp_uid) != 0)
+        write_uid(filename, uid);
+}
+
+static void read_prop_uid(char* source, char *filename, char *uid, char* default_value)
+{
+    char temp_uid[PROPERTY_VALUE_MAX];
+    struct stat info;
+    FILE *fd;
+
+    if ((source && filename && uid && default_value) == 0)
+        return;
+
+    file_read_value(filename, uid, default_value);
+    if (property_get(source, temp_uid, "") <= 0) {
+        LOGE("Property %s not readable\n", source);
+        return;
+    }
+    if (strcmp(uid, temp_uid) != 0) {
+        strncpy(uid, temp_uid, sizeof(uid)-1);
+        write_uid(filename, temp_uid);
+    }
+}
+
 static void build_footprint(char *id)
 {
     char prop[PROPERTY_VALUE_MAX];
@@ -611,7 +690,7 @@ static void build_footprint(char *id)
     strncat(id, prop, SIZE_FOOTPRINT_MAX);
     strncat(id, ",", SIZE_FOOTPRINT_MAX);
 
-    property_get(MODEM_FIELD, prop, "");
+    read_prop_uid(MODEM_FIELD, MODEM_UUID, prop, "unknown");
     strncat(id, prop, SIZE_FOOTPRINT_MAX);
     strncat(id, ",", SIZE_FOOTPRINT_MAX);
 
@@ -2327,61 +2406,6 @@ static int crashlog_check_startupreason(char *reason, unsigned int files)
     return 0;
 }
 
-static int file_read_value(const char *path, char *value, const char *default_value)
-{
-    struct stat info;
-    FILE *fd;
-    int ret = -1;
-
-    if ( stat(path, &info) == 0 ) {
-        fd = fopen(path, "r");
-        if (fd == NULL){
-            LOGE("can not open file: %s\n", LOG_BUILDID);
-            return -1;
-        }
-        ret = fscanf(fd, "%s", value);
-        fclose(fd);
-        if (ret == 1)
-            return 0;
-    }
-    if (default_value) {
-        strcpy(value, default_value);
-        return ret;
-    } else {
-        return ret;
-    }
-}
-
-static void write_uuid(char *uuid_value)
-{
-    FILE *fd;
-
-    fd = fopen(LOG_UUID, "w");
-    if (fd == NULL){
-        LOGE("can not open file: %s\n", LOG_BUILDID);
-        return;
-    }
-    fprintf(fd, "%s", uuid_value);
-    fclose(fd);
-    do_chown(LOG_UUID, PERM_USER, PERM_GROUP);
-}
-
-static void read_uuid(void)
-{
-    char temp_uuid[256];
-    struct stat info;
-    FILE *fd;
-
-    if (file_read_value(PROC_UUID, uuid, "Medfield") != 0) {
-        write_uuid(uuid);
-        LOGE("PROC_UUID error\n");
-        return;
-    }
-    file_read_value(LOG_UUID, temp_uuid, "");
-    if (strcmp(uuid, temp_uuid) != 0)
-        write_uuid(uuid);
-}
-
 static int swupdated(char *buildname)
 {
     struct stat info;
@@ -2691,7 +2715,7 @@ int main(int argc, char **argv)
     if (property_get(BOARD_FIELD, boardVersion, "") <=0){
         get_version_info(SYS_PROP, BOARD_FIELD, boardVersion);
     }
-    read_uuid();
+    read_proc_uid(PROC_UUID, LOG_UUID, uuid, "Medfield");
 
     sdcard_exist();
 
@@ -2719,6 +2743,7 @@ int main(int argc, char **argv)
         if (swupdated(buildVersion)) {
             strcpy(lastuptime, "0000:00:00");
             strcpy(startupreason,"SWUPDATE");
+            remove(MODEM_UUID);
             reset_crashlog();
             reset_statslog();
             reset_aplogslog();
@@ -2745,6 +2770,7 @@ int main(int argc, char **argv)
         if (swupdated(buildVersion)) {
             strcpy(lastuptime, "0000:00:00");
             strcpy(startupreason,"SWUPDATE");
+            remove(MODEM_UUID);
             reset_crashlog();
             reset_statslog();
             reset_aplogslog();
