@@ -2610,6 +2610,7 @@ static void read_startupreason(char *startupreason)
                 reason=strtoul(p, &endptr, 16);
                 if ((errno != ERANGE) &&
                     (endptr != p) &&
+                    (reason >= 0) &&
                     (reason < (sizeof(bootmode_reason)/sizeof(char*)))) {
                     strcpy(startupreason, bootmode_reason[reason]);
                 }else {
