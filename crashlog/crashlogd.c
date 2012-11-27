@@ -1436,6 +1436,46 @@ out:
 }
 
 #define SCREENSHOT_PATTERN "SCREENSHOT="
+
+static int do_screenshot_copy(char* bz_description, char* bzdir){
+    char buffer[PATHMAX];
+    char screenshot[PATHMAX];
+    char destion[PATHMAX];
+    FILE *fd1;
+    struct stat info;
+    int buflen;
+    int bz_num = 0;
+
+    if (stat(bz_description, &info) < 0)
+        return -1;
+
+    fd1 = fopen(bz_description,"r");
+    if(fd1 == NULL){
+        LOGE("can not open file: %s\n", bz_description);
+        return -1;
+    }
+
+    while(!feof(fd1)){
+        if (fgets(buffer, sizeof(buffer), fd1) != NULL){
+            if (strstr(buffer,SCREENSHOT_PATTERN)){
+                int buflen = strlen(buffer);
+                strcpy(screenshot,buffer+strlen(SCREENSHOT_PATTERN));
+                screenshot[strlen(screenshot)-1]= '\0';
+                if(bz_num == 0)
+                    snprintf(destion,sizeof(destion),"%s/bz_screenshot.png", bzdir);
+                else
+                    snprintf(destion,sizeof(destion),"%s/bz_screenshot%d.png", bzdir, bz_num);
+                bz_num++;
+                do_copy(screenshot,destion,0);
+            }
+        }
+    }
+
+    if (fd1 != NULL)
+        fclose(fd1);
+
+    return 0;
+}
 static int do_crashlogd(unsigned int files)
 {
     int fd, fd1;
@@ -1758,14 +1798,12 @@ static int do_crashlogd(unsigned int files)
                                     snprintf(destion,sizeof(destion),"%s%d/bz_description", BZ_DIR,dir);
                                     snprintf(path, sizeof(path),"%s/%s",wd_array[i].filename,event->name);
                                     do_copy(path,destion,0);
-                                    if (!get_str_in_file(path,SCREENSHOT_PATTERN,tmp)) {
-                                        snprintf(destion,sizeof(destion),"%s%d/bz_screenshot.png", BZ_DIR,dir);
-                                        do_copy(tmp,destion,0);
-                                    }
                                     time(&t);
                                     time_tmp = localtime((const time_t *)&t);
                                     PRINT_TIME(date_tmp_2, TIME_FORMAT_2, time_tmp);
                                     compute_key(key, BZEVENT, BZMANUAL);
+                                    snprintf(destion,sizeof(destion),"%s%d", BZ_DIR,dir);
+                                    do_screenshot_copy(path,destion);
                                     snprintf(destion,sizeof(destion),"%s%d/", BZ_DIR,dir);
                                     LOGE("%-8s%-22s%-20s%s %s\n", BZEVENT, key, date_tmp_2, BZMANUAL, destion);
                                     history_file_write(BZEVENT, BZMANUAL, NULL, destion, NULL, key, date_tmp_2);
