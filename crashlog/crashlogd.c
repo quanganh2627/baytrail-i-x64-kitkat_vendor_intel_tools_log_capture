@@ -161,6 +161,7 @@
 #define CRASHFILE_NAME "crashfile"
 
 #define MODEM_SHUTDOWN_TRIGGER "/logs/modemcrash/mshutdown.txt"
+#define SCREENSHOT_PATTERN "SCREENSHOT="
 
 // Add recovery error trigger
 #define RECOVERY_ERROR_TRIGGER "/cache/recovery/recoveryfail"
@@ -1139,7 +1140,7 @@ void prepare_anr_or_uiwdt(char *destion)
     }
 }
 
-void process_anr_or_uiwdt(char *destion, int dir, int remove_path)
+void process_anr_or_uiwdt_tracefile(char *destion, int dir, int remove_path)
 {
     char cmd[PATHMAX];
     int src, dest;
@@ -1254,7 +1255,7 @@ void backtrace_anr_uiwdt(char *dest, int dir)
     char value[PROPERTY_VALUE_MAX];
     property_get(PROP_ANR_USERSTACK, value, "0");
     if (strncmp(value, "1", 1)) {
-        process_anr_or_uiwdt(dest, dir, 0);
+        process_anr_or_uiwdt_tracefile(dest, dir, 0);
     }
 }
 
@@ -1443,8 +1444,6 @@ out:
     return oldest;
 }
 
-#define SCREENSHOT_PATTERN "SCREENSHOT="
-
 static int do_screenshot_copy(char* bz_description, char* bzdir){
     char buffer[PATHMAX];
     char screenshot[PATHMAX];
@@ -1484,9 +1483,734 @@ static int do_screenshot_copy(char* bz_description, char* bzdir){
 
     return 0;
 }
+
+/*
+* Name          : get_formated_times
+* Description   : set given strings to current date/time under 2 differents formats
+* Parameters    :
+* char *format_1_time   -> set to format defined in TIME_FORMAT_1 (used for naming files )
+* char *format_2_time   -> set to format defined in TIME_FORMAT_2 (used for displayed messages or be written in files)*/
+void get_formated_times(char *format_1_time, char *format_2_time)
+{
+    time_t t;
+    struct tm *time_tmp;
+    //Define Epoch variable
+    struct tm EPOCH = {0, 0, 0, 1, 0, 0, 1, 0, 0, 0, ""};
+
+    time(&t);
+    time_tmp = localtime((const time_t *)&t);
+
+    if (time_tmp == NULL) {
+        time_tmp = &EPOCH;
+        LOGE("can't retrieve current time");
+    }
+    PRINT_TIME(format_1_time, TIME_FORMAT_1, time_tmp);
+    PRINT_TIME(format_2_time, TIME_FORMAT_2, time_tmp);
+}
+
+/*
+* Name          : process_hprof_event
+* Description   : processes hprof events
+* Parameters    :
+*   char *filename        -> path of watched directory/file
+*   char *name            -> name of the file inside the watched directory that has triggered the event
+*   unsigned int files    -> nb max of logs destination directories (crashlog, aplogs, bz... )*/
+void process_hprof_event(char *filename,  char *name, unsigned int files)
+{
+    char date_tmp[32];
+    char date_tmp_2[32];
+    char key[SHA1_DIGEST_LENGTH+1];
+    int dir;
+    char path[PATHMAX];
+    char destion[PATHMAX];
+
+    get_formated_times(date_tmp,date_tmp_2);
+    compute_key(key, CRASHEVENT, HPROF);
+
+    dir = find_dir(files,CRASH_MODE);
+    if (dir == -1) {
+        LOGE("find dir %d for hprof failed\n", files);
+        return;
+    }
+    /*copy hprof file*/
+    snprintf(path, sizeof(path),"%s/%s",filename,name);
+    snprintf(destion,sizeof(destion),"%s%d/%s", CRASH_DIR,dir,name);
+    do_copy(path, destion, 0);
+    remove(path);
+    snprintf(destion,sizeof(destion),"%s%d/",CRASH_DIR,dir);
+    LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, date_tmp_2, HPROF, destion);
+    history_file_write(CRASHEVENT, HPROF, NULL, destion, NULL, key, date_tmp_2);
+    del_file_more_lines(HISTORY_FILE);
+    notify_crashreport();
+}
+
+/*
+* Name          : process_modem_reset_event
+* Description   : processes modem reset events
+* Parameters    :
+*   char *filename        -> path of watched directory/file
+*   char *eventname       -> name of the watched event
+*   char *name            -> name of the file inside the watched directory that has triggered the event
+*   unsigned int files    -> nb max of logs destination directories (crashlog, aplogs, bz... )*/
+void process_modem_reset_event(char *filename, char *eventname, char *name,  unsigned int files)
+{
+    char date_tmp[32];
+    char date_tmp_2[32];
+    char key[SHA1_DIGEST_LENGTH+1];
+    int dir;
+    char path[PATHMAX];
+    char destion[PATHMAX];
+    struct stat info;
+
+    get_formated_times(date_tmp,date_tmp_2);
+    compute_key(key, CRASHEVENT, eventname);
+
+    dir = find_dir(files,CRASH_MODE);
+    if (dir == -1) {
+        LOGE("find dir %d for modem reset failed\n", files);
+        LOGE("%-8s%-22s%-20s%s\n", CRASHEVENT, key, date_tmp_2, eventname);
+        history_file_write(CRASHEVENT, eventname, NULL, NULL, NULL, key, date_tmp_2);
+        del_file_more_lines(HISTORY_FILE);
+        notify_crashreport();
+        return;
+    }
+
+    snprintf(path, sizeof(path), "%s/%s", filename, name);
+    if((stat(path, &info) == 0) && (info.st_size != 0)){
+        snprintf(destion,sizeof(destion),"%s%d/%s", CRASH_DIR,dir, name);
+        do_copy(path, destion, FILESIZE_MAX);
+    }
+    snprintf(destion,sizeof(destion),"%s%d/", CRASH_DIR,dir);
+    LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, date_tmp_2, eventname, destion);
+    usleep(TIMEOUT_VALUE);
+    do_log_copy(eventname,dir,date_tmp,APLOG_TYPE);
+    do_log_copy(eventname,dir,date_tmp,BPLOG_TYPE);
+    history_file_write(CRASHEVENT, eventname, NULL, destion, NULL, key, date_tmp_2);
+    del_file_more_lines(HISTORY_FILE);
+    notify_crashreport();
+}
+
+/*
+* Name          : process_modem_crash_event
+* Description   : processes modem crash events
+* Parameters    :
+*   char *filename        -> path of watched directory/file
+*   char *eventname       -> name of the watched event
+*   char *name            -> name of the file inside the watched directory that has triggered the event
+*   unsigned int files    -> nb max of logs destination directories (crashlog, aplogs, bz... )*/
+void process_modem_crash_event(char *filename, char *eventname, char *name,  unsigned int files) {
+
+    char date_tmp[32];
+    char date_tmp_2[32];
+    char key[SHA1_DIGEST_LENGTH+1];
+    int dir;
+    char path[PATHMAX];
+    char destion[PATHMAX];
+
+    get_formated_times(date_tmp,date_tmp_2);
+    compute_key(key, CRASHEVENT, eventname);
+    snprintf(path, sizeof(path),"%s/%s",filename,name);
+    dir = find_dir(files,CRASH_MODE);
+    if (dir == -1) {
+        LOGE("find dir %d for modem crash failed\n", files);
+        LOGE("%-8s%-22s%-20s%s\n", CRASHEVENT, key, date_tmp_2, eventname);
+        history_file_write(CRASHEVENT, eventname, NULL, NULL, NULL, key, date_tmp_2);
+        del_file_more_lines(HISTORY_FILE);
+        remove(path);
+        notify_crashreport();
+        return;
+    }
+
+    snprintf(destion,sizeof(destion),"%s%d", CRASH_DIR,dir);
+    int status = mv_modem_crash(filename, destion);
+    if (status != 0)
+        LOGE("backup modem core dump status: %d.\n", status);
+    snprintf(destion,sizeof(destion),"%s%d/%s", CRASH_DIR,dir,name);
+    do_copy(path, destion, 0);
+    snprintf(destion,sizeof(destion),"%s%d/", CRASH_DIR,dir);
+
+    LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, date_tmp_2, eventname, destion);
+    usleep(TIMEOUT_VALUE);
+    do_log_copy(eventname,dir,date_tmp,APLOG_TYPE);
+    do_log_copy(eventname,dir,date_tmp,BPLOG_TYPE);
+    history_file_write(CRASHEVENT, eventname, NULL, destion, NULL, key, date_tmp_2);
+    del_file_more_lines(HISTORY_FILE);
+    remove(path);
+    notify_crashreport();
+}
+
+/*
+* Name          : process_full_dropbox_event
+* Description   : processes anr, javacrash and watchdog full dropbox events
+* Parameters    :
+*   char *name            -> name of the file inside the watched directory that has triggered the event
+*   unsigned int files    -> nb max of logs destination directories (crashlog, aplogs, bz... )*/
+void process_full_dropbox_event(char *name,  unsigned int files) {
+
+    char date_tmp[32];
+    char date_tmp_2[32];
+    char key[SHA1_DIGEST_LENGTH+1];
+    int dir;
+    char destion[PATHMAX];
+    char lostevent[32] = { '\0', };
+    char lostevent_subtype[32] = { '\0', };
+
+    if (strstr(name, "anr"))
+        strcpy(lostevent, ANR_CRASH);
+    else if (strstr(name, "crash"))
+        strcpy(lostevent, JAVA_CRASH);
+    else if (strstr(name, "watchdog"))
+        strcpy(lostevent, SYSSERVER_WDT);
+    else
+        //inconsistent full dropbox event
+        return;
+
+    snprintf(lostevent_subtype, sizeof(lostevent_subtype), "%s_%s", LOST, lostevent);
+
+    get_formated_times(date_tmp,date_tmp_2);
+    compute_key(key, CRASHEVENT, lostevent);
+
+    dir = find_dir(files,CRASH_MODE);
+    if (dir == -1) {
+        LOGE("find dir %d for lost dropbox failed\n", files);
+        LOGE("%-8s%-22s%-20s%s\n", CRASHEVENT, key, date_tmp_2, lostevent);
+        history_file_write(CRASHEVENT, lostevent, lostevent_subtype, NULL, NULL, key, date_tmp_2);
+        del_file_more_lines(HISTORY_FILE);
+        notify_crashreport();
+        return;
+    }
+
+    snprintf(destion,sizeof(destion),"%s%d/",CRASH_DIR,dir);
+    LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, date_tmp_2, lostevent, destion);
+    usleep(TIMEOUT_VALUE);
+    do_log_copy(lostevent,dir,date_tmp,APLOG_TYPE);
+    history_file_write(CRASHEVENT, lostevent, lostevent_subtype, destion, NULL, key, date_tmp_2);
+    del_file_more_lines(HISTORY_FILE);
+    notify_crashreport();
+}
+
+
+/*
+* Name          : process_aplog_and_bz_trigger
+* Description   : This function manages treatment for aplog triggers and bz triggers.
+*                 When an aplog or a bz trigger file is detected, it manages the packet(s) copy of aplogs file(s)
+* Parameters    :
+*   char *filename        -> path of watched directory/file
+*   char *name            -> name of the file inside the watched directory that has triggered the event
+*   unsigned int files    -> nb max of logs destination directories (crashlog, aplogs, bz... )*/
+void process_aplog_and_bz_trigger(char *filename, char *name,  unsigned int files) {
+
+    char date_tmp[32];
+    char date_tmp_2[32];
+    char key[SHA1_DIGEST_LENGTH+1];
+    int dir;
+    char path[PATHMAX];
+    char destion[PATHMAX];
+    struct stat info;
+    char *p;
+    char tmp[PATHMAX] = {'\0',};
+    int nbPacket,aplogDepth;
+    int aplogIsPresent;
+    struct stat sb;
+    char value[PROPERTY_VALUE_MAX];
+
+    //Get Aplog depth (number of aplogs per packet)
+    property_get(PROP_APLOG_DEPTH, value, PROP_APLOG_DEPTH_DEF);
+    aplogDepth = atoi(value);
+    if (aplogDepth < 0)
+        aplogDepth = 0;
+
+    //Get nb of packets to copy
+    property_get(PROP_APLOG_NB_PACKET, value, PROP_APLOG_NB_PACKET_DEF);
+    nbPacket = atoi(value);
+    if (nbPacket < 0)
+        nbPacket = 0;
+
+    //if a value is specified inside trigger file, it overrides property value
+    snprintf(path, sizeof(path),"%s/%s", filename, name);
+    if ((!stat(path, &sb))) {
+        if (!get_str_in_file(path,"APLOG=",tmp)) {
+            aplogDepth = atoi(tmp);
+            nbPacket = 1;
+        }
+    }
+
+    int j,k;
+    aplogIsPresent = 0;
+    dir = -1;
+    /*copy data file*/
+    for( j=0; j < nbPacket ; j++){
+        if(strstr(name, "aplog_trigger" ))
+            dir=-1;
+        for(k=0;k < aplogDepth ; k++) {
+
+            aplogIsPresent = 1;
+            if ((j == 0) && (k == 0))
+                snprintf(path, sizeof(path),"%s",APLOG_FILE_0);
+            else
+                snprintf(path, sizeof(path),"%s.%d",APLOG_FILE_0,(j*aplogDepth)+k);
+
+            //Check aplog file exists
+            if(stat(path, &info) == 0){
+
+                //aplog_trigger case : for each new packet to copy, create an aplogs destination directory
+                if(k == 0 && strstr(name, "aplog_trigger" )){
+                    dir = find_dir(files,APLOGS_MODE);
+                    if (dir == -1) {
+                        LOGE("find dir %d for aplog trigger failed\n", files);
+                        //No need to write in the history event in this case
+                        break;
+                     }
+                }
+                //for 1st aplog in 1st packet :
+                if ((j == 0) && (k == 0)) {
+                    //bz_trigger case : create a new bz destination directory
+                    if(!strncmp(name, BZTRIGGER, sizeof(BZTRIGGER))) {
+                        dir = find_dir(files,BZ_MODE);
+                        if (dir == -1) {
+                            LOGE("find dir %d for BZ trigger failed\n", files);
+                            //No need to write in the history event in this case
+                            break;
+                        }
+                        snprintf(destion,sizeof(destion),"%s%d/aplog", BZ_DIR,dir);
+                    }
+                    //for aplog_trigger case
+                    else if(strstr(name, "aplog_trigger" ))
+                        snprintf(destion,sizeof(destion),"%s%d/aplog", APLOGS_DIR,dir);
+                }
+                else{
+                    if(!strncmp(name, BZTRIGGER, sizeof(BZTRIGGER)))
+                        snprintf(destion,sizeof(destion),"%s%d/aplog.%d", BZ_DIR,dir,(j*aplogDepth)+k);
+                    else if(strstr(name, "aplog_trigger" ))
+                        snprintf(destion,sizeof(destion),"%s%d/aplog.%d", APLOGS_DIR,dir,(j*aplogDepth)+k);
+                }
+                do_copy(path, destion, 0);
+            }
+            else {
+                aplogIsPresent = 0;
+                break;
+            }
+        }
+
+        //for aplog_trigger, logs an APLOG event in history_event for each copied packet
+        if((k != 0) && (dir != -1) && strstr(name, "aplog_trigger" )) {
+
+            get_formated_times(date_tmp,date_tmp_2);
+            compute_key(key, APLOGEVENT, APLOGTRIGGER);
+            snprintf(destion,sizeof(destion),"%s%d/", APLOGS_DIR,dir);
+            compress_aplog_folder(destion);
+            LOGE("%-8s%-22s%-20s%s %s\n", APLOGEVENT, key, date_tmp_2, name, destion);
+            history_file_write(APLOGEVENT, APLOGTRIGGER, NULL, destion, NULL, key, date_tmp_2);
+            del_file_more_lines(HISTORY_FILE);
+            notify_crashreport();
+            restart_profile2_srv();
+        }
+        if(aplogIsPresent == 0)
+            break;
+    }
+
+    //for bz_trigger, treats bz_trigger file content and logs one BZEVENT event in history_event
+    if(-1!=dir && !strncmp(name, BZTRIGGER, sizeof(BZTRIGGER))) {
+            snprintf(destion,sizeof(destion),"%s%d/", BZ_DIR,dir);
+            compress_aplog_folder(destion);
+            //copy bz_trigger file content
+            snprintf(destion,sizeof(destion),"%s%d/bz_description", BZ_DIR,dir);
+            snprintf(path, sizeof(path),"%s/%s",filename,name);
+            do_copy(path,destion,0);
+            get_formated_times(date_tmp,date_tmp_2);
+            compute_key(key, BZEVENT, BZMANUAL);
+            snprintf(destion,sizeof(destion),"%s%d", BZ_DIR,dir);
+            //copy bz screenshot
+            do_screenshot_copy(path,destion);
+            snprintf(destion,sizeof(destion),"%s%d/", BZ_DIR,dir);
+            LOGE("%-8s%-22s%-20s%s %s\n", BZEVENT, key, date_tmp_2, BZMANUAL, destion);
+            history_file_write(BZEVENT, BZMANUAL, NULL, destion, NULL, key, date_tmp_2);
+            del_file_more_lines(HISTORY_FILE);
+            notify_crashreport();
+            restart_profile2_srv();
+    }
+
+    /*delete trigger file*/
+    snprintf(path, sizeof(path),"%s/%s",filename,name);
+    remove(path);
+    return;
+}
+
+/*
+* Name          : process_stats_trigger
+* Description   : This function manages treatment for stats triggers.
+*                 When stats trigger file is detected, it copies data and trigger files
+* Parameters    :
+*   char *filename        -> path of watched directory/file
+*   char *name            -> name of the file inside the watched directory that has triggered the event
+*   unsigned int files    -> nb max of logs destination directories (crashlog, aplogs, bz... )*/
+void process_stats_trigger(char *filename, char *name,  unsigned int files) {
+
+    char date_tmp[32];
+    char date_tmp_2[32];
+    char key[SHA1_DIGEST_LENGTH+1];
+    int dir;
+    char path[PATHMAX];
+    char destion[PATHMAX];
+    unsigned int j = 0;
+    char *p;
+    char tmp[32];
+    char type[20] = { '\0', };
+    char tmp_data_name[PATHMAX];
+
+    snprintf(tmp,sizeof(tmp),"%s",name);
+
+    get_formated_times(date_tmp,date_tmp_2);
+
+    dir = find_dir(files,STATS_MODE);
+    if (dir == -1) {
+        LOGE("find dir %d for stat trigger failed\n", files);
+        p = strstr(tmp,"trigger");
+        if ( p ){
+            strcpy(p,"data");
+        }
+        compute_key(key, STATSEVENT, tmp);
+        LOGE("%-8s%-22s%-20s%s\n", STATSEVENT, key, date_tmp_2, tmp);
+        history_file_write(STATSEVENT, tmp, NULL, NULL, NULL, key, date_tmp_2);
+        del_file_more_lines(HISTORY_FILE);
+        notify_crashreport();
+        return;
+    }
+    /*copy data file*/
+    p = strstr(tmp,"trigger");
+    if ( p ){
+        strcpy(p,"data");
+        find_file_in_dir(tmp_data_name, filename, tmp);
+        snprintf(path, sizeof(path),"%s/%s",filename,tmp_data_name);
+        snprintf(destion,sizeof(destion),"%s%d/%s", STATS_DIR,dir,tmp_data_name);
+        do_copy(path, destion, 0);
+        remove(path);
+    }
+    /*copy trigger file*/
+    snprintf(path, sizeof(path),"%s/%s",filename,name);
+    snprintf(destion,sizeof(destion),"%s%d/%s", STATS_DIR,dir,name);
+    do_copy(path, destion, 0);
+    remove(path);
+    snprintf(destion,sizeof(destion),"%s%d/", STATS_DIR,dir);
+    compute_key(key, STATSEVENT, tmp);
+    /*create type */
+    snprintf(tmp,sizeof(tmp),"%s",name);
+    p = strstr(tmp,"_trigger");
+    if (p) {
+        for (j=0;j<sizeof(type)-1;j++) {
+            if (p == (tmp+j))
+                break;
+            type[j]=toupper(tmp[j]);
+        }
+    } else
+        snprintf(type,sizeof(type),"%s",name);
+    LOGE("%-8s%-22s%-20s%s %s\n", STATSEVENT, key, date_tmp_2, type, destion);
+    /*for USBBOGUS case copy aplog file*/
+    if (!strncmp(type, USBBOGUS, sizeof(USBBOGUS))) {
+        usleep(TIMEOUT_VALUE);
+        do_log_copy(type,dir,date_tmp,APLOG_STATS_TYPE);
+    }
+    history_file_write(STATSEVENT, type, NULL, destion, NULL, key, date_tmp_2);
+    del_file_more_lines(HISTORY_FILE);
+    notify_crashreport();
+    return;
+}
+
+/*
+* Name          : process_info_and_error
+* Description   : This function manages treatment of error and info
+*                 When event or error trigger file is detected, it copies data and trigger files
+* Parameters    :
+*   char *filename        -> path of watched directory/file
+*   char *name            -> name of the file inside the watched directory that has triggered the event
+*   unsigned int files    -> nb max of logs destination directories (crashlog, aplogs, bz... )*/
+void process_info_and_error(char *filename, char *name,  unsigned int files) {
+
+    char date_tmp[32];
+    char date_tmp_2[32];
+    char key[SHA1_DIGEST_LENGTH+1];
+    int dir;
+    char path[PATHMAX];
+    char destion[PATHMAX];
+    unsigned int j = 0;
+    char *p;
+    char tmp[32];
+    char name_event[10];
+    char file_ext[20];
+    char type[20] = { '\0', };
+    char tmp_data_name[PATHMAX];
+
+    if (strstr(name, "_infoevent" )){
+        snprintf(name_event,sizeof(name_event),"%s",INFOEVENT);
+        snprintf(file_ext,sizeof(file_ext),"%s","_infoevent");
+    }else if (strstr(name, "_errorevent" )){
+        snprintf(name_event,sizeof(name_event),"%s",ERROREVENT);
+        snprintf(file_ext,sizeof(file_ext),"%s","_errorevent");
+    }else{ /* DEAD CODE?  */
+        LOGE("Unknown stats trigger file\n");
+        return;
+    }
+    snprintf(tmp,sizeof(tmp),"%s",name);
+
+    get_formated_times(date_tmp,date_tmp_2);
+
+    dir = find_dir(files,STATS_MODE);
+    if (dir == -1) {
+        LOGE("find dir %d for stat trigger failed\n", files);
+        p = strstr(tmp,"trigger");
+        if ( p ){
+            strcpy(p,"data");
+        }
+        compute_key(key, name_event, tmp);
+        LOGE("%-8s%-22s%-20s%s\n", name_event, key, date_tmp_2, tmp);
+        history_file_write(name_event, tmp, NULL, NULL, NULL, key, date_tmp_2);
+        del_file_more_lines(HISTORY_FILE);
+        notify_crashreport();
+        return;
+    }
+    /*copy data file*/
+    p = strstr(tmp,file_ext);
+    if ( p ){
+        strcpy(p,"_data");
+        find_file_in_dir(tmp_data_name, filename,tmp);
+        snprintf(path, sizeof(path),"%s/%s", filename,tmp_data_name);
+        snprintf(destion,sizeof(destion),"%s%d/%s", STATS_DIR, dir, tmp_data_name);
+        do_copy(path, destion, 0);
+        remove(path);
+    }
+    /*copy trigger file*/
+    snprintf(path, sizeof(path),"%s/%s", filename,name);
+    snprintf(destion,sizeof(destion),"%s%d/%s", STATS_DIR,dir,name);
+    do_copy(path, destion, 0);
+    remove(path);
+    snprintf(destion,sizeof(destion),"%s%d/", STATS_DIR,dir);
+    compute_key(key, name_event, tmp);
+    /*create type */
+    snprintf(tmp,sizeof(tmp),"%s",name);
+    // manage _ problem??
+    p = strstr(tmp,file_ext);
+    if (p) {
+        for (j=0;j<sizeof(type)-1;j++) {
+            if (p == (tmp+j))
+                break;
+            type[j]=toupper(tmp[j]);
+        }
+    } else
+        snprintf(type,sizeof(type),"%s",name);
+    LOGE("%-8s%-22s%-20s%s %s\n", name_event, key, date_tmp_2, type, destion);
+    history_file_write(name_event, type, NULL, destion, NULL, key, date_tmp_2);
+    del_file_more_lines(HISTORY_FILE);
+    notify_crashreport();
+    return;
+}
+
+/*
+* Name          : process_anr_and_uiwatchdog_events
+* Description   : processes anr and uiwatchdog events
+*                 For anr a dumpstate is launched if not already running
+* Parameters    :
+*   char *filename        -> path of watched directory/file
+*   char *eventname       -> name of the watched event
+*   char *name            -> name of the file inside the watched directory that has triggered the event
+*   unsigned int files    -> nb max of logs destination directories (crashlog, aplogs, bz... )
+*   int fd                -> file descriptor referring to the inotify instance
+*   char *current_key     -> key of the current event to upload once the dumpstate is done*/
+void process_anr_and_uiwatchdog_events(char *filename, char *eventname, char *name,  unsigned int files, int fd, char *current_key) {
+
+    char date_tmp[32];
+    char date_tmp_2[32];
+    char key[SHA1_DIGEST_LENGTH+1];
+    int dir;
+    char path[PATHMAX];
+    char destion[PATHMAX];
+    struct stat info;
+    int wd;
+
+    current_key[0]='\0';
+
+    get_formated_times(date_tmp,date_tmp_2);
+    compute_key(key, CRASHEVENT, eventname);
+
+    dir = find_dir(files,CRASH_MODE);
+    if (dir == -1) {
+        LOGE("find dir %d for and and UIwatchdog failed\n", files);
+        LOGE("%-8s%-22s%-20s%s\n", CRASHEVENT, key, date_tmp_2, eventname);
+        del_file_more_lines(HISTORY_FILE);
+        history_file_write(CRASHEVENT, eventname, NULL, NULL, NULL, key, date_tmp_2);
+        notify_crashreport();
+        restart_profile1_srv();
+        return;
+    }
+
+    snprintf(path, sizeof(path),"%s/%s",filename, name);
+    if (stat(path, &info) == 0) {
+        snprintf(destion,sizeof(destion),"%s%d/",CRASH_DIR,dir);
+        LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, date_tmp_2, eventname, destion);
+        snprintf(destion,sizeof(destion),"%s%d/%s",CRASH_DIR,dir, name);
+        do_copy(path, destion, FILESIZE_MAX);
+        prepare_anr_or_uiwdt(destion);
+        history_file_write(CRASHEVENT, eventname, NULL, destion, NULL, key, date_tmp_2);
+        del_file_more_lines(HISTORY_FILE);
+        usleep(TIMEOUT_VALUE);
+        do_log_copy(eventname,dir,date_tmp,APLOG_TYPE);
+        backtrace_anr_uiwdt(destion, dir);
+        restart_profile1_srv();
+
+        if (strstr(name, "anr")) {
+            snprintf(destion,sizeof(destion),"%s%d",CRASH_DIR,dir);
+            char value[PROPERTY_VALUE_MAX];
+            property_get(PROP_LOGSYSTEMSTATE, value, "stopped");
+            //Check if a dumpstate is already running
+            if(strcmp(value,"running") == 0){
+                LOGE("Can't launch dumpstate for %s.\n", destion);
+            }else{
+                //add a watcher on the destination directory to notify the crash upload once dumpstate is done
+                wd = inotify_add_watch(fd, destion, IN_CLOSE_WRITE);
+                if (wd < 0) {
+                    LOGE("Can't add watch for %s.\n", destion);
+                    notify_crashreport();
+                    return;
+                }
+                //return key of current anr for consecutive anr dumpstate management
+                strcpy(current_key,key);
+                start_dumpstate_srv(CRASH_DIR, dir);
+            }
+        }
+        notify_crashreport();
+    }
+    return;
+}
+
+/*
+* Name          : process_generic_events
+* Description   : processes apcoredump, javacrash and tombstones events and
+*                 anr and UIwatchdog events when trigger file is detected elsewhere than the default watched directory
+* Parameters    :
+*   char *filename        -> path of watched directory/file
+*   char *eventname       -> name of the watched event
+*   char *name            -> name of the file inside the watched directory that has triggered the event
+*   unsigned int files    -> nb max of logs destination directories (crashlog, aplogs, bz... )
+*   int fd                -> file descriptor referring to the inotify instance
+*   char *current_key     -> key of the current event to upload once the dumpstate is done*/
+void process_generic_events(char *filename, char *eventname, char *name,  unsigned int files, int fd, char *current_key) {
+
+    char date_tmp[32];
+    char date_tmp_2[32];
+    char key[SHA1_DIGEST_LENGTH+1];
+    int dir;
+    char path[PATHMAX];
+    char destion[PATHMAX];
+    struct stat info;
+    int wd;
+
+    current_key[0]='\0';
+
+    get_formated_times(date_tmp,date_tmp_2);
+    compute_key(key, CRASHEVENT, eventname);
+
+    dir = find_dir(files,CRASH_MODE);
+    if (dir == -1) {
+        LOGE("find dir %d for other crashes failed\n", files);
+        LOGE("%-8s%-22s%-20s%s\n", CRASHEVENT, key, date_tmp_2, eventname);
+        history_file_write(CRASHEVENT, eventname, NULL, NULL, NULL, key, date_tmp_2);
+        del_file_more_lines(HISTORY_FILE);
+        if (strstr(name, "anr") || strstr(name, "system_server_watchdog"))
+            restart_profile1_srv();
+        notify_crashreport();
+        return;
+    }
+
+    snprintf(path, sizeof(path),"%s/%s",filename,name);
+    if (stat(path, &info) == 0) {
+        snprintf(destion,sizeof(destion),"%s%d/",CRASH_DIR,dir);
+        LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, date_tmp_2, eventname, destion);
+        snprintf(destion,sizeof(destion),"%s%d/%s",CRASH_DIR,dir,name);
+        do_copy(path, destion, FILESIZE_MAX);
+        if (strstr(name, ".core" ))
+            backup_apcoredump(dir, name, path);
+        if (strstr(name, "anr") || strstr(name, "system_server_watchdog"))
+            prepare_anr_or_uiwdt(destion);
+        usleep(TIMEOUT_VALUE);
+        do_log_copy(eventname,dir,date_tmp,APLOG_TYPE);
+        history_file_write(CRASHEVENT, eventname, NULL, destion, NULL, key, date_tmp_2);
+        del_file_more_lines(HISTORY_FILE);
+        if (strstr(name, "anr") || strstr(name, "system_server_watchdog")){
+            backtrace_anr_uiwdt(destion, dir);
+            restart_profile1_srv();
+        }
+        if(strstr(name, "anr") || strstr(name, "crash") || strstr(name, "tombstone")){
+            snprintf(destion,sizeof(destion),"%s%d",CRASH_DIR,dir);
+            char value[PROPERTY_VALUE_MAX];
+            property_get(PROP_LOGSYSTEMSTATE, value, "stopped");
+            if(strcmp(value,"running") == 0){
+                LOGE("Can't launch dumpstate for %s.\n", destion);
+            }else{
+                wd = inotify_add_watch(fd, destion, IN_CLOSE_WRITE);
+                if (wd < 0) {
+                    LOGE("Can't add watch for %s.\n", destion);
+                    notify_crashreport();
+                    return;
+                }
+                //return key of current event for consecutive dumpstates management
+                strcpy(current_key,key);
+                start_dumpstate_srv(CRASH_DIR, dir);
+            }
+        }
+        notify_crashreport();
+    }
+    return;
+}
+
+/*
+* Name          : process_uptime
+* Description   : processes uptime events
+* Parameters    :
+*   char *eventname       -> name of the watched event*/
+void process_uptime(char *eventname) {
+
+    long long tm;
+    int hours, seconds, minutes;
+    char date_tmp[32];
+    char date_tmp_2[32];
+    char destion[PATHMAX];
+    int fd1;
+    time_t t;
+    struct tm *time_tmp;
+    char key[SHA1_DIGEST_LENGTH+1];
+
+    if (!get_uptime(&tm)) {
+
+        hours = (int) (tm / 1000000000LL);
+        seconds = hours % 60; hours /= 60;
+        minutes = hours % 60; hours /= 60;
+        snprintf(date_tmp,sizeof(date_tmp),"%04d:%02d:%02d",hours, minutes,seconds);
+        snprintf(destion,sizeof(destion),"#V1.0 %-16s%-24s", eventname, date_tmp);
+        // Create HISTORY_FILE
+        fd1 = open(HISTORY_FILE,O_RDWR);
+        if (fd1 > 0) {
+            write(fd1,destion,strlen(destion));
+            close(fd1);
+        }
+        /*Update event every 12 hours*/
+        if ((hours / UPTIME_HOUR_FREQUENCY) >= loop_uptime_event) {
+
+            time(&t);
+            time_tmp = localtime((const time_t *)&t);
+            PRINT_TIME(date_tmp_2, TIME_FORMAT_2, time_tmp);
+            compute_key(key, PER_UPTIME, NULL);
+            history_file_write(PER_UPTIME, NULL, NULL, NULL, date_tmp, key, date_tmp_2);
+            del_file_more_lines(HISTORY_FILE);
+            loop_uptime_event = (hours / UPTIME_HOUR_FREQUENCY) + 1;
+            notify_crashreport();
+            restart_profile2_srv();
+            check_running_power_service();
+        }
+    }
+}
+
 static int do_crashlogd(unsigned int files)
 {
-    int fd, fd1;
+    int fd;
     int wd;
     int index_prod = 0;
     char buffer[PATHMAX];
@@ -1494,20 +2218,8 @@ static int do_crashlogd(unsigned int files)
     struct inotify_event *event;
     int len, tmp_len;
     int i = 0;
-    unsigned int j = 0;
-    char path[PATHMAX];
-    char destion[PATHMAX];
-    char date_tmp[32];
-    char date_tmp_2[32];
-    struct stat info;
-    int dir;
-    long long tm;
-    int hours, seconds, minutes;
-    time_t t;
-    char cmd[512] = { '\0', };
     char key[SHA1_DIGEST_LENGTH+1];
     char current_key[2][SHA1_DIGEST_LENGTH+1];
-    struct tm *time_tmp;
 
     monitor_crashenv();
     check_crashlog_dead();
@@ -1527,7 +2239,6 @@ static int do_crashlogd(unsigned int files)
         wd_array[i].wd = wd;
         LOGW("%s has been snooped\n", wd_array[i].filename);
     }
-
     while ((len = read(fd, buffer, sizeof(buffer)))) {
         /* clean children to avoid zombie processes */
         while(waitpid(-1, NULL, WNOHANG) > 0){};
@@ -1549,547 +2260,91 @@ static int do_crashlogd(unsigned int files)
                     LOGW("%s has been deleted or moved, we watch it again.\n", wd_array[i].filename);
                 }
             }
+            //Check subject of this event is a not directory
             if (!(event->mask & IN_ISDIR)) {
                 for (i = WDCOUNT_START; i < WDCOUNT; i++) {
                     if (event->wd != wd_array[i].wd)
                         continue;
                     if(!event->len){
-                        /* for file */
+                        /* event concerns a watched file */
                         if (!memcmp(wd_array[i].filename,HISTORY_UPTIME,strlen(HISTORY_UPTIME))) {
-                            if (!get_uptime(&tm)) {
-                                hours = (int) (tm / 1000000000LL);
-                                seconds = hours % 60; hours /= 60;
-                                minutes = hours % 60; hours /= 60;
-                                snprintf(date_tmp,sizeof(date_tmp),"%04d:%02d:%02d",hours, minutes,seconds);
-                                snprintf(destion,sizeof(destion),"#V1.0 %-16s%-24s",wd_array[i].eventname,date_tmp);
-                                fd1 = open(HISTORY_FILE,O_RDWR);
-                                if (fd1 > 0) {
-                                    write(fd1,destion,strlen(destion));
-                                    close(fd1);
-                                }
-                                /*Update event every 12 hours*/
-                                if ((hours / UPTIME_HOUR_FREQUENCY) >= loop_uptime_event) {
-                                    time(&t);
-                                    time_tmp = localtime((const time_t *)&t);
-                                    PRINT_TIME(date_tmp_2, TIME_FORMAT_2, time_tmp);
-                                    compute_key(key, PER_UPTIME, NULL);
-                                    history_file_write(PER_UPTIME, NULL, NULL, NULL, date_tmp, key, date_tmp_2);
-                                    del_file_more_lines(HISTORY_FILE);
-                                    loop_uptime_event = (hours / UPTIME_HOUR_FREQUENCY) + 1;
-                                    notify_crashreport();
-                                    restart_profile2_srv();
-                                    check_running_power_service();
-                                }
-                            }
+
+                            process_uptime(wd_array[i].eventname);
                         }
                         break;
                     }
+                    /* event concerns a file inside a watched directory */
                     else{
                         /* for modem reset */
                         if(strstr(event->name, wd_array[i].cmp) && (strstr(event->name, "apimr.txt" ) ||strstr(event->name, "mreset.txt" ) )){
-                            time(&t);
-                            time_tmp = localtime((const time_t *)&t);
-                            PRINT_TIME(date_tmp, TIME_FORMAT_1, time_tmp);
-                            PRINT_TIME(date_tmp_2, TIME_FORMAT_2, time_tmp);
-                            compute_key(key, CRASHEVENT, wd_array[i].eventname);
 
-                            dir = find_dir(files,CRASH_MODE);
-                            if (dir == -1) {
-                                LOGE("find dir %d for modem reset failed\n", files);
-                                LOGE("%-8s%-22s%-20s%s\n", CRASHEVENT, key, date_tmp_2, wd_array[i].eventname);
-                                history_file_write(CRASHEVENT, wd_array[i].eventname, NULL, NULL, NULL, key, date_tmp_2);
-                                del_file_more_lines(HISTORY_FILE);
-                                notify_crashreport();
-                                break;
-                            }
-
-                            snprintf(path, sizeof(path),"%s/%s",wd_array[i].filename,event->name);
-                            if((stat(path, &info) == 0) && (info.st_size != 0)){
-                                snprintf(destion,sizeof(destion),"%s%d/%s", CRASH_DIR,dir,event->name);
-                                do_copy(path, destion, FILESIZE_MAX);
-                            }
-                            snprintf(destion,sizeof(destion),"%s%d/", CRASH_DIR,dir);
-                            LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, date_tmp_2, wd_array[i].eventname, destion);
-                            usleep(TIMEOUT_VALUE);
-                            do_log_copy(wd_array[i].eventname,dir,date_tmp,APLOG_TYPE);
-                            do_log_copy(wd_array[i].eventname,dir,date_tmp,BPLOG_TYPE);
-                            history_file_write(CRASHEVENT, wd_array[i].eventname, NULL, destion, NULL, key, date_tmp_2);
-                            del_file_more_lines(HISTORY_FILE);
-                            notify_crashreport();
+                            process_modem_reset_event(wd_array[i].filename, wd_array[i].eventname, event->name, files);
                             break;
                         }
                         /* for modem crash */
                         else if(strstr(event->name, wd_array[i].cmp) && strstr(event->name, "mpanic.txt" )){
-                            time(&t);
-                            time_tmp = localtime((const time_t *)&t);
-                            PRINT_TIME(date_tmp, TIME_FORMAT_1, time_tmp);
-                            PRINT_TIME(date_tmp_2, TIME_FORMAT_2, time_tmp);
-                            compute_key(key, CRASHEVENT, wd_array[i].eventname);
-                            snprintf(path, sizeof(path),"%s/%s",wd_array[i].filename,event->name);
-                            dir = find_dir(files,CRASH_MODE);
-                            if (dir == -1) {
-                                LOGE("find dir %d for modem crash failed\n", files);
-                                LOGE("%-8s%-22s%-20s%s\n", CRASHEVENT, key, date_tmp_2, wd_array[i].eventname);
-                                history_file_write(CRASHEVENT, wd_array[i].eventname, NULL, NULL, NULL, key, date_tmp_2);
-                                del_file_more_lines(HISTORY_FILE);
-                                remove(path);
-                                notify_crashreport();
-                                break;
-                            }
 
-                            snprintf(destion,sizeof(destion),"%s%d", CRASH_DIR,dir);
-                            int status = mv_modem_crash(wd_array[i].filename, destion);
-                            if (status != 0)
-                                LOGE("backup modem core dump status: %d.\n", status);
-                            snprintf(destion,sizeof(destion),"%s%d/%s", CRASH_DIR,dir,event->name);
-                            do_copy(path, destion, 0);
-                            snprintf(destion,sizeof(destion),"%s%d/", CRASH_DIR,dir);
-
-                            LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, date_tmp_2, wd_array[i].eventname, destion);
-                            usleep(TIMEOUT_VALUE);
-                            do_log_copy(wd_array[i].eventname,dir,date_tmp,APLOG_TYPE);
-                            do_log_copy(wd_array[i].eventname,dir,date_tmp,BPLOG_TYPE);
-                            history_file_write(CRASHEVENT, wd_array[i].eventname, NULL, destion, NULL, key, date_tmp_2);
-                            del_file_more_lines(HISTORY_FILE);
-                            remove(path);
-                            notify_crashreport();
+                            process_modem_crash_event(wd_array[i].filename, wd_array[i].eventname, event->name, files);
                             break;
                         }
                         /* for full dropbox */
                         else if(strstr(event->name, wd_array[i].cmp) && (strstr(event->name, ".lost" ))){
-                            char lostevent[32] = { '\0', };
-                            char lostevent_subtype[32] = { '\0', };
-                            if (strstr(event->name, "anr"))
-                                strcpy(lostevent, ANR_CRASH);
-                            else if (strstr(event->name, "crash"))
-                                strcpy(lostevent, JAVA_CRASH);
-                            else if (strstr(event->name, "watchdog"))
-                                strcpy(lostevent, SYSSERVER_WDT);
-                            else
-                                break;
-                            snprintf(lostevent_subtype, sizeof(lostevent_subtype), "%s_%s", LOST, lostevent);
 
-                            time(&t);
-                            time_tmp = localtime((const time_t *)&t);
-                            PRINT_TIME(date_tmp, TIME_FORMAT_1, time_tmp);
-                            PRINT_TIME(date_tmp_2, TIME_FORMAT_2, time_tmp);
-                            compute_key(key, CRASHEVENT, lostevent);
-
-                            dir = find_dir(files,CRASH_MODE);
-                            if (dir == -1) {
-                                LOGE("find dir %d for lost dropbox failed\n", files);
-                                LOGE("%-8s%-22s%-20s%s\n", CRASHEVENT, key, date_tmp_2, lostevent);
-                                history_file_write(CRASHEVENT, lostevent, lostevent_subtype, NULL, NULL, key, date_tmp_2);
-                                del_file_more_lines(HISTORY_FILE);
-                                notify_crashreport();
-                                break;
-                            }
-
-                            snprintf(destion,sizeof(destion),"%s%d/",CRASH_DIR,dir);
-                            LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, date_tmp_2, lostevent, destion);
-                            usleep(TIMEOUT_VALUE);
-                            do_log_copy(lostevent,dir,date_tmp,APLOG_TYPE);
-                            history_file_write(CRASHEVENT, lostevent, lostevent_subtype, destion, NULL, key, date_tmp_2);
-                            del_file_more_lines(HISTORY_FILE);
-                            notify_crashreport();
+                            process_full_dropbox_event(event->name, files);
                             break;
                         }
                         /* for hprof */
                         else if(strstr(event->name, wd_array[i].cmp) && (strstr(event->name, ".hprof" ))){
-                            time(&t);
-                            time_tmp = localtime((const time_t *)&t);
-                            PRINT_TIME(date_tmp, TIME_FORMAT_1, time_tmp);
-                            PRINT_TIME(date_tmp_2, TIME_FORMAT_2, time_tmp);
-                            compute_key(key, CRASHEVENT, HPROF);
 
-                            dir = find_dir(files,CRASH_MODE);
-                            if (dir == -1) {
-                                LOGE("find dir %d for hprof failed\n", files);
-                                break;
-                            }
-                            /*copy hprof file*/
-                            snprintf(path, sizeof(path),"%s/%s",wd_array[i].filename,event->name);
-                            snprintf(destion,sizeof(destion),"%s%d/%s", CRASH_DIR,dir,event->name);
-                            do_copy(path, destion, 0);
-                            remove(path);
-                            snprintf(destion,sizeof(destion),"%s%d/",CRASH_DIR,dir);
-                            LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, date_tmp_2, HPROF, destion);
-                            history_file_write(CRASHEVENT, HPROF, NULL, destion, NULL, key, date_tmp_2);
-                            del_file_more_lines(HISTORY_FILE);
-                            notify_crashreport();
+                            process_hprof_event(wd_array[i].filename, event->name, files);
                             break;
                         }
-                        // for aplog and bz trigger
+                        /* for aplog and bz trigger */
                         else if((strcmp(wd_array[i].eventname, APLOGTRIGGER)==0) && (strstr(event->name, "_trigger" ))){
-                            char *p;
-                            char tmp[PATHMAX] = {'\0',};
-                            int nbPacket,aplogDepth;
-                            int aplogIsPresent;
-                            struct stat sb;
 
-                            char value[PROPERTY_VALUE_MAX];
-                            property_get(PROP_APLOG_DEPTH, value, PROP_APLOG_DEPTH_DEF);
-                            aplogDepth = atoi(value);
-                            if (aplogDepth < 0)
-                                aplogDepth = 0;
-                            property_get(PROP_APLOG_NB_PACKET, value, PROP_APLOG_NB_PACKET_DEF);
-                            nbPacket = atoi(value);
-                            if (nbPacket < 0)
-                                nbPacket = 0;
-                            //if a value is specified inside trigger file, it overrides property value
-                            snprintf(path, sizeof(path),"%s/%s",wd_array[i].filename,event->name);
-                            if ((!stat(path, &sb))) {
-                                if (!get_str_in_file(path,"APLOG=",tmp)) {
-                                    aplogDepth = atoi(tmp);
-                                    nbPacket = 1;
-                                }
-                            }
-                            int j,k;
-                            aplogIsPresent = 0;
-                            dir = -1;
-                            /*copy data file*/
-                            for( j=0; j < nbPacket ; j++){
-                                if(strstr(event->name, "aplog_trigger" ))
-                                    dir=-1;
-                                for(k=0;k < aplogDepth ; k++) {
-                                    aplogIsPresent = 1;
-                                    if ((j == 0) && (k == 0))
-                                        snprintf(path, sizeof(path),"%s",APLOG_FILE_0);
-                                    else
-                                        snprintf(path, sizeof(path),"%s.%d",APLOG_FILE_0,(j*aplogDepth)+k);
-
-                                    if(stat(path, &info) == 0){
-                                        if(k == 0 && strstr(event->name, "aplog_trigger" )){
-                                            dir = find_dir(files,APLOGS_MODE);
-                                            if (dir == -1) {
-                                                LOGE("find dir %d for aplog trigger failed\n", files);
-                                                //No need to write in the history event in this case
-                                                break;
-                                             }
-                                        }
-                                        if ((j == 0) && (k == 0)) {
-                                            if(!strncmp(event->name, BZTRIGGER, sizeof(BZTRIGGER))) {
-                                                dir = find_dir(files,BZ_MODE);
-                                                if (dir == -1) {
-                                                    LOGE("find dir %d for BZ trigger failed\n", files);
-                                                    //No need to write in the history event in this case
-                                                    break;
-                                                }
-                                                snprintf(destion,sizeof(destion),"%s%d/aplog", BZ_DIR,dir);
-                                            }
-                                            else if(strstr(event->name, "aplog_trigger" ))
-                                                snprintf(destion,sizeof(destion),"%s%d/aplog", APLOGS_DIR,dir);
-                                        }
-                                        else{
-                                            if(!strncmp(event->name, BZTRIGGER, sizeof(BZTRIGGER)))
-                                                snprintf(destion,sizeof(destion),"%s%d/aplog.%d", BZ_DIR,dir,(j*aplogDepth)+k);
-                                            else if(strstr(event->name, "aplog_trigger" ))
-                                                snprintf(destion,sizeof(destion),"%s%d/aplog.%d", APLOGS_DIR,dir,(j*aplogDepth)+k);
-                                        }
-                                        do_copy(path, destion, 0);
-                                    }
-                                    else {
-                                        aplogIsPresent = 0;
-                                        break;
-                                    }
-                                }
-
-                                if((k != 0) && (dir != -1) && strstr(event->name, "aplog_trigger" )) {
-                                    time(&t);
-                                    time_tmp = localtime((const time_t *)&t);
-                                    PRINT_TIME(date_tmp_2, TIME_FORMAT_2, time_tmp);
-                                    compute_key(key, APLOGEVENT, APLOGTRIGGER);
-                                    snprintf(destion,sizeof(destion),"%s%d/", APLOGS_DIR,dir);
-                                    compress_aplog_folder(destion);
-                                    LOGE("%-8s%-22s%-20s%s %s\n", APLOGEVENT, key, date_tmp_2, event->name, destion);
-                                    history_file_write(APLOGEVENT, APLOGTRIGGER, NULL, destion, NULL, key, date_tmp_2);
-                                    del_file_more_lines(HISTORY_FILE);
-                                    notify_crashreport();
-                                    restart_profile2_srv();
-                                }
-                                if(aplogIsPresent == 0)
-                                    break;
-                            }
-
-                            if(-1!=dir && !strncmp(event->name, BZTRIGGER, sizeof(BZTRIGGER))) {
-                                    snprintf(destion,sizeof(destion),"%s%d/", BZ_DIR,dir);
-                                    compress_aplog_folder(destion);
-                                    snprintf(destion,sizeof(destion),"%s%d/bz_description", BZ_DIR,dir);
-                                    snprintf(path, sizeof(path),"%s/%s",wd_array[i].filename,event->name);
-                                    do_copy(path,destion,0);
-                                    time(&t);
-                                    time_tmp = localtime((const time_t *)&t);
-                                    PRINT_TIME(date_tmp_2, TIME_FORMAT_2, time_tmp);
-                                    compute_key(key, BZEVENT, BZMANUAL);
-                                    snprintf(destion,sizeof(destion),"%s%d", BZ_DIR,dir);
-                                    do_screenshot_copy(path,destion);
-                                    snprintf(destion,sizeof(destion),"%s%d/", BZ_DIR,dir);
-                                    LOGE("%-8s%-22s%-20s%s %s\n", BZEVENT, key, date_tmp_2, BZMANUAL, destion);
-                                    history_file_write(BZEVENT, BZMANUAL, NULL, destion, NULL, key, date_tmp_2);
-                                    del_file_more_lines(HISTORY_FILE);
-                                    notify_crashreport();
-                                    restart_profile2_srv();
-                            }
-                            /*delete trigger file*/
-                            snprintf(path, sizeof(path),"%s/%s",wd_array[i].filename,event->name);
-                            remove(path);
+                            process_aplog_and_bz_trigger(wd_array[i].filename, event->name, files);
                             break;
                         }
-                        // for STATS trigger
+                        /* for STATS trigger */
                         else if((strcmp(wd_array[i].eventname,STATSTRIGGER)==0) && (strstr(event->name, "_trigger" ))){
-                            char *p;
-                            char tmp[32];
-                            char type[20] = { '\0', };
-                            char tmp_data_name[PATHMAX];
 
-                            snprintf(tmp,sizeof(tmp),"%s",event->name);
-                            time(&t);
-                            time_tmp = localtime((const time_t *)&t);
-                            PRINT_TIME(date_tmp, TIME_FORMAT_1, time_tmp);
-                            PRINT_TIME(date_tmp_2, TIME_FORMAT_2, time_tmp);
-                            dir = find_dir(files,STATS_MODE);
-                            if (dir == -1) {
-                                LOGE("find dir %d for stat trigger failed\n", files);
-                                p = strstr(tmp,"trigger");
-                                if ( p ){
-                                    strcpy(p,"data");
-                                }
-                                compute_key(key, STATSEVENT, tmp);
-                                LOGE("%-8s%-22s%-20s%s\n", STATSEVENT, key, date_tmp_2, tmp);
-                                history_file_write(STATSEVENT, tmp, NULL, NULL, NULL, key, date_tmp_2);
-                                del_file_more_lines(HISTORY_FILE);
-                                notify_crashreport();
-                                break;
-                            }
-                            /*copy data file*/
-                            p = strstr(tmp,"trigger");
-                            if ( p ){
-                                strcpy(p,"data");
-                                find_file_in_dir(tmp_data_name,wd_array[i].filename,tmp);
-                                snprintf(path, sizeof(path),"%s/%s",wd_array[i].filename,tmp_data_name);
-                                snprintf(destion,sizeof(destion),"%s%d/%s", STATS_DIR,dir,tmp_data_name);
-                                do_copy(path, destion, 0);
-                                remove(path);
-                            }
-                            /*copy trigger file*/
-                            snprintf(path, sizeof(path),"%s/%s",wd_array[i].filename,event->name);
-                            snprintf(destion,sizeof(destion),"%s%d/%s", STATS_DIR,dir,event->name);
-                            do_copy(path, destion, 0);
-                            remove(path);
-                            snprintf(destion,sizeof(destion),"%s%d/", STATS_DIR,dir);
-                            compute_key(key, STATSEVENT, tmp);
-                            /*create type */
-                            snprintf(tmp,sizeof(tmp),"%s",event->name);
-                            p = strstr(tmp,"_trigger");
-                            if (p) {
-                                for (j=0;j<sizeof(type)-1;j++) {
-                                    if (p == (tmp+j))
-                                        break;
-                                    type[j]=toupper(tmp[j]);
-                                }
-                            } else
-                                snprintf(type,sizeof(type),"%s",event->name);
-                            LOGE("%-8s%-22s%-20s%s %s\n", STATSEVENT, key, date_tmp_2, type, destion);
-                            if (!strncmp(type, USBBOGUS, sizeof(USBBOGUS))) {
-                                usleep(TIMEOUT_VALUE);
-                                do_log_copy(type,dir,date_tmp,APLOG_STATS_TYPE);
-                            }
-                            history_file_write(STATSEVENT, type, NULL, destion, NULL, key, date_tmp_2);
-                            del_file_more_lines(HISTORY_FILE);
-                            notify_crashreport();
+                            process_stats_trigger(wd_array[i].filename, event->name, files);
                             break;
                         }
-                        // for INFO & ERROR (using STATS watcher)
+                        /* for INFO & ERROR (using STATS watcher) */
                         else if((strcmp(wd_array[i].eventname,STATSTRIGGER)==0) && ((strstr(event->name, "_infoevent" )) || (strstr(event->name, "_errorevent" )))){
-                            char *p;
-                            char tmp[32];
-                            char name_event[10];
-                            char file_ext[20];
-                            char type[20] = { '\0', };
-                            char tmp_data_name[PATHMAX];
-                            if (strstr(event->name, "_infoevent" )){
-                                snprintf(name_event,sizeof(name_event),"%s",INFOEVENT);
-                                snprintf(file_ext,sizeof(file_ext),"%s","_infoevent");
-                            }else if (strstr(event->name, "_errorevent" )){
-                                snprintf(name_event,sizeof(name_event),"%s",ERROREVENT);
-                                snprintf(file_ext,sizeof(file_ext),"%s","_errorevent");
-                            }else{
-                                LOGE("Unknown stats trigger file\n");
-                                break;
-                            }
-                            snprintf(tmp,sizeof(tmp),"%s",event->name);
-                            time(&t);
-                            time_tmp = localtime((const time_t *)&t);
-                            PRINT_TIME(date_tmp, TIME_FORMAT_1, time_tmp);
-                            PRINT_TIME(date_tmp_2, TIME_FORMAT_2, time_tmp);
-                            dir = find_dir(files,STATS_MODE);
-                            if (dir == -1) {
-                                LOGE("find dir %d for stat trigger failed\n", files);
-                                p = strstr(tmp,"trigger");
-                                if ( p ){
-                                    strcpy(p,"data");
-                                }
-                                compute_key(key, name_event, tmp);
-                                LOGE("%-8s%-22s%-20s%s\n", name_event, key, date_tmp_2, tmp);
-                                history_file_write(name_event, tmp, NULL, NULL, NULL, key, date_tmp_2);
-                                del_file_more_lines(HISTORY_FILE);
-                                notify_crashreport();
-                                break;
-                            }
-                            /*copy data file*/
-                            p = strstr(tmp,file_ext);
-                            if ( p ){
-                                strcpy(p,"_data");
-                                find_file_in_dir(tmp_data_name,wd_array[i].filename,tmp);
-                                snprintf(path, sizeof(path),"%s/%s",wd_array[i].filename,tmp_data_name);
-                                snprintf(destion,sizeof(destion),"%s%d/%s", STATS_DIR,dir,tmp_data_name);
-                                do_copy(path, destion, 0);
-                                remove(path);
-                            }
-                            /*copy trigger file*/
-                            snprintf(path, sizeof(path),"%s/%s",wd_array[i].filename,event->name);
-                            snprintf(destion,sizeof(destion),"%s%d/%s", STATS_DIR,dir,event->name);
-                            do_copy(path, destion, 0);
-                            remove(path);
-                            snprintf(destion,sizeof(destion),"%s%d/", STATS_DIR,dir);
-                            compute_key(key, name_event, tmp);
-                            /*create type */
-                            snprintf(tmp,sizeof(tmp),"%s",event->name);
-                            // manage _ problem??
-                            p = strstr(tmp,file_ext);
-                            if (p) {
-                                for (j=0;j<sizeof(type)-1;j++) {
-                                    if (p == (tmp+j))
-                                        break;
-                                    type[j]=toupper(tmp[j]);
-                                }
-                            } else
-                                snprintf(type,sizeof(type),"%s",event->name);
-                            LOGE("%-8s%-22s%-20s%s %s\n", name_event, key, date_tmp_2, type, destion);
-                            history_file_write(name_event, type, NULL, destion, NULL, key, date_tmp_2);
-                            del_file_more_lines(HISTORY_FILE);
-                            notify_crashreport();
+
+                            process_info_and_error(wd_array[i].filename, event->name, files);
                             break;
                         }
                         /* for anr and UIwatchdog */
                         else if (strstr(event->name, wd_array[i].cmp) && ( strstr(event->name, "anr") || strstr(event->name, "system_server_watchdog"))) {
-                            time(&t);
-                            time_tmp = localtime((const time_t *)&t);
-                            PRINT_TIME(date_tmp, TIME_FORMAT_1, time_tmp);
-                            PRINT_TIME(date_tmp_2, TIME_FORMAT_2, time_tmp);
-                            compute_key(key, CRASHEVENT, wd_array[i].eventname);
 
-                            dir = find_dir(files,CRASH_MODE);
-                            if (dir == -1) {
-                                LOGE("find dir %dfor and and UIwatchdog failed\n", files);
-                                LOGE("%-8s%-22s%-20s%s\n", CRASHEVENT, key, date_tmp_2, wd_array[i].eventname);
-                                del_file_more_lines(HISTORY_FILE);
-                                history_file_write(CRASHEVENT, wd_array[i].eventname, NULL, NULL, NULL, key, date_tmp_2);
-                                notify_crashreport();
-                                restart_profile1_srv();
-                                break;
-                            }
+                            process_anr_and_uiwatchdog_events(wd_array[i].filename, wd_array[i].eventname, event->name, files, fd, key);
 
-                            snprintf(path, sizeof(path),"%s/%s",wd_array[i].filename,event->name);
-                            if (stat(path, &info) == 0) {
-                                snprintf(destion,sizeof(destion),"%s%d/",CRASH_DIR,dir);
-                                LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, date_tmp_2, wd_array[i].eventname, destion);
-                                snprintf(destion,sizeof(destion),"%s%d/%s",CRASH_DIR,dir,event->name);
-                                do_copy(path, destion, FILESIZE_MAX);
-                                prepare_anr_or_uiwdt(destion);
-                                history_file_write(CRASHEVENT, wd_array[i].eventname, NULL, destion, NULL, key, date_tmp_2);
-                                del_file_more_lines(HISTORY_FILE);
-                                usleep(TIMEOUT_VALUE);
-                                do_log_copy(wd_array[i].eventname,dir,date_tmp,APLOG_TYPE);
-                                backtrace_anr_uiwdt(destion, dir);
-                                restart_profile1_srv();
-                                if (strstr(event->name, "anr")) {
-                                    snprintf(destion,sizeof(destion),"%s%d",CRASH_DIR,dir);
-                                    char value[PROPERTY_VALUE_MAX];
-                                    property_get(PROP_LOGSYSTEMSTATE, value, "stopped");
-                                    if(strcmp(value,"running") == 0){
-                                        LOGE("Can't launch dumpstate for %s.\n", destion);
-                                    }else{
-                                        wd = inotify_add_watch(fd, destion, IN_CLOSE_WRITE);
-                                        if (wd < 0) {
-                                            LOGE("Can't add watch for %s.\n", destion);
-                                            notify_crashreport();
-                                            break;
-                                        }
-                                        strcpy(current_key[index_prod],key);
-                                        index_prod = (index_prod + 1) % 2;
-                                        start_dumpstate_srv(CRASH_DIR, dir);
-                                    }
-
-
-                                }
-                                notify_crashreport();
+                            //manage consecutive anr dumpstates: not null returned event key means an anr dumpstate has been launched
+                            if (key [0] != '\0' ) {
+                                strcpy(current_key[index_prod],key);
+                                index_prod = (index_prod + 1) % 2;
                             }
                             break;
                         }
                         /* for other case */
                         else if (strstr(event->name, wd_array[i].cmp)) {
-                            time(&t);
-                            time_tmp = localtime((const time_t *)&t);
-                            PRINT_TIME(date_tmp, TIME_FORMAT_1, time_tmp);
-                            PRINT_TIME(date_tmp_2, TIME_FORMAT_2, time_tmp);
-                            compute_key(key, CRASHEVENT, wd_array[i].eventname);
 
-                            dir = find_dir(files,CRASH_MODE);
-                            if (dir == -1) {
-                                LOGE("find dir %d for other crashes failed\n", files);
-                                LOGE("%-8s%-22s%-20s%s\n", CRASHEVENT, key, date_tmp_2, wd_array[i].eventname);
-                                history_file_write(CRASHEVENT, wd_array[i].eventname, NULL, NULL, NULL, key, date_tmp_2);
-                                del_file_more_lines(HISTORY_FILE);
-                                if (strstr(event->name, "anr") || strstr(event->name, "system_server_watchdog"))
-                                    restart_profile1_srv();
-                                notify_crashreport();
-                                break;
-                            }
+                            process_generic_events(wd_array[i].filename, wd_array[i].eventname, event->name, files, fd, key);
 
-                            snprintf(path, sizeof(path),"%s/%s",wd_array[i].filename,event->name);
-                            if (stat(path, &info) == 0) {
-                                snprintf(destion,sizeof(destion),"%s%d/",CRASH_DIR,dir);
-                                LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, date_tmp_2, wd_array[i].eventname, destion);
-                                snprintf(destion,sizeof(destion),"%s%d/%s",CRASH_DIR,dir,event->name);
-                                do_copy(path, destion, FILESIZE_MAX);
-                                if (strstr(event->name, ".core" ))
-                                    backup_apcoredump(dir, event->name, path);
-                                if (strstr(event->name, "anr") || strstr(event->name, "system_server_watchdog"))
-                                    prepare_anr_or_uiwdt(destion);
-                                usleep(TIMEOUT_VALUE);
-                                do_log_copy(wd_array[i].eventname,dir,date_tmp,APLOG_TYPE);
-                                history_file_write(CRASHEVENT, wd_array[i].eventname, NULL, destion, NULL, key, date_tmp_2);
-                                del_file_more_lines(HISTORY_FILE);
-                                if (strstr(event->name, "anr") || strstr(event->name, "system_server_watchdog")){
-                                    backtrace_anr_uiwdt(destion, dir);
-                                    restart_profile1_srv();
-                                }
-                                if(strstr(event->name, "anr") || strstr(event->name, "crash") || strstr(event->name, "tombstone")){
-                                    snprintf(destion,sizeof(destion),"%s%d",CRASH_DIR,dir);
-                                    char value[PROPERTY_VALUE_MAX];
-                                    property_get(PROP_LOGSYSTEMSTATE, value, "stopped");
-                                    if(strcmp(value,"running") == 0){
-                                        LOGE("Can't launch dumpstate for %s.\n", destion);
-                                    }else{
-                                        wd = inotify_add_watch(fd, destion, IN_CLOSE_WRITE);
-                                        if (wd < 0) {
-                                            LOGE("Can't add watch for %s.\n", destion);
-                                            notify_crashreport();
-                                            break;
-                                        }
-                                        strcpy(current_key[index_prod],key);
-                                        index_prod = (index_prod + 1) % 2;
-                                        start_dumpstate_srv(CRASH_DIR, dir);
-                                    }
-                                }
-                                notify_crashreport();
+                            //manage consecutive dumpstates: not null returned event key means a dumpstate has been launched
+                            if (key [0] != '\0' ) {
+                                strcpy(current_key[index_prod],key);
+                                index_prod = (index_prod + 1) % 2;
                             }
                             break;
                         }
                     }
                 }
                 if(event->len && !strncmp(event->name, "dropbox-", 8) && (i==WDCOUNT)){
+                    //dumpstate is done so remove the watcher
                     inotify_rm_watch(fd, event->wd);
                     notify_crash_to_upload(current_key[index_cons]);
                     index_cons = (index_cons + 1) % 2;
