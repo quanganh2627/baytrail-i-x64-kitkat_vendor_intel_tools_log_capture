@@ -1450,8 +1450,8 @@ static int do_screenshot_copy(char* bz_description, char* bzdir){
     char destion[PATHMAX];
     FILE *fd1;
     struct stat info;
-    int buflen;
     int bz_num = 0;
+    int screenshot_len;
 
     if (stat(bz_description, &info) < 0)
         return -1;
@@ -1465,9 +1465,15 @@ static int do_screenshot_copy(char* bz_description, char* bzdir){
     while(!feof(fd1)){
         if (fgets(buffer, sizeof(buffer), fd1) != NULL){
             if (strstr(buffer,SCREENSHOT_PATTERN)){
-                int buflen = strlen(buffer);
-                strcpy(screenshot,buffer+strlen(SCREENSHOT_PATTERN));
-                screenshot[strlen(screenshot)-1]= '\0';
+                //Compute length of screenshot path
+                screenshot_len = strlen(buffer) - strlen(SCREENSHOT_PATTERN);
+                //Copy file path
+                strncpy(screenshot, buffer+strlen(SCREENSHOT_PATTERN), screenshot_len);
+                //If last character is '\n' replace it by '\0'
+                if((screenshot[screenshot_len-1]) == '\n')
+                    screenshot_len--;
+                screenshot[screenshot_len]= '\0';
+
                 if(bz_num == 0)
                     snprintf(destion,sizeof(destion),"%s/bz_screenshot.png", bzdir);
                 else
