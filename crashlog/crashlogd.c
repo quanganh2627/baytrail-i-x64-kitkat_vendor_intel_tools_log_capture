@@ -116,6 +116,7 @@
 #define PERM_GROUP "log"
 #define HISTORY_FILE_DIR  "/logs"
 #define HISTORY_CORE_DIR  "/logs/core"
+#define LOGS_MODEM_DIR  "/logs/modemcrash"
 #define APLOG_FILE_BOOT   "/logs/aplog_boot"
 #define APLOG_FILE_0        "/logs/aplog"
 #define APLOG_FILE_1    "/logs/aplog.1"
@@ -3014,6 +3015,28 @@ static void reset_crashlog(void)
     fprintf(fd, "%d", 0);
     fclose(fd);
 }
+
+static void reset_logs(char *path)
+{
+    char file[PATHMAX];
+    DIR *d;
+    struct dirent* de;
+    d = opendir(path);
+
+    if (d == 0)
+        return;
+
+    while ((de = readdir(d)) != 0) {
+        if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, ".."))
+            continue;
+        else {
+            snprintf(file, sizeof(file), "%s/%s", path, de->d_name);
+            remove(file);
+        }
+    }
+    closedir(d);
+}
+
 static void reset_statslog(void)
 {
     char path[PATHMAX];
@@ -3054,6 +3077,17 @@ static void reset_bzlog(void)
     }
     fprintf(fd, "%d", 0);
     fclose(fd);
+}
+static void reset_swupdate(void)
+{
+    reset_logs(HISTORY_CORE_DIR);
+    reset_logs(LOGS_MODEM_DIR);
+    remove(MODEM_UUID);
+    reset_crashlog();
+    reset_statslog();
+    reset_aplogslog();
+    reset_bzlog();
+    reset_history();
 }
 
 static void uptime_history(char *lastuptime)
@@ -3270,11 +3304,7 @@ int main(int argc, char **argv)
         if (swupdated(buildVersion)) {
             strcpy(lastuptime, "0000:00:00");
             strcpy(startupreason,"SWUPDATE");
-            remove(MODEM_UUID);
-            reset_crashlog();
-            reset_statslog();
-            reset_aplogslog();
-            reset_history();
+            reset_swupdate();
         }
         else {
             read_startupreason(startupreason);
@@ -3297,12 +3327,7 @@ int main(int argc, char **argv)
         if (swupdated(buildVersion)) {
             strcpy(lastuptime, "0000:00:00");
             strcpy(startupreason,"SWUPDATE");
-            remove(MODEM_UUID);
-            reset_crashlog();
-            reset_statslog();
-            reset_aplogslog();
-            reset_bzlog();
-            reset_history();
+            reset_swupdate();
         }
         else {
             read_startupreason(startupreason);
