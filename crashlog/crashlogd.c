@@ -1470,7 +1470,7 @@ static int do_screenshot_copy(char* bz_description, char* bzdir){
                 //Copy file path
                 strncpy(screenshot, buffer+strlen(SCREENSHOT_PATTERN), screenshot_len);
                 //If last character is '\n' replace it by '\0'
-                if((screenshot[screenshot_len-1]) == '\n')
+                if((screenshot > 0) && (screenshot[screenshot_len-1]) == '\n')
                     screenshot_len--;
                 screenshot[screenshot_len]= '\0';
 
