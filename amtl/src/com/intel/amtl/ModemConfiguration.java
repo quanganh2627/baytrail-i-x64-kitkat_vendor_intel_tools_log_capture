@@ -31,7 +31,6 @@ public class ModemConfiguration {
     public final static int XSIO_1 = 1;
     public final static int XSIO_2 = 2;
     public final static int XSIO_4 = 4;
-    public final static int XSIO_5 = 5;
 
     /* XSIO AT commands */
     private static final String AT_SET_XSIO_FMT = "at+xsio=%d\r\n";
@@ -66,34 +65,21 @@ public class ModemConfiguration {
     protected final static int xsio_40 = 4;
     protected final static int xsio_44 = 5;
     protected final static int xsio_04 = 6;
-    protected final static int xsio_50 = 7;
-    protected final static int xsio_55 = 8;
-    protected final static int xsio_05 = 9;
-    protected final static int xsio_24 = 10;
-    protected final static int xsio_25 = 11;
-    protected final static int xsio_42 = 12;
-    protected final static int xsio_45 = 13;
-    protected final static int xsio_52 = 14;
-    protected final static int xsio_54 = 15;
-    protected final static int xsio_01 = 16;
-    protected final static int xsio_10 = 17;
-    protected final static int xsio_11 = 18;
-    protected final static int xsio_12 = 19;
-    protected final static int xsio_21 = 20;
-    protected final static int xsio_14 = 21;
-    protected final static int xsio_41 = 22;
-    protected final static int xsio_15 = 23;
-    protected final static int xsio_51 = 24;
+    protected final static int xsio_24 = 7;
+    protected final static int xsio_42 = 8;
+    protected final static int xsio_01 = 9;
+    protected final static int xsio_10 = 10;
+    protected final static int xsio_11 = 11;
+    protected final static int xsio_14 = 12;
+    protected final static int xsio_41 = 13;
     protected final static int reboot_ok0 = 50;
     protected final static int reboot_ko0 = 51;
     protected final static int reboot_ok2 = 52;
     protected final static int reboot_ko2 = 53;
     protected final static int reboot_ok4 = 54;
     protected final static int reboot_ko4 = 55;
-    protected final static int reboot_ok5 = 56;
-    protected final static int reboot_ko5 = 57;
-    protected final static int reboot_ok1 = 58;
-    protected final static int reboot_ko1 = 59;
+    protected final static int reboot_ok1 = 56;
+    protected final static int reboot_ko1 = 57;
 
     /* Simplify the modem status : rebooted (ok) or not rebooted(ko) */
     protected int modem_reboot_status(int reboot_value) {
@@ -106,7 +92,6 @@ public class ModemConfiguration {
             case xsio_01:
             case xsio_02:
             case xsio_04:
-            case xsio_05:
                 /* xsio = 0 and modem has not been rebooted */
                 ret = reboot_ko0;
                 break;
@@ -115,9 +100,7 @@ public class ModemConfiguration {
                 ret = reboot_ok1;
                 break;
             case xsio_10:
-            case xsio_12:
             case xsio_14:
-            case xsio_15:
                 /* xsio = 1 and modem has not been rebooted */
                 ret = reboot_ko1;
                 break;
@@ -126,9 +109,7 @@ public class ModemConfiguration {
                 ret = reboot_ok2;
                 break;
             case xsio_20:
-            case xsio_21:
             case xsio_24:
-            case xsio_25:
                 /* xsio = 2 and modem has not been rebooted */
                 ret = reboot_ko2;
                 break;
@@ -139,20 +120,8 @@ public class ModemConfiguration {
             case xsio_40:
             case xsio_41:
             case xsio_42:
-            case xsio_45:
                 /* xsio = 4 and modem has not been rebooted */
                 ret = reboot_ko4;
-                break;
-            case xsio_55:
-                /* xsio = 5 and modem has been rebooted */
-                ret = reboot_ok5;
-                break;
-            case xsio_50:
-            case xsio_51:
-            case xsio_52:
-            case xsio_54:
-                /* xsio = 5 and modem has not been rebooted */
-                ret = reboot_ko5;
                 break;
             default:
                 ret = reboot_ok0;
@@ -282,42 +251,20 @@ public class ModemConfiguration {
             ret = xsio_44;
         } else if (s.contains("0, *4")) {
             ret = xsio_04;
-        } else if (s.contains("5, *0")) {
-            ret = xsio_50;
-        } else if (s.contains("5, *5")) {
-            ret = xsio_55;
-        } else if (s.contains("0, *5")) {
-            ret = xsio_05;
         } else if (s.contains("2, *4")) {
             ret = xsio_24;
-        } else if (s.contains("2, *5")) {
-            ret = xsio_25;
         } else if (s.contains("4, *2")) {
             ret = xsio_42;
-        } else if (s.contains("4, *5")) {
-            ret = xsio_45;
-        } else if (s.contains("5, *2")) {
-            ret = xsio_52;
-        } else if (s.contains("5, *4")) {
-            ret = xsio_54;
         } else if (s.contains("0, *1")) {
             ret = xsio_01;
         } else if (s.contains("1, *0")) {
             ret = xsio_10;
         } else if (s.contains("1, *1")) {
             ret = xsio_11;
-        } else if (s.contains("1, *2")) {
-            ret = xsio_12;
-        } else if (s.contains("2, *1")) {
-            ret = xsio_21;
         } else if (s.contains("4, *1")) {
             ret = xsio_41;
         } else if (s.contains("1, *4")) {
             ret = xsio_14;
-        } else if (s.contains("5, *1")) {
-            ret = xsio_51;
-        } else if (s.contains("1, *5")) {
-            ret = xsio_15;
         } else {
             ret= xsio_00;
         }
@@ -337,12 +284,8 @@ public class ModemConfiguration {
                 atCmd = String.format(AT_SET_XSIO_FMT, XSIO_2);
                 break;
             case XSIO_4:
-                /* Enable frequency78 */
+                /* Enable hsi */
                 atCmd = String.format(AT_SET_XSIO_FMT, XSIO_4);
-                break;
-            case XSIO_5:
-                /* Enable frequency156 */
-                atCmd = String.format(AT_SET_XSIO_FMT, XSIO_5);
                 break;
             default:
                 /* Disable */

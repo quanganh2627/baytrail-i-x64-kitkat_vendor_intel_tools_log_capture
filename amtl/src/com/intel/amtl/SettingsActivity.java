@@ -48,8 +48,8 @@ public class SettingsActivity extends Activity {
     private CompoundButton button_level_bb_3g_digrf;
     private CompoundButton button_trace_size_small;
     private CompoundButton button_trace_size_large;
-    private CompoundButton button_hsi_frequencies_78;
-    private CompoundButton button_hsi_frequencies_156;
+    private CompoundButton button_offline_logging_hsi;
+    private CompoundButton button_offline_logging_usb;
     private CheckBox checkbox_activate;
     private CheckBox checkbox_mux;
     private CheckBox checkbox_additional_traces;
@@ -76,9 +76,10 @@ public class SettingsActivity extends Activity {
             }
         }
         button_trace_size_large.setEnabled(false);
-        button_hsi_frequencies_78.setEnabled(false);
-        button_hsi_frequencies_156.setEnabled(false);
-        button_level_bb_3g.setChecked((cfg.traceLevel == CustomCfg.TRACE_LEVEL_NONE) || (cfg.traceLevel == CustomCfg.TRACE_LEVEL_BB_3G));
+        button_offline_logging_hsi.setEnabled(false);
+        button_offline_logging_usb.setEnabled(false);
+        button_level_bb_3g.setChecked((cfg.traceLevel == CustomCfg.TRACE_LEVEL_NONE) ||
+            (cfg.traceLevel == CustomCfg.TRACE_LEVEL_BB_3G));
     }
 
     /* Trace file size is useful in EMMC and SDCARD cases */
@@ -93,9 +94,11 @@ public class SettingsActivity extends Activity {
         }
         button_trace_size_large.setEnabled(true);
         button_trace_size_large.setChecked(true);
-        button_hsi_frequencies_78.setEnabled(!AmtlCore.usbAcmEnabled);
-        button_hsi_frequencies_78.setChecked(!AmtlCore.usbAcmEnabled);
-        button_level_bb_3g.setChecked((cfg.traceLevel == CustomCfg.TRACE_LEVEL_NONE) || (cfg.traceLevel == CustomCfg.TRACE_LEVEL_BB_3G));
+        button_offline_logging_hsi.setEnabled(true);
+        button_offline_logging_hsi.setChecked(true);
+        button_offline_logging_usb.setEnabled(AmtlCore.usbAcmEnabled);
+        button_level_bb_3g.setChecked((cfg.traceLevel == CustomCfg.TRACE_LEVEL_NONE) ||
+            (cfg.traceLevel == CustomCfg.TRACE_LEVEL_BB_3G));
     }
 
     /* Set trace level button */
@@ -179,16 +182,16 @@ public class SettingsActivity extends Activity {
         }
     }
 
-    /* Set HSI frequency button */
-    private void set_hsi_frequency_button() {
-        switch (cfg.hsiFrequency) {
-        case CustomCfg.HSI_FREQ_NONE:
+    /* Set log size button */
+    private void set_offline_logging_button() {
+        switch (cfg.offlineLogging) {
+        case CustomCfg.OFFLINE_LOGGING_NONE:
             break;
-        case CustomCfg.HSI_FREQ_78_MHZ:
-            button_hsi_frequencies_78.setChecked(true);
+        case CustomCfg.OFFLINE_LOGGING_HSI:
+            button_offline_logging_hsi.setChecked(true);
             break;
-        case CustomCfg.HSI_FREQ_156_MHZ:
-            button_hsi_frequencies_156.setChecked(true);
+        case CustomCfg.OFFLINE_LOGGING_USB:
+            button_offline_logging_usb.setChecked(true);
             break;
         default:
             /* Do nothing */
@@ -211,7 +214,7 @@ public class SettingsActivity extends Activity {
         set_location_button();
         set_trace_level_button();
         set_log_size_button();
-        set_hsi_frequency_button();
+        set_offline_logging_button();
         set_checkbox_mux();
         set_checkbox_add_traces();
         invalidate();
@@ -229,7 +232,7 @@ public class SettingsActivity extends Activity {
             (cfg.traceLocation != curCfg.traceLocation) ||
             (cfg.traceLevel != curCfg.traceLevel) ||
             (cfg.traceFileSize != curCfg.traceFileSize) ||
-            (cfg.hsiFrequency != curCfg.hsiFrequency));
+            (cfg.offlineLogging != curCfg.offlineLogging));
     }
 
     @Override
@@ -256,9 +259,11 @@ public class SettingsActivity extends Activity {
         button_trace_size_large =
             (CompoundButton) findViewById (R.id.settings_trace_size_large_btn);
 
-        /* HSI frequency buttons */
-        button_hsi_frequencies_78 = (CompoundButton) findViewById (R.id.settings_hsi_frequencies_78_btn);
-        button_hsi_frequencies_156 = (CompoundButton) findViewById (R.id.settings_hsi_frequencies_156_btn);
+        /* HSI or USB logging */
+        button_offline_logging_hsi =
+            (CompoundButton) findViewById (R.id.settings_offline_logging_hsi_btn);
+        button_offline_logging_usb =
+            (CompoundButton) findViewById (R.id.settings_offline_logging_usb_btn);
 
         /* Activate check box */
         checkbox_activate = (CheckBox) findViewById (R.id.activate_checkBox);
@@ -282,8 +287,8 @@ public class SettingsActivity extends Activity {
         AmtlCore.exitIfNull(button_level_bb_3g_digrf, this);
         AmtlCore.exitIfNull(button_trace_size_small, this);
         AmtlCore.exitIfNull(button_trace_size_large, this);
-        AmtlCore.exitIfNull(button_hsi_frequencies_78, this);
-        AmtlCore.exitIfNull(button_hsi_frequencies_156, this);
+        AmtlCore.exitIfNull(button_offline_logging_hsi, this);
+        AmtlCore.exitIfNull(button_offline_logging_usb, this);
         AmtlCore.exitIfNull(checkbox_activate, this);
         AmtlCore.exitIfNull(checkbox_mux, this);
         AmtlCore.exitIfNull(checkbox_additional_traces, this);
@@ -310,7 +315,8 @@ public class SettingsActivity extends Activity {
                 cfg.traceLevel = CustomCfg.TRACE_LEVEL_BB_3G;
                 cfg.traceFileSize = (AmtlCore.usbAcmEnabled) ?
                     CustomCfg.LOG_SIZE_LARGE : CustomCfg.LOG_SIZE_NONE;
-                cfg.hsiFrequency = CustomCfg.HSI_FREQ_NONE;
+                cfg.offlineLogging = (AmtlCore.usbAcmEnabled) ?
+                    CustomCfg.OFFLINE_LOGGING_HSI : CustomCfg.OFFLINE_LOGGING_NONE;
                 cfg.muxTrace = CustomCfg.MUX_TRACE_OFF;
                 cfg.addTraces = CustomCfg.ADD_TRACES_OFF;
                 checkbox_additional_traces.setEnabled(false);
@@ -321,7 +327,7 @@ public class SettingsActivity extends Activity {
                 cfg.traceLocation = curCfg.traceLocation;
                 cfg.traceLevel = curCfg.traceLevel;
                 cfg.traceFileSize = curCfg.traceFileSize;
-                cfg.hsiFrequency = curCfg.hsiFrequency;
+                cfg.offlineLogging = curCfg.offlineLogging;
                 cfg.muxTrace = curCfg.muxTrace;
                 cfg.addTraces = curCfg.addTraces;
             }
@@ -485,23 +491,23 @@ public class SettingsActivity extends Activity {
             }
         });
 
-        /* Listener on button_hsi_frequencies_78 */
-        button_hsi_frequencies_78.setOnCheckedChangeListener(new OnCheckedChangeListener() {
+        /* Listener on button_offline_logging_hsi */
+        button_offline_logging_hsi.setOnCheckedChangeListener(new OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
                 if (isChecked) {
-                    cfg.hsiFrequency = CustomCfg.HSI_FREQ_78_MHZ;
+                    cfg.offlineLogging = CustomCfg.OFFLINE_LOGGING_HSI;
                     invalidate();
                 }
             }
         });
 
-        /* Listener on button_hsi_frequencies_156 */
-        button_hsi_frequencies_156.setOnCheckedChangeListener(new OnCheckedChangeListener() {
+        /* Listener on button_offline_logging_usb */
+        button_offline_logging_usb.setOnCheckedChangeListener(new OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
                 if (isChecked) {
-                    cfg.hsiFrequency = CustomCfg.HSI_FREQ_156_MHZ;
+                    cfg.offlineLogging = CustomCfg.OFFLINE_LOGGING_USB;
                     invalidate();
                 }
             }

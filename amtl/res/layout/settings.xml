@@ -146,33 +146,26 @@
             android:id="@+id/textView4"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/settings_hsi_frequencies_txt"
+            android:text="@string/settings_offline_logging_txt"
             android:textAppearance="?android:attr/textAppearanceLarge" />
         <RadioGroup
-            android:id="@+id/hsi_frequencies"
+            android:id="@+id/logging"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginLeft="150px"
             android:orientation="vertical" >
             <RadioButton
-                android:id="@+id/settings_hsi_frequencies_78_btn"
+                android:id="@+id/settings_offline_logging_hsi_btn"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/settings_hsi_frequencies_78_button" />
+                android:text="@string/settings_offline_logging_hsi_button" />
             <RadioButton
-                android:id="@+id/settings_hsi_frequencies_156_btn"
+                android:id="@+id/settings_offline_logging_usb_btn"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:enabled="false"
-                android:text="@string/settings_hsi_frequencies_156_button" />
+                android:text="@string/settings_offline_logging_usb_button" />
             <RadioButton
-                android:id="@+id/settings_hsi_frequencies_coredump_btn"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:enabled="false"
-                android:visibility="gone" />
-            <RadioButton
-                android:id="@+id/settings_hsi_frequencies_disable_btn"
+                android:id="@+id/settings_offline_logging_disable_btn"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:enabled="false"

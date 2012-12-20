@@ -34,10 +34,10 @@ public class CustomCfg {
     public static final int LOG_SIZE_SMALL = 0;
     public static final int LOG_SIZE_LARGE = 1;
 
-    /* HSI frequencies */
-    public static final int HSI_FREQ_NONE = -1;
-    public static final int HSI_FREQ_78_MHZ = 0;
-    public static final int HSI_FREQ_156_MHZ = 1;
+    /* HSI or USB */
+    public static final int OFFLINE_LOGGING_NONE = -1;
+    public static final int OFFLINE_LOGGING_HSI = 0;
+    public static final int OFFLINE_LOGGING_USB = 1;
 
     /* MUX trace state */
     public static final int MUX_TRACE_OFF = 0;
@@ -56,7 +56,7 @@ public class CustomCfg {
     public int traceLocation = TRACE_LOC_EMMC;
     public int traceLevel = TRACE_LEVEL_BB_3G;
     public int traceFileSize = LOG_SIZE_LARGE;
-    public int hsiFrequency = HSI_FREQ_78_MHZ;
+    public int offlineLogging = OFFLINE_LOGGING_HSI;
     public int muxTrace = MUX_TRACE_OFF;
     public int addTraces = ADD_TRACES_OFF;
 }

@@ -2,7 +2,8 @@
 <resources>
     <string name="app_name">Amtl</string>
     <string name="main_coredump_button">Enable BP traces in modem coredump</string>
-    <string name="main_ape_log_file_button">Enable offline BP logging</string>
+    <string name="main_ape_log_file_button_hsi">Enable offline BP logging via HSI</string>
+    <string name="main_ape_log_file_button_usb">Enable offline BP logging via USB</string>
     <string name="main_online_bp_log_button">Enable online BP logging</string>
     <string name="main_disable_button">Disable BP logging</string>
     <string name="main_pti_log_button">Enable PTI BP logging</string>
@@ -24,9 +25,10 @@
     <string name="settings_trace_size_txt">Trace file size</string>
     <string name="settings_trace_size_small_button">100MB</string>
     <string name="settings_trace_size_large_button">600MB</string>
+    <string name="settings_offline_logging_txt">Offline logging over</string>
+    <string name="settings_offline_logging_hsi_button">HSI</string>
+    <string name="settings_offline_logging_usb_button">USB</string>
     <string name="settings_hsi_frequencies_txt">HSI frequencies</string>
-    <string name="settings_hsi_frequencies_78_button">78MHz</string>
-    <string name="settings_hsi_frequencies_156_button">156MHz</string>
     <string name="settings_activate_txt">ACTIVATE</string>
     <string name="settings_mux_txt">Enable MUX traces</string>
     <string name="settings_add_traces_txt">Enable additional traces \n (LG1 LLT)</string>

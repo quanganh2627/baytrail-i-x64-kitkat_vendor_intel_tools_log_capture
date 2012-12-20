@@ -33,6 +33,7 @@
  * 2.2.0 -  2012-10-12 - BZ 52786 - WA to handle MMGR
  * 2.2.1  - 2012-12-19 - BZ 75912 - Properties for platform specificities
  * 2.2.2  - 2012-12-20 - BZ 41081 - Configuration of MTS via Android properties
+ * 2.2.3  - 2012-12-20 - BZ 63993 - Modifications to handle logging over HSI
  * ============================================================================
  */
 
@@ -59,7 +60,8 @@ public class MainActivity extends Activity {
     private static final String MODULE = "MainActivity";
 
     private ToggleButton button_modem_coredump;
-    private ToggleButton button_ape_log_file;
+    private ToggleButton button_ape_log_file_hsi;
+    private ToggleButton button_ape_log_file_usb;
     private ToggleButton button_online_bp_log;
     private ToggleButton button_pti_bp_log;
     private ToggleButton button_disable_modem_trace;
@@ -105,7 +107,8 @@ public class MainActivity extends Activity {
 
         /* Uncheck all buttons first */
         button_modem_coredump.setChecked(false);
-        button_ape_log_file.setChecked(false);
+        button_ape_log_file_hsi.setChecked(false);
+        button_ape_log_file_usb.setChecked(false);
         button_online_bp_log.setChecked(false);
         button_pti_bp_log.setChecked(false);
         button_disable_modem_trace.setChecked(false);
@@ -116,8 +119,10 @@ public class MainActivity extends Activity {
                 button_modem_coredump.setChecked(true);
                 break;
             case OFFLINE_BP_LOG:
+                button_ape_log_file_hsi.setChecked(true);
+                break;
             case OFFLINE_USB_BP_LOG:
-                button_ape_log_file.setChecked(true);
+                button_ape_log_file_usb.setChecked(true);
                 break;
             case ONLINE_BP_LOG:
                 button_online_bp_log.setChecked(true);
@@ -141,20 +146,23 @@ public class MainActivity extends Activity {
         setContentView(R.layout.main);
 
         button_modem_coredump = (ToggleButton) findViewById(R.id.modem_coredump_btn);
-        button_ape_log_file = (ToggleButton) findViewById(R.id.ape_log_file_btn);
+        button_ape_log_file_hsi = (ToggleButton) findViewById(R.id.ape_log_file_hsi_btn);
+        button_ape_log_file_usb = (ToggleButton) findViewById(R.id.ape_log_file_usb_btn);
         button_disable_modem_trace = (ToggleButton) findViewById(R.id.disable_modem_trace_btn);
         button_pti_bp_log = (ToggleButton) findViewById(R.id.pti_bp_log_btn);
         button_online_bp_log = (ToggleButton) findViewById(R.id.online_bp_log_btn);
 
         /* Check if the buttons are not null*/
         AmtlCore.exitIfNull(button_modem_coredump, this);
-        AmtlCore.exitIfNull(button_ape_log_file, this);
+        AmtlCore.exitIfNull(button_ape_log_file_hsi, this);
+        AmtlCore.exitIfNull(button_ape_log_file_usb, this);
         AmtlCore.exitIfNull(button_disable_modem_trace, this);
         AmtlCore.exitIfNull(button_pti_bp_log, this);
         AmtlCore.exitIfNull(button_online_bp_log, this);
 
         button_modem_coredump.setChecked(false);
-        button_ape_log_file.setChecked(false);
+        button_ape_log_file_hsi.setChecked(false);
+        button_ape_log_file_usb.setChecked(false);
         button_disable_modem_trace.setChecked(false);
         button_pti_bp_log.setChecked(false);
         button_online_bp_log.setChecked(false);
@@ -196,22 +204,36 @@ public class MainActivity extends Activity {
             button_modem_coredump.setVisibility(View.GONE);
         }
 
-        /* Listener on APE Log File button */
-        button_ape_log_file.setOnClickListener(new OnClickListener() {
+        /* Listener on APE Log File via HSI button */
+        button_ape_log_file_hsi.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {
-                if (button_ape_log_file.isChecked()) {
-                    if (!AmtlCore.usbAcmEnabled) {
-                        setCfg(PredefinedCfg.OFFLINE_BP_LOG);
-                    } else {
-                        setCfg(PredefinedCfg.OFFLINE_USB_BP_LOG);
-                    }
+                if (button_ape_log_file_hsi.isChecked()) {
+                    setCfg(PredefinedCfg.OFFLINE_BP_LOG);
                 } else {
-                    /* If user presses again on button_ape_log_file, traces are stopped */
+                    /* If user presses again on button_ape_log_file_hsi, traces are stopped */
                     setCfg(PredefinedCfg.TRACE_DISABLE);
                 }
             }
         });
+
+        if (AmtlCore.usbAcmEnabled) {
+            /* Listener on APE Log File via USB button */
+            button_ape_log_file_usb.setOnClickListener(new OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (button_ape_log_file_usb.isChecked()) {
+                        setCfg(PredefinedCfg.OFFLINE_USB_BP_LOG);
+                    } else {
+                        /* If user presses again on button_ape_log_file, traces are stopped */
+                        setCfg(PredefinedCfg.TRACE_DISABLE);
+                    }
+                }
+            });
+        } else {
+            /* Disable APE Log File via USB button for Medfield and Lexington */
+            button_ape_log_file_usb.setVisibility(View.GONE);
+        }
 
         if (AmtlCore.usbswitchEnabled) {
             /* Listener on online BP logging  button */

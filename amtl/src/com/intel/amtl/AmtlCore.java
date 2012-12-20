@@ -71,6 +71,8 @@ public class AmtlCore implements ModemEventListener {
     public static boolean usbAcmEnabled = false;
     /* Platform logging over PTI availability flag */
     public static boolean ptiEnabled = false;
+    /* Tty to open to get modem log for hsi logging */
+    public static String hsiTty = "";
 
     /* AT command for additional is not persisent */
     /* and there is no at command to check its state */
@@ -142,6 +144,7 @@ public class AmtlCore implements ModemEventListener {
         String usbswitchProperty = SystemProperties.get(USBSWITCH_PROP, null);
         String usbacmProperty = SystemProperties.get(USBACM_PROP, null);
         String ptiProperty = SystemProperties.get(PTI_PROP, null);
+        this.hsiTty = Services.GSMTTY18;
 
         if (usbswitchProperty == null) {
             Log.e(TAG, MODULE + ": usbswitch property cannot be found.");
@@ -152,6 +155,7 @@ public class AmtlCore implements ModemEventListener {
             Log.e(TAG, MODULE + ": usbacm property cannot be found.");
         } else if (usbacmProperty.equals("true")) {
             this.usbAcmEnabled = true;
+            this.hsiTty = Services.MDMTRACE;
         }
         if (ptiProperty == null) {
             Log.e(TAG, MODULE + ": pti property cannot be found.");
@@ -245,7 +249,7 @@ public class AmtlCore implements ModemEventListener {
                 this.curCustomCfg.traceLocation != this.futCustomCfg.traceLocation ||
                 this.curCustomCfg.traceLevel != this.futCustomCfg.traceLevel ||
                 this.curCustomCfg.traceFileSize != this.futCustomCfg.traceFileSize ||
-                this.curCustomCfg.hsiFrequency != this.futCustomCfg.hsiFrequency);
+                this.curCustomCfg.offlineLogging != this.futCustomCfg.offlineLogging);
         } else {
             return (this.curCfg != this.futCfg);
         }
@@ -306,7 +310,8 @@ public class AmtlCore implements ModemEventListener {
         this.services.stop_service();
         this.modemCfg.setXsio(this.gsmtty, ModemConfiguration.XSIO_2);
         this.modemCfg.setTraceLevel(this.gsmtty, CustomCfg.TRACE_LEVEL_BB_3G);
-        this.services.enable_service(Services.MTS_DISABLE);
+        this.services.enable_service(Services.MTS_DISABLE, this.futCfg,
+            this.futCustomCfg.offlineLogging);
     }
 
     /* Apply green configuration */
@@ -314,15 +319,17 @@ public class AmtlCore implements ModemEventListener {
         this.services.stop_service();
         this.modemCfg.setXsio(this.gsmtty, ModemConfiguration.XSIO_4);
         this.modemCfg.setTraceLevel(this.gsmtty, CustomCfg.TRACE_LEVEL_BB_3G);
-        this.services.enable_service(Services.MTS_EXTFS);
+        this.services.enable_service(Services.MTS_EXTFS, this.futCfg,
+            this.futCustomCfg.offlineLogging);
     }
 
-    /* Apply green configuration for Clovertrail */
+    /* Apply green configuration via USB for Clovertrail */
     private void applyOfflineUsbBpLogCfg() throws IOException {
         this.services.stop_service();
         this.modemCfg.setXsio(this.gsmtty, ModemConfiguration.XSIO_1);
         this.modemCfg.setTraceLevel(this.gsmtty, CustomCfg.TRACE_LEVEL_BB_3G);
-        this.services.enable_service(Services.MTS_EXTFS);
+        this.services.enable_service(Services.MTS_EXTFS, this.futCfg,
+            this.futCustomCfg.offlineLogging);
     }
 
     /* Apply purple configuration */
@@ -330,7 +337,8 @@ public class AmtlCore implements ModemEventListener {
         this.services.stop_service();
         this.modemCfg.setXsio(this.gsmtty, ModemConfiguration.XSIO_0);
         this.modemCfg.setTraceLevel(this.gsmtty, CustomCfg.TRACE_LEVEL_BB_3G);
-        this.services.enable_service(Services.ONLINE_BP_LOG);
+        this.services.enable_service(Services.ONLINE_BP_LOG, this.futCfg,
+            this.futCustomCfg.offlineLogging);
     }
 
     /* Apply purple configuration for Clovertrail */
@@ -338,7 +346,8 @@ public class AmtlCore implements ModemEventListener {
         this.services.stop_service();
         this.modemCfg.setXsio(this.gsmtty, ModemConfiguration.XSIO_1);
         this.modemCfg.setTraceLevel(this.gsmtty, CustomCfg.TRACE_LEVEL_BB_3G);
-        this.services.enable_service(Services.MTS_PTI);
+        this.services.enable_service(Services.MTS_PTI, this.futCfg,
+            this.futCustomCfg.offlineLogging);
     }
 
     /* Apply yellow configuration */
@@ -346,7 +355,8 @@ public class AmtlCore implements ModemEventListener {
         this.services.stop_service();
         this.modemCfg.setXsio(this.gsmtty, ModemConfiguration.XSIO_0);
         this.modemCfg.setTraceLevel(this.gsmtty, CustomCfg.TRACE_LEVEL_NONE);
-        this.services.enable_service(Services.MTS_DISABLE);
+        this.services.enable_service(Services.MTS_DISABLE, this.futCfg,
+            this.futCustomCfg.offlineLogging);
     }
 
     /* Apply custom configuration */
@@ -374,11 +384,10 @@ public class AmtlCore implements ModemEventListener {
         /* Determine XSIO value to set */
         if (this.futCustomCfg.traceLocation == CustomCfg.TRACE_LOC_EMMC ||
             this.futCustomCfg.traceLocation == CustomCfg.TRACE_LOC_SDCARD) {
-            if (this.usbAcmEnabled) {
-                xsioToSet = ModemConfiguration.XSIO_1;
-            } else {
-                xsioToSet = (this.futCustomCfg.hsiFrequency == CustomCfg.HSI_FREQ_78_MHZ) ? ModemConfiguration.XSIO_5: ModemConfiguration.XSIO_4;
-            }
+
+            xsioToSet = (this.futCustomCfg.offlineLogging == CustomCfg.OFFLINE_LOGGING_USB) ?
+                ModemConfiguration.XSIO_1 : ModemConfiguration.XSIO_4;
+
         } else if (this.futCustomCfg.traceLocation == CustomCfg.TRACE_LOC_COREDUMP) {
             xsioToSet = ModemConfiguration.XSIO_2;
         } else if (this.futCustomCfg.traceLocation == CustomCfg.TRACE_LOC_PTI_MODEM) {
@@ -391,7 +400,7 @@ public class AmtlCore implements ModemEventListener {
         this.services.stop_service();
         this.modemCfg.setXsio(this.gsmtty, xsioToSet);
         this.modemCfg.setTraceLevel(this.gsmtty, futCustomCfg.traceLevel);
-        this.services.enable_service(serviceToStart);
+        this.services.enable_service(serviceToStart, this.futCfg, this.futCustomCfg.offlineLogging);
     }
 
     /* Enable/Disable MUX traces */
@@ -491,43 +500,52 @@ public class AmtlCore implements ModemEventListener {
 
             switch (this.serviceValue) {
                 case Services.MTS_DISABLE:
-                    this.curCustomCfg.hsiFrequency = CustomCfg.HSI_FREQ_NONE;
+                    this.curCustomCfg.offlineLogging = CustomCfg.OFFLINE_LOGGING_NONE;
                     this.curCustomCfg.traceFileSize = CustomCfg.LOG_SIZE_NONE;
                     this.curCustomCfg.traceLocation =
-                        (this.traceLevelValue == CustomCfg.TRACE_LEVEL_NONE) ? CustomCfg.TRACE_LOC_NONE : CustomCfg.TRACE_LOC_COREDUMP;
+                        (this.traceLevelValue == CustomCfg.TRACE_LEVEL_NONE) ?
+                        CustomCfg.TRACE_LOC_NONE : CustomCfg.TRACE_LOC_COREDUMP;
                     break;
                 case Services.MTS_FS:
-                    this.curCustomCfg.hsiFrequency = (this.usbAcmEnabled) ? CustomCfg.HSI_FREQ_NONE : CustomCfg.HSI_FREQ_78_MHZ;
+                    this.curCustomCfg.offlineLogging =
+                        (this.xsioValue == ModemConfiguration.xsio_44) ?
+                        CustomCfg.OFFLINE_LOGGING_HSI : CustomCfg.OFFLINE_LOGGING_USB;
                     this.curCustomCfg.traceLocation = CustomCfg.TRACE_LOC_EMMC;
                     this.curCustomCfg.traceFileSize = CustomCfg.LOG_SIZE_SMALL;
                     break;
                 case Services.MTS_EXTFS:
-                    this.curCustomCfg.hsiFrequency = (this.usbAcmEnabled) ? CustomCfg.HSI_FREQ_NONE : CustomCfg.HSI_FREQ_78_MHZ;
+                    this.curCustomCfg.offlineLogging =
+                        (this.xsioValue == ModemConfiguration.xsio_44) ?
+                        CustomCfg.OFFLINE_LOGGING_HSI : CustomCfg.OFFLINE_LOGGING_USB;
                     this.curCustomCfg.traceLocation = CustomCfg.TRACE_LOC_EMMC;
                     this.curCustomCfg.traceFileSize = CustomCfg.LOG_SIZE_LARGE;
                     break;
                 case Services.MTS_SD:
-                    this.curCustomCfg.hsiFrequency = (this.usbAcmEnabled) ? CustomCfg.HSI_FREQ_NONE : CustomCfg.HSI_FREQ_78_MHZ;
+                    this.curCustomCfg.offlineLogging =
+                        (this.xsioValue == ModemConfiguration.xsio_44) ?
+                        CustomCfg.OFFLINE_LOGGING_HSI : CustomCfg.OFFLINE_LOGGING_USB;
                     this.curCustomCfg.traceLocation = CustomCfg.TRACE_LOC_SDCARD;
                     this.curCustomCfg.traceFileSize = CustomCfg.LOG_SIZE_SMALL;
                     break;
                 case Services.MTS_EXTSD:
-                    this.curCustomCfg.hsiFrequency = (this.usbAcmEnabled) ? CustomCfg.HSI_FREQ_NONE : CustomCfg.HSI_FREQ_78_MHZ;
+                    this.curCustomCfg.offlineLogging =
+                        (this.xsioValue == ModemConfiguration.xsio_44) ?
+                        CustomCfg.OFFLINE_LOGGING_HSI : CustomCfg.OFFLINE_LOGGING_USB;
                     this.curCustomCfg.traceLocation = CustomCfg.TRACE_LOC_SDCARD;
                     this.curCustomCfg.traceFileSize = CustomCfg.LOG_SIZE_LARGE;
                     break;
                 case Services.MTS_USB:
-                    this.curCustomCfg.hsiFrequency = CustomCfg.HSI_FREQ_NONE;
+                    this.curCustomCfg.offlineLogging = CustomCfg.OFFLINE_LOGGING_NONE;
                     this.curCustomCfg.traceLocation = CustomCfg.TRACE_LOC_USB_APE;
                     this.curCustomCfg.traceFileSize = CustomCfg.LOG_SIZE_NONE;
                     break;
                 case Services.ONLINE_BP_LOG:
-                    this.curCustomCfg.hsiFrequency = CustomCfg.HSI_FREQ_78_MHZ;
+                    this.curCustomCfg.offlineLogging = CustomCfg.OFFLINE_LOGGING_HSI;
                     this.curCustomCfg.traceLocation = CustomCfg.TRACE_LOC_USB_MODEM;
                     this.curCustomCfg.traceFileSize = CustomCfg.LOG_SIZE_LARGE;
                     break;
                 case Services.MTS_PTI:
-                    this.curCustomCfg.hsiFrequency = CustomCfg.HSI_FREQ_NONE;
+                    this.curCustomCfg.offlineLogging = CustomCfg.OFFLINE_LOGGING_NONE;
                     this.curCustomCfg.traceLocation = CustomCfg.TRACE_LOC_PTI_MODEM;
                     this.curCustomCfg.traceFileSize = CustomCfg.LOG_SIZE_NONE;
                     break;
@@ -597,6 +615,22 @@ public class AmtlCore implements ModemEventListener {
     /* Get MUX trace status */
     protected int getMuxTraceValue() {
         return this.muxTraceValue;
+    }
+
+    /* Get offline logging */
+    protected int getOfflineLogging() {
+        int config = CustomCfg.OFFLINE_LOGGING_NONE;
+        String tty = SystemProperties.get("persist.service.mts.input", null);
+        if (tty != null) {
+            if (tty.equals(Services.TTYACM1)) {
+                config = CustomCfg.OFFLINE_LOGGING_USB;
+            } else if (tty.equals(hsiTty)) {
+                config = CustomCfg.OFFLINE_LOGGING_HSI;
+            }
+        } else {
+            Log.e(TAG, MODULE + ": tty cannot be found.");
+        }
+        return config;
     }
 
     /* Check if SIGUSR1 signal has to be sent to mts to unconfigure the ldisc */

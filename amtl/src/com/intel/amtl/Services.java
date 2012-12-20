@@ -39,9 +39,10 @@ public class Services {
     protected final static int ONLINE_BP_LOG = 6;
     protected final static int MTS_PTI = 7;
 
-    private final String CTP_TTY = "/dev/ttyACM1";
-    private final String MFLD_TTY = "/dev/gsmtty18";
-    private final String EMMC_PATH = "/logs/bplog";
+    protected final static String TTYACM1 = "/dev/ttyACM1";
+    protected final static String MDMTRACE = "/dev/mdmTrace";
+    protected final static String GSMTTY18 = "/dev/gsmtty18";
+    protected final static String EMMC_PATH = "/logs/bplog";
     private final String SDCARD_PATH = "/mnt/sdcard/logs/bplog";
     private final String USB_SOCKET_PORT = "6700";
     private final String PTI_PORT = "/dev/ttyPTI1";
@@ -61,36 +62,44 @@ public class Services {
     private int service_val;
 
     public Services() {
-        this.inputTty = (AmtlCore.usbAcmEnabled) ? CTP_TTY : MFLD_TTY;
         this.largeLogSizeEmmc = (!AmtlCore.usbAcmEnabled && !AmtlCore.usbswitchEnabled) ?
             LARGE_LOG_SIZE_LEX : LARGE_LOG_SIZE_CTP_MFLD;
         this.largeLogNumberEmmc = (!AmtlCore.usbAcmEnabled && !AmtlCore.usbswitchEnabled) ?
-            "5" : "3";
+            "6" : "3";
     }
 
     /* Enable selected service */
-    protected void enable_service(int service) {
+    protected void enable_service(int service, PredefinedCfg futurCfg, int offlineLog) {
         String service_name = "";
         switch (service) {
             case MTS_FS:
                 /* emmc 100MB persistent */
                 service_name = "mtsfs";
+                this.inputTty = (offlineLog == CustomCfg.OFFLINE_LOGGING_USB) ?
+                    TTYACM1 : AmtlCore.hsiTty;
                 fillProperties(this.inputTty, FILE_OUTPUT_TYPE, EMMC_PATH, SMALL_LOG_SIZE, "5");
                 break;
             case MTS_EXTFS:
                 /* emmc 600MB (medfield-clovertrail) - 150MB (lexington) persistent */
                 service_name = "mtsextfs";
+                this.inputTty = (futurCfg == PredefinedCfg.OFFLINE_USB_BP_LOG ||
+                    offlineLog == CustomCfg.OFFLINE_LOGGING_USB) ?
+                    TTYACM1 : AmtlCore.hsiTty;
                 fillProperties(this.inputTty, FILE_OUTPUT_TYPE, EMMC_PATH, this.largeLogSizeEmmc,
                     this.largeLogNumberEmmc);
                 break;
             case MTS_SD:
                 /* sdcard 100MB persistent */
                 service_name = "mtssd";
+                this.inputTty = (offlineLog == CustomCfg.OFFLINE_LOGGING_USB) ?
+                    TTYACM1 : AmtlCore.hsiTty;
                 fillProperties(this.inputTty, FILE_OUTPUT_TYPE, SDCARD_PATH, SMALL_LOG_SIZE, "5");
                 break;
             case MTS_EXTSD:
                 /* sdcard 600MB persistent*/
                 service_name = "mtsextsd";
+                this.inputTty = (offlineLog == CustomCfg.OFFLINE_LOGGING_USB) ?
+                    TTYACM1 : AmtlCore.hsiTty;
                 fillProperties(this.inputTty, FILE_OUTPUT_TYPE, SDCARD_PATH, LARGE_LOG_SIZE_SD,
                     "3");
                 break;
@@ -103,14 +112,13 @@ public class Services {
             case MTS_USB:
                 /* USB oneshot */
                 service_name = "mtsusb";
-                fillProperties(this.inputTty, SOCKET_OUTPUT_TYPE, USB_SOCKET_PORT, EMPTY_STRING,
+                fillProperties(GSMTTY18, SOCKET_OUTPUT_TYPE, USB_SOCKET_PORT, EMPTY_STRING,
                     EMPTY_STRING);
                 break;
             case MTS_PTI:
                 /* PTI BP logging => PTI */
                 service_name = "mtspti";
-                fillProperties(this.inputTty, PTI_OUTPUT_TYPE, PTI_PORT, EMPTY_STRING,
-                    EMPTY_STRING);
+                fillProperties(TTYACM1, PTI_OUTPUT_TYPE, PTI_PORT, EMPTY_STRING, EMPTY_STRING);
                 break;
             case MTS_DISABLE:
                 service_name = "disable";
