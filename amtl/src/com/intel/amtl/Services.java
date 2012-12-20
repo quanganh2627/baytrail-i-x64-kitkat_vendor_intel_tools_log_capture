@@ -27,7 +27,7 @@ public class Services {
 
     private static final String MODULE = "Services";
 
-    private static final String PERSIST_MTS_NAME = "persist.service.mts.name";
+    public static final String PERSIST_MTS_NAME = "persist.service.mts.name";
 
     /* Services values */
     protected final static int MTS_DISABLE = 0;
@@ -39,79 +39,139 @@ public class Services {
     protected final static int ONLINE_BP_LOG = 6;
     protected final static int MTS_PTI = 7;
 
+    private final String CTP_TTY = "/dev/ttyACM1";
+    private final String MFLD_TTY = "/dev/gsmtty18";
+    private final String EMMC_PATH = "/logs/bplog";
+    private final String SDCARD_PATH = "/mnt/sdcard/logs/bplog";
+    private final String USB_SOCKET_PORT = "6700";
+    private final String PTI_PORT = "/dev/ttyPTI1";
+    private final String SMALL_LOG_SIZE = "20000";
+    private final String LARGE_LOG_SIZE_SD = "200000";
+    private final String LARGE_LOG_SIZE_CTP_MFLD = "200000";
+    private final String LARGE_LOG_SIZE_LEX = "25000";
+    private final String FILE_OUTPUT_TYPE = "f";
+    private final String SOCKET_OUTPUT_TYPE = "p";
+    private final String PTI_OUTPUT_TYPE = "k";
+    private final String EMPTY_STRING = "";
+
+    private String inputTty;
+    private String largeLogSizeEmmc;
+    private String largeLogNumberEmmc;
+
     private int service_val;
+
+    public Services() {
+        this.inputTty = (AmtlCore.usbAcmEnabled) ? CTP_TTY : MFLD_TTY;
+        this.largeLogSizeEmmc = (!AmtlCore.usbAcmEnabled && !AmtlCore.usbswitchEnabled) ?
+            LARGE_LOG_SIZE_LEX : LARGE_LOG_SIZE_CTP_MFLD;
+        this.largeLogNumberEmmc = (!AmtlCore.usbAcmEnabled && !AmtlCore.usbswitchEnabled) ?
+            "5" : "3";
+    }
 
     /* Enable selected service */
     protected void enable_service(int service) {
         String service_name = "";
         switch (service) {
-        case MTS_FS:
-            /* emmc 100MB persistent => emmc100 */
-            service_name = "mtsfs";
-            break;
-        case MTS_EXTFS:
-            /* emmc 800MB persistent => emmc800 */
-            service_name = "mtsextfs";
-            break;
-        case MTS_SD:
-            /* sdcard 100MB persistent => sdcard100 */
-            service_name = "mtssd";
-            break;
-        case MTS_EXTSD:
-            /* sdcard 800MB persistent => sdcard800 */
-            service_name = "mtsextsd";
-            break;
-        case ONLINE_BP_LOG:
-            /* Online BP logging => usbmodem */
-            service_name = "usbmodem";
-            break;
-        case MTS_USB:
-            /* USB oneshot */
-            service_name = "mtsusb";
-            break;
-        case MTS_PTI:
-            /* PTI BP logging => PTI */
-            service_name = "mtspti";
-            break;
-        case MTS_DISABLE:
-            service_name = "disable";
-            break;
-        default:
-            /* Do nothing */
-            break;
+            case MTS_FS:
+                /* emmc 100MB persistent */
+                service_name = "mtsfs";
+                fillProperties(this.inputTty, FILE_OUTPUT_TYPE, EMMC_PATH, SMALL_LOG_SIZE, "5");
+                break;
+            case MTS_EXTFS:
+                /* emmc 600MB (medfield-clovertrail) - 150MB (lexington) persistent */
+                service_name = "mtsextfs";
+                fillProperties(this.inputTty, FILE_OUTPUT_TYPE, EMMC_PATH, this.largeLogSizeEmmc,
+                    this.largeLogNumberEmmc);
+                break;
+            case MTS_SD:
+                /* sdcard 100MB persistent */
+                service_name = "mtssd";
+                fillProperties(this.inputTty, FILE_OUTPUT_TYPE, SDCARD_PATH, SMALL_LOG_SIZE, "5");
+                break;
+            case MTS_EXTSD:
+                /* sdcard 600MB persistent*/
+                service_name = "mtsextsd";
+                fillProperties(this.inputTty, FILE_OUTPUT_TYPE, SDCARD_PATH, LARGE_LOG_SIZE_SD,
+                    "3");
+                break;
+            case ONLINE_BP_LOG:
+                /* Online BP logging => usbmodem */
+                service_name = "usbmodem";
+                fillProperties(EMPTY_STRING, EMPTY_STRING, EMPTY_STRING, EMPTY_STRING,
+                    EMPTY_STRING);
+                break;
+            case MTS_USB:
+                /* USB oneshot */
+                service_name = "mtsusb";
+                fillProperties(this.inputTty, SOCKET_OUTPUT_TYPE, USB_SOCKET_PORT, EMPTY_STRING,
+                    EMPTY_STRING);
+                break;
+            case MTS_PTI:
+                /* PTI BP logging => PTI */
+                service_name = "mtspti";
+                fillProperties(this.inputTty, PTI_OUTPUT_TYPE, PTI_PORT, EMPTY_STRING,
+                    EMPTY_STRING);
+                break;
+            case MTS_DISABLE:
+                service_name = "disable";
+                fillProperties(EMPTY_STRING, EMPTY_STRING, EMPTY_STRING, EMPTY_STRING,
+                    EMPTY_STRING);
+                break;
+            default:
+                fillProperties(EMPTY_STRING, EMPTY_STRING, EMPTY_STRING, EMPTY_STRING,
+                    EMPTY_STRING);
+                break;
         }
         Log.i(AmtlCore.TAG, MODULE + ": enable " + service_name + " service");
         SystemProperties.set(PERSIST_MTS_NAME, service_name);
     }
 
+    protected void fillProperties(String input, String output_type, String output,
+                                  String rotate_size, String rotate_num) {
+
+        SystemProperties.set("persist.service.mts.input", input);
+        SystemProperties.set("persist.service.mts.output_type", output_type);
+        SystemProperties.set("persist.service.mts.output", output);
+        SystemProperties.set("persist.service.mts.rotate_size", rotate_size);
+        SystemProperties.set("persist.service.mts.rotate_num", rotate_num);
+    }
+
     /* Return the number of service which is enabled */
     protected int service_status() {
-        if (SystemProperties.get("init.svc.mtsfs").equals("running")) {
-            /* emmc 100MB persistent */
-            service_val = MTS_FS;
-        } else if (SystemProperties.get("init.svc.mtsextfs").equals("running")) {
-            /* emmc 800MB persistent */
-            service_val = MTS_EXTFS;
-        } else if (SystemProperties.get("init.svc.mtssd").equals("running")) {
-            /* sdcard 100MB persistent */
-            service_val = MTS_SD;
-        } else if (SystemProperties.get("init.svc.mtsextsd").equals("running")) {
-            /* sdcard 800MB persistent */
-            service_val = MTS_EXTSD;
-        } else if (SystemProperties.get("persist.service.usbmodem.enable").equals("1")) {
-            /* Online BP logging => persistent USB to modem service */
-            /* USB modem is done by a script starting and exiting continuously,
-               we can't rely on init.svc.... property */
-            service_val = ONLINE_BP_LOG;
-        } else if (SystemProperties.get("init.svc.mtsusb").equals("running")) {
-            /* USB oneshot */
-            service_val = MTS_USB;
-        } else if (SystemProperties.get("persist.service.mtspti.enable").equals("1")) {
-            /* PTI persistent */
-            service_val = MTS_PTI;
+        String persistMtsName = SystemProperties.get(PERSIST_MTS_NAME);
+        Log.d(AmtlCore.TAG, MODULE + ": service " + persistMtsName);
+        if (SystemProperties.get("init.svc.mtsp").equals("running")) {
+            if (persistMtsName.equals("mtsfs")) {
+                /* emmc 100MB persistent */
+                service_val = MTS_FS;
+            } else if (persistMtsName.equals("mtsextfs")) {
+                /* emmc 600MB (medfield-clovertrail) - 150MB (lexington) persistent */
+                service_val = MTS_EXTFS;
+            } else if (persistMtsName.equals("mtssd")) {
+                /* sdcard 100MB persistent */
+                service_val = MTS_SD;
+            } else if (persistMtsName.equals("mtsextsd")) {
+                /* sdcard 600MB persistent */
+                service_val = MTS_EXTSD;
+            }
+        } else if (SystemProperties.get("init.svc.mtso").equals("running")) {
+            if (persistMtsName.equals("mtsusb")) {
+                /* USB oneshot */
+                service_val = MTS_USB;
+            } else if (persistMtsName.equals("mtspti")) {
+                /* PTI oneshot */
+                service_val = MTS_PTI;
+            }
         } else {
-            /* No service enabled */
-            service_val = MTS_DISABLE;
+            if (SystemProperties.get("persist.service.usbmodem.enable").equals("1")) {
+                /* Online BP logging => persistent USB to modem service */
+                /* USB modem is done by a script starting and exiting continuously,
+                   we can't rely on init.svc.... property */
+                service_val = ONLINE_BP_LOG;
+            } else {
+                /* No service enabled */
+                service_val = MTS_DISABLE;
+            }
         }
         return service_val;
     }
@@ -121,44 +181,30 @@ public class Services {
         try {
             int service_status = service_status();
             switch(service_status) {
-            case MTS_DISABLE:
-                /* Already disable => nothing to do */
-                break;
-            case MTS_FS:
-                /* emmc 100 MB persistent */
-                SystemProperties.set("persist.service.mtsfs.enable", "0");
-                break;
-            case MTS_EXTFS:
-                /* emmc 800 MB persistent */
-                SystemProperties.set("persist.service.mtsextfs.enable", "0");
-                break;
-            case MTS_SD:
-                /* sdcard 100 MB persistent */
-                SystemProperties.set("persist.service.mtssd.enable", "0");
-                break;
-            case MTS_EXTSD:
-                /* sdcard 800 MB persistent */
-                SystemProperties.set("persist.service.mtsextsd.enable", "0");
-                break;
-            case ONLINE_BP_LOG:
-                /* Persistent USB to modem service */
-                SystemProperties.set("persist.service.usbmodem.enable", "0");
-                break;
-            case MTS_USB:
-                /* USB oneshot */
-                AmtlCore.rtm.exec("stop mtsusb");
-                break;
-            case MTS_PTI:
-                /* PTI persistent */
-                SystemProperties.set("persist.service.mtspti.enable", "0");
-                break;
-            default:
-                /* Do nothing */
-                break;
+                case MTS_DISABLE:
+                    /* Already disable => nothing to do */
+                    break;
+                case MTS_FS:
+                case MTS_EXTFS:
+                case MTS_SD:
+                case MTS_EXTSD:
+                    SystemProperties.set("persist.service.mtsp.enable", "0");
+                    break;
+                case MTS_USB:
+                case MTS_PTI:
+                    AmtlCore.rtm.exec("stop mtso");
+                    break;
+                case ONLINE_BP_LOG:
+                    /* Persistent USB to modem service */
+                    SystemProperties.set("persist.service.usbmodem.enable", "0");
+                    break;
+                default:
+                    /* Do nothing */
+                    break;
             }
-            SystemProperties.set("persist.service.mts.name", "disable");
+            SystemProperties.set(PERSIST_MTS_NAME, "disable");
         } catch (IOException e) {
-            Log.e(AmtlCore.TAG, MODULE + ": can't stop current running MTS");
+            Log.e(AmtlCore.TAG, MODULE + ": can't stop current running mtso");
         }
     }
 }

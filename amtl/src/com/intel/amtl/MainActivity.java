@@ -32,6 +32,7 @@
  * 2.1.9  - 2012-10-05 - BZ 60711 - Check modem status before opening gsmtty
  * 2.2.0 -  2012-10-12 - BZ 52786 - WA to handle MMGR
  * 2.2.1  - 2012-12-19 - BZ 75912 - Properties for platform specificities
+ * 2.2.2  - 2012-12-20 - BZ 41081 - Configuration of MTS via Android properties
  * ============================================================================
  */
 
@@ -96,7 +97,7 @@ public class MainActivity extends Activity {
         this.core.setCfg(cfg);
         setUI(cfg);
         if (this.core.rebootNeeded()) {
-            UIHelper.message_pop_up(this, "WARNING", "Your board need a HARDWARE REBOOT");
+            UIHelper.message_pop_up(this, "WARNING", "Your board needs a HARDWARE REBOOT");
         }
     }
 

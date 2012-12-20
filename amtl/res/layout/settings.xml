@@ -119,15 +119,15 @@
             android:layout_marginLeft="150px"
             android:orientation="vertical" >
             <RadioButton
-                android:id="@+id/settings_trace_size_100_btn"
+                android:id="@+id/settings_trace_size_small_btn"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/settings_trace_size_100_button" />
+                android:text="@string/settings_trace_size_small_button" />
             <RadioButton
-                android:id="@+id/settings_trace_size_800_btn"
+                android:id="@+id/settings_trace_size_large_btn"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/settings_trace_size_800_button" />
+                android:text="@string/settings_trace_size_large_button" />
             <RadioButton
                 android:id="@+id/settings_trace_size_disable_btn"
                 android:layout_width="wrap_content"

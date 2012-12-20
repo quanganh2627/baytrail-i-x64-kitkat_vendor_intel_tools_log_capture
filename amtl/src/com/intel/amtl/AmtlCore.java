@@ -132,7 +132,6 @@ public class AmtlCore implements ModemEventListener {
         this.futCfg = PredefinedCfg.UNKNOWN_CFG;
 
         this.modemCfg = new ModemConfiguration();
-        this.services = new Services();
 
         this.curCustomCfg = new CustomCfg();
         this.futCustomCfg = new CustomCfg();
@@ -159,6 +158,8 @@ public class AmtlCore implements ModemEventListener {
         } else if (ptiProperty.equals("true")) {
             this.ptiEnabled = true;
         }
+
+        this.services = new Services();
 
         try {
             /* Don't forget to start modem status monitoring */
@@ -302,9 +303,10 @@ public class AmtlCore implements ModemEventListener {
 
     /* Apply blue configuration */
     private void applyCoredumpCfg() throws IOException {
+        this.services.stop_service();
         this.modemCfg.setXsio(this.gsmtty, ModemConfiguration.XSIO_2);
         this.modemCfg.setTraceLevel(this.gsmtty, CustomCfg.TRACE_LEVEL_BB_3G);
-        this.services.stop_service();
+        this.services.enable_service(Services.MTS_DISABLE);
     }
 
     /* Apply green configuration */
@@ -341,9 +343,10 @@ public class AmtlCore implements ModemEventListener {
 
     /* Apply yellow configuration */
     private void applyTraceDisableCfg() throws IOException {
+        this.services.stop_service();
         this.modemCfg.setXsio(this.gsmtty, ModemConfiguration.XSIO_0);
         this.modemCfg.setTraceLevel(this.gsmtty, CustomCfg.TRACE_LEVEL_NONE);
-        this.services.stop_service();
+        this.services.enable_service(Services.MTS_DISABLE);
     }
 
     /* Apply custom configuration */
@@ -353,9 +356,11 @@ public class AmtlCore implements ModemEventListener {
 
         /* Determine service to configure */
         if (this.futCustomCfg.traceLocation == CustomCfg.TRACE_LOC_EMMC) {
-            serviceToStart = (this.futCustomCfg.traceFileSize == CustomCfg.LOG_SIZE_100_MB) ? Services.MTS_FS: Services.MTS_EXTFS;
+            serviceToStart = (this.futCustomCfg.traceFileSize == CustomCfg.LOG_SIZE_SMALL) ?
+                Services.MTS_FS: Services.MTS_EXTFS;
         } else if (this.futCustomCfg.traceLocation == CustomCfg.TRACE_LOC_SDCARD) {
-            serviceToStart = (this.futCustomCfg.traceFileSize == CustomCfg.LOG_SIZE_100_MB) ? Services.MTS_SD: Services.MTS_EXTSD;
+            serviceToStart = (this.futCustomCfg.traceFileSize == CustomCfg.LOG_SIZE_SMALL) ?
+                Services.MTS_SD: Services.MTS_EXTSD;
         } else if (this.futCustomCfg.traceLocation == CustomCfg.TRACE_LOC_USB_APE) {
             serviceToStart = Services.MTS_USB;
         } else if (this.futCustomCfg.traceLocation == CustomCfg.TRACE_LOC_USB_MODEM) {
@@ -494,22 +499,22 @@ public class AmtlCore implements ModemEventListener {
                 case Services.MTS_FS:
                     this.curCustomCfg.hsiFrequency = (this.usbAcmEnabled) ? CustomCfg.HSI_FREQ_NONE : CustomCfg.HSI_FREQ_78_MHZ;
                     this.curCustomCfg.traceLocation = CustomCfg.TRACE_LOC_EMMC;
-                    this.curCustomCfg.traceFileSize = CustomCfg.LOG_SIZE_100_MB;
+                    this.curCustomCfg.traceFileSize = CustomCfg.LOG_SIZE_SMALL;
                     break;
                 case Services.MTS_EXTFS:
                     this.curCustomCfg.hsiFrequency = (this.usbAcmEnabled) ? CustomCfg.HSI_FREQ_NONE : CustomCfg.HSI_FREQ_78_MHZ;
                     this.curCustomCfg.traceLocation = CustomCfg.TRACE_LOC_EMMC;
-                    this.curCustomCfg.traceFileSize = CustomCfg.LOG_SIZE_800_MB;
+                    this.curCustomCfg.traceFileSize = CustomCfg.LOG_SIZE_LARGE;
                     break;
                 case Services.MTS_SD:
                     this.curCustomCfg.hsiFrequency = (this.usbAcmEnabled) ? CustomCfg.HSI_FREQ_NONE : CustomCfg.HSI_FREQ_78_MHZ;
                     this.curCustomCfg.traceLocation = CustomCfg.TRACE_LOC_SDCARD;
-                    this.curCustomCfg.traceFileSize = CustomCfg.LOG_SIZE_100_MB;
+                    this.curCustomCfg.traceFileSize = CustomCfg.LOG_SIZE_SMALL;
                     break;
                 case Services.MTS_EXTSD:
                     this.curCustomCfg.hsiFrequency = (this.usbAcmEnabled) ? CustomCfg.HSI_FREQ_NONE : CustomCfg.HSI_FREQ_78_MHZ;
                     this.curCustomCfg.traceLocation = CustomCfg.TRACE_LOC_SDCARD;
-                    this.curCustomCfg.traceFileSize = CustomCfg.LOG_SIZE_800_MB;
+                    this.curCustomCfg.traceFileSize = CustomCfg.LOG_SIZE_LARGE;
                     break;
                 case Services.MTS_USB:
                     this.curCustomCfg.hsiFrequency = CustomCfg.HSI_FREQ_NONE;
@@ -519,7 +524,7 @@ public class AmtlCore implements ModemEventListener {
                 case Services.ONLINE_BP_LOG:
                     this.curCustomCfg.hsiFrequency = CustomCfg.HSI_FREQ_78_MHZ;
                     this.curCustomCfg.traceLocation = CustomCfg.TRACE_LOC_USB_MODEM;
-                    this.curCustomCfg.traceFileSize = CustomCfg.LOG_SIZE_800_MB;
+                    this.curCustomCfg.traceFileSize = CustomCfg.LOG_SIZE_LARGE;
                     break;
                 case Services.MTS_PTI:
                     this.curCustomCfg.hsiFrequency = CustomCfg.HSI_FREQ_NONE;

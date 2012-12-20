@@ -31,8 +31,8 @@ public class CustomCfg {
 
     /* Maximum logs size */
     public static final int LOG_SIZE_NONE = -1;
-    public static final int LOG_SIZE_100_MB = 0;
-    public static final int LOG_SIZE_800_MB = 1;
+    public static final int LOG_SIZE_SMALL = 0;
+    public static final int LOG_SIZE_LARGE = 1;
 
     /* HSI frequencies */
     public static final int HSI_FREQ_NONE = -1;
@@ -55,7 +55,7 @@ public class CustomCfg {
 
     public int traceLocation = TRACE_LOC_EMMC;
     public int traceLevel = TRACE_LEVEL_BB_3G;
-    public int traceFileSize = LOG_SIZE_800_MB;
+    public int traceFileSize = LOG_SIZE_LARGE;
     public int hsiFrequency = HSI_FREQ_78_MHZ;
     public int muxTrace = MUX_TRACE_OFF;
     public int addTraces = ADD_TRACES_OFF;

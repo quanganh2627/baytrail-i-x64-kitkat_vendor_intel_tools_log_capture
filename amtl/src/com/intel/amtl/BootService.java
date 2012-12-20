@@ -31,6 +31,7 @@ import java.io.IOException;
 public class BootService extends Service {
 
     private static final String MODULE = "BootService";
+    private boolean serviceToRemove = true;
 
     @Override
     public IBinder onBind(Intent intent) {
@@ -48,47 +49,59 @@ public class BootService extends Service {
         // Get selected service name
         String service_name = "";
 
-        service_name = SystemProperties.get("persist.service.mts.name");
-        Log.i(AmtlCore.TAG, MODULE + ": start " + service_name + " service");
+        service_name = SystemProperties.get(Services.PERSIST_MTS_NAME);
 
         /* Test if requested service is already running */
-        if (SystemProperties.get("init.svc." + service_name).equals("running")) {
-            Log.i(AmtlCore.TAG, MODULE + ": " + service_name + " service already running");
-        } else {
+        if (SystemProperties.get("init.svc.mtso").equals("running")) {
+            if (service_name.equals("mtspti") || service_name.equals("mtsusb")) {
+                Log.i(AmtlCore.TAG, MODULE + ": " + service_name + " service already running");
+                serviceToRemove = false;
+            }
+        } else if (SystemProperties.get("init.svc.mtsp").equals("running")) {
+            if (service_name.equals("mtsextfs") || service_name.equals("mtsfs") ||
+                service_name.equals("mtsextsd") || service_name.equals("mtssd")) {
+                Log.i(AmtlCore.TAG, MODULE + ": " + service_name + " service already running");
+                serviceToRemove = false;
+            }
+        } else if (SystemProperties.get("init.svc.usb_to_modem").equals("running")) {
+            if (service_name.equals("usbmodem")) {
+                Log.i(AmtlCore.TAG, MODULE + ": " + service_name + " service already running");
+                serviceToRemove = false;
+            }
+        }
+
+        if (serviceToRemove) {
             /* Remove old running service if necessary */
-            if (SystemProperties.get("init.svc.mtsfs").equals("running")) {
-                SystemProperties.set("persist.service.mtsfs", "0");
-            } else if (SystemProperties.get("init.svc.mtsextfs").equals("running")) {
-                SystemProperties.set("persist.service.mtsextfs.enable", "0");
-            } else if (SystemProperties.get("init.svc.mtssd").equals("running")) {
-                SystemProperties.set("persist.service.mtssd.enable", "0");
-            } else if (SystemProperties.get("init.svc.mtsextsd").equals("running")) {
-                SystemProperties.set("persist.service.mtsextsd.enable", "0");
-            } else if (SystemProperties.get("init.svc.mtspti").equals("running")) {
-                SystemProperties.set("persist.service.mtspti.enable", "0");
+            if (SystemProperties.get("init.svc.mtso").equals("running")) {
+                try {
+                    AmtlCore.rtm.exec("stop mtso");
+                } catch (IOException e) {
+                    Log.e(AmtlCore.TAG, MODULE + ": can't stop mtso");
+                }
+            } else if (SystemProperties.get("init.svc.mtsp").equals("running")) {
+                SystemProperties.set("persist.service.mtsp.enable", "0");
             } else if (service_name.equals("usbmodem")) {
                 if (SystemProperties.get("init.svc.usb_to_modem").equals("running")) {
                     SystemProperties.set("persist.service.usbmodem.enable", "0");
                 }
-            } else if (SystemProperties.get("init.svc.mtsusb").equals("running")) {
-                SystemProperties.set("persist.service.mtsusb.enable", "0");
-            } else {
-                /* No service enabled */
             }
         }
 
-        if (service_name.equals("mtsusb")) {
+        if (service_name.equals("mtspti") || service_name.equals("mtsusb")) {
             try {
-                Log.i(AmtlCore.TAG, MODULE + ": start mtsusb service");
-                AmtlCore.rtm.exec("start mtsusb");
+                Log.i(AmtlCore.TAG, MODULE + ": start " + service_name + " service");
+                AmtlCore.rtm.exec("start mtso");
             } catch (IOException e) {
-                Log.e(AmtlCore.TAG, MODULE + ": can't start mtsusb service");
+                Log.e(AmtlCore.TAG, MODULE + ": can't start " + service_name  + "service");
             }
         } else if (service_name.equals("disable") || service_name.equals("")) {
             Log.i(AmtlCore.TAG, MODULE + ": MTS service disabled");
+        } else if (service_name.equals("usbmodem")) {
+            Log.i(AmtlCore.TAG, MODULE + ": start " + service_name + " service");
+            SystemProperties.set("persist.service.usbmodem.enable", "1");
         } else {
             Log.i(AmtlCore.TAG, MODULE + ": start " + service_name + " service");
-            SystemProperties.set("persist.service." + service_name + ".enable", "1");
+            SystemProperties.set("persist.service.mtsp.enable", "1");
         }
     }
 

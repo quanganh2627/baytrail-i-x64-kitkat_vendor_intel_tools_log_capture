@@ -34,6 +34,9 @@ public class SettingsActivity extends Activity {
 
     private static final String MODULE = "SettingsActivity";
 
+    private final String LOG_SIZE_150MB = "150MB";
+    private final String LOG_SIZE_600MB = "600MB";
+
     private CompoundButton button_location_emmc;
     private CompoundButton button_location_sdcard;
     private CompoundButton button_location_coredump;
@@ -43,14 +46,17 @@ public class SettingsActivity extends Activity {
     private CompoundButton button_level_bb;
     private CompoundButton button_level_bb_3g;
     private CompoundButton button_level_bb_3g_digrf;
-    private CompoundButton button_trace_size_100;
-    private CompoundButton button_trace_size_800;
+    private CompoundButton button_trace_size_small;
+    private CompoundButton button_trace_size_large;
     private CompoundButton button_hsi_frequencies_78;
     private CompoundButton button_hsi_frequencies_156;
     private CheckBox checkbox_activate;
     private CheckBox checkbox_mux;
     private CheckBox checkbox_additional_traces;
     private TextView header_additional_traces;
+    /* when set_trace_file_size is called by the listener on emmc button */
+    /* button_location_emmc is not considered as checked yet */
+    private boolean isEmmcChecked = false;
 
     private boolean invalidateFlag;
 
@@ -61,8 +67,15 @@ public class SettingsActivity extends Activity {
 
     /* Trace file size not useful in coredump,pti,usb ape and usb modem cases */
     private void unset_trace_file_size() {
-        button_trace_size_100.setEnabled(false);
-        button_trace_size_800.setEnabled(false);
+        button_trace_size_small.setEnabled(false);
+        if (!AmtlCore.usbswitchEnabled && !AmtlCore.usbAcmEnabled) {
+            if (button_location_emmc.isChecked()) {
+                button_trace_size_large.setText(LOG_SIZE_150MB);
+            } else {
+                button_trace_size_large.setText(LOG_SIZE_600MB);
+            }
+        }
+        button_trace_size_large.setEnabled(false);
         button_hsi_frequencies_78.setEnabled(false);
         button_hsi_frequencies_156.setEnabled(false);
         button_level_bb_3g.setChecked((cfg.traceLevel == CustomCfg.TRACE_LEVEL_NONE) || (cfg.traceLevel == CustomCfg.TRACE_LEVEL_BB_3G));
@@ -70,9 +83,16 @@ public class SettingsActivity extends Activity {
 
     /* Trace file size is useful in EMMC and SDCARD cases */
     private void set_trace_file_size() {
-        button_trace_size_100.setEnabled(true);
-        button_trace_size_800.setEnabled(true);
-        button_trace_size_800.setChecked(true);
+        button_trace_size_small.setEnabled(true);
+        if (!AmtlCore.usbswitchEnabled && !AmtlCore.usbAcmEnabled) {
+            if (isEmmcChecked) {
+                button_trace_size_large.setText(LOG_SIZE_150MB);
+            } else {
+                button_trace_size_large.setText(LOG_SIZE_600MB);
+            }
+        }
+        button_trace_size_large.setEnabled(true);
+        button_trace_size_large.setChecked(true);
         button_hsi_frequencies_78.setEnabled(!AmtlCore.usbAcmEnabled);
         button_hsi_frequencies_78.setChecked(!AmtlCore.usbAcmEnabled);
         button_level_bb_3g.setChecked((cfg.traceLevel == CustomCfg.TRACE_LEVEL_NONE) || (cfg.traceLevel == CustomCfg.TRACE_LEVEL_BB_3G));
@@ -105,10 +125,12 @@ public class SettingsActivity extends Activity {
             break;
         case CustomCfg.TRACE_LOC_EMMC:
             button_location_emmc.setChecked(true);
+            isEmmcChecked = true;
             set_trace_file_size();
             break;
         case CustomCfg.TRACE_LOC_SDCARD:
             button_location_sdcard.setChecked(true);
+            isEmmcChecked = false;
             set_trace_file_size();
             break;
         case CustomCfg.TRACE_LOC_COREDUMP:
@@ -138,11 +160,18 @@ public class SettingsActivity extends Activity {
         switch (cfg.traceFileSize) {
         case CustomCfg.LOG_SIZE_NONE:
             break;
-        case CustomCfg.LOG_SIZE_100_MB:
-            button_trace_size_100.setChecked(true);
+        case CustomCfg.LOG_SIZE_SMALL:
+            button_trace_size_small.setChecked(true);
             break;
-        case CustomCfg.LOG_SIZE_800_MB:
-            button_trace_size_800.setChecked(true);
+        case CustomCfg.LOG_SIZE_LARGE:
+            if (!AmtlCore.usbswitchEnabled && !AmtlCore.usbAcmEnabled) {
+                if (isEmmcChecked) {
+                    button_trace_size_large.setText(LOG_SIZE_150MB);
+                } else {
+                    button_trace_size_large.setText(LOG_SIZE_600MB);
+                }
+            }
+            button_trace_size_large.setChecked(true);
             break;
         default:
             /* Do nothing */
@@ -222,8 +251,10 @@ public class SettingsActivity extends Activity {
         button_level_bb_3g_digrf = (CompoundButton) findViewById (R.id.settings_level_bb_3g_digrf_btn);
 
         /* Log size buttons */
-        button_trace_size_100 = (CompoundButton) findViewById (R.id.settings_trace_size_100_btn);
-        button_trace_size_800 = (CompoundButton) findViewById (R.id.settings_trace_size_800_btn);
+        button_trace_size_small =
+            (CompoundButton) findViewById (R.id.settings_trace_size_small_btn);
+        button_trace_size_large =
+            (CompoundButton) findViewById (R.id.settings_trace_size_large_btn);
 
         /* HSI frequency buttons */
         button_hsi_frequencies_78 = (CompoundButton) findViewById (R.id.settings_hsi_frequencies_78_btn);
@@ -249,8 +280,8 @@ public class SettingsActivity extends Activity {
         AmtlCore.exitIfNull(button_level_bb, this);
         AmtlCore.exitIfNull(button_level_bb_3g, this);
         AmtlCore.exitIfNull(button_level_bb_3g_digrf, this);
-        AmtlCore.exitIfNull(button_trace_size_100, this);
-        AmtlCore.exitIfNull(button_trace_size_800, this);
+        AmtlCore.exitIfNull(button_trace_size_small, this);
+        AmtlCore.exitIfNull(button_trace_size_large, this);
         AmtlCore.exitIfNull(button_hsi_frequencies_78, this);
         AmtlCore.exitIfNull(button_hsi_frequencies_156, this);
         AmtlCore.exitIfNull(checkbox_activate, this);
@@ -274,9 +305,11 @@ public class SettingsActivity extends Activity {
                     "INFO","Currently, traces are disabled.\n" +
                     "We suggest you a default configuration.\n" +
                     "Don't forget to confirm with ACTIVATE checkbox");
-                cfg.traceLocation = (AmtlCore.usbAcmEnabled) ? CustomCfg.TRACE_LOC_EMMC : CustomCfg.TRACE_LOC_COREDUMP;
+                cfg.traceLocation = (AmtlCore.usbAcmEnabled) ?
+                    CustomCfg.TRACE_LOC_EMMC : CustomCfg.TRACE_LOC_COREDUMP;
                 cfg.traceLevel = CustomCfg.TRACE_LEVEL_BB_3G;
-                cfg.traceFileSize = (AmtlCore.usbAcmEnabled) ? CustomCfg.LOG_SIZE_800_MB : CustomCfg.LOG_SIZE_NONE;
+                cfg.traceFileSize = (AmtlCore.usbAcmEnabled) ?
+                    CustomCfg.LOG_SIZE_LARGE : CustomCfg.LOG_SIZE_NONE;
                 cfg.hsiFrequency = CustomCfg.HSI_FREQ_NONE;
                 cfg.muxTrace = CustomCfg.MUX_TRACE_OFF;
                 cfg.addTraces = CustomCfg.ADD_TRACES_OFF;
@@ -306,6 +339,7 @@ public class SettingsActivity extends Activity {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
                 if (isChecked) {
+                    isEmmcChecked = true;
                     set_trace_file_size();
                     cfg.traceLocation = CustomCfg.TRACE_LOC_EMMC;
                     invalidate();
@@ -318,6 +352,7 @@ public class SettingsActivity extends Activity {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
                 if (isChecked) {
+                    isEmmcChecked = false;
                     set_trace_file_size();
                     cfg.traceLocation = CustomCfg.TRACE_LOC_SDCARD;
                     invalidate();
@@ -428,23 +463,23 @@ public class SettingsActivity extends Activity {
             }
         });
 
-        /* Listener on button_trace_size_100 */
-        button_trace_size_100.setOnCheckedChangeListener(new OnCheckedChangeListener() {
+        /* Listener on button_trace_size_small */
+        button_trace_size_small.setOnCheckedChangeListener(new OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
                 if (isChecked) {
-                    cfg.traceFileSize = CustomCfg.LOG_SIZE_100_MB;
+                    cfg.traceFileSize = CustomCfg.LOG_SIZE_SMALL;
                     invalidate();
                 }
             }
         });
 
-        /* Listener on button_trace_size_800 */
-        button_trace_size_800.setOnCheckedChangeListener(new OnCheckedChangeListener() {
+        /* Listener on button_trace_size_large */
+        button_trace_size_large.setOnCheckedChangeListener(new OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
                 if (isChecked) {
-                    cfg.traceFileSize = CustomCfg.LOG_SIZE_800_MB;
+                    cfg.traceFileSize = CustomCfg.LOG_SIZE_LARGE;
                     invalidate();
                 }
             }

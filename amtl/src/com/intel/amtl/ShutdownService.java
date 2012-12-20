@@ -37,7 +37,7 @@ public class ShutdownService extends Service {
 
     private AmtlCore core;
 
-    private static final int PTI_KILL_WAIT = 1000;
+    private static final int PTI_KILL_WAIT = 50;
 
     @Override
     public IBinder onBind(Intent intent) {
