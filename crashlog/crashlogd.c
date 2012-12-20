@@ -897,7 +897,6 @@ static void history_file_write(char *event, char *type, char *subtype, char *log
         else
             fprintf(to, "%-8s%-22s%-20s%-16s\n", event, key, date_tmp_2, type);
         fclose(to);
-        LOGE("%-8s%-22s%-20s%s\n", event, key, date_tmp_2, type);
     } else {
 
         to = fopen(HISTORY_FILE, "a");
@@ -907,7 +906,6 @@ static void history_file_write(char *event, char *type, char *subtype, char *log
         }
         fprintf(to, "%-8s%-22s%-20s%s\n", event, key, date_tmp_2, lastuptime);
         fclose(to);
-        LOGE("%-8s%-22s%-20s%s\n", event, key, date_tmp_2, lastuptime);
     }
     return;
 }
@@ -2039,7 +2037,7 @@ void process_anr_and_uiwatchdog_events(char *filename, char *eventname, char *na
 
     dir = find_dir(files,CRASH_MODE);
     if (dir == -1) {
-        LOGE("find dir %d for and and UIwatchdog failed\n", files);
+        LOGE("find dir %d for anr and UIwatchdog failed\n", files);
         LOGE("%-8s%-22s%-20s%s\n", CRASHEVENT, key, date_tmp_2, eventname);
         del_file_more_lines(HISTORY_FILE);
         history_file_write(CRASHEVENT, eventname, NULL, NULL, NULL, key, date_tmp_2);
@@ -2204,6 +2202,7 @@ void process_uptime(char *eventname) {
             time_tmp = localtime((const time_t *)&t);
             PRINT_TIME(date_tmp_2, TIME_FORMAT_2, time_tmp);
             compute_key(key, PER_UPTIME, NULL);
+            LOGE("%-8s%-22s%-20s%s\n", PER_UPTIME, key, date_tmp_2, date_tmp);
             history_file_write(PER_UPTIME, NULL, NULL, NULL, date_tmp, key, date_tmp_2);
             del_file_more_lines(HISTORY_FILE);
             loop_uptime_event = (hours / UPTIME_HOUR_FREQUENCY) + 1;
@@ -3113,9 +3112,11 @@ next:
     time_tmp = localtime((const time_t *)&t);
     PRINT_TIME(date_tmp, TIME_FORMAT_2, time_tmp);
     compute_key(key, SYS_REBOOT, startupreason);
+    LOGE("%-8s%-22s%-20s%s\n", SYS_REBOOT, key, date_tmp, startupreason);
     history_file_write(SYS_REBOOT, startupreason, NULL, NULL, lastuptime, key, date_tmp);
 
     compute_key(key, STATEEVENT, encryptstate);
+    LOGE("%-8s%-22s%-20s%s\n", STATEEVENT, key, date_tmp, encryptstate);
     history_file_write(STATEEVENT, encryptstate, NULL, NULL, NULL, key, date_tmp);
 
     del_file_more_lines(HISTORY_FILE);
