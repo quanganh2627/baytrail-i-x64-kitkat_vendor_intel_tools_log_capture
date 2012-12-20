@@ -30,7 +30,8 @@
  * 2.1.7  - 2012-09-03 - BZ 23105 - PTI logging support in AMTL
  * 2.1.8  - 2012-09-25 - BZ 55058 - Fix ANR on services and main activity
  * 2.1.9  - 2012-10-05 - BZ 60711 - Check modem status before opening gsmtty
- * 2.2.0 - 2012-10-12 - BZ 52786 - WA to handle MMGR
+ * 2.2.0 -  2012-10-12 - BZ 52786 - WA to handle MMGR
+ * 2.2.1  - 2012-12-19 - BZ 75912 - Properties for platform specificities
  * ============================================================================
  */
 

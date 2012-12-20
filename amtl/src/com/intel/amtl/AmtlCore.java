@@ -52,11 +52,9 @@ public class AmtlCore implements ModemEventListener {
     private static final String ERR_APPLY_CFG = "Failed to apply configuration";
     private static final String ERR_UPDATE_CFG = "Failed to get current configuration";
 
-    private static final String PLATFORM_VERSION_PROPERTY = "ro.build.product";
-    private static final String PLATFORM_MFLD_PR1 = "mfld_pr1";
-    private static final String PLATFORM_MFLD_PR2 = "mfld_pr2";
-    private static final String PLATFORM_VICTORIABAY = "victoriabay";
-    private static final String PLATFORM_CTP_PR1 = "ctp_pr1";
+    private static final String USBSWITCH_PROP = "ro.amtl.usbswitch";
+    private static final String USBACM_PROP = "ro.amtl.usbacm";
+    private static final String PTI_PROP = "ro.amtl.pti";
 
     private static final long MODEM_STATUS_TIMEOUT_MS = 2000;
 
@@ -141,20 +139,25 @@ public class AmtlCore implements ModemEventListener {
 
         this.ctx = null;
 
-        String platformVersion;
-        /*Get the platform version*/
-        platformVersion = SystemProperties.get(PLATFORM_VERSION_PROPERTY, null);
-        if (platformVersion != null) {
-            if ((platformVersion.equals(PLATFORM_MFLD_PR1)) ||
-                (platformVersion.equals(PLATFORM_MFLD_PR2))) {
-                this.usbswitchEnabled = true;
-            } else if ((platformVersion.equals(PLATFORM_VICTORIABAY)) ||
-                (platformVersion.equals(PLATFORM_CTP_PR1))) {
-                this.usbAcmEnabled = true;
-                this.ptiEnabled = true;
-            }
-        } else {
-            Log.v(TAG, MODULE + ": platform version cannot be found.");
+        /* Retrieve platform specificities */
+        String usbswitchProperty = SystemProperties.get(USBSWITCH_PROP, null);
+        String usbacmProperty = SystemProperties.get(USBACM_PROP, null);
+        String ptiProperty = SystemProperties.get(PTI_PROP, null);
+
+        if (usbswitchProperty == null) {
+            Log.e(TAG, MODULE + ": usbswitch property cannot be found.");
+        } else if (usbswitchProperty.equals("true")) {
+            this.usbswitchEnabled = true;
+        }
+        if (usbacmProperty == null) {
+            Log.e(TAG, MODULE + ": usbacm property cannot be found.");
+        } else if (usbacmProperty.equals("true")) {
+            this.usbAcmEnabled = true;
+        }
+        if (ptiProperty == null) {
+            Log.e(TAG, MODULE + ": pti property cannot be found.");
+        } else if (ptiProperty.equals("true")) {
+            this.ptiEnabled = true;
         }
 
         try {
