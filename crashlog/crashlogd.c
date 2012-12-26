@@ -47,6 +47,7 @@
 #define APLOGEVENT "APLOG"
 #define STATSTRIGGER "STTRIG"
 #define HPROF "HPROF"
+#define CMDTRIGGER "CMDTRIG"
 #define APLOGTRIGGER "APLOGTRIG"
 #define BZEVENT "BZ"
 #define ERROREVENT "ERROR"
@@ -79,6 +80,7 @@
 
 #define FILESIZE_MAX  (10*1024*1024)
 #define PATHMAX 512
+#define CMDSIZE_MAX   (21*20) + 1
 #define UPTIME_FREQUENCY (5 * 60)
 #define TIMEOUT_VALUE (20*1000)
 #define UPTIME_HOUR_FREQUENCY 12
@@ -122,6 +124,7 @@
 #define APLOG_TYPE       0
 #define BPLOG_TYPE       1
 #define APLOG_STATS_TYPE 2
+#define SDCARD_LOGS_DIR "/mnt/sdcard/logs"
 #define SDCARD_CRASH_DIR "/mnt/sdcard/logs/crashlog"
 #define EMMC_CRASH_DIR "/logs/crashlog"
 #define SDCARD_STATS_DIR "/mnt/sdcard/logs/stats"
@@ -168,6 +171,7 @@
 // Add recovery error log path
 #define RECOVERY_ERROR_LOG "/cache/recovery/last_log"
 
+#define CMDDELETE 1
 
 #define TIME_FORMAT_1 "%Y%m%d%H%M%S"
 #define TIME_FORMAT_2 "%Y-%m-%d/%H:%M:%S  "
@@ -423,6 +427,31 @@ static void do_log_copy(char *mode, int dir, char* ts, int type)
     }
 
     return ;
+}
+
+static int remove_folder(char* path)
+{
+    char spath[PATHMAX];
+    DIR *d;
+    struct dirent* de;
+
+    d = opendir(path);
+    if (d == 0) {
+         return -1;
+    }
+    else {
+        while ((de = readdir(d)) != 0) {
+           if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, ".."))
+               continue;
+           else {
+               snprintf(spath, sizeof(spath)-1,  "%s/%s", path, de->d_name);
+               remove(spath);
+           }
+        }
+    }
+    closedir(d);
+    int status = rmdir(path);
+    return status;
 }
 
 static int write_file(const char *path, const char *value)
@@ -826,6 +855,62 @@ static void notify_crashreport()
         LOGI("notify crashreport status: %d.\n", status);
 }
 
+static int history_file_updated(char *data, char* filters)
+{
+    char *p, *p1, *p2, *cmd, *line;
+    int i, size, updated = 0;
+    char path[PATHMAX];
+
+    if (!data)
+        return 0;
+    
+    cmd = filters;
+    while (cmd) {
+       char filter[64]={'\0'};
+        p = strchr(cmd, ';');
+        if (p) {
+            size = p - cmd;
+        if ((size > 0) && ((unsigned int) size < sizeof(filter)))
+                memcpy(filter, cmd, size);
+            cmd = ++p;
+            p = strstr(data, filter);
+        } else
+            cmd = p;
+        if (p) {
+            line = data;
+            for (p1 = p; p1 > data; p1--)
+                if (*p1 == '\n') {
+                   line = ++p1;
+                   break;
+            }
+            p2 = strstr(line, SDCARD_CRASH_DIR);
+            if (!p2)
+                p2 = strstr(line, EMMC_CRASH_DIR);
+            if (p2) {
+                size = p2 - line;
+                for (i = 0; i < size; i++)
+                    if (line[i] == '\n')
+                        break;
+                if ((i == size) && !strncmp(line, CRASHEVENT, sizeof(CRASHEVENT)-1)) {
+                    p1 = strchr(p2, '\n');
+                    if (p1) {
+                        size = p1 - p2;
+                        if (size > 0 && ((unsigned int) size < sizeof(path)-1)) {
+                            strncpy(path, p2, size);
+                            path[size] = '\0';
+                            if (!remove_folder(path)) {
+                                memcpy(line, "DELETE", 6);
+                                updated = 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return updated;
+}
+
 static void history_file_write(char *event, char *type, char *subtype, char *log, char* lastuptime, char* key, char* date_tmp_2)
 {
     char uptime[32];
@@ -836,7 +921,6 @@ static void history_file_write(char *event, char *type, char *subtype, char *log
     FILE *to;
     char tmp[PATHMAX];
     char * p;
-    char * p1;
 
     // compute subtype
     if (!subtype)
@@ -865,12 +949,7 @@ static void history_file_write(char *event, char *type, char *subtype, char *log
     }
 
     if (log != NULL) {
-        p = strstr(log, "/mnt/sdcard");
-        p1 = strstr(log, "/logs");
-        if (p && p1)
-            snprintf(tmp, sizeof(tmp), "/storage/sdcard0%s", p1);
-        else
-            snprintf(tmp, sizeof(tmp), "%s", log);
+        snprintf(tmp, sizeof(tmp), "%s", log);
         if((p = strrchr(tmp,'/'))){
             p[0] = '\0';
         }
@@ -996,14 +1075,14 @@ static void sdcard_exist(void)
 {
     struct stat info;
 
-    if ((stat("/mnt/sdcard/logs", &info) == 0) && (opendir("/mnt/sdcard/logs"))){
+    if ((stat(SDCARD_LOGS_DIR, &info) == 0) && (opendir(SDCARD_LOGS_DIR))){
         CRASH_DIR = SDCARD_CRASH_DIR;
         STATS_DIR = SDCARD_STATS_DIR;
         APLOGS_DIR = SDCARD_APLOGS_DIR;
         BZ_DIR = SDCARD_BZ_DIR;
     } else {
-        mkdir("/mnt/sdcard/logs", 0777);
-        if ((stat("/mnt/sdcard/logs", &info) == 0) && (opendir("/mnt/sdcard/logs"))){
+        mkdir(SDCARD_LOGS_DIR, 0777);
+        if ((stat(SDCARD_LOGS_DIR, &info) == 0) && (opendir(SDCARD_LOGS_DIR))){
             CRASH_DIR = SDCARD_CRASH_DIR;
             STATS_DIR = SDCARD_STATS_DIR;
             APLOGS_DIR = SDCARD_APLOGS_DIR;
@@ -1115,6 +1194,7 @@ struct wd_name wd_array[] = {
     {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, HPROF, "/logs/core", ".hprof"},
     {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, STATSTRIGGER, "/logs/stats", "_trigger"},
     {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, APLOGTRIGGER, "/logs/aplogs", "_trigger"},
+    {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, CMDTRIGGER, "/logs/aplogs", "_cmd"},
     /* -----------------------------above is dir, below is file------------------------------------------------------------ */
     {0, IN_CLOSE_WRITE, CURRENT_UPTIME, "/logs/uptime", ""},
     /* -------------------------above is AP, below is modem---------------------------------------------------------------- */
@@ -1208,13 +1288,12 @@ void compress_aplog_folder(char *folder_path)
     system(cmd);
 }
 
-static int get_str_in_file(char *file, char *keyword, char *result)
+static int get_str_in_file(char *file, char *keyword, char *result, unsigned int sizemax)
 {
     char buffer[PATHMAX];
     int rc = -1;
     FILE *fd1;
     struct stat info;
-    int filelen,buflen;
 
     if (stat(file, &info) < 0)
         return -1;
@@ -1231,12 +1310,19 @@ static int get_str_in_file(char *file, char *keyword, char *result)
     while(!feof(fd1)){
         if (fgets(buffer, sizeof(buffer), fd1) != NULL){
             if (keyword && strstr(buffer,keyword)){
-                int buflen = strlen(buffer);
-                strcpy(result,buffer+strlen(keyword));
-                result[strlen(result)-1]= '\0';
-                rc = 0;
-                break;
-
+                unsigned int buflen = strlen(buffer);
+                if((buflen > 0) && (buffer[buflen-1]) == '\n')
+                    buffer[--buflen]= '\0';
+                if (buflen > sizemax + strlen(keyword))
+                    return -1;
+                unsigned int size = buflen - strlen(keyword);
+                if (size < sizemax) {
+                    strncpy(result,buffer+strlen(keyword),size);
+                    rc = 0;
+                    break;
+                }
+                else
+                  return -1;
             }
         }
     }
@@ -1442,6 +1528,32 @@ out:
     return oldest;
 }
 
+static int ishex(char c)
+{
+   return ((c >= '0' && c <= '9') ||
+      (c >= 'a' && c <= 'f') ||
+      (c >= 'A' && c <= 'F'));
+}
+
+/*
+* Name          : checkEvents
+* Description   : This function checks the expected format for a list of events
+*                 A list of events is 16 hex cut by a separator ;
+*                 if the size of the list exceeds the max, the command is not valid
+* Parameters    :
+*   char *list            -> string containing a list of events*/
+static int checkEvents(char* list)
+{
+   unsigned int i, j;
+   for(j=0; j < strlen(list) ; j+=21)
+       for (i=0; i < 20; i++)
+           if ((!ishex(list[i+j])))
+                 return 0;
+       if (list[j+i] != ';')
+              return 0;
+   return 1;
+}
+
 static int do_screenshot_copy(char* bz_description, char* bzdir){
     char buffer[PATHMAX];
     char screenshot[PATHMAX];
@@ -1486,6 +1598,74 @@ static int do_screenshot_copy(char* bz_description, char* bzdir){
         fclose(fd1);
 
     return 0;
+}
+
+/*
+* Name          : update_history_on_cmd_delete
+* Description   : This function updates the history_event on a CMDDELETE command
+*                 The line of the history event containing one of events list is updated:
+*                 The CRASH keyword is replaced by DELETE keyword
+*                 The crashlog folder is removed
+* Parameters    :
+*   char *events          -> list of events */
+static int update_history_on_cmd_delete(char* events)
+{
+    char *data = NULL;
+    int fd, sz;
+
+    fd = open(HISTORY_FILE, O_RDWR);
+    if (fd < 0){
+        LOGE("can not open file: %s\n", HISTORY_FILE);
+        return 0;
+    }
+
+    sz = lseek(fd, 0, SEEK_END);
+    if (sz < 0) {
+        close(fd);
+        return 0;
+    }
+
+    if (lseek(fd, 0, SEEK_SET) != 0) {
+        close(fd);
+        return 0;
+    }
+
+    data = (char *)malloc(sz + 2);
+    if (data == 0) {
+        return 0;
+    }
+    if (read(fd, data, sz) != sz) {
+        close(fd);
+        if (data != 0)
+            free(data);
+        return 0;
+    }
+
+    close(fd);
+
+    data[sz] = '\n';
+    data[sz + 1] = 0;
+
+    // if the command is performed successfully, the history file is updated
+    if (history_file_updated(data, events)) {
+          fd = open(HISTORY_FILE, O_RDWR | O_TRUNC);
+          if (fd < 0) {
+              free(data);
+              LOGE("can not open file: %s\n", HISTORY_FILE);
+              return 0;
+          }
+
+          if (write(fd, &data[0], sz) != sz) {
+              close(fd);
+              free(data);
+              return 0;
+          }
+          close(fd);
+    }
+
+    if (data != 0)
+         free(data);
+    return 1;
 }
 
 /*
@@ -1693,6 +1873,32 @@ void process_full_dropbox_event(char *name,  unsigned int files) {
     notify_crashreport();
 }
 
+/*
+* Name          : process_command
+* Description   : This function manages treatment for commands.
+*                 When a command file is detected, it manages the action and the list of events
+* Parameters    :
+*   char *filename        -> path of watched directory/file
+*   char *name            -> name of the file inside the watched directory that has triggered the event*/
+void process_command(char *filename, char *name) {
+
+    char path[PATHMAX];
+    struct stat info;
+    char action[32] = {'\0',};
+    char events[CMDSIZE_MAX] = {'\0',};
+
+    //extract the action and list of events from the commad file
+    snprintf(path, sizeof(path),"%s/%s", filename, name);
+    if ((!stat(path, &info))) {
+         if (!get_str_in_file(path,"ACTION=",action, sizeof(action)) && !get_str_in_file(path,"ARGS=",events, sizeof(events))) {
+            if ((!strncmp(action, "DELETE", 6)) && checkEvents(events)) {
+               update_history_on_cmd_delete(events);
+               return;
+            }
+         }
+    }
+    LOGE("Invalid command %s", path);
+}
 
 /*
 * Name          : process_aplog_and_bz_trigger
@@ -1733,12 +1939,13 @@ void process_aplog_and_bz_trigger(char *filename, char *name,  unsigned int file
     //if a value is specified inside trigger file, it overrides property value
     snprintf(path, sizeof(path),"%s/%s", filename, name);
     if ((!stat(path, &sb))) {
-        if (!get_str_in_file(path,"APLOG=",tmp)) {
+        if (!get_str_in_file(path,"APLOG=", tmp, sizeof(tmp))) {
             aplogDepth = atoi(tmp);
             nbPacket = 1;
         }
     }
 
+    LOGI("received trigger file %s for aplog or bz", path);
     int j,k;
     aplogIsPresent = 0;
     dir = -1;
@@ -1795,7 +2002,6 @@ void process_aplog_and_bz_trigger(char *filename, char *name,  unsigned int file
                 break;
             }
         }
-
         //for aplog_trigger, logs an APLOG event in history_event for each copied packet
         if((k != 0) && (dir != -1) && strstr(name, "aplog_trigger" )) {
 
@@ -1812,7 +2018,6 @@ void process_aplog_and_bz_trigger(char *filename, char *name,  unsigned int file
         if(aplogIsPresent == 0)
             break;
     }
-
     //for bz_trigger, treats bz_trigger file content and logs one BZEVENT event in history_event
     if(-1!=dir && !strncmp(name, BZTRIGGER, sizeof(BZTRIGGER))) {
             snprintf(destion,sizeof(destion),"%s%d/", BZ_DIR,dir);
@@ -2304,6 +2509,11 @@ static int do_crashlogd(unsigned int files)
                             process_hprof_event(wd_array[i].filename, event->name, files);
                             break;
                         }
+                        /* for cmd */
+                        else if((strcmp(wd_array[i].eventname, CMDTRIGGER)==0) && (strstr(event->name, "_cmd" ))){
+                            process_command(wd_array[i].filename, event->name);
+                            break;
+                        }
                         /* for aplog and bz trigger */
                         else if((strcmp(wd_array[i].eventname, APLOGTRIGGER)==0) && (strstr(event->name, "_trigger" ))){
 
@@ -2401,7 +2611,7 @@ static int find_str_in_file(char *file, char *keyword, char *tail)
     struct stat info;
     int brtw, brtr;
     char *p;
-    int filelen,tmp,stringlen,buflen;
+    int tmp,stringlen,buflen;
 
     if (stat(file, &info) < 0)
         return -1;
@@ -2992,7 +3202,7 @@ int main(int argc, char **argv)
 
     if (argc == 2) {
         if(!memcmp(argv[1], "-modem", 6)){
-            WDCOUNT_START = 8;
+            WDCOUNT_START = 9;
             WDCOUNT = WDCOUNT_START + 4;
             LOGI(" crashlogd only snoop modem \n");
         }
