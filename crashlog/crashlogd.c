@@ -42,6 +42,8 @@
 #include <sha1.h>
 #include <backtrace.h>
 #include <limits.h>
+#include "mmgr_cli.h"
+#include "mmgr_source.h"
 
 #define CRASHEVENT "CRASH"
 #define STATSEVENT "STATS"
@@ -837,6 +839,7 @@ static void create_minimal_crashfile(char* type, char* path, char* key, char* up
         FILE *fd_panic;
         DIR *d;
         struct dirent* de;
+        char value[PATHMAX] = "";
         d = opendir(path);
         while ((de = readdir(d))) {
             const char *name = de->d_name;
@@ -847,10 +850,20 @@ static void create_minimal_crashfile(char* type, char* path, char* key, char* up
                     LOGE("can not open file: %s\n", mpanicpath);
                     break;
                 }
-                char value[PATHMAX] = "";
                 fscanf(fd_panic, "%s", value);
                 fclose(fd_panic);
                 fprintf(fp,"DATA0=%s\n", value);
+                break;
+            } else if (strstr(name, "_crashdata")){ //MMGR case
+                snprintf(mpanicpath, sizeof(mpanicpath)-1, "%s/%s", path, name);
+                fd_panic = fopen(mpanicpath, "r");
+                if (fd_panic == NULL){
+                    LOGE("can not open file: %s\n", mpanicpath);
+                    break;
+                }
+                fscanf(fd_panic, "%s", value);
+                fclose(fd_panic);
+                fprintf(fp,"%s\n", value);
                 break;
             }
         }
@@ -1383,6 +1396,14 @@ void monitor_crashenv(void)
     if (status != 0)
         LOGE("monitor_crashenv status: %d.\n", status);
     return ;
+}
+
+void init_mmgr_cli(void)
+{
+    LOGD("init_mmgr_cli begin");
+    init_mmgr_cli_source();
+
+    LOGD("init_mmgr_cli end");
 }
 
 static int crashlog_raise_infoerror(char *type, char *subtype)
@@ -2949,7 +2970,222 @@ static int file_monitor_handle(unsigned int files)
         event = (struct inotify_event *)(offset + tmp_len);
         offset += tmp_len;
     }
+    return 0;
+}
 
+/**
+ * @brief Compute mmgr parameter
+ *
+ * Called when parameter are needed for a mmgr callback
+ *
+ * @param parameters needed to create event (logd, name,...)
+ *
+ * @return 0 on success, -1 on error.
+ */
+int compute_mmgr_param(char *type, int *mode, char *name, int *aplog, int *bplog, int *log_mode){
+
+        if (strstr(type, "MODEMOFF" )){
+            //CASE MODEMOFF
+            *mode = STATS_MODE;
+            sprintf(name, "%s", INFOEVENT);
+        }else if (strstr(type, "MSHUTDOWN" )){
+            //CASE MSHUTDOWN
+            *mode = CRASH_MODE;
+            sprintf(name, "%s", CRASHEVENT);
+            *aplog = 1;
+            *log_mode = APLOG_TYPE;
+        }else if (strstr(type, "MOUTOFSERVICE" )){
+            //CASE MOUTOFSERVICE
+            *mode = CRASH_MODE;
+            sprintf(name, "%s", CRASHEVENT);
+            *aplog = 1;
+            *log_mode = APLOG_TYPE;
+        }else if (strstr(type, "MPANIC" )){
+            //CASE MPANIC
+            *mode = CRASH_MODE;
+            sprintf(name, "%s",CRASHEVENT);
+            *aplog = 1;
+            *log_mode = APLOG_TYPE;
+            *bplog = 1;
+        }else if (strstr(type, "APIMR" )){
+            //CASE APIMR
+            *mode = CRASH_MODE;
+            sprintf(name, "%s", CRASHEVENT);
+            *aplog = 1;
+            *log_mode = APLOG_TYPE;
+        }else if (strstr(type, "MRESET" )){
+            //CASE MRESET
+            *mode = CRASH_MODE;
+            sprintf(name, "%s",CRASHEVENT);
+            *log_mode = APLOG_TYPE;
+            *aplog = 1;
+        }else if (strstr(type, "TELEPHONY" )){
+            //CASE TEL_ERROR
+            *mode = STATS_MODE;
+            sprintf(name, "%s", ERROREVENT);
+            *aplog = 1;
+            *log_mode = APLOG_STATS_TYPE;
+        }else{
+            //unknown event name
+            LOGW("wrong type found in mmgr_get_fd : %s.\n",type);
+            return -1;
+        }
+        return 0;
+}
+
+/**
+ * @brief Handle mmgr call back
+ *
+ * Called when a call back function is triggered
+ * depending on init subscription
+ *
+ * @param files nb max of logs destination directories (crashlog,
+ * aplogs, bz... )
+ *
+ * @return 0 on success, -1 on error.
+ */
+static int mmgr_handle(unsigned int files)
+{
+    char date_tmp_2[32];
+    char key[SHA1_DIGEST_LENGTH+1];
+    int dir;
+    int event_mode;
+    int aplog_mode;
+    char event_name[MMGRMAXDATA]= { '\0', };
+    char * event_dir;
+    char data0[MMGRMAXDATA]= { '\0', };
+    char data1[MMGRMAXDATA]= { '\0', };
+    char data2[MMGRMAXDATA]= { '\0', };
+    char data3[MMGRMAXDATA]= { '\0', };
+    char cd_path[MMGRMAXDATA]= { '\0', };
+    char destion[PATHMAX];
+    char destion2[PATHMAX];
+    char curChar[1];
+    int iChar;
+    char type[20] = { '\0', };
+    char date_tmp[32];
+    int nbytes;
+    int copy_aplog = 0;
+    int copy_bplog = 0;
+    struct mmgr_data cur_data;
+
+    // get data from mmgr pipe
+    nbytes = read(mmgr_get_fd(), &cur_data, sizeof( struct mmgr_data));
+    strcpy(type,cur_data.string);
+
+    if (nbytes > 0){
+        //find_dir should be done before event_dir is set
+        LOGD("Received string from mmgr: %s  - %d bytes", type,nbytes);
+        get_formated_times(date_tmp,date_tmp_2);
+        if (compute_mmgr_param (type, &event_mode,event_name, &copy_aplog, &copy_bplog, &aplog_mode) < 0){
+            return -1;
+        }
+        //set DATA0/1 value
+        if (strstr(type, "MPANIC" )){
+            LOGD("Extra int value : %d ",cur_data.extra_int);
+            if (cur_data.extra_int >= 0){
+                snprintf(data0,sizeof(data0),"%d", cur_data.extra_int);
+            }else if (cur_data.extra_int == -1){
+                snprintf(data0,sizeof(data0),"%s", "CD_FAILED");
+            }else if (cur_data.extra_int == -2){
+                snprintf(data0,sizeof(data0),"%s", "NO_PANIC_ID");
+            }else if (cur_data.extra_int == -3){
+                snprintf(data0,sizeof(data0),"%s", "UNKNOWN");
+            }
+            LOGD("Extra string value : %s ",cur_data.extra_string);
+            snprintf(cd_path,sizeof(cd_path),"%s", cur_data.extra_string);
+        }else if (strstr(type, "APIMR" )){
+            LOGD("Extra string value : %s ",cur_data.extra_string);
+            //need to put it in DATA3 to avoid conflict with parser
+            snprintf(data3,sizeof(data3),"%s", cur_data.extra_string);
+        }else if (strstr(type, "TELEPHONY" )){
+            LOGD("Extra int value : %d ",cur_data.extra_int);
+            snprintf(data0,sizeof(data0),"%d", cur_data.extra_int);
+            LOGD("Extra string value : %s ",cur_data.extra_string);
+            snprintf(data1,sizeof(data1),"%s", cur_data.extra_string);
+        }
+
+        dir = find_dir(files,event_mode);
+        if (dir == -1) {
+            LOGE("find dir %d for mmgr trigger failed\n", files);
+            compute_key(key, event_name, type);
+            LOGE("%-8s%-22s%-20s%s\n", event_name, key, date_tmp_2, type);
+            history_file_write(event_name, type, NULL, NULL, NULL, key, date_tmp_2);
+            del_file_more_lines(HISTORY_FILE);
+            notify_crashreport();
+            return 0;
+        }
+        //update event_dir should be done after find_dir call
+        if (event_mode == STATS_MODE){
+            event_dir = STATS_DIR;
+        }else if (event_mode == CRASH_MODE) {
+            event_dir = CRASH_DIR;
+        }else{
+            //unknown event name
+            LOGW("wrong event_mode found in mmgr_get_fd - event_dir : %d.\n",event_mode);
+            return -1;
+        }
+
+        if (copy_aplog > 0){
+            do_log_copy(type,dir,date_tmp,aplog_mode);
+        }
+        if (copy_bplog > 0){
+            do_log_copy(type,dir,date_tmp,BPLOG_TYPE);
+        }
+        snprintf(destion,sizeof(destion),"%s%d/", event_dir,dir);
+        compute_key(key, event_name, type);
+        LOGE("%-8s%-22s%-20s%s %s\n", event_name, key, date_tmp_2, type, destion);
+        //copying file if required
+        if (strlen(cd_path) > 0){
+            char *basename;
+            basename = strrchr ( cd_path, '/' );
+            //needed to remove '/'
+            basename++;
+            if (basename){
+                snprintf(destion2,sizeof(destion2),"%s/%s", destion,basename);
+            }else{
+                snprintf(destion2,sizeof(destion2),"%s/%s", destion, "core_dump");
+            }
+            do_copy(cd_path, destion2, 0);
+            remove(cd_path);
+        }
+        //generating extra DATA (if required)
+        if ((strlen(data0) > 0) || (strlen(data1) > 0) || (strlen(data2) > 0) || (strlen(data3) > 0)){
+            FILE *fp;
+            char fullpath[PATHMAX];
+            if (strstr(event_name , ERROREVENT)) {
+                snprintf(fullpath, sizeof(fullpath)-1, "%s/%s_errorevent", destion,type );
+            }else if (strstr(event_name , INFOEVENT)) {
+                snprintf(fullpath, sizeof(fullpath)-1, "%s/%s_infoevent", destion,type );
+            }else{
+                snprintf(fullpath, sizeof(fullpath)-1, "%s/%s_crashdata", destion,type );
+            }
+
+            fp = fopen(fullpath,"w");
+            if (fp == NULL){
+                LOGE("can not create file: %s\n", fullpath);
+            }else{
+                //Fill DATA fields
+                if (strlen(data0) > 0)
+                    fprintf(fp,"DATA0=%s\n", data0);
+                if (strlen(data1) > 0)
+                    fprintf(fp,"DATA1=%s\n", data1);
+                if (strlen(data2) > 0)
+                    fprintf(fp,"DATA2=%s\n", data2);
+                if (strlen(data3) > 0)
+                    fprintf(fp,"DATA3=%s\n", data3);
+                fprintf(fp,"_END\n");
+                fclose(fp);
+            }
+        }
+
+        history_file_write(event_name, type, NULL, destion, NULL, key, date_tmp_2);
+        del_file_more_lines(HISTORY_FILE);
+        notify_crashreport();
+    }else{
+        LOGW("No data found in mmgr_get_fd.\n");
+        return -1;
+    }
     return 0;
 }
 
@@ -2976,6 +3212,7 @@ static int do_monitor(unsigned int files)
     int select_result; /**< select result */
 
     file_monitor_init();
+    init_mmgr_cli();
 
     for(;;) {
 
@@ -2987,6 +3224,13 @@ static int do_monitor(unsigned int files)
             FD_SET(file_monitor_get_fd(), &read_fds);
             if (file_monitor_get_fd() > max)
                 max = file_monitor_get_fd();
+        }
+
+        //mmgr fd setup
+        if (mmgr_get_fd() > 0) {
+            FD_SET(mmgr_get_fd(), &read_fds);
+            if (mmgr_get_fd() > max)
+                max = mmgr_get_fd();
         }
 
         // Wait for events
@@ -3002,9 +3246,14 @@ static int do_monitor(unsigned int files)
             if (FD_ISSET(file_monitor_get_fd(), &read_fds)) {
                 file_monitor_handle(files);
             }
+            // mmgr monitor
+            if (FD_ISSET(mmgr_get_fd(), &read_fds)) {
+                LOGD("mmgr fd set");
+                mmgr_handle(files);
+            }
         }
     }
-
+    close_mmgr_cli_source();
     LOGE("Exiting main monitor loop");
     return -1;
 }
