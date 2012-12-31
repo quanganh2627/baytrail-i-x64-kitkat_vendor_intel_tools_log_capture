@@ -1,4 +1,4 @@
-/* * Copyright (C) Intel 2010
+/* Copyright (C) Intel 2010
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,6 +27,8 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <sys/select.h>
+#include <sys/time.h>
 #include <private/android_filesystem_config.h>
 #include <linux/ioctl.h>
 #include <linux/rtc.h>
@@ -2523,9 +2525,71 @@ void process_uptime(char *eventname) {
     }
 }
 
-static int do_crashlogd(unsigned int files)
+/**
+ * File monitor module file descriptor
+ */
+static int file_monitor_fd = -1;
+
+/**
+ * @brief File monitor module file descriptor getter
+ *
+ * Export FD which expose new events from File Monitor module events
+ * source.
+ *
+ * @return Initialized File Monitor module file descriptor.
+ */
+int file_monitor_get_fd()
 {
-    int fd;
+    return file_monitor_fd;
+}
+
+/**
+ * @brief File Monitor module init function
+ *
+ * Initialize File Monitor module by adding all watched
+ * files/directories to the inotify mechanism and expose it in the
+ * module FD. The list of watched files/directories is defined by the
+ * wd_array global array.
+ *
+ * @return 0 on success, -1 on failure.
+ */
+static int file_monitor_init()
+{
+    file_monitor_fd = inotify_init();
+    if (file_monitor_fd < 0) {
+        LOGE("inotify_init failed, %s\n", strerror(errno));
+        return -1;
+    }
+
+    int i, wd;
+    for (i = WDCOUNT_START; i < WDCOUNT; i++) {
+        wd = inotify_add_watch(file_monitor_fd, wd_array[i].filename,
+                wd_array[i].mask);
+        if (wd < 0) {
+            LOGE("Can't add watch for %s.\n", wd_array[i].filename);
+            return -1;
+        }
+        wd_array[i].wd = wd;
+        LOGI("%s has been snooped\n", wd_array[i].filename);
+    }
+
+    return 0;
+}
+
+/**
+ * @brief Handle File Monitor processing of events
+ *
+ * Called when a file/directory has changed according to the global
+ * wd_array array. Compare the current event with the list to
+ * determine the source and call the good processing function.
+ *
+ * @param files nb max of logs destination directories (crashlog,
+ * aplogs, bz... )
+ *
+ * @return 0 on success, -1 on error.
+ */
+static int file_monitor_handle(unsigned int files)
+{
     int wd;
     int index_prod = 0;
     char buffer[PATHMAX];
@@ -2536,148 +2600,185 @@ static int do_crashlogd(unsigned int files)
     char key[SHA1_DIGEST_LENGTH+1];
     char current_key[2][SHA1_DIGEST_LENGTH+1];
 
-    monitor_crashenv();
-    check_crashlog_dead();
-    fd = inotify_init();
-    if (fd < 0) {
-        LOGE("inotify_init failed, %s\n", strerror(errno));
-        return 1;
-    }
-
-    for (i = WDCOUNT_START; i < WDCOUNT; i++) {
-        wd = inotify_add_watch(fd, wd_array[i].filename,
-                wd_array[i].mask);
-        if (wd < 0) {
-            LOGE("Can't add watch for %s.\n", wd_array[i].filename);
-            return -1;
-        }
-        wd_array[i].wd = wd;
-        LOGW("%s has been snooped\n", wd_array[i].filename);
-    }
-    while ((len = read(fd, buffer, sizeof(buffer)))) {
-        /* clean children to avoid zombie processes */
-        while(waitpid(-1, NULL, WNOHANG) > 0){};
-        offset = buffer;
-        event = (struct inotify_event *)buffer;
-        while (((char *)event - buffer) < len) {
-            /* for dir to be delete */
-            if((event->mask & IN_DELETE_SELF) ||(event->mask & IN_MOVE_SELF)){
-                for (i = WDCOUNT_START; i < WDCOUNT; i++) {
-                    if (event->wd != wd_array[i].wd)
-                        continue;
-                    mkdir(wd_array[i].filename, 0777);
-                    wd = inotify_add_watch(fd, wd_array[i].filename, wd_array[i].mask);
-                    if (wd < 0) {
-                        LOGE("Can't add watch for %s.\n", wd_array[i].filename);
-                        return -1;
-                    }
-                    wd_array[i].wd = wd;
-                    LOGW("%s has been deleted or moved, we watch it again.\n", wd_array[i].filename);
+    len = read(file_monitor_fd, buffer, sizeof(buffer));
+    /* clean children to avoid zombie processes */
+    while(waitpid(-1, NULL, WNOHANG) > 0){};
+    offset = buffer;
+    event = (struct inotify_event *)buffer;
+    while (((char *)event - buffer) < len) {
+        /* for dir to be delete */
+        if((event->mask & IN_DELETE_SELF) ||(event->mask & IN_MOVE_SELF)){
+            for (i = WDCOUNT_START; i < WDCOUNT; i++) {
+                if (event->wd != wd_array[i].wd)
+                    continue;
+                mkdir(wd_array[i].filename, 0777);
+                wd = inotify_add_watch(file_monitor_fd, wd_array[i].filename, wd_array[i].mask);
+                if (wd < 0) {
+                    LOGE("Can't add watch for %s.\n", wd_array[i].filename);
+                    return -1;
                 }
+                wd_array[i].wd = wd;
+                LOGW("%s has been deleted or moved, we watch it again.\n", wd_array[i].filename);
             }
-            //Check subject of this event is a not directory
-            if (!(event->mask & IN_ISDIR)) {
-                for (i = WDCOUNT_START; i < WDCOUNT; i++) {
-                    if (event->wd != wd_array[i].wd)
-                        continue;
-                    if(!event->len){
-                        /* event concerns a watched file */
-                        if (!memcmp(wd_array[i].filename,HISTORY_UPTIME,strlen(HISTORY_UPTIME))) {
+        }
+        //Check subject of this event is a not directory
+        if (!(event->mask & IN_ISDIR)) {
+            for (i = WDCOUNT_START; i < WDCOUNT; i++) {
+                if (event->wd != wd_array[i].wd)
+                    continue;
+                if(!event->len){
+                    /* event concerns a watched file */
+                    if (!memcmp(wd_array[i].filename,HISTORY_UPTIME,strlen(HISTORY_UPTIME))) {
 
-                            process_uptime(wd_array[i].eventname);
+                        process_uptime(wd_array[i].eventname);
+                    }
+                    break;
+                }
+                /* event concerns a file inside a watched directory */
+                else{
+                    /* for modem reset */
+                    if(strstr(event->name, wd_array[i].cmp) && (strstr(event->name, "apimr.txt" ) ||strstr(event->name, "mreset.txt" ) )){
+
+                        process_modem_reset_event(wd_array[i].filename, wd_array[i].eventname, event->name, files);
+                        break;
+                    }
+                    /* for modem crash */
+                    else if(strstr(event->name, wd_array[i].cmp) && strstr(event->name, "mpanic.txt" )){
+
+                        process_modem_crash_event(wd_array[i].filename, wd_array[i].eventname, event->name, files);
+                        break;
+                    }
+                    /* for full dropbox */
+                    else if(strstr(event->name, wd_array[i].cmp) && (strstr(event->name, ".lost" ))){
+
+                        process_full_dropbox_event(event->name, files);
+                        break;
+                    }
+                    /* for hprof */
+                    else if(strstr(event->name, wd_array[i].cmp) && (strstr(event->name, ".hprof" ))){
+
+                        process_hprof_event(wd_array[i].filename, event->name, files);
+                        break;
+                    }
+                    /* for cmd */
+                    else if((strcmp(wd_array[i].eventname, CMDTRIGGER)==0) && (strstr(event->name, "_cmd" ))){
+
+                        process_command(wd_array[i].filename, event->name);
+                        break;
+                    }
+                    /* for aplog and bz trigger */
+                    else if((strcmp(wd_array[i].eventname, APLOGTRIGGER)==0) && (strstr(event->name, "_trigger" ))){
+
+                        process_aplog_and_bz_trigger(wd_array[i].filename, event->name, files);
+                        break;
+                    }
+                    /* for STATS trigger */
+                    else if((strcmp(wd_array[i].eventname,STATSTRIGGER)==0) && (strstr(event->name, "_trigger" ))){
+
+                        process_stats_trigger(wd_array[i].filename, event->name, files);
+                        break;
+                    }
+                    /* for INFO & ERROR (using STATS watcher) */
+                    else if((strcmp(wd_array[i].eventname,STATSTRIGGER)==0) && ((strstr(event->name, "_infoevent" )) || (strstr(event->name, "_errorevent" )))){
+
+                        process_info_and_error(wd_array[i].filename, event->name, files);
+                        break;
+                    }
+                    /* for anr and UIwatchdog */
+                    else if (strstr(event->name, wd_array[i].cmp) && ( strstr(event->name, "anr") || strstr(event->name, "system_server_watchdog"))) {
+
+                        process_anr_and_uiwatchdog_events(wd_array[i].filename, wd_array[i].eventname, event->name, files, file_monitor_fd, key);
+
+                        //manage consecutive anr dumpstates: not null returned event key means an anr dumpstate has been launched
+                        if (key [0] != '\0' ) {
+                            strcpy(current_key[index_prod],key);
+                            index_prod = (index_prod + 1) % 2;
                         }
                         break;
                     }
-                    /* event concerns a file inside a watched directory */
-                    else{
-                        /* for modem reset */
-                        if(strstr(event->name, wd_array[i].cmp) && (strstr(event->name, "apimr.txt" ) ||strstr(event->name, "mreset.txt" ) )){
+                    /* for other case */
+                    else if (strstr(event->name, wd_array[i].cmp)) {
 
-                            process_modem_reset_event(wd_array[i].filename, wd_array[i].eventname, event->name, files);
-                            break;
+                        process_generic_events(wd_array[i].filename, wd_array[i].eventname, event->name, files, file_monitor_fd, key);
+
+                        //manage consecutive dumpstates: not null returned event key means a dumpstate has been launched
+                        if (key [0] != '\0' ) {
+                            strcpy(current_key[index_prod],key);
+                            index_prod = (index_prod + 1) % 2;
                         }
-                        /* for modem crash */
-                        else if(strstr(event->name, wd_array[i].cmp) && strstr(event->name, "mpanic.txt" )){
-
-                            process_modem_crash_event(wd_array[i].filename, wd_array[i].eventname, event->name, files);
-                            break;
-                        }
-                        /* for full dropbox */
-                        else if(strstr(event->name, wd_array[i].cmp) && (strstr(event->name, ".lost" ))){
-
-                            process_full_dropbox_event(event->name, files);
-                            break;
-                        }
-                        /* for hprof */
-                        else if(strstr(event->name, wd_array[i].cmp) && (strstr(event->name, ".hprof" ))){
-
-                            process_hprof_event(wd_array[i].filename, event->name, files);
-                            break;
-                        }
-                        /* for cmd */
-                        else if((strcmp(wd_array[i].eventname, CMDTRIGGER)==0) && (strstr(event->name, "_cmd" ))){
-                            process_command(wd_array[i].filename, event->name);
-                            break;
-                        }
-                        /* for aplog and bz trigger */
-                        else if((strcmp(wd_array[i].eventname, APLOGTRIGGER)==0) && (strstr(event->name, "_trigger" ))){
-
-                            process_aplog_and_bz_trigger(wd_array[i].filename, event->name, files);
-                            break;
-                        }
-                        /* for STATS trigger */
-                        else if((strcmp(wd_array[i].eventname,STATSTRIGGER)==0) && (strstr(event->name, "_trigger" ))){
-
-                            process_stats_trigger(wd_array[i].filename, event->name, files);
-                            break;
-                        }
-                        /* for INFO & ERROR (using STATS watcher) */
-                        else if((strcmp(wd_array[i].eventname,STATSTRIGGER)==0) && ((strstr(event->name, "_infoevent" )) || (strstr(event->name, "_errorevent" )))){
-
-                            process_info_and_error(wd_array[i].filename, event->name, files);
-                            break;
-                        }
-                        /* for anr and UIwatchdog */
-                        else if (strstr(event->name, wd_array[i].cmp) && ( strstr(event->name, "anr") || strstr(event->name, "system_server_watchdog"))) {
-
-                            process_anr_and_uiwatchdog_events(wd_array[i].filename, wd_array[i].eventname, event->name, files, fd, key);
-
-                            //manage consecutive anr dumpstates: not null returned event key means an anr dumpstate has been launched
-                            if (key [0] != '\0' ) {
-                                strcpy(current_key[index_prod],key);
-                                index_prod = (index_prod + 1) % 2;
-                            }
-                            break;
-                        }
-                        /* for other case */
-                        else if (strstr(event->name, wd_array[i].cmp)) {
-
-                            process_generic_events(wd_array[i].filename, wd_array[i].eventname, event->name, files, fd, key);
-
-                            //manage consecutive dumpstates: not null returned event key means a dumpstate has been launched
-                            if (key [0] != '\0' ) {
-                                strcpy(current_key[index_prod],key);
-                                index_prod = (index_prod + 1) % 2;
-                            }
-                            break;
-                        }
+                        break;
                     }
                 }
-                if(event->len && !strncmp(event->name, "dropbox-", 8) && (i==WDCOUNT)){
-                    //dumpstate is done so remove the watcher
-                    inotify_rm_watch(fd, event->wd);
-                    notify_crash_to_upload(current_key[index_cons]);
-                    index_cons = (index_cons + 1) % 2;
-                }
             }
-            tmp_len = sizeof(struct inotify_event) + event->len;
-            event = (struct inotify_event *)(offset + tmp_len);
-            offset += tmp_len;
+            if(event->len && !strncmp(event->name, "dropbox-", 8) && (i==WDCOUNT)){
+                //dumpstate is done so remove the watcher
+                inotify_rm_watch(file_monitor_fd, event->wd);
+                notify_crash_to_upload(current_key[index_cons]);
+                index_cons = (index_cons + 1) % 2;
+            }
         }
-
+        tmp_len = sizeof(struct inotify_event) + event->len;
+        event = (struct inotify_event *)(offset + tmp_len);
+        offset += tmp_len;
     }
 
     return 0;
+}
+
+/**
+ * @brief crashlogd monitor loop function which wait for events.
+ *
+ * It intializes the different event sources, register them
+ * (FD_SET()), wait for events (select()) and finally handle the
+ * processing of each source (FD_ISSET()).
+ *
+ * Each source of event should provide 3 functions to be monitored :
+ *  @li <src>_init() initialize the source
+ *  @li <src>_get_fd() return a file descriptor which represent the new event trigger
+ *  @li <src>_handle() to call when an event on the source is detected
+ *
+ * @param files nb max of logs destination directories (crashlog,
+ * aplogs, bz... )
+ * @return -1 if the loop exit, meaning that something went wrong before
+ */
+static int do_monitor(unsigned int files)
+{
+    fd_set read_fds; /**< file descriptor set watching data availability from sources */
+    int max = 0; /**< select max fd value +1 {@see man select(2) nfds} */
+    int select_result; /**< select result */
+
+    file_monitor_init();
+
+    for(;;) {
+
+        // Clear fd set
+        FD_ZERO(&read_fds);
+
+        // File monitor fd setup
+        if (file_monitor_get_fd() > 0) {
+            FD_SET(file_monitor_get_fd(), &read_fds);
+            if (file_monitor_get_fd() > max)
+                max = file_monitor_get_fd();
+        }
+
+        // Wait for events
+        select_result = select(max+1, &read_fds, NULL, NULL, NULL);
+
+        if (select_result == -1 && errno == EINTR) // Interrupted, need to recycle
+            continue;
+
+        // Result processing
+        if (select_result > 0) {
+
+            // File monitor
+            if (FD_ISSET(file_monitor_get_fd(), &read_fds)) {
+                file_monitor_handle(files);
+            }
+        }
+    }
+
+    LOGE("Exiting main monitor loop");
+    return -1;
 }
 
 void check_running_logs_service()
@@ -3469,8 +3570,9 @@ next2:
         LOGE("pthread_create error");
         return -1;
     }
-    do_crashlogd(files);
 
-    return 0;
+    monitor_crashenv();
+    check_crashlog_dead();
 
+    return do_monitor(files);
 }
