@@ -101,6 +101,7 @@
 #define PROP_CRASH "persist.service.crashlog.enable"
 #define PROP_PROFILE "persist.service.profile.enable"
 #define PROP_COREDUMP "persist.core.enabled"
+#define PROP_CRASH_MODE "persist.sys.crashlogd.mode"
 #define PROP_ANR_USERSTACK "persist.anr.userstack.disabled"
 #define PROP_APLOG_DEPTH "persist.crashreport.aplogdepth"
 #define PROP_APLOG_NB_PACKET "persist.crashreport.packet"
@@ -199,6 +200,8 @@ int loop_uptime_event = 1;
 int test_flag = 0;
 int index_cons = 0;
 int WDCOUNT_START = 0;
+// global variable to abort a clean procedure
+int abort_clean_sd = 0;
 
 static int do_mv(char *src, char *des)
 {
@@ -444,13 +447,12 @@ static int remove_folder(char* path)
         while ((de = readdir(d)) != 0) {
            if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, ".."))
                continue;
-           else {
-               snprintf(spath, sizeof(spath)-1,  "%s/%s", path, de->d_name);
-               remove(spath);
-           }
+           snprintf(spath, sizeof(spath)-1,  "%s/%s", path, de->d_name);
+           if (remove(spath) < 0)
+               LOGE("Unable to remove %s", spath);
         }
+        closedir(d);
     }
-    closedir(d);
     int status = rmdir(path);
     return status;
 }
@@ -1072,32 +1074,6 @@ static int del_file_more_lines(char *fn)
     return 0;
 }
 
-static void sdcard_exist(void)
-{
-    struct stat info;
-
-    if ((stat(SDCARD_LOGS_DIR, &info) == 0) && (opendir(SDCARD_LOGS_DIR))){
-        CRASH_DIR = SDCARD_CRASH_DIR;
-        STATS_DIR = SDCARD_STATS_DIR;
-        APLOGS_DIR = SDCARD_APLOGS_DIR;
-        BZ_DIR = SDCARD_BZ_DIR;
-    } else {
-        mkdir(SDCARD_LOGS_DIR, 0777);
-        if ((stat(SDCARD_LOGS_DIR, &info) == 0) && (opendir(SDCARD_LOGS_DIR))){
-            CRASH_DIR = SDCARD_CRASH_DIR;
-            STATS_DIR = SDCARD_STATS_DIR;
-            APLOGS_DIR = SDCARD_APLOGS_DIR;
-            BZ_DIR = SDCARD_BZ_DIR;
-        } else {
-            CRASH_DIR = EMMC_CRASH_DIR;
-            STATS_DIR = EMMC_STATS_DIR;
-            APLOGS_DIR = EMMC_APLOGS_DIR;
-            BZ_DIR = EMMC_BZ_DIR;
-        }
-    }
-    return;
-}
-
 static void restart_profile1_srv(void)
 {
     char value[PROPERTY_VALUE_MAX];
@@ -1400,9 +1376,41 @@ void check_crashlog_dead()
 }
 
 #define CRASH_MODE 0
-#define STATS_MODE 1
-#define APLOGS_MODE 2
-#define BZ_MODE 3
+#define CRASH_MODE_NOSD 1
+#define STATS_MODE 2
+#define APLOGS_MODE 3
+#define BZ_MODE 4
+static void sdcard_available(int mode)
+{
+    struct stat info;
+    char value[PROPERTY_VALUE_MAX];
+
+    CRASH_DIR = EMMC_CRASH_DIR;
+    STATS_DIR = EMMC_STATS_DIR;
+    APLOGS_DIR = EMMC_APLOGS_DIR;
+    BZ_DIR = EMMC_BZ_DIR;
+
+    property_get(PROP_CRASH_MODE, value, "");
+    if ((!strncmp(value, "lowmemory", 9)) || (mode == CRASH_MODE_NOSD))
+        return;
+
+    if ((stat(SDCARD_LOGS_DIR, &info) == 0) && (opendir(SDCARD_LOGS_DIR))){
+        CRASH_DIR = SDCARD_CRASH_DIR;
+        STATS_DIR = SDCARD_STATS_DIR;
+        APLOGS_DIR = SDCARD_APLOGS_DIR;
+        BZ_DIR = SDCARD_BZ_DIR;
+    } else {
+        mkdir(SDCARD_LOGS_DIR, 0777);
+        if ((stat(SDCARD_LOGS_DIR, &info) == 0) && (opendir(SDCARD_LOGS_DIR))){
+            CRASH_DIR = SDCARD_CRASH_DIR;
+            STATS_DIR = SDCARD_STATS_DIR;
+            APLOGS_DIR = SDCARD_APLOGS_DIR;
+            BZ_DIR = SDCARD_BZ_DIR;
+        }
+    }
+    return;
+}
+
 static unsigned int find_dir(unsigned int max, int mode)
 {
     struct stat sb;
@@ -1414,10 +1422,11 @@ static unsigned int find_dir(unsigned int max, int mode)
     struct stat st;
     char *dir;
 
-    sdcard_exist();
+    sdcard_available(mode);
 
     switch(mode){
     case CRASH_MODE:
+    case CRASH_MODE_NOSD:
         snprintf(path, sizeof(path), CRASH_CURRENT_LOG);
         break;
     case APLOGS_MODE:
@@ -1437,7 +1446,7 @@ static unsigned int find_dir(unsigned int max, int mode)
             LOGE("can not open file: %s\n", path);
             goto out_err;
         }
-        if (fscanf(fd, "%d", &i)==EOF) {
+        if (fscanf(fd, "%4d", &i)==EOF) {
             i = 0;
         }
         fclose(fd);
@@ -1448,7 +1457,7 @@ static unsigned int find_dir(unsigned int max, int mode)
             LOGE("can not open file: %s\n", path);
              goto out_err;
         }
-        fprintf(fd, "%d", (i % max));
+        fprintf(fd, "%4d", (i % max));
         fclose(fd);
     } else {
         if (errno == ENOENT){
@@ -1465,12 +1474,13 @@ static unsigned int find_dir(unsigned int max, int mode)
             goto out_err;
         }
         oldest = 0;
-        fprintf(fd, "%d", 1);
+        fprintf(fd, "%4d", 1);
         fclose(fd);
     }
 
     /* we didn't find an available file, so we clobber the oldest one */
     switch(mode){
+    case CRASH_MODE_NOSD:
     case CRASH_MODE:
         dir = CRASH_DIR;
         break;
@@ -1562,7 +1572,7 @@ static int do_screenshot_copy(char* bz_description, char* bzdir){
     FILE *fd1;
     struct stat info;
     int bz_num = 0;
-    int screenshot_len;
+    unsigned int screenshot_len;
 
     if (stat(bz_description, &info) < 0)
         return -1;
@@ -1578,19 +1588,21 @@ static int do_screenshot_copy(char* bz_description, char* bzdir){
             if (strstr(buffer,SCREENSHOT_PATTERN)){
                 //Compute length of screenshot path
                 screenshot_len = strlen(buffer) - strlen(SCREENSHOT_PATTERN);
-                //Copy file path
-                strncpy(screenshot, buffer+strlen(SCREENSHOT_PATTERN), screenshot_len);
-                //If last character is '\n' replace it by '\0'
-                if((screenshot > 0) && (screenshot[screenshot_len-1]) == '\n')
-                    screenshot_len--;
-                screenshot[screenshot_len]= '\0';
+                if ((screenshot_len > 0) && (screenshot_len < sizeof(screenshot))) {
+                    //Copy file path
+                    strncpy(screenshot, buffer+strlen(SCREENSHOT_PATTERN), screenshot_len);
+                    //If last character is '\n' replace it by '\0'
+                    if ((screenshot[screenshot_len-1]) == '\n')
+                        screenshot_len--;
+                    screenshot[screenshot_len]= '\0';
 
-                if(bz_num == 0)
-                    snprintf(destion,sizeof(destion),"%s/bz_screenshot.png", bzdir);
-                else
-                    snprintf(destion,sizeof(destion),"%s/bz_screenshot%d.png", bzdir, bz_num);
-                bz_num++;
-                do_copy(screenshot,destion,0);
+                    if(bz_num == 0)
+                        snprintf(destion,sizeof(destion),"%s/bz_screenshot.png", bzdir);
+                    else
+                        snprintf(destion,sizeof(destion),"%s/bz_screenshot%d.png", bzdir, bz_num);
+                    bz_num++;
+                    do_copy(screenshot,destion,0);
+                }
             }
         }
     }
@@ -1599,6 +1611,90 @@ static int do_screenshot_copy(char* bz_description, char* bzdir){
         fclose(fd1);
 
     return 0;
+}
+
+static int find_str_in_file(char *file, char *keyword, char *tail)
+{
+    char buffer[4*1024];
+    int rc = 0;
+    FILE *fd1;
+    struct stat info;
+    int brtw, brtr;
+    char *p;
+    int filelen,tmp,stringlen,buflen;
+
+    if (stat(file, &info) < 0)
+        return -1;
+
+    if (keyword == NULL)
+        return -1;
+
+    fd1 = fopen(file,"r");
+    if(fd1 == NULL){
+        LOGE("can not open file: %s\n", file);
+        goto out_err;
+    }
+    while(!feof(fd1)){
+        if (fgets(buffer, sizeof(buffer), fd1) != NULL){
+            if (keyword && strstr(buffer,keyword)){
+                if (!tail){
+                    rc = 0;
+                    goto out;
+                } else{
+                    int buflen = strlen(buffer);
+                    int str2len = strlen(tail);
+                    if ((buflen > str2len) && (!strncmp(&(buffer[buflen-str2len-1]), tail, strlen(tail)))){
+                        rc = 0;
+                        goto out;
+                    }
+                }
+            }
+        }
+    }
+
+out_err:
+    rc = -1;
+out:
+    if (fd1 != NULL)
+        fclose(fd1);
+
+    return rc;
+}
+
+/*
+* Name          : clean_crashlog_in_sd
+* Description   : clean legacy crash log folder
+* Parameters    :
+*   char *dir_to_search       -> name of the folder
+*   int max                   -> max number of folder to remove*/
+static void clean_crashlog_in_sd(char *dir_to_search, int max)
+{
+    char path[PATHMAX];
+    DIR *d;
+    struct dirent* de;
+    int i = 0;
+
+    d = opendir(dir_to_search);
+    if (d) {
+        while ((de = readdir(d))) {
+            const char *name = de->d_name;
+            snprintf(path, sizeof(path)-1, "%s/%s", dir_to_search, name);
+            if ((strstr(path, SDCARD_CRASH_DIR) ||
+               (strstr(path, SDCARD_STATS_DIR)) ||
+               (strstr(path, SDCARD_APLOGS_DIR)) ||
+               (strstr(path, SDCARD_BZ_DIR))))
+                if (find_str_in_file(HISTORY_FILE, path, NULL)) {
+                    if  (remove_folder(path) < 0)
+                        LOGE("failed to remove folder %s", path);
+                    i++;
+                    if (i >= max)
+                       break;
+                }
+            }
+            closedir(d);
+    }
+    // abort clean of legacy log folder when there is no more folders expect the ones in history_event
+    abort_clean_sd = (i < max);
 }
 
 /*
@@ -1855,7 +1951,7 @@ void process_full_dropbox_event(char *name,  unsigned int files) {
     get_formated_times(date_tmp,date_tmp_2);
     compute_key(key, CRASHEVENT, lostevent);
 
-    dir = find_dir(files,CRASH_MODE);
+    dir = find_dir(files,CRASH_MODE_NOSD);
     if (dir == -1) {
         LOGE("find dir %d for lost dropbox failed\n", files);
         LOGE("%-8s%-22s%-20s%s\n", CRASHEVENT, key, date_tmp_2, lostevent);
@@ -2401,6 +2497,8 @@ void process_uptime(char *eventname) {
             write(fd1,destion,strlen(destion));
             close(fd1);
         }
+        if (!abort_clean_sd)
+            clean_crashlog_in_sd(SDCARD_LOGS_DIR, 10);
         /*Update event every 12 hours*/
         if ((hours / UPTIME_HOUR_FREQUENCY) >= loop_uptime_event) {
 
@@ -2602,54 +2700,6 @@ void do_timeup()
         else
             close(fd);
     }
-}
-
-static int find_str_in_file(char *file, char *keyword, char *tail)
-{
-    char buffer[4*1024];
-    int rc = 0;
-    FILE *fd1;
-    struct stat info;
-    int brtw, brtr;
-    char *p;
-    int tmp,stringlen,buflen;
-
-    if (stat(file, &info) < 0)
-        return -1;
-
-    if (keyword == NULL)
-        return -1;
-
-    fd1 = fopen(file,"r");
-    if(fd1 == NULL){
-        LOGE("can not open file: %s\n", file);
-        goto out_err;
-    }
-    while(!feof(fd1)){
-        if (fgets(buffer, sizeof(buffer), fd1) != NULL){
-            if (keyword && strstr(buffer,keyword)){
-                if (!tail){
-                    rc = 0;
-                    goto out;
-                } else{
-                    int buflen = strlen(buffer);
-                    int str2len = strlen(tail);
-                    if ((buflen > str2len) && (!strncmp(&(buffer[buflen-str2len-1]), tail, strlen(tail)))){
-                        rc = 0;
-                        goto out;
-                    }
-                }
-            }
-        }
-    }
-
-out_err:
-    rc = -1;
-out:
-    if (fd1 != NULL)
-        fclose(fd1);
-
-    return rc;
 }
 
 struct fabric_type {
@@ -3012,7 +3062,7 @@ static void reset_crashlog(void)
         LOGE("can not open file: %s\n", path);
         return;
     }
-    fprintf(fd, "%d", 0);
+    fprintf(fd, "%4d", 0);
     fclose(fd);
 }
 
@@ -3047,7 +3097,7 @@ static void reset_statslog(void)
         LOGE("can not open file: %s\n", path);
         return;
     }
-    fprintf(fd, "%d", 0);
+    fprintf(fd, "%4d", 0);
     fclose(fd);
 }
 
@@ -3061,7 +3111,7 @@ static void reset_aplogslog(void)
         LOGE("can not open file: %s\n", path);
         return;
     }
-    fprintf(fd, "%d", 0);
+    fprintf(fd, "%4d", 0);
     fclose(fd);
 }
 
@@ -3075,7 +3125,7 @@ static void reset_bzlog(void)
         LOGE("can not open file: %s\n", path);
         return;
     }
-    fprintf(fd, "%d", 0);
+    fprintf(fd, "%4d", 0);
     fclose(fd);
 }
 static void reset_swupdate(void)
@@ -3180,6 +3230,7 @@ static void read_startupreason(char *startupreason)
         }
     }
 }
+
 static void update_logs_permission(void)
 {
     char value[PROPERTY_VALUE_MAX] = "0";
@@ -3278,7 +3329,7 @@ int main(int argc, char **argv)
     }
     read_proc_uid(PROC_UUID, LOG_UUID, uuid, "Medfield");
 
-    sdcard_exist();
+    sdcard_available(CRASH_MODE);
 
     // check startup reason and sw update
     char startupreason[32] = { '\0', };
