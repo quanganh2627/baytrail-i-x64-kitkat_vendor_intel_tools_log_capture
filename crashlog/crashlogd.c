@@ -103,6 +103,7 @@
 #define PROP_COREDUMP "persist.core.enabled"
 #define PROP_CRASH_MODE "persist.sys.crashlogd.mode"
 #define PROP_ANR_USERSTACK "persist.anr.userstack.disabled"
+#define PROP_IPANIC_PATTERN "persist.crashlogd.panic.pattern"
 #define PROP_APLOG_DEPTH "persist.crashreport.aplogdepth"
 #define PROP_APLOG_NB_PACKET "persist.crashreport.packet"
 #define PROP_APLOG_DEPTH_DEF "5"
@@ -2033,16 +2034,17 @@ void process_aplog_and_bz_trigger(char *filename, char *name,  unsigned int file
     if (nbPacket < 0)
         nbPacket = 0;
 
-    //if a value is specified inside trigger file, it overrides property value
-    snprintf(path, sizeof(path),"%s/%s", filename, name);
-    if ((!stat(path, &sb))) {
-        if (!get_str_in_file(path,"APLOG=", tmp, sizeof(tmp))) {
-            aplogDepth = atoi(tmp);
-            nbPacket = 1;
+    if (filename) {
+        //if a value is specified inside trigger file, it overrides property value
+        snprintf(path, sizeof(path),"%s/%s", filename, name);
+        if ((!stat(path, &sb))) {
+            if (!get_str_in_file(path,"APLOG=", tmp, sizeof(tmp))) {
+                aplogDepth = atoi(tmp);
+                nbPacket = 1;
+            }
         }
+        LOGI("received trigger file %s for aplog or bz", path);
     }
-
-    LOGI("received trigger file %s for aplog or bz", path);
     int j,k;
     aplogIsPresent = 0;
     dir = -1;
@@ -2110,7 +2112,8 @@ void process_aplog_and_bz_trigger(char *filename, char *name,  unsigned int file
             history_file_write(APLOGEVENT, APLOGTRIGGER, NULL, destion, NULL, key, date_tmp_2);
             del_file_more_lines(HISTORY_FILE);
             notify_crashreport();
-            restart_profile2_srv();
+            if (filename)
+                restart_profile2_srv();
         }
         if(aplogIsPresent == 0)
             break;
@@ -2137,8 +2140,10 @@ void process_aplog_and_bz_trigger(char *filename, char *name,  unsigned int file
     }
 
     /*delete trigger file*/
-    snprintf(path, sizeof(path),"%s/%s",filename,name);
-    remove(path);
+    if (filename) {
+        snprintf(path, sizeof(path),"%s/%s",filename,name);
+        remove(path);
+    }
     return;
 }
 
@@ -2702,6 +2707,47 @@ void do_timeup()
     }
 }
 
+/*
+* Name          : check_aplogs_tobackup
+* Description   : backup a number of aplogs if a patten is found in a file
+* Parameters    :
+*   char *filename        -> filename where a pattern is searched
+*   unsigned int files    -> nb max of logs destination directories (crashlog, aplogs, bz... )*/
+
+static void check_aplogs_tobackup(char *filename, unsigned int files)
+{
+    int size;
+    char *p, *p1;
+    char filter[64]= "EIP is at ";
+    char pattern[PROPERTY_VALUE_MAX] = "0";
+
+    if (property_get(PROP_IPANIC_PATTERN, pattern, "") <= 0) {
+          strncpy(pattern, "SGXInitialise", sizeof(pattern));
+    }
+    strncat(pattern, ";", PROPERTY_VALUE_MAX);
+
+    p = pattern;
+
+    do {
+        p1 = strchr(p, ';');
+        size = 0;
+        if (p1) {
+           filter[10] = '\0';
+           size = p1 - p;
+           if ((size > 0) && ((unsigned int) size < (sizeof(filter)-10))) {
+                memcpy(filter + 10, p, size);
+                filter[10 + size] = '\0';
+                if (!find_str_in_file(filename, filter, NULL)) {
+                  process_aplog_and_bz_trigger(NULL, "aplog_trigger", files);
+                  break;
+                }
+           }
+           p = ++p1;
+        }
+    } while (size > 0);
+    return;
+}
+
 struct fabric_type {
     char *keyword;
     char *tail;
@@ -2840,7 +2886,12 @@ static int crashlog_check_panic(char *reason, unsigned int files)
         LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, date_tmp_2, crashtype, destion);
         history_file_write(CRASHEVENT, crashtype, NULL, destion, NULL, key, date_tmp_2);
         del_file_more_lines(HISTORY_FILE);
-    }
+
+        // if a pattern is found in the console file, upload a large number of aplogs
+        // property persist.crashlogd.panic.pattern is used to fill the list of pattern
+        // Each pattern is split by a semicolon in the property
+        check_aplogs_tobackup(SAVED_CONSOLE_NAME, files);
+       }
     return 0;
 }
 
