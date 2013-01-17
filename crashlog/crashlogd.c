@@ -2837,7 +2837,8 @@ static int crashlog_check_panic(char *reason, unsigned int files)
 
     if ((stat(CURRENT_PANIC_CONSOLE_NAME, &info) == 0) || (test_flag == 1)) {
 
-        if (!find_str_in_file(SAVED_CONSOLE_NAME, "Kernel panic - not syncing: Kernel Watchdog", NULL)) {
+        if ((!find_str_in_file(SAVED_CONSOLE_NAME, "Kernel panic - not syncing: Kernel Watchdog", NULL)) ||
+          (!find_str_in_file(SAVED_CONSOLE_NAME, "EIP is at pmu_sc_irq", NULL))) {
             strcpy(crashtype, KERNEL_FORCE_CRASH);
         } else if (!find_str_in_file(SAVED_CONSOLE_NAME, "EIP is at panic_dbg_set", NULL)  || !find_str_in_file(SAVED_CONSOLE_NAME, "EIP is at kwd_trigger_open", NULL)) {
             if (!strncmp(reason, "SWWDT_RESET", 11))
