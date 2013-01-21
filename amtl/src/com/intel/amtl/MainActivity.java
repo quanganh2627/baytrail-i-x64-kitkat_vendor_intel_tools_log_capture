@@ -35,6 +35,7 @@
  * 2.2.2  - 2012-12-20 - BZ 41081 - Configuration of MTS via Android properties
  * 2.2.3  - 2012-12-20 - BZ 63993 - Modifications to handle logging over HSI
  * 2.2.4  - 2013-01-10 - BZ 79656 - Enable bplogs in coredump for redhookbay
+ * 2.2.5  - 2013-01-18 - BZ 77175 - REVERT ME: Disable logging via HSI
  * ============================================================================
  */
 
@@ -205,7 +206,17 @@ public class MainActivity extends Activity {
             @Override
             public void onClick(View v) {
                 if (button_ape_log_file_hsi.isChecked()) {
-                    setCfg(PredefinedCfg.OFFLINE_BP_LOG);
+                    /* to be uncommented once logging over HSI is implemented */
+                    // setCfg(PredefinedCfg.OFFLINE_BP_LOG);
+                    /* to be removed once logging over HSI is implemented */
+                    if (!AmtlCore.usbAcmEnabled) {
+                        setCfg(PredefinedCfg.OFFLINE_BP_LOG);
+                    } else {
+                        UIHelper.message_pop_up(MainActivity.this, "Feature not available",
+                                "Logging via HSI isn't available yet."
+                                + "\nPlease use offline BP logging via USB instead.");
+                        button_ape_log_file_hsi.setChecked(false);
+                    }
                 } else {
                     /* If user presses again on button_ape_log_file_hsi, traces are stopped */
                     setCfg(PredefinedCfg.TRACE_DISABLE);

@@ -94,9 +94,16 @@ public class SettingsActivity extends Activity {
         }
         button_trace_size_large.setEnabled(true);
         button_trace_size_large.setChecked(true);
-        button_offline_logging_hsi.setEnabled(true);
-        button_offline_logging_hsi.setChecked(true);
+        /* to be uncommented when logging over HSI is working */
+        // button_offline_logging_hsi.setEnabled(true);
+        // button_offline_logging_hsi.setChecked(true);
+        // button_offline_logging_usb.setEnabled(AmtlCore.usbAcmEnabled);
+        /* to be removed when logging over HSI is working */
+        button_offline_logging_hsi.setEnabled(!AmtlCore.usbAcmEnabled);
+        button_offline_logging_hsi.setChecked(!AmtlCore.usbAcmEnabled);
         button_offline_logging_usb.setEnabled(AmtlCore.usbAcmEnabled);
+        button_offline_logging_usb.setChecked(AmtlCore.usbAcmEnabled);
+
         button_level_bb_3g.setChecked((cfg.traceLevel == CustomCfg.TRACE_LEVEL_NONE) ||
             (cfg.traceLevel == CustomCfg.TRACE_LEVEL_BB_3G));
     }
