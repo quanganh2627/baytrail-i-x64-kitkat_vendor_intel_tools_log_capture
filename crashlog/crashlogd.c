@@ -121,7 +121,6 @@
 #define MAX_DIR 1000
 #define PERM_USER "system"
 #define PERM_GROUP "log"
-#define HISTORY_FILE_DIR  "/logs"
 #define HISTORY_CORE_DIR  "/logs/core"
 #define LOGS_MODEM_DIR  "/logs/modemcrash"
 #define LOGS_GPS_DIR  "/logs/gps"
@@ -141,8 +140,10 @@
 #define SDCARD_APLOGS_DIR "/mnt/sdcard/logs/aplogs"
 #define EMMC_APLOGS_DIR "/logs/aplogs"
 #define SDCARD_BZ_DIR "/mnt/sdcard/logs/bz"
+#define LOGS_DIR "/logs"
 #define EMMC_BZ_DIR "/logs/bz"
 #define LOGINFO_DIR "/logs/info/"
+#define DROPBOX_DIR "/data/system/dropbox"
 #define LOGRESERVED "/logs/reserved"
 #define BZ_CURRENT_LOG "/logs/currentbzlog"
 #define CRASH_CURRENT_LOG "/logs/currentcrashlog"
@@ -171,6 +172,13 @@
 #define LOGCAT_NAME "emmc_ipanic_logcat"
 #define FABRIC_ERROR_NAME "ipanic_fabric_err"
 #define CRASHFILE_NAME "crashfile"
+#define ANR_DUPLICATE_INFOERROR "anr_duplicate_infoevent"
+#define JAVACRASH_DUPLICATE_INFOERROR "javacrash_duplicate_infoevent"
+#define UIWDT_DUPLICATE_INFOERROR "uiwdt_duplicate_infoevent"
+#define ANR_DUPLICATE_DATA "anr_duplicate_data.txt"
+#define JAVACRASH_DUPLICATE_DATA "javacrash_duplicate_data.txt"
+#define UIWDT_DUPLICATE_DATA "uiwdt_duplicate_data.txt"
+
 
 #define MODEM_SHUTDOWN_TRIGGER "/logs/modemcrash/mshutdown.txt"
 #define SCREENSHOT_PATTERN "SCREENSHOT="
@@ -187,6 +195,16 @@
 
 #define TIME_FORMAT_1 "%Y%m%d%H%M%S"
 #define TIME_FORMAT_2 "%Y-%m-%d/%H:%M:%S  "
+
+//Define inotify mask values for watched directories
+#define DROPBOX_DIR_MASK IN_MOVED_TO|IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF|IN_MOVED_FROM
+#define TOMBSTONES_DIR_MASK IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF
+#define CORE_DIR_MASK IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF
+#define STATS_DIR_MASK IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF
+#define APLOGS_DIR_MASK IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF
+#define UPTIME_FILE_MASK IN_CLOSE_WRITE
+#define MODEMCRASH_DIR_MASK IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF
+
 
 #define PRINT_TIME(var_tmp, format_time, local_time) { \
     strftime(var_tmp, 32, format_time, local_time);    \
@@ -876,7 +894,6 @@ static int history_file_updated(char *data, char* filters)
 
     if (!data)
         return 0;
-    
     cmd = filters;
     while (cmd) {
        char filter[64]={'\0'};
@@ -1170,27 +1187,54 @@ struct wd_name {
     char *cmp;
 };
 
+/**
+* @brief structure containing directories watched by crashlogd
+*
+* This structure contains every watched directories, with the itnotify mask value, and the associated
+* filename that should trigger a processing
+* note: a watched directory can only have one mask value
+*/
 struct wd_name wd_array[] = {
     /* -------------Warning: if table is updated, don't forget to update also WDCOUNT and WDCOUNT_START in main function--- */
-    {0, IN_MOVED_TO|IN_DELETE_SELF|IN_MOVE_SELF, SYSSERVER_WDT, "/data/system/dropbox", "system_server_watchdog"},
-    {0, IN_MOVED_TO|IN_DELETE_SELF|IN_MOVE_SELF, ANR_CRASH, "/data/system/dropbox", "anr"},
-    {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, TOMB_CRASH, "/data/tombstones", "tombstone"},
-    {0, IN_MOVED_TO|IN_DELETE_SELF|IN_MOVE_SELF, JAVA_CRASH, "/data/system/dropbox", "crash"},
-    {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, AP_COREDUMP ,"/logs/core", ".core"},
-    {0, IN_MOVED_TO|IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, LOST ,"/data/system/dropbox", ".lost"}, /* for full dropbox */
-    {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, HPROF, "/logs/core", ".hprof"},
-    {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, STATSTRIGGER, "/logs/stats", "_trigger"},
-    {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, APLOGTRIGGER, "/logs/aplogs", "_trigger"},
-    {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, CMDTRIGGER, "/logs/aplogs", "_cmd"},
+    {0, DROPBOX_DIR_MASK, SYSSERVER_WDT, DROPBOX_DIR, "system_server_watchdog"},
+    {0, DROPBOX_DIR_MASK, ANR_CRASH, DROPBOX_DIR, "anr"},
+    {0, TOMBSTONES_DIR_MASK, TOMB_CRASH, "/data/tombstones", "tombstone"},
+    {0, DROPBOX_DIR_MASK, JAVA_CRASH, DROPBOX_DIR, "crash"},
+    {0, CORE_DIR_MASK, AP_COREDUMP ,"/logs/core", ".core"},
+    {0, DROPBOX_DIR_MASK, LOST , DROPBOX_DIR, ".lost"}, /* for full dropbox */
+    {0, CORE_DIR_MASK, HPROF, "/logs/core", ".hprof"},
+    {0, STATS_DIR_MASK, STATSTRIGGER, "/logs/stats", "_trigger"},
+    {0, APLOGS_DIR_MASK, APLOGTRIGGER, "/logs/aplogs", "_trigger"},
+    {0, APLOGS_DIR_MASK, CMDTRIGGER, "/logs/aplogs", "_cmd"},
     /* -----------------------------above is dir, below is file------------------------------------------------------------ */
-    {0, IN_CLOSE_WRITE, CURRENT_UPTIME, "/logs/uptime", ""},
+    {0, UPTIME_FILE_MASK, CURRENT_UPTIME, "/logs/uptime", ""},
     /* -------------------------above is AP, below is modem---------------------------------------------------------------- */
-    {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, MODEM_CRASH ,"/logs/modemcrash", "mpanic.txt"},/*for modem crash */
-    {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, AP_INI_M_RST ,"/logs/modemcrash", "apimr.txt"},
-    {0, IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF, M_RST_WN_COREDUMP ,"/logs/modemcrash", "mreset.txt"},
+    {0, MODEMCRASH_DIR_MASK, MODEM_CRASH ,"/logs/modemcrash", "mpanic.txt"},/*for modem crash */
+    {0, MODEMCRASH_DIR_MASK, AP_INI_M_RST ,"/logs/modemcrash", "apimr.txt"},
+    {0, MODEMCRASH_DIR_MASK, M_RST_WN_COREDUMP ,"/logs/modemcrash", "mreset.txt"},
 };
 
+
 int WDCOUNT = ((int)(sizeof(wd_array)/sizeof(struct wd_name)));
+
+ /**
+ * @brief returns the watch descriptor of a watched directory declared in 'wd_name' array
+ *
+ * @param[in] dir_name : input directory path as declared to inotify watcher
+ *
+ * @retval returns the watch descriptor value the input directory is associated with (otherwise it returns -1)
+ */
+int get_watched_directory_wd( char *dir_name)
+{
+    int i;
+
+    for (i = WDCOUNT_START; i < WDCOUNT; i++) {
+        if (!strncmp( wd_array[i].filename, dir_name, sizeof(wd_array[i].filename)) ) {
+            return wd_array[i].wd;
+        }
+    }
+    return -1;
+}
 
 void prepare_anr_or_uiwdt(char *destion)
 {
@@ -2271,7 +2315,7 @@ void process_info_and_error(char *filename, char *name,  unsigned int files) {
     }else if (strstr(name, "_errorevent" )){
         snprintf(name_event,sizeof(name_event),"%s",ERROREVENT);
         snprintf(file_ext,sizeof(file_ext),"%s","_errorevent");
-    }else{ /* DEAD CODE?  */
+    }else{ /*Robustness*/
         LOGE("Unknown stats trigger file\n");
         return;
     }
@@ -2312,7 +2356,7 @@ void process_info_and_error(char *filename, char *name,  unsigned int files) {
     compute_key(key, name_event, tmp);
     /*create type */
     snprintf(tmp,sizeof(tmp),"%s",name);
-    // manage _ problem??
+    /*Set to upper case*/
     p = strstr(tmp,file_ext);
     if (p) {
         for (j=0;j<sizeof(type)-1;j++) {
@@ -2537,6 +2581,111 @@ void process_uptime(char *eventname) {
 }
 
 /**
+ * @brief Generates an INFO event from an input trigger file and input data
+ *
+ * This function generates an INFO event by creating an infoevent file (instead of
+ * using classical watcher mechanism) and filling it with input data (data0, data1 and data2)
+ *
+ * @param[in] filename : name of the infoevent file to create (shall contains "_infoevent" pattern)
+ * @param[in] data0 : string set to DATA0 field in the infoevent file created
+ * @param[in] data1 : string set to DATA1 field in the infoevent file created
+ * @param[in] data2 : string set to DATA2 field in the infoevent file created
+ */
+static void create_infoevent(char* filename, char* data0, char* data1, char* data2, unsigned int files)
+{
+    FILE *fp;
+    char fullpath[PATHMAX];
+
+    snprintf(fullpath, sizeof(fullpath)-1, "%s/%s", LOGS_DIR, filename);
+
+    fp = fopen(fullpath,"w");
+    if (fp == NULL)
+    {
+        LOGE("can not create file: %s\n", fullpath);
+        return;
+    }
+    //Fill DATA fields
+    if (data0 != NULL)
+        fprintf(fp,"DATA0=%s\n", data0);
+    if (data1 != NULL)
+        fprintf(fp,"DATA1=%s\n", data1);
+    if (data2 != NULL)
+        fprintf(fp,"DATA2=%s\n", data2);
+    fprintf(fp,"_END\n");
+    fclose(fp);
+
+    process_info_and_error(LOGS_DIR, filename, files);
+}
+
+ /**
+ * @brief allows to avoid processing a duplicate dropbox event as a real event
+ *
+ * This function allows to not process twice a same dropbox log file that
+ * has been only renamed (notably because of the DropBoxManager service)
+ *
+ * @param[in] event : current inotify event detected by the file system watcher
+ * @param[in] files : nb max of logs destination directories
+ *
+ * @retval -1 the input event is DUPLICATE and shall NOT be processed
+ * @retval 0 the input event shall be processed as usual
+ */
+static int manage_duplicate_dropbox_events(struct inotify_event *event, unsigned int files)
+{
+    static uint32_t previous_event_cookie = 0;
+    static char previous_filename[PATHMAX] = { '\0', };
+    char info_filename[PATHMAX] = { '\0',};
+    char destination[PATHMAX] = { '\0', };
+    char origin[PATHMAX] = { '\0', };
+    struct stat info;
+
+    //If a file is moved from the dropbox directory, it shall not be processed as an event
+    //but the inotify event cookie and name shall be saved
+    if (event->mask & IN_MOVED_FROM) {
+
+        previous_event_cookie = event->cookie;
+        strncpy(previous_filename, event->name, event->len);
+        return -1;
+    }
+    //If a log file is moved to the dropbox directory, it could be the log file previously moved from the dropbox so we check it
+    //note : we can reasonably assume kernel behaviour is reliable and then move events are always emitted as contiguous pairs
+    //with IN_MOVED_FROM immediately followed by IN_MOVED_TO
+    if ( (event->mask & IN_MOVED_TO) && (previous_event_cookie != 0) && (previous_event_cookie == event->cookie) && event->len) {
+
+        //the log file is temporaly copied from dropbox directory to /logs and is renamed
+        //so it could be detected and processed as an infoevent data
+        if (strstr(event->name, "anr")) {
+            snprintf(destination,sizeof(destination),"%s/%s", LOGS_DIR, ANR_DUPLICATE_DATA);
+            strcpy(info_filename, ANR_DUPLICATE_INFOERROR);
+        }
+        else if ( strstr(event->name, "system_server_watchdog") ) {
+            snprintf(destination,sizeof(destination),"%s/%s", LOGS_DIR, UIWDT_DUPLICATE_DATA);
+            strcpy(info_filename, UIWDT_DUPLICATE_INFOERROR);
+        }
+        else { //event->name contains "crash"
+            snprintf(destination,sizeof(destination),"%s/%s", LOGS_DIR, JAVACRASH_DUPLICATE_DATA);
+            strcpy(info_filename, JAVACRASH_DUPLICATE_INFOERROR);
+        }
+        snprintf(origin,sizeof(origin),"%s/%s", DROPBOX_DIR, event->name);
+
+        //manages compressed log file
+        if ( !strcmp(".gz", &origin[strlen(origin) - 3]) )
+            strcat(destination,".gz");
+
+        if((stat(origin, &info) == 0) && (info.st_size != 0))
+            do_copy(origin, destination, FILESIZE_MAX);
+
+        //Generates the INFO event with the previous and the current filename as DATA0 and DATA1
+        create_infoevent(info_filename, previous_filename, event->name, "update of timestamp in dropbox log file name", files);
+
+        //re-initialize variables for next event
+        previous_event_cookie = 0;
+        strcpy(previous_filename, "");
+        return -1;
+    }
+    return 0;
+}
+
+/**
  * File monitor module file descriptor
  */
 static int file_monitor_fd = -1;
@@ -2647,6 +2796,12 @@ static int file_monitor_handle(unsigned int files)
                 }
                 /* event concerns a file inside a watched directory */
                 else{
+                    /* for duplicate dropbox events : first managed before continuing nominal events processing*/
+                    if ( (event->wd == get_watched_directory_wd(DROPBOX_DIR)) && ( strstr(event->name, "anr") || strstr(event->name, "system_server_watchdog") || strstr(event->name, "crash"))) {
+                        //Check if this event shall be processed
+                        if (manage_duplicate_dropbox_events(event, files)!=0)
+                            break;
+                    }
                     /* for modem reset */
                     if(strstr(event->name, wd_array[i].cmp) && (strstr(event->name, "apimr.txt" ) ||strstr(event->name, "mreset.txt" ) )){
 
@@ -3428,7 +3583,7 @@ static void update_logs_permission(void)
 
     if (!strncmp(value, "1", 1)) {
         LOGI("Folders /logs and /logs/core set to 0777\n");
-        chmod(HISTORY_FILE_DIR,0777);
+        chmod(LOGS_DIR,0777);
         chmod(HISTORY_CORE_DIR,0777);
     }
 }
