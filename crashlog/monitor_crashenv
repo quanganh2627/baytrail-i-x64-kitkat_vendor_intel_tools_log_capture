@@ -8,6 +8,7 @@ if [ -f /logs/reserved ]; then
 fi
 /system/bin/date > /logs/info/infosystem.txt
 /system/bin/df >> /logs/info/infosystem.txt
+/system/bin/du -k /logs >> /logs/info/infosystem.txt
 /system/bin/cat /logs/history_event >> /logs/info/infosystem.txt
 /system/bin/chmod 0660 /logs/info/infosystem.txt
 /system/bin/chown system.log /logs/info/infosystem.txt

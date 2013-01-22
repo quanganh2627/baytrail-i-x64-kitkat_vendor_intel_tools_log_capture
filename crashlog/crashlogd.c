@@ -119,6 +119,7 @@
 #define HISTORY_FILE_DIR  "/logs"
 #define HISTORY_CORE_DIR  "/logs/core"
 #define LOGS_MODEM_DIR  "/logs/modemcrash"
+#define LOGS_GPS_DIR  "/logs/gps"
 #define APLOG_FILE_BOOT   "/logs/aplog_boot"
 #define APLOG_FILE_0        "/logs/aplog"
 #define APLOG_FILE_1    "/logs/aplog.1"
@@ -3183,6 +3184,7 @@ static void reset_swupdate(void)
 {
     reset_logs(HISTORY_CORE_DIR);
     reset_logs(LOGS_MODEM_DIR);
+    reset_logs(LOGS_GPS_DIR);
     remove(MODEM_UUID);
     reset_crashlog();
     reset_statslog();
