@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Amtl</string>
-    <string name="main_coredump_button">Enable BP traces in modem coredump</string>
+    <string name="main_coredump_button">Enable BP logs in modem coredump</string>
     <string name="main_ape_log_file_button_hsi">Enable offline BP logging via HSI</string>
     <string name="main_ape_log_file_button_usb">Enable offline BP logging via USB</string>
     <string name="main_online_bp_log_button">Enable online BP logging</string>

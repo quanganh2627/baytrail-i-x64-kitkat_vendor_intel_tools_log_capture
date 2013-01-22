@@ -51,6 +51,13 @@ public class ModemConfiguration {
     private static final String AT_SET_XSYSTRACE_LEVEL_BB = "at+xsystrace=0,\"bb_sw=1;3g_sw=0;digrf=0\",,\"oct=4\"\r\n";
     private static final String AT_SET_XSYSTRACE_LEVEL_BB_3G = "at+xsystrace=0,\"bb_sw=1;3g_sw=1;digrf=0\",,\"oct=4\"\r\n";
     private static final String AT_SET_XSYSTRACE_LEVEL_BB_3G_DIGRF = "at+xsystrace=0,\"digrf=1;bb_sw=1;3g_sw=1\",\"digrf=0x84\",\"oct=4\"\r\n";
+    /* XSYSTRACE AT commands for redhookbay when bplogs are enabled in coredump */
+    private static final String AT_SET_XSYSTRACE_LEVEL_BB_RED
+            = "at+xsystrace=0,\"bb_sw=1;3g_sw=0;digrf=0\",,\"oct=3\"\r\n";
+    private static final String AT_SET_XSYSTRACE_LEVEL_BB_3G_RED
+            = "at+xsystrace=0,\"bb_sw=1;3g_sw=1;digrf=0\",,\"oct=3\"\r\n";
+    private static final String AT_SET_XSYSTRACE_LEVEL_BB_3G_DIGRF_RED
+            = "at+xsystrace=0,\"digrf=1;bb_sw=1;3g_sw=1\",\"digrf=0x84\",\"oct=3\"\r\n";
 
     /* TRACE AT commands */
     private static final String AT_SET_TRACE_LEVEL_DISABLE = "at+trace=0,115200,\"st=0,pr=0,bt=0,ap=0,db=0,lt=0,li=0,ga=0,ae=0\"\r\n";
@@ -300,23 +307,29 @@ public class ModemConfiguration {
     }
 
     /* Set trace level */
-    protected void setTraceLevel(RandomAccessFile f, int level) {
+    protected void setTraceLevel(RandomAccessFile f, int level, boolean isCoredump) {
+        String sysTraceBb = (isCoredump)
+                ? AT_SET_XSYSTRACE_LEVEL_BB_RED : AT_SET_XSYSTRACE_LEVEL_BB;
+        String sysTrace3G = (isCoredump)
+                ? AT_SET_XSYSTRACE_LEVEL_BB_3G_RED : AT_SET_XSYSTRACE_LEVEL_BB_3G;
+        String sysTraceDigrf = (isCoredump)
+                ? AT_SET_XSYSTRACE_LEVEL_BB_3G_DIGRF_RED : AT_SET_XSYSTRACE_LEVEL_BB_3G_DIGRF;
         try {
             switch (level) {
             case CustomCfg.TRACE_LEVEL_BB:
                 /* MA traces */
                 read_write_modem(f, AT_SET_TRACE_LEVEL_BB);
-                read_write_modem(f, AT_SET_XSYSTRACE_LEVEL_BB);
+                read_write_modem(f, sysTraceBb);
                 break;
             case CustomCfg.TRACE_LEVEL_BB_3G:
                 /* MA & Artemis traces */
                 read_write_modem(f, AT_SET_TRACE_LEVEL_BB_3G);
-                read_write_modem(f, AT_SET_XSYSTRACE_LEVEL_BB_3G);
+                read_write_modem(f, sysTrace3G);
                 break;
             case CustomCfg.TRACE_LEVEL_BB_3G_DIGRF:
                 /* MA & Artemis & Digrf traces */
                 read_write_modem(f, AT_SET_TRACE_LEVEL_BB_3G_DIGRF);
-                read_write_modem(f, AT_SET_XSYSTRACE_LEVEL_BB_3G_DIGRF);
+                read_write_modem(f, sysTraceDigrf);
                 break;
             default:
                 /* Disable trace */

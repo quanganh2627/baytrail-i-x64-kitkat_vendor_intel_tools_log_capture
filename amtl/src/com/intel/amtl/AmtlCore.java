@@ -307,9 +307,11 @@ public class AmtlCore implements ModemEventListener {
 
     /* Apply blue configuration */
     private void applyCoredumpCfg() throws IOException {
+        int xsioToSend = (this.usbAcmEnabled)
+                ? ModemConfiguration.XSIO_0 : ModemConfiguration.XSIO_2;
         this.services.stop_service();
-        this.modemCfg.setXsio(this.gsmtty, ModemConfiguration.XSIO_2);
-        this.modemCfg.setTraceLevel(this.gsmtty, CustomCfg.TRACE_LEVEL_BB_3G);
+        this.modemCfg.setXsio(this.gsmtty, xsioToSend);
+        this.modemCfg.setTraceLevel(this.gsmtty, CustomCfg.TRACE_LEVEL_BB_3G, this.usbAcmEnabled);
         this.services.enable_service(Services.MTS_DISABLE, this.futCfg,
             this.futCustomCfg.offlineLogging);
     }
@@ -318,7 +320,7 @@ public class AmtlCore implements ModemEventListener {
     private void applyOfflineBpLogCfg() throws IOException {
         this.services.stop_service();
         this.modemCfg.setXsio(this.gsmtty, ModemConfiguration.XSIO_4);
-        this.modemCfg.setTraceLevel(this.gsmtty, CustomCfg.TRACE_LEVEL_BB_3G);
+        this.modemCfg.setTraceLevel(this.gsmtty, CustomCfg.TRACE_LEVEL_BB_3G, false);
         this.services.enable_service(Services.MTS_EXTFS, this.futCfg,
             this.futCustomCfg.offlineLogging);
     }
@@ -327,7 +329,7 @@ public class AmtlCore implements ModemEventListener {
     private void applyOfflineUsbBpLogCfg() throws IOException {
         this.services.stop_service();
         this.modemCfg.setXsio(this.gsmtty, ModemConfiguration.XSIO_1);
-        this.modemCfg.setTraceLevel(this.gsmtty, CustomCfg.TRACE_LEVEL_BB_3G);
+        this.modemCfg.setTraceLevel(this.gsmtty, CustomCfg.TRACE_LEVEL_BB_3G, false);
         this.services.enable_service(Services.MTS_EXTFS, this.futCfg,
             this.futCustomCfg.offlineLogging);
     }
@@ -336,7 +338,7 @@ public class AmtlCore implements ModemEventListener {
     private void applyOnlineBpLogCfg() throws IOException {
         this.services.stop_service();
         this.modemCfg.setXsio(this.gsmtty, ModemConfiguration.XSIO_0);
-        this.modemCfg.setTraceLevel(this.gsmtty, CustomCfg.TRACE_LEVEL_BB_3G);
+        this.modemCfg.setTraceLevel(this.gsmtty, CustomCfg.TRACE_LEVEL_BB_3G, false);
         this.services.enable_service(Services.ONLINE_BP_LOG, this.futCfg,
             this.futCustomCfg.offlineLogging);
     }
@@ -345,7 +347,7 @@ public class AmtlCore implements ModemEventListener {
     private void applyPtiBpLogCfg() throws IOException {
         this.services.stop_service();
         this.modemCfg.setXsio(this.gsmtty, ModemConfiguration.XSIO_1);
-        this.modemCfg.setTraceLevel(this.gsmtty, CustomCfg.TRACE_LEVEL_BB_3G);
+        this.modemCfg.setTraceLevel(this.gsmtty, CustomCfg.TRACE_LEVEL_BB_3G, false);
         this.services.enable_service(Services.MTS_PTI, this.futCfg,
             this.futCustomCfg.offlineLogging);
     }
@@ -354,7 +356,7 @@ public class AmtlCore implements ModemEventListener {
     private void applyTraceDisableCfg() throws IOException {
         this.services.stop_service();
         this.modemCfg.setXsio(this.gsmtty, ModemConfiguration.XSIO_0);
-        this.modemCfg.setTraceLevel(this.gsmtty, CustomCfg.TRACE_LEVEL_NONE);
+        this.modemCfg.setTraceLevel(this.gsmtty, CustomCfg.TRACE_LEVEL_NONE, false);
         this.services.enable_service(Services.MTS_DISABLE, this.futCfg,
             this.futCustomCfg.offlineLogging);
     }
@@ -389,17 +391,21 @@ public class AmtlCore implements ModemEventListener {
                 ModemConfiguration.XSIO_1 : ModemConfiguration.XSIO_4;
 
         } else if (this.futCustomCfg.traceLocation == CustomCfg.TRACE_LOC_COREDUMP) {
-            xsioToSet = ModemConfiguration.XSIO_2;
+            xsioToSet = (this.usbAcmEnabled)
+                    ? ModemConfiguration.XSIO_0 : ModemConfiguration.XSIO_2;
         } else if (this.futCustomCfg.traceLocation == CustomCfg.TRACE_LOC_PTI_MODEM) {
             xsioToSet = ModemConfiguration.XSIO_1;
         } else {
             xsioToSet = ModemConfiguration.XSIO_0;
         }
 
+        boolean isCoredump = ((xsioToSet == ModemConfiguration.XSIO_0)
+                && (futCustomCfg.traceLevel != CustomCfg.TRACE_LEVEL_NONE)
+                && (this.usbAcmEnabled));
         /* Apply configuration */
         this.services.stop_service();
         this.modemCfg.setXsio(this.gsmtty, xsioToSet);
-        this.modemCfg.setTraceLevel(this.gsmtty, futCustomCfg.traceLevel);
+        this.modemCfg.setTraceLevel(this.gsmtty, futCustomCfg.traceLevel, isCoredump);
         this.services.enable_service(serviceToStart, this.futCfg, this.futCustomCfg.offlineLogging);
     }
 
@@ -458,11 +464,19 @@ public class AmtlCore implements ModemEventListener {
             /* Recover the modem reboot information */
             this.infoModemReboot = this.modemCfg.modem_reboot_status(xsioValue);
 
-            if (((this.infoModemReboot == ModemConfiguration.reboot_ok2) ||
-                (this.infoModemReboot == ModemConfiguration.reboot_ko2)) &&
-                (this.serviceValue == Services.MTS_DISABLE) &&
-                (this.traceLevelValue == CustomCfg.TRACE_LEVEL_BB_3G)) {
+            if (((this.infoModemReboot == ModemConfiguration.reboot_ok2)
+                    || (this.infoModemReboot == ModemConfiguration.reboot_ko2))
+                    && (this.serviceValue == Services.MTS_DISABLE)
+                    && (this.traceLevelValue == CustomCfg.TRACE_LEVEL_BB_3G)
+                    && (!this.usbAcmEnabled)) {
                 /* Trace in coredump enabled */
+                this.curCfg = PredefinedCfg.COREDUMP;
+            } else if (((this.infoModemReboot == ModemConfiguration.reboot_ok0)
+                    || (this.infoModemReboot == ModemConfiguration.reboot_ko0))
+                    && (this.serviceValue == Services.MTS_DISABLE)
+                    && (this.traceLevelValue == CustomCfg.TRACE_LEVEL_BB_3G)
+                    && (this.usbAcmEnabled)) {
+                /* Trace in coredump enabled for redhookbay*/
                 this.curCfg = PredefinedCfg.COREDUMP;
             } else if (((this.infoModemReboot == ModemConfiguration.reboot_ok4) ||
                 (this.infoModemReboot == ModemConfiguration.reboot_ko4)) &&

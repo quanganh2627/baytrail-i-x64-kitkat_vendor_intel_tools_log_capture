@@ -304,19 +304,15 @@ public class SettingsActivity extends Activity {
             this.core.invalidate();
             if (core.getCurCfg() == PredefinedCfg.TRACE_DISABLE) {
                 /* There is no way to disable logs from advanced settings menu */
-                /* Suggest a default configuration : blue configuration for Medfield*/
-                /* green configuration for Clovertrail */
+                /* Suggest a default configuration : blue configuration */
                 UIHelper.message_pop_up(this,
                     "INFO","Currently, traces are disabled.\n" +
                     "We suggest you a default configuration.\n" +
                     "Don't forget to confirm with ACTIVATE checkbox");
-                cfg.traceLocation = (AmtlCore.usbAcmEnabled) ?
-                    CustomCfg.TRACE_LOC_EMMC : CustomCfg.TRACE_LOC_COREDUMP;
+                cfg.traceLocation = CustomCfg.TRACE_LOC_COREDUMP;
                 cfg.traceLevel = CustomCfg.TRACE_LEVEL_BB_3G;
-                cfg.traceFileSize = (AmtlCore.usbAcmEnabled) ?
-                    CustomCfg.LOG_SIZE_LARGE : CustomCfg.LOG_SIZE_NONE;
-                cfg.offlineLogging = (AmtlCore.usbAcmEnabled) ?
-                    CustomCfg.OFFLINE_LOGGING_HSI : CustomCfg.OFFLINE_LOGGING_NONE;
+                cfg.traceFileSize = CustomCfg.LOG_SIZE_NONE;
+                cfg.offlineLogging = CustomCfg.OFFLINE_LOGGING_NONE;
                 cfg.muxTrace = CustomCfg.MUX_TRACE_OFF;
                 cfg.addTraces = CustomCfg.ADD_TRACES_OFF;
                 checkbox_additional_traces.setEnabled(false);
@@ -366,22 +362,17 @@ public class SettingsActivity extends Activity {
             }
         });
 
-        if (!AmtlCore.usbAcmEnabled) {
-            /* Listener on button_location_coredump */
-            button_location_coredump.setOnCheckedChangeListener(new OnCheckedChangeListener() {
-                @Override
-                public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-                    if (isChecked) {
-                        unset_trace_file_size();
-                        cfg.traceLocation = CustomCfg.TRACE_LOC_COREDUMP;
-                        invalidate();
-                    }
+        /* Listener on button_location_coredump */
+        button_location_coredump.setOnCheckedChangeListener(new OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                if (isChecked) {
+                    unset_trace_file_size();
+                    cfg.traceLocation = CustomCfg.TRACE_LOC_COREDUMP;
+                    invalidate();
                 }
-            });
-        } else {
-            /*Disable the coredump button for Clovertrail*/
-            button_location_coredump.setVisibility(View.GONE);
-        }
+            }
+        });
 
         if (AmtlCore.usbswitchEnabled) {
             /* Listener on button_location_usb_ape */

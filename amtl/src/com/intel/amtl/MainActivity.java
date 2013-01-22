@@ -34,6 +34,7 @@
  * 2.2.1  - 2012-12-19 - BZ 75912 - Properties for platform specificities
  * 2.2.2  - 2012-12-20 - BZ 41081 - Configuration of MTS via Android properties
  * 2.2.3  - 2012-12-20 - BZ 63993 - Modifications to handle logging over HSI
+ * 2.2.4  - 2013-01-10 - BZ 79656 - Enable bplogs in coredump for redhookbay
  * ============================================================================
  */
 
@@ -186,23 +187,18 @@ public class MainActivity extends Activity {
         /* On start, print a warning message */
         UIHelper.message_warning(this, "WARNING","This is a R&D Application. Please do not use unless you are asked to!");
 
-        if (!AmtlCore.usbAcmEnabled) {
-            /* Listener on Modem Coredump button */
-            button_modem_coredump.setOnClickListener(new OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    if (button_modem_coredump.isChecked()) {
-                        setCfg(PredefinedCfg.COREDUMP);
-                    } else {
-                        /* If user presses again on button_modem_coredump, traces are stopped */
-                        setCfg(PredefinedCfg.TRACE_DISABLE);
-                    }
+        /* Listener on Modem Coredump button */
+        button_modem_coredump.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (button_modem_coredump.isChecked()) {
+                    setCfg(PredefinedCfg.COREDUMP);
+                } else {
+                    /* If user presses again on button_modem_coredump, traces are stopped */
+                    setCfg(PredefinedCfg.TRACE_DISABLE);
                 }
-            });
-        } else {
-            /*Disable modem coredump button for Clovertrail*/
-            button_modem_coredump.setVisibility(View.GONE);
-        }
+            }
+        });
 
         /* Listener on APE Log File via HSI button */
         button_ape_log_file_hsi.setOnClickListener(new OnClickListener() {
