@@ -36,6 +36,7 @@
  * 2.2.3  - 2012-12-20 - BZ 63993 - Modifications to handle logging over HSI
  * 2.2.4  - 2013-01-10 - BZ 79656 - Enable bplogs in coredump for redhookbay
  * 2.2.5  - 2013-01-18 - BZ 77175 - REVERT ME: Disable logging via HSI
+ * 2.2.6  - 2013-01-21 - BZ 80473 - Fix coding style issues
  * ============================================================================
  */
 
@@ -137,7 +138,8 @@ public class MainActivity extends Activity {
                 break;
             default:
                 /* Other configuration not available in standard mode */
-                UIHelper.message_pop_up(this, "WARNING","Please use Advanced Menu to know your current configuration");
+                UIHelper.message_pop_up(this, "WARNING",
+                        "Please use Advanced Menu to know your current configuration");
                 break;
         }
     }
@@ -175,7 +177,7 @@ public class MainActivity extends Activity {
             this.core.setContext(this.getApplicationContext());
             this.core.main = this;
             this.initTask = new AsyncMainActivityInitTask();
-            // let's init our AmtlCore in a background thread to release the UI thread asap.
+            /* let's init our AmtlCore in a background thread to release the UI thread asap. */
             this.initTask.execute((Void)null);
 
         } catch (AmtlCoreException e) {
@@ -186,7 +188,8 @@ public class MainActivity extends Activity {
         }
 
         /* On start, print a warning message */
-        UIHelper.message_warning(this, "WARNING","This is a R&D Application. Please do not use unless you are asked to!");
+        UIHelper.message_warning(this, "WARNING",
+                "This is a R&D Application. Please do not use unless you are asked to!");
 
         /* Listener on Modem Coredump button */
         button_modem_coredump.setOnClickListener(new OnClickListener() {
@@ -256,12 +259,12 @@ public class MainActivity extends Activity {
                 }
             });
         } else {
-            /*Disable online bp log button for Clovertrail and Lexington*/
+            /* Disable online bp log button for Clovertrail and Lexington */
             button_online_bp_log.setVisibility(View.GONE);
         }
 
         if (AmtlCore.ptiEnabled) {
-            /* Listener on PTI BP logging  button */
+            /* Listener on PTI BP logging button */
             button_pti_bp_log.setOnClickListener(new OnClickListener() {
                 @Override
                 public void onClick(View v) {
@@ -274,7 +277,7 @@ public class MainActivity extends Activity {
                 }
             });
         } else {
-            /*Disable online bp log button for Clovertrail and Lexington*/
+            /* Disable online bp log button for Clovertrail and Lexington */
             button_pti_bp_log.setVisibility(View.GONE);
         }
 
@@ -341,7 +344,8 @@ public class MainActivity extends Activity {
             if (result) {
                 MainActivity.this.setUI(MainActivity.this.core.getCurCfg());
             } else {
-                UIHelper.exitDialog(MainActivity.this, "ERROR", this.lastException.getMessage() + "\nAMTL will exit.");
+                UIHelper.exitDialog(MainActivity.this, "ERROR",
+                        this.lastException.getMessage() + "\nAMTL will exit.");
             }
         }
     }

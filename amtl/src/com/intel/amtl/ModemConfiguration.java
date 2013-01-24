@@ -48,9 +48,12 @@ public class ModemConfiguration {
     /* XSYSTRACE AT commands */
     private static final String AT_GET_TRACE_LEVEL = "at+xsystrace=10\r\n";
     private static final String AT_SET_XSYSTRACE_LEVEL_DISABLE = "at+xsystrace=0\r\n";
-    private static final String AT_SET_XSYSTRACE_LEVEL_BB = "at+xsystrace=0,\"bb_sw=1;3g_sw=0;digrf=0\",,\"oct=4\"\r\n";
-    private static final String AT_SET_XSYSTRACE_LEVEL_BB_3G = "at+xsystrace=0,\"bb_sw=1;3g_sw=1;digrf=0\",,\"oct=4\"\r\n";
-    private static final String AT_SET_XSYSTRACE_LEVEL_BB_3G_DIGRF = "at+xsystrace=0,\"digrf=1;bb_sw=1;3g_sw=1\",\"digrf=0x84\",\"oct=4\"\r\n";
+    private static final String AT_SET_XSYSTRACE_LEVEL_BB
+            = "at+xsystrace=0,\"bb_sw=1;3g_sw=0;digrf=0\",,\"oct=4\"\r\n";
+    private static final String AT_SET_XSYSTRACE_LEVEL_BB_3G
+            = "at+xsystrace=0,\"bb_sw=1;3g_sw=1;digrf=0\",,\"oct=4\"\r\n";
+    private static final String AT_SET_XSYSTRACE_LEVEL_BB_3G_DIGRF
+            = "at+xsystrace=0,\"digrf=1;bb_sw=1;3g_sw=1\",\"digrf=0x84\",\"oct=4\"\r\n";
     /* XSYSTRACE AT commands for redhookbay when bplogs are enabled in coredump */
     private static final String AT_SET_XSYSTRACE_LEVEL_BB_RED
             = "at+xsystrace=0,\"bb_sw=1;3g_sw=0;digrf=0\",,\"oct=3\"\r\n";
@@ -60,10 +63,14 @@ public class ModemConfiguration {
             = "at+xsystrace=0,\"digrf=1;bb_sw=1;3g_sw=1\",\"digrf=0x84\",\"oct=3\"\r\n";
 
     /* TRACE AT commands */
-    private static final String AT_SET_TRACE_LEVEL_DISABLE = "at+trace=0,115200,\"st=0,pr=0,bt=0,ap=0,db=0,lt=0,li=0,ga=0,ae=0\"\r\n";
-    private static final String AT_SET_TRACE_LEVEL_BB = "at+trace=,115200,\"st=1,pr=1,bt=1,ap=0,db=1,lt=0,li=1,ga=0,ae=0\"\r\n";
-    private static final String AT_SET_TRACE_LEVEL_BB_3G = "at+trace=,115200,\"st=1,pr=1,bt=1,ap=0,db=1,lt=0,li=1,ga=0,ae=1\"\r\n";
-    private static final String AT_SET_TRACE_LEVEL_BB_3G_DIGRF = "at+trace=,115200,\"st=1,pr=1,bt=1,ap=0,db=1,lt=0,li=1,ga=0,ae=1\"\r\n";
+    private static final String AT_SET_TRACE_LEVEL_DISABLE
+            = "at+trace=0,115200,\"st=0,pr=0,bt=0,ap=0,db=0,lt=0,li=0,ga=0,ae=0\"\r\n";
+    private static final String AT_SET_TRACE_LEVEL_BB
+            = "at+trace=,115200,\"st=1,pr=1,bt=1,ap=0,db=1,lt=0,li=1,ga=0,ae=0\"\r\n";
+    private static final String AT_SET_TRACE_LEVEL_BB_3G
+            = "at+trace=,115200,\"st=1,pr=1,bt=1,ap=0,db=1,lt=0,li=1,ga=0,ae=1\"\r\n";
+    private static final String AT_SET_TRACE_LEVEL_BB_3G_DIGRF
+            = "at+trace=,115200,\"st=1,pr=1,bt=1,ap=0,db=1,lt=0,li=1,ga=0,ae=1\"\r\n";
 
     protected final static int xsio_00 = 0;
     protected final static int xsio_20 = 1;
@@ -165,7 +172,8 @@ public class ModemConfiguration {
             bCount += bRead;
         }
         /* find "OK\r\n" at reponse end */
-        while (rsp_byte[bCount-4] != 0x4f || rsp_byte[bCount-3] != 0x4b || rsp_byte[bCount-2] != 0x0d || rsp_byte[bCount-1] != 0x0a);
+        while (rsp_byte[bCount-4] != 0x4f || rsp_byte[bCount-3] != 0x4b
+                || rsp_byte[bCount-2] != 0x0d || rsp_byte[bCount-1] != 0x0a);
 
         modem_value = new String(rsp_byte);
         logAtCommand(modem_value, ival);
@@ -229,7 +237,8 @@ public class ModemConfiguration {
     /* Get trace level from string */
     private int getTraceLevelValue(String s) {
         int ret = CustomCfg.TRACE_LEVEL_NONE;
-        if ((s.contains("bb_sw: Oct")) && (s.contains("3g_sw: Oct")) && (s.contains("digrf: Oct"))) {
+        if ((s.contains("bb_sw: Oct")) && (s.contains("3g_sw: Oct"))
+                && (s.contains("digrf: Oct"))) {
             ret = CustomCfg.TRACE_LEVEL_BB_3G_DIGRF;
         } else if ((s.contains("bb_sw: Oct")) && (s.contains("3g_sw: Oct"))) {
             ret = CustomCfg.TRACE_LEVEL_BB_3G;

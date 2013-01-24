@@ -38,8 +38,8 @@ public class NotificationReceiver extends BroadcastReceiver {
         if (intent.getAction().equals(bootCompleted)) {
             Log.i(AmtlCore.TAG, MODULE + ": bootCompletedIntent received");
             context.startService(bootCompletedIntent);
-        } else if (intent.getAction().equals(shutdown) ||
-                 intent.getAction().equals(poweroff)) {
+        } else if (intent.getAction().equals(shutdown)
+                 || intent.getAction().equals(poweroff)) {
             Log.i(AmtlCore.TAG, MODULE + ": shutdownIntent received");
             context.startService(shutdownIntent);
         }

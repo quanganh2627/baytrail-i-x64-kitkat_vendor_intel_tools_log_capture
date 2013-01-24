@@ -102,10 +102,8 @@ public class SettingsActivity extends Activity {
         button_offline_logging_hsi.setEnabled(!AmtlCore.usbAcmEnabled);
         button_offline_logging_hsi.setChecked(!AmtlCore.usbAcmEnabled);
         button_offline_logging_usb.setEnabled(AmtlCore.usbAcmEnabled);
-        button_offline_logging_usb.setChecked(AmtlCore.usbAcmEnabled);
-
-        button_level_bb_3g.setChecked((cfg.traceLevel == CustomCfg.TRACE_LEVEL_NONE) ||
-            (cfg.traceLevel == CustomCfg.TRACE_LEVEL_BB_3G));
+        button_level_bb_3g.setChecked((cfg.traceLevel == CustomCfg.TRACE_LEVEL_NONE)
+                || (cfg.traceLevel == CustomCfg.TRACE_LEVEL_BB_3G));
     }
 
     /* Set trace level button */
@@ -236,10 +234,10 @@ public class SettingsActivity extends Activity {
     private boolean reboot_needed() {
         CustomCfg curCfg = core.getCurCustomCfg();
         return (
-            (cfg.traceLocation != curCfg.traceLocation) ||
-            (cfg.traceLevel != curCfg.traceLevel) ||
-            (cfg.traceFileSize != curCfg.traceFileSize) ||
-            (cfg.offlineLogging != curCfg.offlineLogging));
+            (cfg.traceLocation != curCfg.traceLocation)
+                || (cfg.traceLevel != curCfg.traceLevel)
+                || (cfg.traceFileSize != curCfg.traceFileSize)
+                || (cfg.offlineLogging != curCfg.offlineLogging));
     }
 
     @Override
@@ -250,27 +248,32 @@ public class SettingsActivity extends Activity {
         /* Trace location buttons */
         button_location_emmc = (CompoundButton) findViewById(R.id.settings_location_emmc_btn);
         button_location_sdcard = (CompoundButton) findViewById (R.id.settings_location_sdcard_btn);
-        button_location_coredump = (CompoundButton) findViewById (R.id.settings_location_coredump_btn);
-        button_location_usb_ape = (CompoundButton) findViewById (R.id.settings_location_usb_ape_btn);
-        button_location_usb_modem = (CompoundButton) findViewById (R.id.settings_location_usb_modem_btn);
-        button_location_pti_modem = (CompoundButton) findViewById (R.id.settings_location_pti_modem_btn);
+        button_location_coredump
+                = (CompoundButton) findViewById (R.id.settings_location_coredump_btn);
+        button_location_usb_ape
+                = (CompoundButton) findViewById (R.id.settings_location_usb_ape_btn);
+        button_location_usb_modem
+                = (CompoundButton) findViewById (R.id.settings_location_usb_modem_btn);
+        button_location_pti_modem
+                = (CompoundButton) findViewById (R.id.settings_location_pti_modem_btn);
 
         /* Trace level buttons */
         button_level_bb = (CompoundButton) findViewById (R.id.settings_level_bb_btn);
         button_level_bb_3g = (CompoundButton) findViewById (R.id.settings_level_bb_3g_btn);
-        button_level_bb_3g_digrf = (CompoundButton) findViewById (R.id.settings_level_bb_3g_digrf_btn);
+        button_level_bb_3g_digrf
+                = (CompoundButton) findViewById (R.id.settings_level_bb_3g_digrf_btn);
 
         /* Log size buttons */
-        button_trace_size_small =
-            (CompoundButton) findViewById (R.id.settings_trace_size_small_btn);
-        button_trace_size_large =
-            (CompoundButton) findViewById (R.id.settings_trace_size_large_btn);
+        button_trace_size_small
+                = (CompoundButton) findViewById (R.id.settings_trace_size_small_btn);
+        button_trace_size_large
+                = (CompoundButton) findViewById (R.id.settings_trace_size_large_btn);
 
         /* HSI or USB logging */
-        button_offline_logging_hsi =
-            (CompoundButton) findViewById (R.id.settings_offline_logging_hsi_btn);
-        button_offline_logging_usb =
-            (CompoundButton) findViewById (R.id.settings_offline_logging_usb_btn);
+        button_offline_logging_hsi
+                = (CompoundButton) findViewById (R.id.settings_offline_logging_hsi_btn);
+        button_offline_logging_usb
+                = (CompoundButton) findViewById (R.id.settings_offline_logging_usb_btn);
 
         /* Activate check box */
         checkbox_activate = (CheckBox) findViewById (R.id.activate_checkBox);
@@ -278,11 +281,11 @@ public class SettingsActivity extends Activity {
         /* MUX traces check box */
         checkbox_mux = (CheckBox) findViewById (R.id.mux_checkBox);
 
-        /* Additional traces check box and header*/
+        /* Additional traces check box and header */
         checkbox_additional_traces = (CheckBox) findViewById (R.id.additional_traces_checkBox);
         header_additional_traces = (TextView) findViewById (R.id.textView7);
 
-        /* Check if the buttons and checkboxes are not null*/
+        /* Check if the buttons and checkboxes are not null */
         AmtlCore.exitIfNull(button_location_emmc, this);
         AmtlCore.exitIfNull(button_location_sdcard, this);
         AmtlCore.exitIfNull(button_location_coredump, this);
@@ -412,7 +415,7 @@ public class SettingsActivity extends Activity {
                 }
             });
         } else {
-            /*Disable the usbswitch buttons for Clovertrail and Lexington*/
+            /* Disable the usbswitch buttons for Clovertrail and Lexington */
             button_location_usb_ape.setVisibility(View.GONE);
             button_location_usb_modem.setVisibility(View.GONE);
         }
@@ -430,7 +433,7 @@ public class SettingsActivity extends Activity {
                 }
             });
         } else {
-            /*Disable the pti button for Medfield*/
+            /* Disable the pti button for Medfield */
             button_location_pti_modem.setVisibility(View.GONE);
         }
 
@@ -528,9 +531,11 @@ public class SettingsActivity extends Activity {
                 core.isAddTracesEnabled = isChecked;
                 core.setAdditionalTraces(cfg.addTraces);
                 if (isChecked) {
-                    UIHelper.message_pop_up(SettingsActivity.this, "WARNING", "Traces are not persistent");
+                    UIHelper.message_pop_up(SettingsActivity.this,
+                            "WARNING", "Traces are not persistent");
                 } else {
-                    UIHelper.message_pop_up(SettingsActivity.this, "WARNING", "To disable additional traces please reboot");
+                    UIHelper.message_pop_up(SettingsActivity.this, "WARNING",
+                            "To disable additional traces please reboot");
                 }
             }
         });
@@ -542,7 +547,8 @@ public class SettingsActivity extends Activity {
                 if (!invalidateFlag) {
                     if (isChecked) {
                         core.setCustomCfg(cfg);
-                        UIHelper.message_pop_up(SettingsActivity.this, "WARNING", "Your board needs a HARDWARE REBOOT");
+                        UIHelper.message_pop_up(SettingsActivity.this, "WARNING",
+                                "Your board needs a HARDWARE REBOOT");
                     }
                 }
             }

@@ -57,7 +57,7 @@ public class AdditionalFeaturesActivity extends Activity {
         button_usb_ape = (CompoundButton) findViewById(R.id.additional_features_ape_btn);
         button_toggle_on1 = (Button) findViewById(R.id.additional_features_toggle_on1_btn);
 
-        /* Check if the buttons and header are not null*/
+        /* Check if the buttons and header are not null */
         AmtlCore.exitIfNull(header_usbswitch, this);
         AmtlCore.exitIfNull(button_usb_modem, this);
         AmtlCore.exitIfNull(button_usb_ape, this);
@@ -79,8 +79,7 @@ public class AdditionalFeaturesActivity extends Activity {
                 /* Set button according to usbswitch.conf file */
                 if (data.contains("1")) {
                     button_usb_modem.setChecked(true);
-                }
-                else {
+                } else {
                     button_usb_ape.setChecked(true);
                 }
             } catch (Exception e1) {
@@ -126,7 +125,7 @@ public class AdditionalFeaturesActivity extends Activity {
                 }
             });
         } else {
-            /*Disable the usbswitch buttons for Clovertrail and Lexington*/
+            /* Disable the usbswitch buttons for Clovertrail and Lexington */
             header_usbswitch.setVisibility(View.GONE);
             button_usb_modem.setVisibility(View.GONE);
             button_usb_ape.setVisibility(View.GONE);
@@ -138,7 +137,8 @@ public class AdditionalFeaturesActivity extends Activity {
             public void onClick(View arg0) {
                 try {
                     AmtlCore.rtm.exec("start toggle_on1");
-                    Toast toast = Toast.makeText(AdditionalFeaturesActivity.this, "Toggle pin on1 DONE", Toast.LENGTH_LONG);
+                    Toast toast = Toast.makeText(AdditionalFeaturesActivity.this,
+                            "Toggle pin on1 DONE", Toast.LENGTH_LONG);
                     toast.show();
                 } catch (IOException e) {
                     Log.e(AmtlCore.TAG, MODULE + ": toggle pin can't apply");

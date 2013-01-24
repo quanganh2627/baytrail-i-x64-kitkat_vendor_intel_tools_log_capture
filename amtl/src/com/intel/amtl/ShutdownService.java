@@ -80,7 +80,8 @@ public class ShutdownService extends Service {
                     Runnable displayToast = new Runnable() {
                         @Override
                         public void run() {
-                            Toast toast = Toast.makeText(ShutdownService.this, "New Amtl configuration applied", Toast.LENGTH_LONG);
+                            Toast toast = Toast.makeText(ShutdownService.this,
+                                    "New Amtl configuration applied", Toast.LENGTH_LONG);
                             toast.show();
                         }
                     };
@@ -89,7 +90,8 @@ public class ShutdownService extends Service {
                     Runnable displayToast = new Runnable() {
                         @Override
                         public void run() {
-                            Toast toast = Toast.makeText(ShutdownService.this, e.getMessage(), Toast.LENGTH_LONG);
+                            Toast toast = Toast.makeText(ShutdownService.this,
+                                    e.getMessage(), Toast.LENGTH_LONG);
                             toast.show();
                         }
                     };

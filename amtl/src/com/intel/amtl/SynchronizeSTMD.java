@@ -55,7 +55,7 @@ public class SynchronizeSTMD {
     public void openTty() {
         /* Check if /dev/gsmtty19 is already opened */
         if (this.ttyFd == TTY_CLOSED) {
-            /*Not open -> open it*/
+            /* Not open -> open it */
             this.ttyFd = this.OpenSerial(TTY_NAME, TTY_BAUDRATE);
             if (this.ttyFd < 0) {
                 Log.e(AmtlCore.TAG, MODULE + ": can't open " + TTY_NAME);

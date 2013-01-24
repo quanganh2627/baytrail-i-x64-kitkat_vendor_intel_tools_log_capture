@@ -46,7 +46,7 @@ public class BootService extends Service {
 
     private synchronized void init() {
 
-        // Get selected service name
+        /* Get selected service name */
         String service_name = "";
 
         service_name = SystemProperties.get(Services.PERSIST_MTS_NAME);
@@ -58,8 +58,8 @@ public class BootService extends Service {
                 serviceToRemove = false;
             }
         } else if (SystemProperties.get("init.svc.mtsp").equals("running")) {
-            if (service_name.equals("mtsextfs") || service_name.equals("mtsfs") ||
-                service_name.equals("mtsextsd") || service_name.equals("mtssd")) {
+            if (service_name.equals("mtsextfs") || service_name.equals("mtsfs")
+                    || service_name.equals("mtsextsd") || service_name.equals("mtssd")) {
                 Log.i(AmtlCore.TAG, MODULE + ": " + service_name + " service already running");
                 serviceToRemove = false;
             }
