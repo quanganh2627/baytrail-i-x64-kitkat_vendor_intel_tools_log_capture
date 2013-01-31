@@ -37,6 +37,7 @@
  * 2.2.4  - 2013-01-10 - BZ 79656 - Enable bplogs in coredump for redhookbay
  * 2.2.5  - 2013-01-18 - BZ 77175 - REVERT ME: Disable logging via HSI
  * 2.2.6  - 2013-01-21 - BZ 80473 - Fix coding style issues
+ * 2.2.7  - 2013-01-29 - BZ 75736 - Fix JAVACRASH at com.intel.amtl
  * ============================================================================
  */
 
@@ -175,7 +176,6 @@ public class MainActivity extends Activity {
         try {
             this.core = AmtlCore.get();
             this.core.setContext(this.getApplicationContext());
-            this.core.main = this;
             this.initTask = new AsyncMainActivityInitTask();
             /* let's init our AmtlCore in a background thread to release the UI thread asap. */
             this.initTask.execute((Void)null);
@@ -307,9 +307,6 @@ public class MainActivity extends Activity {
 
         if (this.initTask != null) {
             this.initTask.cancel(true);
-        }
-        if (this.core.main != null) {
-            this.core.main = null;
         }
         if (this.core != null) {
             this.core.destroy();

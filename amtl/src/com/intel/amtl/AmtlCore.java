@@ -109,8 +109,6 @@ public class AmtlCore implements ModemEventListener {
 
     private RandomAccessFile gsmtty;
 
-    protected Activity main;
-
     /* Constructor */
     private AmtlCore() throws AmtlCoreException {
         Log.i(TAG, MODULE + ": create application core");
