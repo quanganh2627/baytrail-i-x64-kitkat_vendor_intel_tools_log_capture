@@ -555,9 +555,9 @@ public class AmtlCore implements ModemEventListener {
                     this.curCustomCfg.traceFileSize = CustomCfg.LOG_SIZE_NONE;
                     break;
                 case Services.ONLINE_BP_LOG:
-                    this.curCustomCfg.offlineLogging = CustomCfg.OFFLINE_LOGGING_HSI;
+                    this.curCustomCfg.offlineLogging = CustomCfg.OFFLINE_LOGGING_NONE;
                     this.curCustomCfg.traceLocation = CustomCfg.TRACE_LOC_USB_MODEM;
-                    this.curCustomCfg.traceFileSize = CustomCfg.LOG_SIZE_LARGE;
+                    this.curCustomCfg.traceFileSize = CustomCfg.LOG_SIZE_NONE;
                     break;
                 case Services.MTS_PTI:
                     this.curCustomCfg.offlineLogging = CustomCfg.OFFLINE_LOGGING_NONE;

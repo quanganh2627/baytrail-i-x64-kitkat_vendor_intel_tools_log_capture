@@ -14,7 +14,7 @@
     <string name="additional_features_toggle_on1_button">Toggle Pin ON1</string>
     <string name="settings_location_emmc_button">EMMC</string>
     <string name="settings_location_sdcard_button">SDCARD</string>
-    <string name="settings_location_coredump_button">Coredump</string>
+    <string name="settings_location_coredump_button">COREDUMP</string>
     <string name="settings_location_usb_ape_button">USB APE</string>
     <string name="settings_location_usb_modem_button">USB MODEM</string>
     <string name="settings_location_pti_modem_button">PTI MODEM</string>
@@ -32,4 +32,5 @@
     <string name="settings_activate_txt">ACTIVATE</string>
     <string name="settings_mux_txt">Enable MUX traces</string>
     <string name="settings_add_traces_txt">Enable additional traces \n (LG1 LLT)</string>
+    <string name="settings_none">NONE</string>
 </resources>

@@ -38,6 +38,7 @@
  * 2.2.5  - 2013-01-18 - BZ 77175 - REVERT ME: Disable logging via HSI
  * 2.2.6  - 2013-01-21 - BZ 80473 - Fix coding style issues
  * 2.2.7  - 2013-01-29 - BZ 75736 - Fix JAVACRASH at com.intel.amtl
+ * 2.2.8  - 2013-01-31 - BZ 69540 - Fix Activate checkbox in Settings menu
  * ============================================================================
  */
 
@@ -71,6 +72,8 @@ public class MainActivity extends Activity {
     private ToggleButton button_disable_modem_trace;
 
     private AsyncMainActivityInitTask initTask = null;
+
+    protected static boolean isPerformingInit = false;
 
     private AmtlCore core;
 
@@ -295,6 +298,23 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         if (this.core != null) {
+            if (!isPerformingInit) {
+                if (button_modem_coredump.isChecked()) {
+                    setCfg(PredefinedCfg.COREDUMP);
+                } else if (button_ape_log_file_hsi.isChecked()) {
+                    setCfg(PredefinedCfg.OFFLINE_BP_LOG);
+                } else if (button_ape_log_file_usb.isChecked()) {
+                    setCfg(PredefinedCfg.OFFLINE_USB_BP_LOG);
+                } else if (button_online_bp_log.isChecked()) {
+                    setCfg(PredefinedCfg.ONLINE_BP_LOG);
+                } else if (button_pti_bp_log.isChecked()) {
+                    setCfg(PredefinedCfg.PTI_BP_LOG);
+                } else if (button_disable_modem_trace.isChecked()) {
+                    setCfg(PredefinedCfg.TRACE_DISABLE);
+                } else {
+                    setCfg(PredefinedCfg.CUSTOM);
+                }
+            }
             if (this.core.rebootNeeded()) {
                 UIHelper.message_pop_up(this, "WARNING", "Your board needs a HARDWARE REBOOT");
             }
@@ -321,6 +341,7 @@ public class MainActivity extends Activity {
         protected Boolean doInBackground(Void... parms) {
 
             Boolean ret = false;
+            MainActivity.isPerformingInit = true;
 
             Log.i(AmtlCore.TAG, MODULE + ": MainActivity init starting...");
 
@@ -337,6 +358,7 @@ public class MainActivity extends Activity {
         }
 
         protected void onPostExecute(Boolean result) {
+            MainActivity.isPerformingInit = false;
             Log.i(AmtlCore.TAG, MODULE + ": MainActivity init done.");
             if (result) {
                 MainActivity.this.setUI(MainActivity.this.core.getCurCfg());

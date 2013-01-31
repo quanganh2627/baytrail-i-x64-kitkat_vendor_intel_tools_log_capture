@@ -25,38 +25,44 @@
                 android:id="@+id/settings_location_emmc_btn"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:onClick="onTraceLocationClicked"
                 android:text="@string/settings_location_emmc_button" />
             <RadioButton
                 android:id="@+id/settings_location_sdcard_btn"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:onClick="onTraceLocationClicked"
                 android:text="@string/settings_location_sdcard_button" />
             <RadioButton
                 android:id="@+id/settings_location_coredump_btn"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:onClick="onTraceLocationClicked"
                 android:text="@string/settings_location_coredump_button" />
             <RadioButton
                 android:id="@+id/settings_location_usb_ape_btn"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:onClick="onTraceLocationClicked"
                 android:text="@string/settings_location_usb_ape_button" />
             <RadioButton
                 android:id="@+id/settings_location_usb_modem_btn"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:onClick="onTraceLocationClicked"
                 android:text="@string/settings_location_usb_modem_button" />
             <RadioButton
                 android:id="@+id/settings_location_pti_modem_btn"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:onClick="onTraceLocationClicked"
                 android:text="@string/settings_location_pti_modem_button" />
             <RadioButton
-                android:id="@+id/settings_location_not_enable_btn"
+                android:id="@+id/settings_location_none_btn"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:enabled="false"
-                android:visibility="gone" />
+                android:onClick="onTraceLocationClicked"
+                android:text="@string/settings_none" />
         </RadioGroup>
 
         <View
@@ -81,23 +87,26 @@
                 android:id="@+id/settings_level_bb_btn"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:onClick="onTraceLevelClicked"
                 android:text="@string/settings_level_bb_button" />
             <RadioButton
                 android:id="@+id/settings_level_bb_3g_btn"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:onClick="onTraceLevelClicked"
                 android:text="@string/settings_level_bb_3g_button" />
             <RadioButton
                 android:id="@+id/settings_level_bb_3g_digrf_btn"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:onClick="onTraceLevelClicked"
                 android:text="@string/settings_level_bb_3g_digrf_button" />
             <RadioButton
-                android:id="@+id/settings_level_no_trace_btn"
+                android:id="@+id/settings_level_none_btn"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:enabled="false"
-                android:visibility="gone" />
+                android:onClick="onTraceLevelClicked"
+                android:text="@string/settings_none" />
         </RadioGroup>
 
         <View
@@ -122,18 +131,20 @@
                 android:id="@+id/settings_trace_size_small_btn"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:onClick="onTraceSizeClicked"
                 android:text="@string/settings_trace_size_small_button" />
             <RadioButton
                 android:id="@+id/settings_trace_size_large_btn"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:onClick="onTraceSizeClicked"
                 android:text="@string/settings_trace_size_large_button" />
             <RadioButton
-                android:id="@+id/settings_trace_size_disable_btn"
+                android:id="@+id/settings_trace_size_none_btn"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:enabled="false"
-                android:visibility="gone" />
+                android:onClick="onTraceSizeClicked"
+                android:text="@string/settings_none" />
         </RadioGroup>
 
         <View
@@ -158,18 +169,20 @@
                 android:id="@+id/settings_offline_logging_hsi_btn"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:onClick="onOfflineLoggingClicked"
                 android:text="@string/settings_offline_logging_hsi_button" />
             <RadioButton
                 android:id="@+id/settings_offline_logging_usb_btn"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:onClick="onOfflineLoggingClicked"
                 android:text="@string/settings_offline_logging_usb_button" />
             <RadioButton
-                android:id="@+id/settings_offline_logging_disable_btn"
+                android:id="@+id/settings_offline_logging_none_btn"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:enabled="false"
-                android:visibility="gone" />
+                android:onClick="onOfflineLoggingClicked"
+                android:text="@string/settings_none" />
         </RadioGroup>
 
         <TableLayout
