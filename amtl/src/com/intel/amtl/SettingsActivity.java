@@ -141,17 +141,12 @@ public class SettingsActivity extends Activity {
         button_trace_size_large.setEnabled(true);
         button_trace_size_large.setChecked(true);
         button_trace_size_none.setEnabled(false);
-        /* By default offline logging is usb for redhookbay and hsi for blackbay and lexington */
-        /* to be uncommented when logging over HSI is working */
-        // button_offline_logging_hsi.setEnabled(true);
-        // button_offline_logging_hsi.setChecked(true);
-        // button_offline_logging_usb.setEnabled(AmtlCore.usbAcmEnabled);
-        /* to be removed when logging over HSI is working */
-        button_offline_logging_none.setEnabled(false);
-        button_offline_logging_hsi.setEnabled(!AmtlCore.usbAcmEnabled);
-        button_offline_logging_hsi.setChecked(!AmtlCore.usbAcmEnabled);
+        /* By default offline logging is HSI for medfield and USB for clovertrail */
+        button_offline_logging_hsi.setEnabled(true);
         button_offline_logging_usb.setEnabled(AmtlCore.usbAcmEnabled);
+        button_offline_logging_hsi.setChecked(!AmtlCore.usbAcmEnabled);
         button_offline_logging_usb.setChecked(AmtlCore.usbAcmEnabled);
+        button_offline_logging_none.setEnabled(false);
     }
 
     private void enableDisableButtons () {

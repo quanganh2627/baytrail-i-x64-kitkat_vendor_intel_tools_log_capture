@@ -215,17 +215,7 @@ public class MainActivity extends Activity {
             @Override
             public void onClick(View v) {
                 if (button_ape_log_file_hsi.isChecked()) {
-                    /* to be uncommented once logging over HSI is implemented */
-                    // setCfg(PredefinedCfg.OFFLINE_BP_LOG);
-                    /* to be removed once logging over HSI is implemented */
-                    if (!AmtlCore.usbAcmEnabled) {
-                        setCfg(PredefinedCfg.OFFLINE_BP_LOG);
-                    } else {
-                        UIHelper.message_pop_up(MainActivity.this, "Feature not available",
-                                "Logging via HSI isn't available yet."
-                                + "\nPlease use offline BP logging via USB instead.");
-                        button_ape_log_file_hsi.setChecked(false);
-                    }
+                    setCfg(PredefinedCfg.OFFLINE_BP_LOG);
                 } else {
                     /* If user presses again on button_ape_log_file_hsi, traces are stopped */
                     setCfg(PredefinedCfg.TRACE_DISABLE);
