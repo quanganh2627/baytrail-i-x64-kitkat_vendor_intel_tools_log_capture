@@ -620,12 +620,34 @@ public class SettingsActivity extends Activity {
                     if (isChecked) {
                         core.setCustomCfg(cfg);
                         UIHelper.message_pop_up(SettingsActivity.this, "WARNING",
-                                "Your board needs a HARDWARE REBOOT");
+                                "Your board needs a HARDWARE REBOOT"
+                                + " otherwise your settings WON'T BE SAVED");
                     } else {
                         invalidate();
                     }
                 }
             }
         });
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        if (reboot_needed() && checkbox_activate.isChecked()) {
+            UIHelper.message_pop_up(SettingsActivity.this, "WARNING",
+                    "Your board needs a HARDWARE REBOOT"
+                    + " otherwise your settings WON'T BE SAVED");
+        }
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (reboot_needed()) {
+            UIHelper.messageExitActivity(this, "WARNING",
+                    "Are you sure you want to leave Settings ?\n"
+                    + "You should reboot if you want your settings to be saved");
+        } else {
+            super.onBackPressed();
+        }
     }
 }

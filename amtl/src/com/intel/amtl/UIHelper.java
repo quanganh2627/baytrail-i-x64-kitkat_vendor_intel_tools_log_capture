@@ -72,4 +72,24 @@ public class UIHelper {
         })
         .show();
     }
+
+    /* Print pop-up message with ok and cancel buttons */
+    public static void messageExitActivity(final Activity A, String title, String message) {
+        new AlertDialog.Builder(A)
+        .setTitle(title)
+        .setMessage(message)
+        .setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int whichButton) {
+                A.finish();
+            }
+        })
+        .setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int whichButton) {
+                /* Nothing to do */
+            }
+        })
+        .show();
+    }
 }

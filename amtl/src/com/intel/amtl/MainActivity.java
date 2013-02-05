@@ -39,6 +39,7 @@
  * 2.2.6  - 2013-01-21 - BZ 80473 - Fix coding style issues
  * 2.2.7  - 2013-01-29 - BZ 75736 - Fix JAVACRASH at com.intel.amtl
  * 2.2.8  - 2013-01-31 - BZ 69540 - Fix Activate checkbox in Settings menu
+ * 2.2.9  - 2013-02-04 - BZ 69524 - Add validation when exiting
  * ============================================================================
  */
 
@@ -106,7 +107,8 @@ public class MainActivity extends Activity {
         this.core.setCfg(cfg);
         setUI(cfg);
         if (this.core.rebootNeeded()) {
-            UIHelper.message_pop_up(this, "WARNING", "Your board needs a HARDWARE REBOOT");
+            UIHelper.message_pop_up(this, "WARNING", "Your board needs a HARDWARE REBOOT"
+                    + " otherwise your configuration WON'T BE SAVED");
         }
     }
 
@@ -315,9 +317,17 @@ public class MainActivity extends Activity {
                     setCfg(PredefinedCfg.CUSTOM);
                 }
             }
-            if (this.core.rebootNeeded()) {
-                UIHelper.message_pop_up(this, "WARNING", "Your board needs a HARDWARE REBOOT");
-            }
+        }
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (this.core.rebootNeeded()) {
+            UIHelper.messageExitActivity(this, "WARNING",
+                    "Are you sure you want to leave AMTL ?\n"
+                    + "You should reboot if you want your configuration to be saved");
+        } else {
+            super.onBackPressed();
         }
     }
 
