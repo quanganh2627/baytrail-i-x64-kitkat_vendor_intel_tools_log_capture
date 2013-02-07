@@ -1392,6 +1392,7 @@ static void sdcard_available(int mode)
 {
     struct stat info;
     char value[PROPERTY_VALUE_MAX];
+    DIR *d;
 
     CRASH_DIR = EMMC_CRASH_DIR;
     STATS_DIR = EMMC_STATS_DIR;
@@ -1402,19 +1403,22 @@ static void sdcard_available(int mode)
     if ((!strncmp(value, "lowmemory", 9)) || (mode == CRASH_MODE_NOSD))
         return;
 
-    if ((stat(SDCARD_LOGS_DIR, &info) == 0) && (opendir(SDCARD_LOGS_DIR))){
+    if ((stat(SDCARD_LOGS_DIR, &info) == 0) && (d = opendir(SDCARD_LOGS_DIR))){
         CRASH_DIR = SDCARD_CRASH_DIR;
         STATS_DIR = SDCARD_STATS_DIR;
         APLOGS_DIR = SDCARD_APLOGS_DIR;
         BZ_DIR = SDCARD_BZ_DIR;
     } else {
         mkdir(SDCARD_LOGS_DIR, 0777);
-        if ((stat(SDCARD_LOGS_DIR, &info) == 0) && (opendir(SDCARD_LOGS_DIR))){
+        if ((stat(SDCARD_LOGS_DIR, &info) == 0) && (d = opendir(SDCARD_LOGS_DIR))){
             CRASH_DIR = SDCARD_CRASH_DIR;
             STATS_DIR = SDCARD_STATS_DIR;
             APLOGS_DIR = SDCARD_APLOGS_DIR;
             BZ_DIR = SDCARD_BZ_DIR;
         }
+    }
+    if (d) {
+        closedir(d);
     }
     return;
 }
@@ -1526,10 +1530,11 @@ static unsigned int find_dir(unsigned int max, int mode)
         snprintf(path, sizeof(path),  "%s%d", dir, oldest);
         mkdir(path, 0777);
     }
-    if (opendir(path) == 0) {
+    if ((d = opendir(path)) == 0) {
        LOGE("Can not create dir %s", path);
        goto out_err;
     }
+    closedir(d);
     if (!strstr(path, "sdcard")) {
          char cmd[512] = { '\0', };
 

@@ -639,6 +639,7 @@ void backtrace_parse_anr_file( char *filename)
 	fp  = fopen(filename,"r");
 	if (fp == NULL) {
 		printf("failed to open file %s: %s.\n", data, strerror(errno));
+		fclose(fp_copy);
 		return;
 	}
 	// parse maps
@@ -684,7 +685,8 @@ void backtrace_parse_anr_file( char *filename)
 		free(milist);
 		milist = next;
 	}
-
+	fclose(fp);
+	fclose(fp_copy);
 	return ;
 }
 
@@ -828,6 +830,10 @@ f:      	if (farther == true)  {
 			}
 		}
 	}
+	if (fp)
+		fclose(fp);
+	if (fp_copy)
+		fclose(fp_copy);
 	return ;
 }
 
