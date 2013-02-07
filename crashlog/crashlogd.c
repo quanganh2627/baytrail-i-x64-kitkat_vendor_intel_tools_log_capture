@@ -57,7 +57,8 @@
 #define BZMANUAL "MANUAL"
 #define KERNEL_CRASH "IPANIC"
 #define SYSSERVER_WDT "UIWDT"
-#define KERNEL_FORCE_CRASH "IPANIC_FORCED"
+#define KERNEL_SWWDT_CRASH "IPANIC_SWWDT"
+#define KERNEL_HWWDT_CRASH "IPANIC_HWWDT"
 #define FABRIC_FAKE_CRASH "FABRIC_FAKE"
 #define KERNEL_FAKE_CRASH "IPANIC_FAKE"
 #define ANR_CRASH "ANR"
@@ -79,6 +80,7 @@
 #define RECOVERY_ERROR "RECOVERY_ERROR"
 #define CRASHLOG_ERROR_DEAD "CRASHLOG_DEAD"
 #define CRASHLOG_ERROR_PATH "CRASHLOG_PATH"
+#define CRASHLOG_SWWDT_MISSING "SWWDT_MISSING"
 #define USBBOGUS "USBBOGUS"
 
 #define FILESIZE_MAX  (10*1024*1024)
@@ -2947,15 +2949,26 @@ static int crashlog_check_panic(char *reason, unsigned int files)
 
     if ((stat(CURRENT_PANIC_CONSOLE_NAME, &info) == 0) || (test_flag == 1)) {
 
-        if ((!find_str_in_file(SAVED_CONSOLE_NAME, "Kernel panic - not syncing: Kernel Watchdog", NULL)) ||
-          (!find_str_in_file(SAVED_CONSOLE_NAME, "EIP is at pmu_sc_irq", NULL))) {
-            strcpy(crashtype, KERNEL_FORCE_CRASH);
-        } else if (!find_str_in_file(SAVED_CONSOLE_NAME, "EIP is at panic_dbg_set", NULL)  || !find_str_in_file(SAVED_CONSOLE_NAME, "EIP is at kwd_trigger_open", NULL)) {
-            if (!strncmp(reason, "SWWDT_RESET", 11))
-                  strcat(reason,"_FAKE");
+        if (!find_str_in_file(SAVED_CONSOLE_NAME, "Kernel panic - not syncing: Kernel Watchdog", NULL))
+            strcpy(crashtype, KERNEL_SWWDT_CRASH);
+        else if  (!find_str_in_file(SAVED_CONSOLE_NAME, "EIP is at pmu_sc_irq", NULL))
+            // This panic is triggered by a fabric error
+            // It is marked as a kernel panic linked to a HW watdchog
+            // to create a link between these 2 critical crashes
+            strcpy(crashtype, KERNEL_HWWDT_CRASH);
+        else if (!find_str_in_file(SAVED_CONSOLE_NAME, "EIP is at panic_dbg_set", NULL)  || !find_str_in_file(SAVED_CONSOLE_NAME, "EIP is at kwd_trigger_open", NULL))
             strcpy(crashtype, KERNEL_FAKE_CRASH);
-        } else
+        else
             strcpy(crashtype, KERNEL_CRASH);
+
+        if (!strncmp(crashtype, KERNEL_FAKE_CRASH, sizeof(KERNEL_FAKE_CRASH)))
+             strcat(reason,"_FAKE");
+        else if (!strncmp(reason,"HWWDT_RESET", 11))
+             strcpy(crashtype, KERNEL_HWWDT_CRASH);
+         else if (strncmp(reason,"SWWDT_RESET", 11) != 0)
+             // In some corner cases, the startupreason is not correctly set
+             // In this case, an ERROR is sent to have correct SWWDT metrics
+             crashlog_raise_infoerror(ERROREVENT, CRASHLOG_SWWDT_MISSING);
 
         time(&t);
         time_tmp = localtime((const time_t *)&t);
