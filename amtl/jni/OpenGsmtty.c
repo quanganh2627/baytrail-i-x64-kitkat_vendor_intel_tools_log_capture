@@ -34,7 +34,8 @@
 
 #define TTY_CLOSED -1
 
-JNIEXPORT jint JNICALL Java_com_intel_amtl_SynchronizeSTMD_OpenSerial(JNIEnv *env, jobject obj, jstring jtty_name, jint baudrate)
+JNIEXPORT jint JNICALL Java_com_intel_amtl_GsmttyManager_OpenSerial(JNIEnv *env, jobject obj,
+        jstring jtty_name, jint baudrate)
 {
     int fd = TTY_CLOSED;
     const char *tty_name = (*env)->GetStringUTFChars(env, jtty_name, 0);
@@ -92,7 +93,8 @@ open_serial_success:
     return fd;
 }
 
-JNIEXPORT jint JNICALL Java_com_intel_amtl_SynchronizeSTMD_CloseSerial(JNIEnv *env, jobject obj, jint fd)
+JNIEXPORT jint JNICALL Java_com_intel_amtl_GsmttyManager_CloseSerial(JNIEnv *env,
+        jobject obj, jint fd)
 {
     LOGI("CloseSerial: closing file descriptor (%d)", fd);
     if (fd >= 0) {

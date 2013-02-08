@@ -103,7 +103,7 @@ public class AmtlCore implements ModemEventListener {
     private Services services;
     private ModemConfiguration modemCfg;
     private ModemStatusManager modemStatusManager;
-    private SynchronizeSTMD ttyManager;
+    private GsmttyManager ttyManager;
 
     private Context ctx;
 
@@ -117,7 +117,7 @@ public class AmtlCore implements ModemEventListener {
             /* Create status monitor and open gsmtty device */
             this.modemStatusManager = ModemStatusManager.getInstance();
             this.modemStatusManager.subscribeToEvent(this, ModemStatus.ALL, ModemNotification.ALL);
-            this.ttyManager = new SynchronizeSTMD();
+            this.ttyManager = new GsmttyManager();
         } catch (InstantiationException ex) {
             throw new AmtlCoreException("Modem Status Manager client could not be instantiated." +
                     " Make sur his device has STMD or MMGR deployed.");
@@ -183,9 +183,11 @@ public class AmtlCore implements ModemEventListener {
                 Log.d(TAG, MODULE + ": openGsmtty");
                 this.ttyManager.openTty();
                 this.gsmtty = new RandomAccessFile(this.ttyManager.getTtyName(), "rw");
-            } catch (Exception ex) {
+            } catch (IOException ex) {
                 throw new AmtlCoreException(String.format("Error while opening %s",
                         this.ttyManager.getTtyName()));
+            } catch (IllegalArgumentException ex2) {
+                Log.e(TAG, MODULE + ": " + ex2.toString());
             }
         }
     }
@@ -699,9 +701,11 @@ public class AmtlCore implements ModemEventListener {
         try {
             this.ttyManager.openTty();
             this.gsmtty = new RandomAccessFile(this.ttyManager.getTtyName(), "rw");
-        } catch (Exception ex) {
+        } catch (IOException ex) {
             Log.e(TAG, MODULE + String.format("Error while opening %s",
                     this.ttyManager.getTtyName()));
+        } catch (IllegalArgumentException ex2) {
+            Log.e(TAG, MODULE + ": " + ex2.toString());
         }
     }
 
@@ -716,8 +720,8 @@ public class AmtlCore implements ModemEventListener {
                     this.gsmtty.close();
                     this.gsmtty = null;
                 }
-            } catch (Exception ex) {
-                Log.e(TAG, MODULE + String.format("Error while opening %s",
+            } catch (IOException ex) {
+                Log.e(TAG, MODULE + String.format("Error while closing %s",
                         this.ttyManager.getTtyName()));
             }
         }

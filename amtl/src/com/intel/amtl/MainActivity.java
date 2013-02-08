@@ -30,7 +30,7 @@
  * 2.1.7  - 2012-09-03 - BZ 23105 - PTI logging support in AMTL
  * 2.1.8  - 2012-09-25 - BZ 55058 - Fix ANR on services and main activity
  * 2.1.9  - 2012-10-05 - BZ 60711 - Check modem status before opening gsmtty
- * 2.2.0 -  2012-10-12 - BZ 52786 - WA to handle MMGR
+ * 2.2.0  - 2012-10-12 - BZ 52786 - Port to MMGR through MMGR java lib
  * 2.2.1  - 2012-12-19 - BZ 75912 - Properties for platform specificities
  * 2.2.2  - 2012-12-20 - BZ 41081 - Configuration of MTS via Android properties
  * 2.2.3  - 2012-12-20 - BZ 63993 - Modifications to handle logging over HSI
@@ -40,6 +40,7 @@
  * 2.2.7  - 2013-01-29 - BZ 75736 - Fix JAVACRASH at com.intel.amtl
  * 2.2.8  - 2013-01-31 - BZ 69540 - Fix Activate checkbox in Settings menu
  * 2.2.9  - 2013-02-04 - BZ 69524 - Add validation when exiting
+ * 2.2.10 - 2013-02-08 - BZ 72645 - Fix code issues after BZ 52786
  * ============================================================================
  */
 

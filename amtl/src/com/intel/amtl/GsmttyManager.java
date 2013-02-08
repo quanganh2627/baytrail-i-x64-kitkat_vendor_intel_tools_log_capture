@@ -23,7 +23,7 @@ import android.util.Log;
 import java.io.IOException;
 import java.io.InputStream;
 
-public class SynchronizeSTMD {
+public class GsmttyManager {
 
     private static final String AMTL_JNI_LIBRARY = "amtl_jni";
 
@@ -40,11 +40,11 @@ public class SynchronizeSTMD {
 
     private static final int TTY_CLOSED = -1;
 
-    private static final String MODULE = "SynchronizeSTMD";
+    private static final String MODULE = "GsmttyManager";
 
     private int ttyFd;
 
-    public SynchronizeSTMD() {
+    public GsmttyManager() {
         this.ttyFd = TTY_CLOSED;
     }
 
