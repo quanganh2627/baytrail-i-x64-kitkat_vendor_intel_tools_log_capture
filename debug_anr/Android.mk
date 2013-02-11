@@ -26,9 +26,6 @@ LOCAL_SRC_FILES:= \
 LOCAL_MODULE_TAGS := eng debug
 LOCAL_MODULE:= libdebug_anr
 
-LOCAL_UNSTRIPPED_PATH := $(TARGET_ROOT_OUT_UNSTRIPPED)
-
-#LOCAL_STATIC_LIBRARIES:= libc libcutils libparse_stack
 LOCAL_SHARED_LIBRARIES:= libnativehelper libc libcutils libparse_stack
 
 include $(BUILD_SHARED_LIBRARY)

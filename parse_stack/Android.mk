@@ -27,11 +27,6 @@ LOCAL_C_INCLUDES += \
 LOCAL_MODULE_TAGS := eng debug
 LOCAL_MODULE:= parse_stack
 
-LOCAL_UNSTRIPPED_PATH := $(TARGET_ROOT_OUT_UNSTRIPPED)
-
 LOCAL_SHARED_LIBRARIES:= libc libcutils libparse_stack
 
-#LOCAL_SHARED_LIBRARIES:= libparse_stack
-
-#include $(BUILD_SHARED_LIBRARY)
 include $(BUILD_EXECUTABLE)
