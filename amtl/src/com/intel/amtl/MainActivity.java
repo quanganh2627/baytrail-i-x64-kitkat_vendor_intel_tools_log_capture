@@ -42,6 +42,7 @@
  * 2.2.9  - 2013-02-04 - BZ 69524 - Add validation when exiting
  * 2.2.10 - 2013-02-08 - BZ 72645 - Fix code issues after BZ 52786
  * 2.2.11 - 2013-02-20 - BZ 88037 - Change at+trace command
+ * 2.2.12 - 2013-02-19 - BZ 86854 - Add checks to avoid NullPointerException
  * ============================================================================
  */
 

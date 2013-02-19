@@ -179,15 +179,17 @@ public class AmtlCore implements ModemEventListener {
 
     protected void openGsmtty () throws AmtlCoreException {
         if (this.gsmtty == null) {
-            try {
-                Log.d(TAG, MODULE + ": openGsmtty");
-                this.ttyManager.openTty();
-                this.gsmtty = new RandomAccessFile(this.ttyManager.getTtyName(), "rw");
-            } catch (IOException ex) {
-                throw new AmtlCoreException(String.format("Error while opening %s",
-                        this.ttyManager.getTtyName()));
-            } catch (IllegalArgumentException ex2) {
-                Log.e(TAG, MODULE + ": " + ex2.toString());
+            if (this.ttyManager != null) {
+                try {
+                    this.ttyManager.openTty();
+                    this.gsmtty = new RandomAccessFile(this.ttyManager.getTtyName(), "rw");
+                } catch (IOException ex) {
+                    throw new AmtlCoreException(String.format("Error while opening gsmtty"));
+                } catch (IllegalArgumentException ex2) {
+                    Log.e(TAG, MODULE + ": " + ex2.toString());
+                }
+            } else {
+                throw new AmtlCoreException(String.format("Cannot open gsmtty: gsmttyManager null"));
             }
         }
     }
@@ -208,7 +210,7 @@ public class AmtlCore implements ModemEventListener {
     /* Destructor */
     protected void destroy() {
         /* Close gsmtty device */
-        closeGsmtty();
+        this.closeGsmtty();
         /* Stop modem status monitoring */
         if (this.modemStatusManager != null) {
             this.modemStatusManager.disconnect();
@@ -669,12 +671,17 @@ public class AmtlCore implements ModemEventListener {
     }
 
     private void closeGsmtty() {
-        ttyManager.closeTty();
-        if (this.gsmtty != null) {
-            try {
+        try {
+            if (this.gsmtty != null) {
                 this.gsmtty.close();
-            } catch (IOException ex) {
-                Log.e(TAG, MODULE + ": " + ex.toString());
+                this.gsmtty = null;
+            }
+        } catch (IOException ex) {
+                Log.e(TAG, MODULE + ": " + ex.toString() + "\nError while close gsmtty");
+        } finally {
+            if (this.ttyManager != null) {
+                this.ttyManager.closeTty();
+                this.ttyManager = null;
             }
         }
     }
@@ -697,15 +704,19 @@ public class AmtlCore implements ModemEventListener {
     @Override
     public void onModemUp() {
         this.currentStatus = ModemStatus.UP;
-
-        try {
-            this.ttyManager.openTty();
-            this.gsmtty = new RandomAccessFile(this.ttyManager.getTtyName(), "rw");
-        } catch (IOException ex) {
-            Log.e(TAG, MODULE + String.format("Error while opening %s",
-                    this.ttyManager.getTtyName()));
-        } catch (IllegalArgumentException ex2) {
-            Log.e(TAG, MODULE + ": " + ex2.toString());
+        if (this.gsmtty == null) {
+            if (this.ttyManager != null) {
+                try {
+                    this.ttyManager.openTty();
+                    this.gsmtty = new RandomAccessFile(this.ttyManager.getTtyName(), "rw");
+                } catch (IOException ex) {
+                    Log.e(TAG, MODULE + String.format("Error while opening gsmtty"));
+                } catch (IllegalArgumentException ex2) {
+                    Log.e(TAG, MODULE + ": " + ex2.toString());
+                }
+            } else {
+                Log.e(TAG, MODULE + "Cannot open gsmtty: ttyManager null");
+            }
         }
     }
 
@@ -713,16 +724,16 @@ public class AmtlCore implements ModemEventListener {
     public void onModemDown() {
         this.currentStatus = ModemStatus.DOWN;
 
-        if (this.ttyManager != null) {
-            try {
+        try {
+            if (this.gsmtty != null) {
+                this.gsmtty.close();
+                this.gsmtty = null;
+            }
+        } catch (IOException ex) {
+            Log.e(TAG, MODULE + "Error while closing gsmtty");
+        } finally {
+            if (this.ttyManager != null) {
                 this.ttyManager.closeTty();
-                if (this.gsmtty != null) {
-                    this.gsmtty.close();
-                    this.gsmtty = null;
-                }
-            } catch (IOException ex) {
-                Log.e(TAG, MODULE + String.format("Error while closing %s",
-                        this.ttyManager.getTtyName()));
             }
         }
     }
