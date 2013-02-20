@@ -1608,19 +1608,21 @@ static int ishex(char c)
 /*
 * Name          : checkEvents
 * Description   : This function checks the expected format for a list of events
-*                 A list of events is 16 hex cut by a separator ;
+*                 A list of events is 20 hex characters cut by a separator ';'
 *                 if the size of the list exceeds the max, the command is not valid
 * Parameters    :
 *   char *list            -> string containing a list of events*/
 static int checkEvents(char* list)
 {
-   unsigned int i, j;
-   for(j=0; j < strlen(list) ; j+=21)
-       for (i=0; i < 20; i++)
-           if ((!ishex(list[i+j])))
-                 return 0;
-       if (list[j+i] != ';')
-              return 0;
+    unsigned int i, j;
+    for(j=0; j < strlen(list) ; j+=21) {
+        for (i=0; i < 20; i++) {
+            if ((!ishex(list[i+j])))
+                return 0;
+        }
+        if (list[j+i] != ';')
+            return 0;
+    }
    return 1;
 }
 
@@ -2049,6 +2051,8 @@ void process_command(char *filename, char *name) {
          if (!get_str_in_file(path,"ACTION=",action, sizeof(action)) && !get_str_in_file(path,"ARGS=",events, sizeof(events))) {
             if ((!strncmp(action, "DELETE", 6)) && checkEvents(events)) {
                update_history_on_cmd_delete(events);
+               /*delete trigger file*/
+               remove(path);
                return;
             }
          }
