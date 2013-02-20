@@ -63,14 +63,8 @@ public class ModemConfiguration {
             = "at+xsystrace=0,\"digrf=1;bb_sw=1;3g_sw=1\",\"digrf=0x84\",\"oct=3\"\r\n";
 
     /* TRACE AT commands */
-    private static final String AT_SET_TRACE_LEVEL_DISABLE
-            = "at+trace=0,115200,\"st=0,pr=0,bt=0,ap=0,db=0,lt=0,li=0,ga=0,ae=0\"\r\n";
-    private static final String AT_SET_TRACE_LEVEL_BB
-            = "at+trace=,115200,\"st=1,pr=1,bt=1,ap=0,db=1,lt=0,li=1,ga=0,ae=0\"\r\n";
-    private static final String AT_SET_TRACE_LEVEL_BB_3G
-            = "at+trace=,115200,\"st=1,pr=1,bt=1,ap=0,db=1,lt=0,li=1,ga=0,ae=1\"\r\n";
-    private static final String AT_SET_TRACE_LEVEL_BB_3G_DIGRF
-            = "at+trace=,115200,\"st=1,pr=1,bt=1,ap=0,db=1,lt=0,li=1,ga=0,ae=1\"\r\n";
+    private static final String AT_SET_TRACE_LEVEL_DISABLE = "at+trace=0\r\n";
+    private static final String AT_SET_TRACE_LEVEL_ENABLE = "at+trace=1\r\n";
 
     protected final static int xsio_00 = 0;
     protected final static int xsio_20 = 1;
@@ -327,17 +321,17 @@ public class ModemConfiguration {
             switch (level) {
             case CustomCfg.TRACE_LEVEL_BB:
                 /* MA traces */
-                read_write_modem(f, AT_SET_TRACE_LEVEL_BB);
+                read_write_modem(f, AT_SET_TRACE_LEVEL_ENABLE);
                 read_write_modem(f, sysTraceBb);
                 break;
             case CustomCfg.TRACE_LEVEL_BB_3G:
                 /* MA & Artemis traces */
-                read_write_modem(f, AT_SET_TRACE_LEVEL_BB_3G);
+                read_write_modem(f, AT_SET_TRACE_LEVEL_ENABLE);
                 read_write_modem(f, sysTrace3G);
                 break;
             case CustomCfg.TRACE_LEVEL_BB_3G_DIGRF:
                 /* MA & Artemis & Digrf traces */
-                read_write_modem(f, AT_SET_TRACE_LEVEL_BB_3G_DIGRF);
+                read_write_modem(f, AT_SET_TRACE_LEVEL_ENABLE);
                 read_write_modem(f, sysTraceDigrf);
                 break;
             default:
