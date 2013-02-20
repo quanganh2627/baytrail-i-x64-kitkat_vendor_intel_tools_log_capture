@@ -27,10 +27,12 @@ LOCAL_CFLAGS += -DFULL_REPORT=1
 
 LOCAL_C_INCLUDES += \
   $(TARGET_OUT_HEADERS)/IFX-modem \
+  $(TARGET_OUT_HEADERS)/logreader \
   device/intel/log_capture/backtrace
 
 LOCAL_MODULE_TAGS := eng debug
 LOCAL_MODULE:= crashlogd
 
-LOCAL_SHARED_LIBRARIES:= libparse_stack libc libcutils libmmgrcli
+LOCAL_SHARED_LIBRARIES:= libparse_stack libc libcutils libmmgrcli liblogreader
+
 include $(BUILD_EXECUTABLE)
