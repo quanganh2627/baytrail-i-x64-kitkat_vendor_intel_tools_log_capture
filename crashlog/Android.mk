@@ -24,7 +24,7 @@ LOCAL_SRC_FILES:= \
 
 LOCAL_C_INCLUDES += \
   $(TARGET_OUT_HEADERS)/IFX-modem \
-  device/intel/log_capture/backtrace
+  vendor/intel/tools/log_capture/backtrace
 
 LOCAL_MODULE_TAGS := eng debug
 LOCAL_MODULE:= crashlogd
