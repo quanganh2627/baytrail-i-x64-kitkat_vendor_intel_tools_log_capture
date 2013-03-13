@@ -82,6 +82,7 @@
 #define CRASHLOG_ERROR_DEAD "CRASHLOG_DEAD"
 #define CRASHLOG_ERROR_PATH "CRASHLOG_PATH"
 #define CRASHLOG_SWWDT_MISSING "SWWDT_MISSING"
+#define CRASHLOG_IPANIC_CORRUPTED "IPANIC_CORRUPTED"
 #define USBBOGUS "USBBOGUS"
 
 #define FILESIZE_MAX  (10*1024*1024)
@@ -3176,6 +3177,10 @@ static int crashlog_check_panic(char *reason, unsigned int files)
             strcpy(crashtype, KERNEL_FAKE_CRASH);
         else
             strcpy(crashtype, KERNEL_CRASH);
+
+        if (find_str_in_file(SAVED_CONSOLE_NAME, "sdhci_pci_power_up_host: host controller power up is done", NULL))
+             // An error is raised when the panic console file does not end normally
+             crashlog_raise_infoerror(ERROREVENT, CRASHLOG_IPANIC_CORRUPTED);
 
         if (!strncmp(crashtype, KERNEL_FAKE_CRASH, sizeof(KERNEL_FAKE_CRASH)))
              strcat(reason,"_FAKE");
