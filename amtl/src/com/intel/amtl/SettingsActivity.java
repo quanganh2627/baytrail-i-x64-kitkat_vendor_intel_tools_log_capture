@@ -71,6 +71,7 @@ public class SettingsActivity extends Activity {
     /* button_location_emmc is not considered as checked yet */
 
     private boolean invalidateFlag;
+    private boolean isUsbEnabled = true;
 
     private AmtlCore core;
 
@@ -90,7 +91,7 @@ public class SettingsActivity extends Activity {
     private void callOfflineButtonListerner() {
         button_level_bb_3g.performClick();
         button_trace_size_large.performClick();
-        if (this.platformConfig.getOfflineUsbAvailable()) {
+        if ((this.platformConfig.getOfflineUsbAvailable()) && (this.isUsbEnabled)) {
             button_offline_logging_usb.performClick();
         } else {
             button_offline_logging_hsi.performClick();
@@ -139,9 +140,12 @@ public class SettingsActivity extends Activity {
         button_trace_size_none.setEnabled(false);
         /* By default offline logging is HSI for medfield and USB for clovertrail */
         button_offline_logging_hsi.setEnabled(true);
-        button_offline_logging_usb.setEnabled(this.platformConfig.getOfflineUsbAvailable());
-        button_offline_logging_hsi.setChecked(!this.platformConfig.getOfflineUsbAvailable());
-        button_offline_logging_usb.setChecked(this.platformConfig.getOfflineUsbAvailable());
+        button_offline_logging_usb.setEnabled((this.platformConfig.getOfflineUsbAvailable())
+                && (this.isUsbEnabled));
+        button_offline_logging_hsi.setChecked((!this.platformConfig.getOfflineUsbAvailable())
+                || (!this.isUsbEnabled));
+        button_offline_logging_usb.setChecked((this.platformConfig.getOfflineUsbAvailable())
+                && (this.isUsbEnabled));
         button_offline_logging_none.setEnabled(false);
     }
 
@@ -596,6 +600,7 @@ public class SettingsActivity extends Activity {
             this.core.invalidate();
             this.platformConfig = PlatformConfig.get();
             retrieveLogSize();
+            this.isUsbEnabled = this.core.getUsbEnabled();
 
             CustomCfg curCfg = core.getCurCustomCfg();
             /* Get current custom configuration */

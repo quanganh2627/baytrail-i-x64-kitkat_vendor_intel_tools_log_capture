@@ -27,9 +27,15 @@ import android.os.SystemProperties;
 import android.util.Log;
 import android.widget.TextView;
 
+import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+
+import java.util.Scanner;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import com.intel.internal.telephony.MmgrClientException;
 import com.intel.internal.telephony.ModemEventListener;
@@ -82,6 +88,8 @@ public class AmtlCore implements ModemEventListener {
     /* Flag of first configuration set:
        to not interpret as a configuration to set */
     private boolean firstCfgSet = true;
+
+    private boolean isUsbEnabled = true;
 
     /* Current configuration values */
     private int serviceValue;
@@ -230,6 +238,45 @@ public class AmtlCore implements ModemEventListener {
         } else {
             return (this.curCfg != this.futCfg);
         }
+    }
+
+    private void setUsbEnabled() {
+
+        this.isUsbEnabled = true;
+        if ((platformConfig.getPlatformVersion()).equals("redhookbay")
+                && (platformConfig.getOfflineUsbAvailable())) {
+            this.isUsbEnabled = false;
+            File file = new File("/d/osip/cmdline");
+            Scanner scanner = null;
+
+            try {
+                scanner = new Scanner(file);
+                int lineNum = 0;
+                Pattern pattern =  Pattern.compile("ehci_hcd.use_sph=1");
+                Matcher matcher = null;
+                while (scanner.hasNextLine()) {
+                    String line = scanner.nextLine();
+                    lineNum++;
+                    matcher = pattern.matcher(line);
+                    if (matcher.find()) {
+                        this.isUsbEnabled = true;
+                    } else {
+                        Log.d(TAG, MODULE + ": ehci_hcd.use_sph=1 not found in /d/osip/cmdline");
+                    }
+                }
+            } catch (FileNotFoundException e) {
+                Log.e(TAG, MODULE + ": cmdline file not found");
+            } finally {
+                if (scanner != null) {
+                    scanner.close();
+                }
+            }
+        }
+    }
+
+    protected boolean getUsbEnabled() {
+        this.setUsbEnabled();
+        return this.isUsbEnabled;
     }
 
     /* Get current active configuration */

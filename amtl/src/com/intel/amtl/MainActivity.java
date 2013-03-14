@@ -44,6 +44,7 @@
  * 2.2.11 - 2013-02-20 - BZ 88037 - Change at+trace command
  * 2.2.12 - 2013-02-19 - BZ 86854 - Add checks to avoid NullPointerException
  * 2.3.0  - 2013-02-25 - BZ 88485 - Config file for platform specificities
+ * 2.3.1  - 2013-03-14 - BZ 92443 - Usb logging based on SPH driver status
  * ============================================================================
  */
 
@@ -234,9 +235,16 @@ public class MainActivity extends Activity {
             @Override
             public void onClick(View v) {
                 if (button_ape_log_file_usb.isChecked()) {
-                    setCfg(PredefinedCfg.OFFLINE_USB_BP_LOG);
+                    if (core.getUsbEnabled()) {
+                        setCfg(PredefinedCfg.OFFLINE_USB_BP_LOG);
+                    } else {
+                        UIHelper.message_pop_up(MainActivity.this, "Feature disabled",
+                                "To enabled logging over USB please add ehci_hcd.use_sph=1"
+                                + "in the file d/osip/cmdline and reboot.");
+                        button_ape_log_file_usb.setChecked(false);
+                    }
                 } else {
-                    /* If user presses again on button_ape_log_file, traces are stopped */
+                    /* If user presses again on button_ape_log_file_usb, traces are stopped */
                     setCfg(PredefinedCfg.TRACE_DISABLE);
                 }
             }
