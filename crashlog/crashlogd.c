@@ -1295,7 +1295,7 @@ void process_anr_or_uiwdt_tracefile(char *destion, int dir, int remove_path)
                     break;
                 }
                 fstat(src, &stat_buf);
-                dest = open(dest_path, O_WRONLY|O_CREAT);
+                dest = open(dest_path, O_WRONLY|O_CREAT, 0600);
                 close(dest);
                 do_chmod(dest_path, "600");
                 do_chown(dest_path, PERM_USER, PERM_GROUP);
