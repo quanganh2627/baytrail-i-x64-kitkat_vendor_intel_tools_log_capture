@@ -1844,7 +1844,11 @@ static int update_history_on_cmd_delete(char* events)
           }
           close(fd);
     }
-
+    else {
+        if (data != 0)
+            free(data);
+        return 0;
+    }
     if (data != 0)
          free(data);
     return 1;
@@ -2076,16 +2080,19 @@ void process_command(char *filename, char *name) {
     //extract the action and list of events from the commad file
     snprintf(path, sizeof(path),"%s/%s", filename, name);
     if ((!stat(path, &info))) {
-         if (!get_str_in_file(path,"ACTION=",action, sizeof(action)) && !get_str_in_file(path,"ARGS=",events, sizeof(events))) {
+        if (!get_str_in_file(path,"ACTION=",action, sizeof(action)) && !get_str_in_file(path,"ARGS=",events, sizeof(events))) {
             if ((!strncmp(action, "DELETE", 6)) && checkEvents(events)) {
-               update_history_on_cmd_delete(events);
-               /*delete trigger file*/
-               remove(path);
-               return;
-            }
-         }
+                if (!update_history_on_cmd_delete(events))
+                    LOGE("Can't update history_event on delete cmd for events=%s", events);
+            } else
+                LOGE("Invalid command file %s : invalid action or/and arguments", path);
+        } else
+            LOGE("Invalid command file %s : invalid keywords", path);
+        /*delete trigger file*/
+        remove(path);
+        return;
     }
-    LOGE("Invalid command %s", path);
+    LOGE("Invalid command : can't open file %s", path);
 }
 
 /*
