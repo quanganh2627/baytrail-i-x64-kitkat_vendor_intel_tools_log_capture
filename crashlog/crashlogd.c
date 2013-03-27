@@ -3545,6 +3545,8 @@ static int crashlog_check_panic(char *reason, unsigned int files)
 
         if (!strncmp(crashtype, KERNEL_FAKE_CRASH, sizeof(KERNEL_FAKE_CRASH)))
              strcat(reason,"_FAKE");
+        else if (!strncmp(reason, "HWWDT_RESET_FAKE", 16))
+             strcpy(crashtype, KERNEL_FAKE_CRASH);
         else if (!strncmp(reason,"HWWDT_RESET", 11))
              strcpy(crashtype, KERNEL_HWWDT_CRASH);
          else if (strncmp(reason,"SWWDT_RESET", 11) != 0)
