@@ -34,6 +34,15 @@ public class SettingsActivity extends Activity {
 
     private static final String MODULE = "SettingsActivity";
 
+    private final int LOG_SIZE_EMMC = 1;
+    private final int LOG_SIZE_SDCARD = 2;
+    private final int CONVERSION = 1000;
+
+    private String largeLogSizeEmmcText = "";
+    private String smallLogSizeEmmcText = "";
+    private String largeLogSizeSdcardText = "";
+    private String smallLogSizeSdcardText = "";
+
     private final String LOG_SIZE_150MB = "150MB";
     private final String LOG_SIZE_600MB = "600MB";
 
@@ -60,14 +69,16 @@ public class SettingsActivity extends Activity {
     private TextView header_additional_traces;
     /* when set_trace_file_size is called by the listener on emmc button */
     /* button_location_emmc is not considered as checked yet */
-    private boolean isEmmcChecked = false;
 
     private boolean invalidateFlag;
+    private boolean isUsbEnabled = true;
 
     private AmtlCore core;
 
     /* Local selected values */
     private CustomCfg cfg;
+
+    private PlatformConfig platformConfig;
 
     /* Update other buttons after enabling coredump, pti, usb ape or modem as trace location */
     private void callOnlineButtonListerner() {
@@ -80,7 +91,7 @@ public class SettingsActivity extends Activity {
     private void callOfflineButtonListerner() {
         button_level_bb_3g.performClick();
         button_trace_size_large.performClick();
-        if (AmtlCore.usbAcmEnabled) {
+        if ((this.platformConfig.getOfflineUsbAvailable()) && (this.isUsbEnabled)) {
             button_offline_logging_usb.performClick();
         } else {
             button_offline_logging_hsi.performClick();
@@ -104,13 +115,6 @@ public class SettingsActivity extends Activity {
         button_level_none.setEnabled(false);
         /* By default trace file size is none */
         button_trace_size_small.setEnabled(false);
-        if (!AmtlCore.usbswitchEnabled && !AmtlCore.usbAcmEnabled) {
-            if (button_location_emmc.isChecked()) {
-                button_trace_size_large.setText(LOG_SIZE_150MB);
-            } else {
-                button_trace_size_large.setText(LOG_SIZE_600MB);
-            }
-        }
         button_trace_size_large.setEnabled(false);
         button_trace_size_none.setEnabled(true);
         button_trace_size_none.setChecked(true);
@@ -131,21 +135,17 @@ public class SettingsActivity extends Activity {
         button_level_bb_3g_digrf.setEnabled(true);
         /* By default trace file size is large */
         button_trace_size_small.setEnabled(true);
-        if (!AmtlCore.usbswitchEnabled && !AmtlCore.usbAcmEnabled) {
-            if (isEmmcChecked) {
-                button_trace_size_large.setText(LOG_SIZE_150MB);
-            } else {
-                button_trace_size_large.setText(LOG_SIZE_600MB);
-            }
-        }
         button_trace_size_large.setEnabled(true);
         button_trace_size_large.setChecked(true);
         button_trace_size_none.setEnabled(false);
         /* By default offline logging is HSI for medfield and USB for clovertrail */
         button_offline_logging_hsi.setEnabled(true);
-        button_offline_logging_usb.setEnabled(AmtlCore.usbAcmEnabled);
-        button_offline_logging_hsi.setChecked(!AmtlCore.usbAcmEnabled);
-        button_offline_logging_usb.setChecked(AmtlCore.usbAcmEnabled);
+        button_offline_logging_usb.setEnabled((this.platformConfig.getOfflineUsbAvailable())
+                && (this.isUsbEnabled));
+        button_offline_logging_hsi.setChecked((!this.platformConfig.getOfflineUsbAvailable())
+                || (!this.isUsbEnabled));
+        button_offline_logging_usb.setChecked((this.platformConfig.getOfflineUsbAvailable())
+                && (this.isUsbEnabled));
         button_offline_logging_none.setEnabled(false);
     }
 
@@ -192,13 +192,13 @@ public class SettingsActivity extends Activity {
     private void set_location_button() {
         switch (cfg.traceLocation) {
         case CustomCfg.TRACE_LOC_EMMC:
+            displayLogSize(LOG_SIZE_EMMC);
             button_location_emmc.setChecked(true);
-            isEmmcChecked = true;
             enableOfflineButtons();
             break;
         case CustomCfg.TRACE_LOC_SDCARD:
+            displayLogSize(LOG_SIZE_SDCARD);
             button_location_sdcard.setChecked(true);
-            isEmmcChecked = false;
             enableOfflineButtons();
             break;
         case CustomCfg.TRACE_LOC_COREDUMP:
@@ -236,13 +236,6 @@ public class SettingsActivity extends Activity {
             button_trace_size_small.setChecked(true);
             break;
         case CustomCfg.LOG_SIZE_LARGE:
-            if (!AmtlCore.usbswitchEnabled && !AmtlCore.usbAcmEnabled) {
-                if (isEmmcChecked) {
-                    button_trace_size_large.setText(LOG_SIZE_150MB);
-                } else {
-                    button_trace_size_large.setText(LOG_SIZE_600MB);
-                }
-            }
             button_trace_size_large.setChecked(true);
             break;
         default:
@@ -312,7 +305,7 @@ public class SettingsActivity extends Activity {
         switch(V.getId()) {
             case R.id.settings_location_emmc_btn:
                 if (checked) {
-                    isEmmcChecked = true;
+                    displayLogSize(LOG_SIZE_EMMC);
                     cfg.traceLocation = CustomCfg.TRACE_LOC_EMMC;
                     enableOfflineButtons();
                     callOfflineButtonListerner();
@@ -321,7 +314,7 @@ public class SettingsActivity extends Activity {
                 break;
             case R.id.settings_location_sdcard_btn:
                 if (checked) {
-                    isEmmcChecked = false;
+                    displayLogSize(LOG_SIZE_SDCARD);
                     cfg.traceLocation = CustomCfg.TRACE_LOC_SDCARD;
                     enableOfflineButtons();
                     callOfflineButtonListerner();
@@ -384,25 +377,28 @@ public class SettingsActivity extends Activity {
             case R.id.settings_level_bb_btn:
                 if (checked) {
                     cfg.traceLevel = CustomCfg.TRACE_LEVEL_BB;
+                    cfg.traceStatus = CustomCfg.TRACE_ENABLED;
                     invalidate();
                 }
                 break;
             case R.id.settings_level_bb_3g_btn:
                 if (checked) {
                     cfg.traceLevel = CustomCfg.TRACE_LEVEL_BB_3G;
+                    cfg.traceStatus = CustomCfg.TRACE_ENABLED;
                     invalidate();
                 }
                 break;
             case R.id.settings_level_bb_3g_digrf_btn:
                 if (checked) {
-
                     cfg.traceLevel = CustomCfg.TRACE_LEVEL_BB_3G_DIGRF;
+                    cfg.traceStatus = CustomCfg.TRACE_ENABLED;
                     invalidate();
                 }
                 break;
             case R.id.settings_level_none_btn:
                 if (checked) {
                     cfg.traceLevel = CustomCfg.TRACE_LEVEL_NONE;
+                    cfg.traceStatus = CustomCfg.TRACE_DISABLED;
                     invalidate();
                 }
                 break;
@@ -469,6 +465,53 @@ public class SettingsActivity extends Activity {
             default: /* Error, unknown button ID */
                 Log.e(AmtlCore.TAG, MODULE + ": unknown button ID, set offline to none.");
                 break;
+        }
+    }
+
+    private void retrieveLogSize() {
+
+        String smallLogSizeEmmc = this.platformConfig.getSmallLogSizeEmmc();
+        String largeLogSizeEmmc = this.platformConfig.getLargeLogSizeEmmc();
+        String smallLogSizeSdcard = this.platformConfig.getSmallLogSizeSdcard();
+        String largeLogSizeSdcard = this.platformConfig.getLargeLogSizeSdcard();
+        String smallLogNumberEmmc = this.platformConfig.getSmallLogNumEmmc();
+        String largeLogNumberEmmc = this.platformConfig.getLargeLogNumEmmc();
+        String smallLogNumberSdcard = this.platformConfig.getSmallLogNumSdcard();
+        String largeLogNumberSdcard = this.platformConfig.getLargeLogNumSdcard();
+        String emptyString = "";
+
+        if ((!smallLogSizeEmmc.equals(emptyString))
+                && (!smallLogNumberEmmc.equals(emptyString))) {
+            smallLogSizeEmmcText = Integer.toString((Integer.parseInt(smallLogSizeEmmc)
+                    * Integer.parseInt(smallLogNumberEmmc)) / CONVERSION) + " MB";
+        }
+        if ((!largeLogSizeEmmc.equals(emptyString))
+                && (!largeLogNumberEmmc.equals(emptyString))) {
+            largeLogSizeEmmcText = Integer.toString((Integer.parseInt(largeLogSizeEmmc)
+                    * Integer.parseInt(largeLogNumberEmmc)) / CONVERSION) + " MB";
+        }
+        if ((!smallLogSizeSdcard.equals(emptyString))
+                && (!smallLogNumberSdcard.equals(emptyString))) {
+            smallLogSizeSdcardText = Integer.toString((Integer.parseInt(smallLogSizeSdcard)
+                    * Integer.parseInt(smallLogNumberSdcard)) / CONVERSION) + " MB";
+        }
+        if ((!largeLogSizeSdcard.equals(emptyString))
+                && (!largeLogNumberSdcard.equals(emptyString))) {
+            largeLogSizeSdcardText = Integer.toString((Integer.parseInt(largeLogSizeSdcard)
+                    * Integer.parseInt(largeLogNumberSdcard)) / CONVERSION) + " MB";
+        }
+    }
+
+    private void displayLogSize (int logToDisplay) {
+        switch (logToDisplay) {
+            case LOG_SIZE_EMMC:
+                button_trace_size_small.setText(smallLogSizeEmmcText);
+                button_trace_size_large.setText(largeLogSizeEmmcText);
+            break;
+            case LOG_SIZE_SDCARD:
+                button_trace_size_small.setText(smallLogSizeSdcardText);
+                button_trace_size_large.setText(largeLogSizeSdcardText);
+            break;
         }
     }
 
@@ -555,11 +598,15 @@ public class SettingsActivity extends Activity {
             this.core = AmtlCore.get();
             this.core.setContext(this.getApplicationContext());
             this.core.invalidate();
+            this.platformConfig = PlatformConfig.get();
+            retrieveLogSize();
+            this.isUsbEnabled = this.core.getUsbEnabled();
 
             CustomCfg curCfg = core.getCurCustomCfg();
             /* Get current custom configuration */
             cfg.traceLocation = curCfg.traceLocation;
             cfg.traceLevel = curCfg.traceLevel;
+            cfg.traceStatus = curCfg.traceStatus;
             cfg.traceFileSize = curCfg.traceFileSize;
             cfg.offlineLogging = curCfg.offlineLogging;
             cfg.muxTrace = curCfg.muxTrace;
@@ -573,11 +620,19 @@ public class SettingsActivity extends Activity {
             UIHelper.message_pop_up(this, "ERROR",e.getMessage());
         }
 
-        if (!AmtlCore.usbswitchEnabled) {
+        if (!this.platformConfig.getCoredumpAvailable()) {
+            button_location_coredump.setVisibility(View.GONE);
+        }
+        if (!this.platformConfig.getOfflineHsiAvailable()
+                && (!platformConfig.getOfflineUsbAvailable())) {
+             button_location_emmc.setVisibility(View.GONE);
+             button_location_sdcard.setVisibility(View.GONE);
+        }
+        if (!this.platformConfig.getOnlineUsbAvailable()) {
             button_location_usb_ape.setVisibility(View.GONE);
             button_location_usb_modem.setVisibility(View.GONE);
         }
-        if (!AmtlCore.ptiEnabled) {
+        if (!this.platformConfig.getOnlinePtiAvailable()) {
             button_location_pti_modem.setVisibility(View.GONE);
         }
 
