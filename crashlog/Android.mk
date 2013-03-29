@@ -18,13 +18,16 @@
 LOCAL_PATH:= $(call my-dir)
 include $(CLEAR_VARS)
 
-LOCAL_SRC_FILES:= crashlogd.c
+LOCAL_SRC_FILES:= \
+  crashlogd.c \
+  mmgr_source.c
 
 LOCAL_C_INCLUDES += \
+  $(TARGET_OUT_HEADERS)/IFX-modem \
   device/intel/log_capture/backtrace
 
 LOCAL_MODULE_TAGS := eng debug
 LOCAL_MODULE:= crashlogd
 
-LOCAL_SHARED_LIBRARIES:= libparse_stack libc libcutils
+LOCAL_SHARED_LIBRARIES:= libparse_stack libc libcutils libmmgrcli
 include $(BUILD_EXECUTABLE)

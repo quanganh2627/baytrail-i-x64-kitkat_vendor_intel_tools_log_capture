@@ -43,6 +43,8 @@
  * 2.2.10 - 2013-02-08 - BZ 72645 - Fix code issues after BZ 52786
  * 2.2.11 - 2013-02-20 - BZ 88037 - Change at+trace command
  * 2.2.12 - 2013-02-19 - BZ 86854 - Add checks to avoid NullPointerException
+ * 2.3.0  - 2013-02-25 - BZ 88485 - Config file for platform specificities
+ * 2.3.1  - 2013-03-14 - BZ 92443 - Usb logging based on SPH driver status
  * ============================================================================
  */
 
@@ -80,6 +82,8 @@ public class MainActivity extends Activity {
     protected static boolean isPerformingInit = false;
 
     private AmtlCore core;
+
+    private PlatformConfig platformConfig;
 
     /* Create advanced menu */
     @Override
@@ -184,6 +188,7 @@ public class MainActivity extends Activity {
         try {
             this.core = AmtlCore.get();
             this.core.setContext(this.getApplicationContext());
+            this.platformConfig = PlatformConfig.get();
             this.initTask = new AsyncMainActivityInitTask();
             /* let's init our AmtlCore in a background thread to release the UI thread asap. */
             this.initTask.execute((Void)null);
@@ -225,59 +230,51 @@ public class MainActivity extends Activity {
             }
         });
 
-        if (AmtlCore.usbAcmEnabled) {
-            /* Listener on APE Log File via USB button */
-            button_ape_log_file_usb.setOnClickListener(new OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    if (button_ape_log_file_usb.isChecked()) {
+        /* Listener on APE Log File via USB button */
+        button_ape_log_file_usb.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (button_ape_log_file_usb.isChecked()) {
+                    if (core.getUsbEnabled()) {
                         setCfg(PredefinedCfg.OFFLINE_USB_BP_LOG);
                     } else {
-                        /* If user presses again on button_ape_log_file, traces are stopped */
-                        setCfg(PredefinedCfg.TRACE_DISABLE);
+                        UIHelper.message_pop_up(MainActivity.this, "Feature disabled",
+                                "To enabled logging over USB please add ehci_hcd.use_sph=1"
+                                + "in the file d/osip/cmdline and reboot.");
+                        button_ape_log_file_usb.setChecked(false);
                     }
+                } else {
+                    /* If user presses again on button_ape_log_file_usb, traces are stopped */
+                    setCfg(PredefinedCfg.TRACE_DISABLE);
                 }
-            });
-        } else {
-            /* Disable APE Log File via USB button for Medfield and Lexington */
-            button_ape_log_file_usb.setVisibility(View.GONE);
-        }
+            }
+        });
 
-        if (AmtlCore.usbswitchEnabled) {
-            /* Listener on online BP logging  button */
-            button_online_bp_log.setOnClickListener(new OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    if (button_online_bp_log.isChecked()) {
-                        setCfg(PredefinedCfg.ONLINE_BP_LOG);
-                    } else {
-                        /* If user presses again on button_bp_log_file, traces are stopped */
-                        setCfg(PredefinedCfg.TRACE_DISABLE);
-                    }
+        /* Listener on online BP logging  button */
+        button_online_bp_log.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (button_online_bp_log.isChecked()) {
+                    setCfg(PredefinedCfg.ONLINE_BP_LOG);
+                } else {
+                    /* If user presses again on button_bp_log_file, traces are stopped */
+                    setCfg(PredefinedCfg.TRACE_DISABLE);
                 }
-            });
-        } else {
-            /* Disable online bp log button for Clovertrail and Lexington */
-            button_online_bp_log.setVisibility(View.GONE);
-        }
+            }
+        });
 
-        if (AmtlCore.ptiEnabled) {
-            /* Listener on PTI BP logging button */
-            button_pti_bp_log.setOnClickListener(new OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    if (button_pti_bp_log.isChecked()) {
-                        setCfg(PredefinedCfg.PTI_BP_LOG);
-                    } else {
-                        /* If user presses again on button_pti_bp_log_file, traces are stopped */
-                        setCfg(PredefinedCfg.TRACE_DISABLE);
-                    }
+        /* Listener on PTI BP logging button */
+        button_pti_bp_log.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (button_pti_bp_log.isChecked()) {
+                    setCfg(PredefinedCfg.PTI_BP_LOG);
+                } else {
+                    /* If user presses again on button_pti_bp_log_file, traces are stopped */
+                    setCfg(PredefinedCfg.TRACE_DISABLE);
                 }
-            });
-        } else {
-            /* Disable online bp log button for Clovertrail and Lexington */
-            button_pti_bp_log.setVisibility(View.GONE);
-        }
+            }
+        });
 
         /* Listener on Disable button */
         button_disable_modem_trace.setOnClickListener(new OnClickListener() {
@@ -334,7 +331,38 @@ public class MainActivity extends Activity {
         if (this.core != null) {
             this.core.destroy();
         }
+        if (this.platformConfig != null) {
+            this.platformConfig.destroy();
+        }
         super.onDestroy();
+    }
+
+    private void setButtons() {
+        if (!this.platformConfig.getCoredumpAvailable()) {
+            button_modem_coredump.setVisibility(View.GONE);
+        } else {
+            button_modem_coredump.setVisibility(View.VISIBLE);
+        }
+        if (!this.platformConfig.getOfflineHsiAvailable()) {
+            button_ape_log_file_hsi.setVisibility(View.GONE);
+        } else {
+            button_ape_log_file_hsi.setVisibility(View.VISIBLE);
+        }
+        if (!this.platformConfig.getOfflineUsbAvailable()) {
+            button_ape_log_file_usb.setVisibility(View.GONE);
+        } else {
+            button_ape_log_file_usb.setVisibility(View.VISIBLE);
+        }
+        if (!this.platformConfig.getOnlinePtiAvailable()) {
+            button_pti_bp_log.setVisibility(View.GONE);
+        } else {
+            button_pti_bp_log.setVisibility(View.VISIBLE);
+        }
+        if (!this.platformConfig.getOnlineUsbAvailable()) {
+            button_online_bp_log.setVisibility(View.GONE);
+        } else {
+            button_online_bp_log.setVisibility(View.VISIBLE);
+        }
     }
 
     private class AsyncMainActivityInitTask extends AsyncTask<Void, Integer, Boolean> {
@@ -364,6 +392,7 @@ public class MainActivity extends Activity {
             MainActivity.isPerformingInit = false;
             Log.i(AmtlCore.TAG, MODULE + ": MainActivity init done.");
             if (result) {
+                MainActivity.this.setButtons();
                 MainActivity.this.setUI(MainActivity.this.core.getCurCfg());
             } else {
                 UIHelper.exitDialog(MainActivity.this, "ERROR",

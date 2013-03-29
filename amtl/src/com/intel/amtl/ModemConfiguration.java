@@ -27,11 +27,6 @@ public class ModemConfiguration {
 
     private static final String MODULE = "ModemConfiguration";
 
-    public final static int XSIO_0 = 0;
-    public final static int XSIO_1 = 1;
-    public final static int XSIO_2 = 2;
-    public final static int XSIO_4 = 4;
-
     /* XSIO AT commands */
     private static final String AT_SET_XSIO_FMT = "at+xsio=%d\r\n";
     private static final String AT_GET_XSIO = "at+xsio?\r\n";
@@ -63,79 +58,14 @@ public class ModemConfiguration {
             = "at+xsystrace=0,\"digrf=1;bb_sw=1;3g_sw=1\",\"digrf=0x84\",\"oct=3\"\r\n";
 
     /* TRACE AT commands */
+    private static final String AT_GET_TRACE = "at+trace?\r\n";
     private static final String AT_SET_TRACE_LEVEL_DISABLE = "at+trace=0\r\n";
     private static final String AT_SET_TRACE_LEVEL_ENABLE = "at+trace=1\r\n";
 
-    protected final static int xsio_00 = 0;
-    protected final static int xsio_20 = 1;
-    protected final static int xsio_22 = 2;
-    protected final static int xsio_02 = 3;
-    protected final static int xsio_40 = 4;
-    protected final static int xsio_44 = 5;
-    protected final static int xsio_04 = 6;
-    protected final static int xsio_24 = 7;
-    protected final static int xsio_42 = 8;
-    protected final static int xsio_01 = 9;
-    protected final static int xsio_10 = 10;
-    protected final static int xsio_11 = 11;
-    protected final static int xsio_14 = 12;
-    protected final static int xsio_41 = 13;
-    protected final static int reboot_ok0 = 50;
-    protected final static int reboot_ko0 = 51;
-    protected final static int reboot_ok2 = 52;
-    protected final static int reboot_ko2 = 53;
-    protected final static int reboot_ok4 = 54;
-    protected final static int reboot_ko4 = 55;
-    protected final static int reboot_ok1 = 56;
-    protected final static int reboot_ko1 = 57;
+    private PlatformConfig platformConfig;
 
-    /* Simplify the modem status : rebooted (ok) or not rebooted(ko) */
-    protected int modem_reboot_status(int reboot_value) {
-        int ret = reboot_ok0;
-        switch (reboot_value) {
-            case xsio_00:
-                /* xsio = 0 and modem has been rebooted */
-                ret = reboot_ok0;
-                break;
-            case xsio_01:
-            case xsio_02:
-            case xsio_04:
-                /* xsio = 0 and modem has not been rebooted */
-                ret = reboot_ko0;
-                break;
-            case xsio_11:
-                /* xsio = 1 and modem has been rebooted */
-                ret = reboot_ok1;
-                break;
-            case xsio_10:
-            case xsio_14:
-                /* xsio = 1 and modem has not been rebooted */
-                ret = reboot_ko1;
-                break;
-            case xsio_22:
-                /* xsio = 2 and modem has been rebooted */
-                ret = reboot_ok2;
-                break;
-            case xsio_20:
-            case xsio_24:
-                /* xsio = 2 and modem has not been rebooted */
-                ret = reboot_ko2;
-                break;
-            case xsio_44:
-                /* xsio = 4 and modem has been rebooted */
-                ret = reboot_ok4;
-                break;
-            case xsio_40:
-            case xsio_41:
-            case xsio_42:
-                /* xsio = 4 and modem has not been rebooted */
-                ret = reboot_ko4;
-                break;
-            default:
-                ret = reboot_ok0;
-                break;
-        }
-        return ret;
+    public void ModemConfiguration () {
+        this.platformConfig = PlatformConfig.get();
     }
 
     /* Send command to the modem and read the response */
@@ -176,6 +106,8 @@ public class ModemConfiguration {
             ret = getXsioValue(modem_value);
         } else if (ival.equals(AT_GET_TRACE_LEVEL)) {
             ret = getTraceLevelValue(modem_value);
+        } else if (ival.equals(AT_GET_TRACE)) {
+            ret = getTraceStatus(modem_value);
         } else if (ival.equals(AT_GET_MUX_TRACE)) {
             if ((modem_value.contains("1,3,-1"))) {
                 ret = CustomCfg.MUX_TRACE_ON;
@@ -228,6 +160,15 @@ public class ModemConfiguration {
         }
     }
 
+    /* Get trace from string */
+    private int getTraceStatus(String s) {
+        int ret = CustomCfg.TRACE_DISABLED;
+        if (s.contains("+TRACE: 1")) {
+            ret = CustomCfg.TRACE_ENABLED;
+        }
+        return ret;
+    }
+
     /* Get trace level from string */
     private int getTraceLevelValue(String s) {
         int ret = CustomCfg.TRACE_LEVEL_NONE;
@@ -246,66 +187,21 @@ public class ModemConfiguration {
 
     /* Get XSIO value from string */
     private int getXsioValue(String s) {
-        int ret = xsio_00;
-        if (s.contains("0, *0")) {
-            ret = xsio_00;
-        } else if (s.contains("2, *0")) {
-            ret = xsio_20;
-        } else if (s.contains("2, *2")) {
-            ret = xsio_22;
-        } else if (s.contains("0, *2")) {
-            ret = xsio_02;
-        } else if (s.contains("4, *0")) {
-            ret = xsio_40;
-        } else if (s.contains("4, *4")) {
-            ret = xsio_44;
-        } else if (s.contains("0, *4")) {
-            ret = xsio_04;
-        } else if (s.contains("2, *4")) {
-            ret = xsio_24;
-        } else if (s.contains("4, *2")) {
-            ret = xsio_42;
-        } else if (s.contains("0, *1")) {
-            ret = xsio_01;
-        } else if (s.contains("1, *0")) {
-            ret = xsio_10;
-        } else if (s.contains("1, *1")) {
-            ret = xsio_11;
-        } else if (s.contains("4, *1")) {
-            ret = xsio_41;
-        } else if (s.contains("1, *4")) {
-            ret = xsio_14;
-        } else {
-            ret= xsio_00;
-        }
-        return ret;
+        int indexXsio = s.indexOf("+XSIO: ");
+        return Integer.parseInt(s.substring(indexXsio+7, indexXsio+8));
     }
 
     /* Set XSIO configuration */
     protected void setXsio(RandomAccessFile f, int xsio) {
-        String atCmd;
-        switch (xsio) {
-            case XSIO_1:
-                /* Enable usb acm */
-                atCmd = String.format(AT_SET_XSIO_FMT, XSIO_1);
-                break;
-            case XSIO_2:
-                /* Enable coredump */
-                atCmd = String.format(AT_SET_XSIO_FMT, XSIO_2);
-                break;
-            case XSIO_4:
-                /* Enable hsi */
-                atCmd = String.format(AT_SET_XSIO_FMT, XSIO_4);
-                break;
-            default:
-                /* Disable */
-                atCmd = String.format(AT_SET_XSIO_FMT, XSIO_0);
-                break;
-        }
-        try {
-            read_write_modem(f, atCmd);
-        } catch (IOException e) {
-            Log.e(AmtlCore.TAG, MODULE + ": can't enable_frequency");
+        this.platformConfig = PlatformConfig.get();
+        if (this.platformConfig.isXsioAllowed(xsio)) {
+            try {
+                read_write_modem(f, String.format(AT_SET_XSIO_FMT, xsio));
+            } catch (IOException e) {
+                Log.e(AmtlCore.TAG, MODULE + ": can't set xsio");
+            }
+        } else {
+            Log.e(AmtlCore.TAG, MODULE + ": the xsio to set is not allowed");
         }
     }
 
@@ -321,22 +217,18 @@ public class ModemConfiguration {
             switch (level) {
             case CustomCfg.TRACE_LEVEL_BB:
                 /* MA traces */
-                read_write_modem(f, AT_SET_TRACE_LEVEL_ENABLE);
                 read_write_modem(f, sysTraceBb);
                 break;
             case CustomCfg.TRACE_LEVEL_BB_3G:
                 /* MA & Artemis traces */
-                read_write_modem(f, AT_SET_TRACE_LEVEL_ENABLE);
                 read_write_modem(f, sysTrace3G);
                 break;
             case CustomCfg.TRACE_LEVEL_BB_3G_DIGRF:
                 /* MA & Artemis & Digrf traces */
-                read_write_modem(f, AT_SET_TRACE_LEVEL_ENABLE);
                 read_write_modem(f, sysTraceDigrf);
                 break;
             default:
                 /* Disable trace */
-                read_write_modem(f, AT_SET_TRACE_LEVEL_DISABLE);
                 read_write_modem(f, AT_SET_XSYSTRACE_LEVEL_DISABLE);
                 break;
             }
@@ -344,6 +236,29 @@ public class ModemConfiguration {
             Log.e(AmtlCore.TAG, MODULE + ": can't set trace level");
         }
     }
+
+   /* Set trace status */
+    protected void setTraceStatus(RandomAccessFile f, int status) {
+         try {
+            switch (status) {
+            case CustomCfg.TRACE_ENABLED:
+                /* Enable traces */
+                read_write_modem(f, AT_SET_TRACE_LEVEL_ENABLE);
+                break;
+            case CustomCfg.TRACE_DISABLED:
+                /* Disable traces */
+                read_write_modem(f, AT_SET_TRACE_LEVEL_DISABLE);
+                break;
+            default:
+                /* Disable traces */
+                read_write_modem(f, AT_SET_TRACE_LEVEL_DISABLE);
+                break;
+            }
+        } catch (IOException e) {
+            Log.e(AmtlCore.TAG, MODULE + ": can't set trace status");
+        }
+    }
+
 
     /* Set MUX traces on */
     protected void setMuxTraceOn(RandomAccessFile f) {
@@ -389,6 +304,11 @@ public class ModemConfiguration {
     /* Get current XSIO */
     protected int getXsio(RandomAccessFile f) throws IOException {
         return read_write_modem(f, AT_GET_XSIO);
+    }
+
+     /* Get current trace*/
+    protected int getTraceStatus(RandomAccessFile f) throws IOException {
+        return read_write_modem(f, AT_GET_TRACE);
     }
 
     protected int getMuxTraceState(RandomAccessFile f) throws IOException {

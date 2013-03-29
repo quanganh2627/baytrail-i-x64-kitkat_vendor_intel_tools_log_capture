@@ -47,6 +47,8 @@ public class AdditionalFeaturesActivity extends Activity {
     private char[] inputBuffer;
     private String data;
 
+    private PlatformConfig platformConfig;
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -65,7 +67,9 @@ public class AdditionalFeaturesActivity extends Activity {
 
         button_toggle_on1.setEnabled(false);
 
-        if (AmtlCore.usbswitchEnabled) {
+        this.platformConfig = PlatformConfig.get();
+
+        if (this.platformConfig.getUsbswitchAvailable()) {
             /* Read usbswitch.conf file */
             FileInputStream fIn = null;
             InputStreamReader isr = null;
