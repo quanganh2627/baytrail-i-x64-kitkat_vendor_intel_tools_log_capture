@@ -23,8 +23,8 @@
     <string name="settings_level_bb_3g_button">bb_sw+3g_sw</string>
     <string name="settings_level_bb_3g_digrf_button">bb_sw+3g_sw+digrf</string>
     <string name="settings_trace_size_txt">Trace file size</string>
-    <string name="settings_trace_size_small_button">MB</string>
-    <string name="settings_trace_size_large_button">MB</string>
+    <string name="settings_trace_size_small_button">100MB</string>
+    <string name="settings_trace_size_large_button">600MB</string>
     <string name="settings_offline_logging_txt">Offline logging over</string>
     <string name="settings_offline_logging_hsi_button">HSI</string>
     <string name="settings_offline_logging_usb_button">USB</string>

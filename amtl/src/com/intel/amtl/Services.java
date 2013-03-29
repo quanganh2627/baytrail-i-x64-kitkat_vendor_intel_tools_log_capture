@@ -39,51 +39,33 @@ public class Services {
     protected final static int ONLINE_BP_LOG = 6;
     protected final static int MTS_PTI = 7;
 
-    private final String EMMC_PATH = "/logs/bplog";
+    protected final static String TTYACM1 = "/dev/ttyACM1";
+    protected final static String MDMTRACE = "/dev/mdmTrace";
+    protected final static String GSMTTY18 = "/dev/gsmtty18";
+    protected final static String EMMC_PATH = "/logs/bplog";
     private final String SDCARD_PATH = "/mnt/sdcard/logs/bplog";
+    private final String USB_SOCKET_PORT = "6700";
+    private final String PTI_PORT = "/dev/ttyPTI1";
+    private final String SMALL_LOG_SIZE = "20000";
+    private final String LARGE_LOG_SIZE_SD = "200000";
+    private final String LARGE_LOG_SIZE_CTP_MFLD = "200000";
+    private final String LARGE_LOG_SIZE_LEX = "25000";
     private final String FILE_OUTPUT_TYPE = "f";
     private final String SOCKET_OUTPUT_TYPE = "p";
     private final String PTI_OUTPUT_TYPE = "k";
     private final String EMPTY_STRING = "";
 
-    private String inputTty = "";
-    private String ttyOfflineUsb = "";
-    private String ttyOfflineHsi = "";
-    private String portOnlineUsb = "";
-    private String portOnlinePti = "";
-
-    private String smallLogSizeEmmc = "";
-    private String largeLogSizeEmmc = "";
-    private String smallLogSizeSdcard = "";
-    private String largeLogSizeSdcard = "";
-    private String smallLogNumberEmmc = "";
-    private String largeLogNumberEmmc = "";
-    private String smallLogNumberSdcard = "";
-    private String largeLogNumberSdcard = "";
-
-    private PlatformConfig platformConfig;
+    private String inputTty;
+    private String largeLogSizeEmmc;
+    private String largeLogNumberEmmc;
 
     private int service_val;
 
     public Services() {
-
-        this.platformConfig = PlatformConfig.get();
-
-        this.ttyOfflineUsb = this.platformConfig.getInputOfflineUsb();
-        this.ttyOfflineHsi = this.platformConfig.getInputOfflineHsi();
-        this.portOnlineUsb = this.platformConfig.getInputOnlineUsb();
-        this.portOnlinePti = this.platformConfig.getInputOnlinePti();
-
-        this.smallLogSizeEmmc = this.platformConfig.getSmallLogSizeEmmc();
-        this.largeLogSizeEmmc = this.platformConfig.getLargeLogSizeEmmc();
-        this.smallLogSizeSdcard = this.platformConfig.getSmallLogSizeSdcard();
-        this.largeLogSizeSdcard = this.platformConfig.getLargeLogSizeSdcard();
-
-        this.smallLogNumberEmmc = this.platformConfig.getSmallLogNumEmmc();
-        this.largeLogNumberEmmc = this.platformConfig.getLargeLogNumEmmc();
-        this.smallLogNumberSdcard = this.platformConfig.getSmallLogNumSdcard();
-        this.largeLogNumberSdcard = this.platformConfig.getLargeLogNumSdcard();
-
+        this.largeLogSizeEmmc = (!AmtlCore.usbAcmEnabled && !AmtlCore.usbswitchEnabled)
+                ? LARGE_LOG_SIZE_LEX : LARGE_LOG_SIZE_CTP_MFLD;
+        this.largeLogNumberEmmc = (!AmtlCore.usbAcmEnabled && !AmtlCore.usbswitchEnabled)
+                ? "6" : "3";
     }
 
     /* Enable selected service */
@@ -94,61 +76,58 @@ public class Services {
                 /* emmc 100MB persistent */
                 service_name = "mtsfs";
                 this.inputTty = (offlineLog == CustomCfg.OFFLINE_LOGGING_USB)
-                        ? this.ttyOfflineUsb : this.ttyOfflineHsi;
-                fillProperties(this.inputTty, FILE_OUTPUT_TYPE, EMMC_PATH,
-                        this.smallLogSizeEmmc, this.smallLogNumberEmmc);
+                        ? TTYACM1 : AmtlCore.hsiTty;
+                fillProperties(this.inputTty, FILE_OUTPUT_TYPE, EMMC_PATH, SMALL_LOG_SIZE, "5");
                 break;
             case MTS_EXTFS:
                 /* emmc 600MB (medfield-clovertrail) - 150MB (lexington) persistent */
                 service_name = "mtsextfs";
                 this.inputTty = (futurCfg == PredefinedCfg.OFFLINE_USB_BP_LOG
                         || offlineLog == CustomCfg.OFFLINE_LOGGING_USB)
-                        ? this.ttyOfflineUsb : this.ttyOfflineHsi;
-                fillProperties(this.inputTty, FILE_OUTPUT_TYPE, EMMC_PATH,
-                        this.largeLogSizeEmmc, this.largeLogNumberEmmc);
+                        ? TTYACM1 : AmtlCore.hsiTty;
+                fillProperties(this.inputTty, FILE_OUTPUT_TYPE, EMMC_PATH, this.largeLogSizeEmmc,
+                        this.largeLogNumberEmmc);
                 break;
             case MTS_SD:
                 /* sdcard 100MB persistent */
                 service_name = "mtssd";
                 this.inputTty = (offlineLog == CustomCfg.OFFLINE_LOGGING_USB)
-                        ? this.ttyOfflineUsb : this.ttyOfflineHsi;
-                fillProperties(this.inputTty, FILE_OUTPUT_TYPE, SDCARD_PATH,
-                        this.smallLogSizeSdcard, this.smallLogNumberSdcard);
+                        ? TTYACM1 : AmtlCore.hsiTty;
+                fillProperties(this.inputTty, FILE_OUTPUT_TYPE, SDCARD_PATH, SMALL_LOG_SIZE, "5");
                 break;
             case MTS_EXTSD:
                 /* sdcard 600MB persistent*/
                 service_name = "mtsextsd";
                 this.inputTty = (offlineLog == CustomCfg.OFFLINE_LOGGING_USB)
-                        ? this.ttyOfflineUsb : this.ttyOfflineHsi;
-                fillProperties(this.inputTty, FILE_OUTPUT_TYPE, SDCARD_PATH,
-                        this.largeLogSizeSdcard, this.largeLogNumberSdcard);
+                        ? TTYACM1 : AmtlCore.hsiTty;
+                fillProperties(this.inputTty, FILE_OUTPUT_TYPE, SDCARD_PATH, LARGE_LOG_SIZE_SD,
+                        "3");
                 break;
             case ONLINE_BP_LOG:
                 /* Online BP logging => usbmodem */
                 service_name = "usbmodem";
-                fillProperties(EMPTY_STRING, EMPTY_STRING, EMPTY_STRING,
-                        EMPTY_STRING, EMPTY_STRING);
+                fillProperties(EMPTY_STRING, EMPTY_STRING, EMPTY_STRING, EMPTY_STRING,
+                        EMPTY_STRING);
                 break;
             case MTS_USB:
                 /* USB oneshot */
                 service_name = "mtsusb";
-                fillProperties(this.ttyOfflineHsi, SOCKET_OUTPUT_TYPE, this.portOnlineUsb,
-                        EMPTY_STRING, EMPTY_STRING);
+                fillProperties(GSMTTY18, SOCKET_OUTPUT_TYPE, USB_SOCKET_PORT, EMPTY_STRING,
+                        EMPTY_STRING);
                 break;
             case MTS_PTI:
                 /* PTI BP logging => PTI */
                 service_name = "mtspti";
-                fillProperties(this.ttyOfflineUsb, PTI_OUTPUT_TYPE, this.portOnlinePti,
-                        EMPTY_STRING, EMPTY_STRING);
+                fillProperties(TTYACM1, PTI_OUTPUT_TYPE, PTI_PORT, EMPTY_STRING, EMPTY_STRING);
                 break;
             case MTS_DISABLE:
                 service_name = "disable";
-                fillProperties(EMPTY_STRING, EMPTY_STRING, EMPTY_STRING,
-                         EMPTY_STRING, EMPTY_STRING);
+                fillProperties(EMPTY_STRING, EMPTY_STRING, EMPTY_STRING, EMPTY_STRING,
+                        EMPTY_STRING);
                 break;
             default:
-                fillProperties(EMPTY_STRING, EMPTY_STRING, EMPTY_STRING,
-                         EMPTY_STRING, EMPTY_STRING);
+                fillProperties(EMPTY_STRING, EMPTY_STRING, EMPTY_STRING, EMPTY_STRING,
+                        EMPTY_STRING);
                 break;
         }
         Log.i(AmtlCore.TAG, MODULE + ": enable " + service_name + " service");

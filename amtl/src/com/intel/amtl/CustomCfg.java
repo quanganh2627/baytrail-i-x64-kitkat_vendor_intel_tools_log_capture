@@ -53,13 +53,8 @@ public class CustomCfg {
     public static final int TRACE_LEVEL_BB_3G = 2;
     public static final int TRACE_LEVEL_BB_3G_DIGRF = 3;
 
-    /* Modem state */
-    public static final int TRACE_DISABLED = 0;
-    public static final int TRACE_ENABLED = 1;
-
     public int traceLocation = TRACE_LOC_EMMC;
     public int traceLevel = TRACE_LEVEL_BB_3G;
-    public int traceStatus = TRACE_ENABLED;
     public int traceFileSize = LOG_SIZE_LARGE;
     public int offlineLogging = OFFLINE_LOGGING_HSI;
     public int muxTrace = MUX_TRACE_OFF;
