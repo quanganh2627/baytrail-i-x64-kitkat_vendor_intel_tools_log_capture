@@ -619,14 +619,18 @@ public class SettingsActivity extends Activity {
             Log.e(AmtlCore.TAG, MODULE + ": " + e.getMessage());
             UIHelper.message_pop_up(this, "ERROR",e.getMessage());
         }
+        /* remove sdcard button as /sdcard is part of the emmc */
+        button_location_sdcard.setVisibility(View.GONE);
 
+        if (!this.platformConfig.getCoredumpAvailable()) {
+            button_location_coredump.setVisibility(View.GONE);
+        }
         if (!this.platformConfig.getCoredumpAvailable()) {
             button_location_coredump.setVisibility(View.GONE);
         }
         if (!this.platformConfig.getOfflineHsiAvailable()
                 && (!platformConfig.getOfflineUsbAvailable())) {
              button_location_emmc.setVisibility(View.GONE);
-             button_location_sdcard.setVisibility(View.GONE);
         }
         if (!this.platformConfig.getOnlineUsbAvailable()) {
             button_location_usb_ape.setVisibility(View.GONE);
