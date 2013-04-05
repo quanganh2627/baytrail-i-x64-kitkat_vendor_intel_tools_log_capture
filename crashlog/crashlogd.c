@@ -1295,7 +1295,7 @@ void process_anr_or_uiwdt_tracefile(char *destion, int dir, int remove_path)
                     break;
                 }
                 fstat(src, &stat_buf);
-                dest = open(dest_path, O_WRONLY|O_CREAT);
+                dest = open(dest_path, O_WRONLY|O_CREAT, 0600);
                 close(dest);
                 do_chmod(dest_path, "600");
                 do_chown(dest_path, PERM_USER, PERM_GROUP);
@@ -2809,7 +2809,10 @@ static int file_monitor_init()
         wd = inotify_add_watch(file_monitor_fd, wd_array[i].filename,
                 wd_array[i].mask);
         if (wd < 0) {
-            LOGE("Can't add watch for %s.\n", wd_array[i].filename);
+            LOGE("Can't add watch for %si, remove all existing watches.\n", wd_array[i].filename);
+            for (--i ; i >= 0 ; i--) {
+                inotify_rm_watch(file_monitor_fd, wd_array[i].wd);
+            }
             return -1;
         }
         wd_array[i].wd = wd;
@@ -2818,6 +2821,49 @@ static int file_monitor_init()
 
     return 0;
 }
+
+/**
+ * @brief Show the contents of an array of inotify_events
+ *
+ * Called when a problem occurred during the parsing of
+ * the array to ease the debug
+ *
+ * @param buffer: buffer containing the inotify events
+ * @param len: length of the buffer
+ */
+void dump_inotify_events(char *buffer, unsigned int len,
+    char *lastevent) {
+
+    struct inotify_event *event;
+    int i;
+
+    LOGI("%s: Dump the wd_array:\n", __FUNCTION__);
+    for (i = WDCOUNT_START; i < WDCOUNT; i++) {
+        LOGI("%s: wd_array[%d]: filename=%s, wd=%d\n", __FUNCTION__, i, wd_array[i].filename, wd_array[i].wd);
+    }
+
+    while (1) {
+        if (len == 0) {
+            /* End of the buffer */
+            return;
+        }
+        event = (struct inotify_event*)buffer;
+        if (len < sizeof(struct inotify_event) ||
+            len < (sizeof(struct inotify_event) + event->len)) {
+            /* Not enought room the last event,
+             * get it from the lastevent */
+            event = (struct inotify_event*)lastevent;
+            len = 0;
+            if (!event->wd && !event->mask && !event->cookie && !event->len)
+                // no last event
+                return;
+        } else {
+            buffer += sizeof(struct inotify_event) + event->len;
+            len -= sizeof(struct inotify_event) + event->len;
+        }
+        LOGI("%s: event received (name=%s, wd=%d, mask=0x%x, len=%d)\n", __FUNCTION__, event->name, event->wd, event->mask, event->len);
+    }
+ }
 
 /**
  * @brief Handle File Monitor processing of events
@@ -2834,33 +2880,96 @@ static int file_monitor_init()
 static int file_monitor_handle(unsigned int files)
 {
     int wd;
-    int index_prod = 0;
-    char buffer[PATHMAX];
-    char *offset = NULL;
+    int len = 0, orig_len;
+    char orig_buffer[sizeof(struct inotify_event)+PATHMAX], *buffer, lastevent[sizeof(struct inotify_event)+PATHMAX];
     struct inotify_event *event;
-    int len, tmp_len;
     int i = 0;
     char key[SHA1_DIGEST_LENGTH+1];
-    char current_key[2][SHA1_DIGEST_LENGTH+1];
+    static char current_key[2][SHA1_DIGEST_LENGTH+1] = {{0,},{0,}};
+    static int index_prod = 0;
 
-    len = read(file_monitor_fd, buffer, sizeof(buffer));
+    len = read(file_monitor_fd, orig_buffer, sizeof(orig_buffer));
+    if (len < 0) {
+        LOGE("%s: Cannot read file_monitor_fd, error is %s\n", __FUNCTION__, strerror(errno));
+        return -1;
+    }
+
+    buffer = &orig_buffer[0];
+    event = (struct inotify_event *)buffer;
+    orig_len = len;
+
+    /* Preinitialize lastevent (in case it was not used so it is not dumped) */
+    ((struct inotify_event *)lastevent)->wd = 0;
+    ((struct inotify_event *)lastevent)->mask = 0;
+    ((struct inotify_event *)lastevent)->cookie = 0;
+    ((struct inotify_event *)lastevent)->len = 0;
+
     /* clean children to avoid zombie processes */
     while(waitpid(-1, NULL, WNOHANG) > 0){};
-    offset = buffer;
-    event = (struct inotify_event *)buffer;
-    while (((char *)event - buffer) < len) {
+
+    while (1) {
+        if (len == 0) {
+            /* End of the events to read */
+            return 0;
+        }
+        if ((unsigned int)len < sizeof(struct inotify_event)) {
+            /* Not enought room for an empty event */
+            LOGI("%s: incomplete inotify_event received (%d bytes), complete it\n", __FUNCTION__, len);
+            /* copy the last bytes received */
+            memcpy(lastevent, buffer, len);
+            /* read the missing bytes to get the full length */
+            if ( read(file_monitor_fd, &lastevent[len], (int)sizeof(struct inotify_event)-len)
+                    != (int)sizeof(struct inotify_event) - len) {
+                LOGE("%s: Cannot complete the last inotify_event received (structure part) - %s\n",
+                    __FUNCTION__, strerror(errno));
+                return -1;
+            }
+            event = (struct inotify_event*)lastevent;
+            /* now, reads the full last event, including its name field */
+            if ( read(file_monitor_fd, &lastevent[sizeof(struct inotify_event)],
+                event->len) != (int)event->len) {
+                LOGE("%s: Cannot complete the last inotify_event received (name part) - %s\n",
+                    __FUNCTION__, strerror(errno));
+                return -1;
+            }
+            len = 0;
+            /* now, the last event is complete, we can continue the parsing */
+        } else if ( (unsigned int)len < sizeof(struct inotify_event) + event->len ) {
+            int res, missing_bytes = (int)sizeof(struct inotify_event) + event->len - len;
+            event = (struct inotify_event*)lastevent;
+            /* The event was truncated */
+            LOGI("%s: truncated inotify_event received (%d bytes missing), complete it\n", __FUNCTION__, missing_bytes);
+            /* copy the last bytes received */
+            memcpy(lastevent, buffer, len);
+            /* now, reads the full last event, including its name field */
+            res = read(file_monitor_fd, &lastevent[len], missing_bytes);
+            if ( res != missing_bytes ) {
+                LOGE("%s: Cannot complete the last inotify_event received (name part2); received %d bytes, expected %d bytes - %s\n",
+                    __FUNCTION__, res, missing_bytes, strerror(errno));
+                return -1;
+            }
+            len = 0;
+            /* now, the last event is complete, we can continue the parsing */
+        } else {
+            event = (struct inotify_event *)buffer;
+            buffer += sizeof(struct inotify_event) + event->len;
+            len -= sizeof(struct inotify_event) + event->len;
+        }
+
         /* for dir to be delete */
-        if((event->mask & IN_DELETE_SELF) ||(event->mask & IN_MOVE_SELF)){
+        if((event->mask & IN_DELETE_SELF) ||(event->mask & IN_MOVE_SELF)) {
             for (i = WDCOUNT_START; i < WDCOUNT; i++) {
                 if (event->wd != wd_array[i].wd)
                     continue;
                 mkdir(wd_array[i].filename, 0777);
+                inotify_rm_watch(file_monitor_fd, event->wd);
                 wd = inotify_add_watch(file_monitor_fd, wd_array[i].filename, wd_array[i].mask);
                 if (wd < 0) {
                     LOGE("Can't add watch for %s.\n", wd_array[i].filename);
                     return -1;
                 }
                 wd_array[i].wd = wd;
+                event->wd = -1;
                 LOGW("%s has been deleted or moved, we watch it again.\n", wd_array[i].filename);
             }
         }
@@ -2940,7 +3049,7 @@ static int file_monitor_handle(unsigned int files)
 
                         //manage consecutive anr dumpstates: not null returned event key means an anr dumpstate has been launched
                         if (key [0] != '\0' ) {
-                            strcpy(current_key[index_prod],key);
+                            strncpy(current_key[index_prod],key,sizeof(key));
                             index_prod = (index_prod + 1) % 2;
                         }
                         break;
@@ -2952,23 +3061,26 @@ static int file_monitor_handle(unsigned int files)
 
                         //manage consecutive dumpstates: not null returned event key means a dumpstate has been launched
                         if (key [0] != '\0' ) {
-                            strcpy(current_key[index_prod],key);
+                            strncpy(current_key[index_prod],key,sizeof(key));
                             index_prod = (index_prod + 1) % 2;
                         }
                         break;
                     }
                 }
             }
-            if(event->len && !strncmp(event->name, "dropbox-", 8) && (i==WDCOUNT)){
+            if(event->len && !strncmp(event->name, "dropbox-", 8) && (i==WDCOUNT) && event->wd != -1) {
+                if (current_key[index_cons][0] == 0) {
+                    LOGE("%s: Dropbox event received but event_id has not been set properly\n", __FUNCTION__);
+                    dump_inotify_events(orig_buffer, orig_len, lastevent);
+                    return -1;
+                }
                 //dumpstate is done so remove the watcher
                 inotify_rm_watch(file_monitor_fd, event->wd);
                 notify_crash_to_upload(current_key[index_cons]);
+                current_key[index_cons][0] = 0;
                 index_cons = (index_cons + 1) % 2;
             }
         }
-        tmp_len = sizeof(struct inotify_event) + event->len;
-        event = (struct inotify_event *)(offset + tmp_len);
-        offset += tmp_len;
     }
     return 0;
 }
@@ -3433,6 +3545,8 @@ static int crashlog_check_panic(char *reason, unsigned int files)
 
         if (!strncmp(crashtype, KERNEL_FAKE_CRASH, sizeof(KERNEL_FAKE_CRASH)))
              strcat(reason,"_FAKE");
+        else if (!strncmp(reason, "HWWDT_RESET_FAKE", 16))
+             strcpy(crashtype, KERNEL_FAKE_CRASH);
         else if (!strncmp(reason,"HWWDT_RESET", 11))
              strcpy(crashtype, KERNEL_HWWDT_CRASH);
          else if (strncmp(reason,"SWWDT_RESET", 11) != 0)
