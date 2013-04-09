@@ -51,6 +51,9 @@ public class ShutdownService extends Service {
         try {
             core = AmtlCore.get();
             this.core.setContext(this.getApplicationContext());
+        } catch (AmtlModemCoreException e) {
+            Log.e(AmtlCore.TAG, MODULE + ": failed to get Amtl core");
+            this.stopSelf();
         } catch (AmtlCoreException e) {
             Log.e(AmtlCore.TAG, MODULE + ": failed to get Amtl core");
             this.stopSelf();
