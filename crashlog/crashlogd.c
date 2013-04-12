@@ -1844,7 +1844,11 @@ static int update_history_on_cmd_delete(char* events)
           }
           close(fd);
     }
-
+    else {
+        if (data != 0)
+            free(data);
+        return 0;
+    }
     if (data != 0)
          free(data);
     return 1;
@@ -2009,15 +2013,16 @@ void process_modem_crash_event(char *filename, char *eventname, char *name,  uns
 * Name          : process_full_dropbox_event
 * Description   : processes anr, javacrash and watchdog full dropbox events
 * Parameters    :
+*   char *filename        -> path of watched directory
 *   char *name            -> name of the file inside the watched directory that has triggered the event
 *   unsigned int files    -> nb max of logs destination directories (crashlog, aplogs, bz... )*/
-void process_full_dropbox_event(char *name,  unsigned int files) {
+void process_full_dropbox_event(char *filename, char *name,  unsigned int files) {
 
     char date_tmp[32];
     char date_tmp_2[32];
     char key[SHA1_DIGEST_LENGTH+1];
     int dir;
-    char destion[PATHMAX];
+    char destion[PATHMAX], path[PATHMAX];
     char lostevent[32] = { '\0', };
     char lostevent_subtype[32] = { '\0', };
 
@@ -2045,7 +2050,10 @@ void process_full_dropbox_event(char *name,  unsigned int files) {
         notify_crashreport();
         return;
     }
-
+    /*copy the *.lost dropbox file*/
+    snprintf(path, sizeof(path),"%s/%s",filename,name);
+    snprintf(destion,sizeof(destion),"%s%d/%s", CRASH_DIR,dir,name);
+    do_copy(path, destion, 0);
     snprintf(destion,sizeof(destion),"%s%d/",CRASH_DIR,dir);
     LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, date_tmp_2, lostevent, destion);
     usleep(TIMEOUT_VALUE);
@@ -2072,16 +2080,19 @@ void process_command(char *filename, char *name) {
     //extract the action and list of events from the commad file
     snprintf(path, sizeof(path),"%s/%s", filename, name);
     if ((!stat(path, &info))) {
-         if (!get_str_in_file(path,"ACTION=",action, sizeof(action)) && !get_str_in_file(path,"ARGS=",events, sizeof(events))) {
+        if (!get_str_in_file(path,"ACTION=",action, sizeof(action)) && !get_str_in_file(path,"ARGS=",events, sizeof(events))) {
             if ((!strncmp(action, "DELETE", 6)) && checkEvents(events)) {
-               update_history_on_cmd_delete(events);
-               /*delete trigger file*/
-               remove(path);
-               return;
-            }
-         }
+                if (!update_history_on_cmd_delete(events))
+                    LOGE("Can't update history_event on delete cmd for events=%s", events);
+            } else
+                LOGE("Invalid command file %s : invalid action or/and arguments", path);
+        } else
+            LOGE("Invalid command file %s : invalid keywords", path);
+        /*delete trigger file*/
+        remove(path);
+        return;
     }
-    LOGE("Invalid command %s", path);
+    LOGE("Invalid command : can't open file %s", path);
 }
 
 /*
@@ -3009,7 +3020,7 @@ static int file_monitor_handle(unsigned int files)
                     /* for full dropbox */
                     else if(strstr(event->name, wd_array[i].cmp) && (strstr(event->name, ".lost" ))){
 
-                        process_full_dropbox_event(event->name, files);
+                        process_full_dropbox_event(wd_array[i].filename, event->name, files);
                         break;
                     }
                     /* for hprof */

@@ -45,6 +45,7 @@
  * 2.2.12 - 2013-02-19 - BZ 86854 - Add checks to avoid NullPointerException
  * 2.3.0  - 2013-02-25 - BZ 88485 - Config file for platform specificities
  * 2.3.1  - 2013-03-14 - BZ 92443 - Usb logging based on SPH driver status
+ * 2.3.2  - 2013-04-02 - BZ 89945 - Remove SDCARD button in Settings menu
  * ============================================================================
  */
 
