@@ -18,18 +18,12 @@
 #define MMGR_SOURCE_H_INCLUDED
 
 #include <stdlib.h>
+
 #include "mmgr_cli.h"
-
-#define MMGRMAXDATA 512
-
-struct mmgr_data {
-    char string[20]; //main string representing mmgr data content
-    int  extra_int; // optional integer data (mailly used for error code)
-    char extra_string[MMGRMAXDATA]; // optional string that could be used for any purpose
-};
 
 int mmgr_get_fd();
 void init_mmgr_cli_source(void);
 void close_mmgr_cli_source(void);
+int mmgr_handle(void);
 
 #endif

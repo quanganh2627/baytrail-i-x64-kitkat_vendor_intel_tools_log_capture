@@ -14,62 +14,86 @@
  * limitations under the License.
  */
 
+#include "crashutils.h"
+#include "privconfig.h"
+#include "fsutils.h"
+
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <string.h>
+#include <stdlib.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <errno.h>
+
 #include "mmgr_source.h"
+#if defined(LOG_TAG)
+#undef LOG_TAG
+#endif
 #define LOG_TAG "MMGRSOURCE"
 #include <cutils/log.h>
-#define MMGRMAX 512
+
+/* private structure */
+struct mmgr_data {
+    char string[MMGRMAXSTRING];     /* main string representing mmgr data content */
+    int  extra_int;                 /* optional integer data (mailly used for error code) */
+    char extra_string[MMGRMAXEXTRA];/* optional string that could be used for any purpose */
+};
 
 mmgr_cli_handle_t *mmgr_hdl = NULL;
 static int mmgr_monitor_fd[2];
 
-int mdm_SHUTDOWN(mmgr_cli_event_t *ev)
-{
-    LOGD("Received E_MMGR_NOTIFY_MODEM_SHUTDOWN");
+static void write_mmgr_monitor_with_extras(char *chain, char *extra_string, int extra_string_len, int extra_int) {
     struct mmgr_data cur_data;
-    strncpy(cur_data.string,"MMODEMOFF\0",sizeof(cur_data.string));
+    strncpy(cur_data.string, chain, sizeof(cur_data.string));
+    if (extra_string_len > 0) {
+        int size = MIN(extra_string_len+1, (int)sizeof(cur_data.extra_string));
+        strncpy(cur_data.extra_string, extra_string, size);
+        cur_data.extra_string[size-1] = 0;
+    }
+    cur_data.extra_int = extra_int;
     write(mmgr_monitor_fd[1], &cur_data, sizeof( struct mmgr_data));
+}
+
+int mdm_SHUTDOWN(mmgr_cli_event_t __attribute__((unused))*ev) {
+    LOGD("Received E_MMGR_NOTIFY_MODEM_SHUTDOWN");
+    write_mmgr_monitor_with_extras("MMODEMOFF", NULL, 0, 0);
     return 0;
 }
 
-int mdm_REBOOT(mmgr_cli_event_t *ev)
+int mdm_REBOOT(mmgr_cli_event_t __attribute__((unused))*ev)
 {
     LOGD("Received E_MMGR_NOTIFY_PLATFORM_REBOOT");
-    struct mmgr_data cur_data;
-    strncpy(cur_data.string,"MSHUTDOWN\0",sizeof(cur_data.string));
-    write(mmgr_monitor_fd[1], &cur_data, sizeof( struct mmgr_data));
+    write_mmgr_monitor_with_extras("MSHUTDOWN", NULL, 0, 0);
     return 0;
 }
 
 
-int mdm_OUT_OF_SERVICE(mmgr_cli_event_t *ev)
+int mdm_OUT_OF_SERVICE(mmgr_cli_event_t __attribute__((unused))*ev)
 {
     LOGD("Received E_MMGR_EVENT_MODEM_OUT_OF_SERVICE");
-    struct mmgr_data cur_data;
-    strncpy(cur_data.string,"MOUTOFSERVICE\0",sizeof(cur_data.string));
-    write(mmgr_monitor_fd[1], &cur_data, sizeof( struct mmgr_data));
+    write_mmgr_monitor_with_extras("MOUTOFSERVICE", NULL, 0, 0);
     return 0;
 }
 
-int mdm_MRESET(mmgr_cli_event_t *ev)
+int mdm_MRESET(mmgr_cli_event_t __attribute__((unused))*ev)
 {
     LOGD("Received E_MMGR_NOTIFY_SELF_RESET");
-    struct mmgr_data cur_data;
-    strncpy(cur_data.string,"MRESET\0",sizeof(cur_data.string));
-    write(mmgr_monitor_fd[1], &cur_data, sizeof( struct mmgr_data));
+    write_mmgr_monitor_with_extras("MRESET", NULL, 0, 0);
     return 0;
 }
 
 int mdm_CORE_DUMP(mmgr_cli_event_t *ev)
 {
     LOGD("Received E_MMGR_NOTIFY_CORE_DUMP_COMPLETE");
-    struct mmgr_data cur_data;
-    strncpy(cur_data.string,"MPANIC\0",sizeof(cur_data.string));
+    int extra_int = 0, extra_string_len = 0;
+    char *extra_string = NULL;
     int copy_cd = 0;
 
-    mmgr_cli_core_dump_t *cd = NULL;
-    cd = (mmgr_cli_core_dump_t *)ev->data;
+    mmgr_cli_core_dump_t *cd = (mmgr_cli_core_dump_t *)ev->data;
     if (cd == NULL) {
-        LOGE("mdm_CORE_DUMP : empty data");
+        LOGE("%s: empty data", __FUNCTION__);
         return -1;
     }
 
@@ -78,88 +102,86 @@ int mdm_CORE_DUMP(mmgr_cli_event_t *ev)
     case E_CD_FAILED:
         LOGW("core dump not retrived");
         // use -1 value to indicate a CD failed
-        cur_data.extra_int = -1;
+        extra_int = -1;
         break;
     case E_CD_FAILED_WITH_PANIC_ID:
         LOGW("FAILED_WITH_PANIC_ID");
         LOGD("panic id: %d", cd->panic_id);
-        cur_data.extra_int = cd->panic_id;
+        extra_int = cd->panic_id;
         break;
     case E_CD_SUCCEED_WITHOUT_PANIC_ID:
         LOGD("No panic id");
         // use -2 value to indicate an empty panic ID to crashlogd
-        cur_data.extra_int = -2;
+        extra_int = -2;
         copy_cd = 1;
         break;
     case E_CD_SUCCEED:
         LOGD("panic id: %d", cd->panic_id);
-        cur_data.extra_int = cd->panic_id;
+        extra_int = cd->panic_id;
         copy_cd = 1;
         break;
     default:
         LOGE("Unknown core dump state");
         // use -3 value to indicate an unknown state to crashlogd
-         cur_data.extra_int = -3;
+        extra_int = -3;
         break;
     }
-    if ((cd->len < MMGRMAXDATA) && (copy_cd == 1) ) {
-        strncpy(cur_data.extra_string,cd->path,cd->len);
-        cur_data.extra_string[cd->len] = '\0';
-        LOGD("core dump path: %s", cur_data.extra_string);
-    }else{
-        LOGE("mdm_CORE_DUMP length error : %d", cd->len);
-        cur_data.extra_string[0] = '\0';
+    if ( (cd->len < MMGRMAXEXTRA) && (copy_cd == 1) ) {
+        extra_string_len = cd->len;
+        extra_string = cd->path;
+        LOGD("core dump path: %s", cd->path);
+    } else if (copy_cd == 1) {
+        LOGE("%s: length error : %lu", __FUNCTION__, (unsigned long)cd->len);
     }
 
-    write(mmgr_monitor_fd[1], &cur_data, sizeof( struct mmgr_data));
+    write_mmgr_monitor_with_extras("MPANIC", extra_string, extra_string_len, extra_int);
     return 0;
 }
 
 int mdm_AP_RESET(mmgr_cli_event_t *ev)
 {
     LOGD("Received E_MMGR_NOTIFY_AP_RESET");
-    struct mmgr_data cur_data;
-    mmgr_cli_ap_reset_t *ap = NULL;
-    strncpy(cur_data.string,"APIMR\0",sizeof(cur_data.string));
-    ap = (mmgr_cli_ap_reset_t *)ev->data;
+    char *extra_string = NULL;
+    int extra_string_len = 0;
+    mmgr_cli_ap_reset_t *ap = (mmgr_cli_ap_reset_t *)ev->data;
+
     if (ap == NULL) {
-        LOGE("mdm_AP_RESET : empty data");
-        cur_data.extra_string[0] = '\0';
-    }else{
-        LOGD("AP reset asked by: %s (len: %d)", ap->name, ap->len);
-        if (ap->len < MMGRMAXDATA){
-            strncpy(cur_data.extra_string,ap->name,ap->len);
-            cur_data.extra_string[ap->len] = '\0';
-        }else{
-            LOGE("mdm_AP_RESET length error : %d", ap->len);
-            snprintf(cur_data.extra_string,sizeof(cur_data.extra_string),"length error %d", ap->len);
+        LOGE("%s: empty data", __FUNCTION__);
+    } else {
+        LOGD("%s: AP reset asked by: %s (len: %lu)", __FUNCTION__, ap->name, (unsigned long)ap->len);
+        if (ap->len < MMGRMAXEXTRA) {
+            extra_string = ap->name;
+            extra_string_len = ap->len;
+        } else {
+            LOGE("%s: length error : %lu", __FUNCTION__, (unsigned long)ap->len);
         }
     }
-    write(mmgr_monitor_fd[1], &cur_data, sizeof( struct mmgr_data));
+
+    write_mmgr_monitor_with_extras("APIMR", extra_string, extra_string_len, 0);
     return 0;
 }
 
 int mdm_TEL_ERROR(mmgr_cli_event_t *ev)
 {
     LOGD("Received E_MMGR_NOTIFY_ERROR");
-    struct mmgr_data cur_data;
-    strncpy(cur_data.string,"TELEPHONY\0",sizeof(cur_data.string));
+    char *extra_string = NULL;
+    int extra_int = 0, extra_string_len = 0;
     mmgr_cli_error_t * err = (mmgr_cli_error_t *)ev->data;
+
     if (err == NULL) {
-        LOGE(" mmgr_cli_error_t empty data");
-        strcpy(cur_data.extra_string,"\0");
+        LOGE("%s: empty data", __FUNCTION__);
     }else{
-        cur_data.extra_int = err->id;
-        if (err->len < MMGRMAXDATA){
-            strncpy(cur_data.extra_string,err->reason,err->len);
-            cur_data.extra_string[err->len] = '\0';
-            LOGD("error {id:%d reason:\"%s\" len:%d}", err->id, cur_data.extra_string, err->len);
+        extra_int = err->id;
+        if (err->len < MMGRMAXEXTRA) {
+            extra_string = err->reason;
+            extra_string_len = err->len;
+            LOGD("error {id:%d reason:\"%s\" len:%d}", err->id, extra_string, extra_string_len);
         }else{
-            LOGE("mdm_TEL_ERROR length error : %d", err->len);
-            snprintf(cur_data.extra_string,sizeof(cur_data.extra_string),"length error %d", err->len);
+            LOGE("%s: length error : %lu", __FUNCTION__, (unsigned long)err->len);
         }
     }
-    write(mmgr_monitor_fd[1],  &cur_data, sizeof( struct mmgr_data));
+
+    write_mmgr_monitor_with_extras("TELEPHONY", extra_string, extra_string_len, extra_int);
     return 0;
 }
 
@@ -191,4 +213,208 @@ void init_mmgr_cli_source(void){
 void close_mmgr_cli_source(void){
     mmgr_cli_disconnect(mmgr_hdl);
     mmgr_cli_delete_handle(mmgr_hdl);
+}
+
+/**
+ * @brief Compute mmgr parameter
+ *
+ * Called when parameter are needed for a mmgr callback
+ *
+ * @param parameters needed to create event (logd, name,...)
+ *
+ * @return 0 on success, -1 on error.
+ */
+static int compute_mmgr_param(char *type, int *mode, char *name, int *aplog, int *bplog, int *log_mode) {
+
+    if (strstr(type, "MODEMOFF" )) {
+        //CASE MODEMOFF
+        *mode = STATS_MODE;
+        sprintf(name, "%s", INFOEVENT);
+    } else if (strstr(type, "MSHUTDOWN" )) {
+        //CASE MSHUTDOWN
+        *mode = CRASH_MODE;
+        sprintf(name, "%s", CRASHEVENT);
+        *aplog = 1;
+        *log_mode = APLOG_TYPE;
+    } else if (strstr(type, "MOUTOFSERVICE" )) {
+        //CASE MOUTOFSERVICE
+        *mode = CRASH_MODE;
+        sprintf(name, "%s", CRASHEVENT);
+        *aplog = 1;
+        *log_mode = APLOG_TYPE;
+    } else if (strstr(type, "MPANIC" )) {
+        //CASE MPANIC
+        *mode = CRASH_MODE;
+        sprintf(name, "%s",CRASHEVENT);
+        *aplog = 1;
+        *log_mode = APLOG_TYPE;
+        *bplog = 1;
+    } else if (strstr(type, "APIMR" )) {
+        //CASE APIMR
+        *mode = CRASH_MODE;
+        sprintf(name, "%s", CRASHEVENT);
+        *aplog = 1;
+        *log_mode = APLOG_TYPE;
+    } else if (strstr(type, "MRESET" )) {
+        //CASE MRESET
+        *mode = CRASH_MODE;
+        sprintf(name, "%s",CRASHEVENT);
+        *log_mode = APLOG_TYPE;
+        *aplog = 1;
+    } else if (strstr(type, "TELEPHONY" )) {
+        //CASE TEL_ERROR
+        *mode = STATS_MODE;
+        sprintf(name, "%s", ERROREVENT);
+        *aplog = 1;
+        *log_mode = APLOG_STATS_TYPE;
+    } else{
+        //unknown event name
+        LOGE("%s: wrong type found in mmgr_get_fd : %s.\n", __FUNCTION__, type);
+        return -1;
+    }
+    return 0;
+}
+
+/**
+ * @brief Handle mmgr call back
+ *
+ * Called when a call back function is triggered
+ * depending on init subscription
+ *
+ * @param files nb max of logs destination directories (crashlog,
+ * aplogs, bz... )
+ *
+ * @return 0 on success, -1 on error.
+ */
+int mmgr_handle(void) {
+    int event_mode, aplog_mode, dir;
+    char *event_dir, *key;
+    char event_name[MMGRMAXSTRING];
+    char data0[MMGRMAXEXTRA];
+    char data1[MMGRMAXEXTRA];
+    char data2[MMGRMAXEXTRA];
+    char data3[MMGRMAXEXTRA];
+    char cd_path[MMGRMAXEXTRA];
+    char destion[PATHMAX];
+    char destion2[PATHMAX];
+    char type[20];
+    int nbytes, copy_aplog = 0, copy_bplog = 0;
+    struct mmgr_data cur_data;
+    const char *dateshort = get_current_time_short(1);
+
+    // Initialize stack strings to empty strings
+    event_name[0] = 0;
+    data0[0] = 0;
+    data1[0] = 0;
+    data2[0] = 0;
+    cd_path[0] = 0;
+    destion[0] = 0;
+    destion2[0] = 0;
+    type[0] = 0;
+
+    // get data from mmgr pipe
+    nbytes = read(mmgr_get_fd(), &cur_data, sizeof( struct mmgr_data));
+    strcpy(type,cur_data.string);
+
+    if (nbytes == 0) {
+        LOGW("No data found in mmgr_get_fd.\n");
+        return 0;
+    }
+    if (nbytes < 0) {
+        nbytes = -errno;
+        LOGE("%s: Error while reading mmgr_get_fd - %s.\n", __FUNCTION__, strerror(errno));
+        return nbytes;
+    }
+    //find_dir should be done before event_dir is set
+    LOGD("Received string from mmgr: %s  - %d bytes", type,nbytes);
+    if (compute_mmgr_param(type, &event_mode, event_name, &copy_aplog, &copy_bplog, &aplog_mode) < 0) {
+        return -1;
+    }
+    //set DATA0/1 value
+    if (strstr(type, "MPANIC" )) {
+        LOGD("Extra int value : %d ", cur_data.extra_int);
+        if (cur_data.extra_int >= 0){
+            snprintf(data0,sizeof(data0),"%d", cur_data.extra_int);
+        }else if (cur_data.extra_int == -1){
+            snprintf(data0,sizeof(data0),"%s", "CD_FAILED");
+        }else if (cur_data.extra_int == -2){
+            snprintf(data0,sizeof(data0),"%s", "NO_PANIC_ID");
+        }else if (cur_data.extra_int == -3){
+            snprintf(data0,sizeof(data0),"%s", "UNKNOWN");
+        }
+        LOGD("Extra string value : %s ",cur_data.extra_string);
+        snprintf(cd_path,sizeof(cd_path),"%s", cur_data.extra_string);
+    } else if (strstr(type, "APIMR" )){
+        LOGD("Extra string value : %s ",cur_data.extra_string);
+        //need to put it in DATA3 to avoid conflict with parser
+        snprintf(data3,sizeof(data3),"%s", cur_data.extra_string);
+    } else if (strstr(type, "TELEPHONY" )){
+        LOGD("Extra int value : %d ",cur_data.extra_int);
+        snprintf(data0,sizeof(data0),"%d", cur_data.extra_int);
+        LOGD("Extra string value : %s ",cur_data.extra_string);
+        snprintf(data1,sizeof(data1),"%s", cur_data.extra_string);
+    }
+
+    dir = find_new_crashlog_dir(event_mode);
+    if (dir < 0) {
+        LOGE("%s: Cannot get a valid new crash directory...\n", __FUNCTION__);
+        key = raise_event(CRASHEVENT, event_name, NULL, NULL);
+        LOGE("%-8s%-22s%-20s%s\n", CRASHEVENT, key, get_current_time_long(0), event_name);
+        free(key);
+        return -1;
+    }
+
+    // update event_dir should be done after find_dir call
+    event_dir = (event_mode == STATS_MODE ? STATS_DIR : CRASH_DIR);
+
+    if (copy_aplog > 0) {
+        do_log_copy(type, dir, dateshort, aplog_mode);
+    }
+    if (copy_bplog > 0) {
+        do_log_copy(type, dir, dateshort, BPLOG_TYPE);
+    }
+    snprintf(destion, sizeof(destion), "%s%d/", event_dir, dir);
+    // copying file (if required)
+    if (strlen(cd_path) > 0){
+        char *basename;
+        basename = strrchr ( cd_path, '/' );
+        if (basename) basename++;
+        else basename = "core_dump";
+        snprintf(destion2, sizeof(destion2),"%s/%s", destion, basename);
+        do_copy_tail(cd_path, destion2, 0);
+        rmfr(cd_path);
+    }
+    // generating extra DATA (if required)
+    if ((strlen(data0) > 0) || (strlen(data1) > 0) || (strlen(data2) > 0) || (strlen(data3) > 0)){
+        FILE *fp;
+        char fullpath[PATHMAX];
+        if (strstr(event_name , ERROREVENT)) {
+            snprintf(fullpath, sizeof(fullpath)-1, "%s/%s_errorevent", destion,type );
+        }else if (strstr(event_name , INFOEVENT)) {
+            snprintf(fullpath, sizeof(fullpath)-1, "%s/%s_infoevent", destion,type );
+        }else{
+            snprintf(fullpath, sizeof(fullpath)-1, "%s/%s_crashdata", destion,type );
+        }
+
+        fp = fopen(fullpath,"w");
+        if (fp == NULL) {
+            LOGE("%s: Cannot create file %s - %s\n", __FUNCTION__, fullpath, strerror(errno));
+        } else {
+            //Fill DATA fields
+            if (strlen(data0) > 0)
+                fprintf(fp,"DATA0=%s\n", data0);
+            if (strlen(data1) > 0)
+                fprintf(fp,"DATA1=%s\n", data1);
+            if (strlen(data2) > 0)
+                fprintf(fp,"DATA2=%s\n", data2);
+            if (strlen(data3) > 0)
+                fprintf(fp,"DATA3=%s\n", data3);
+            fprintf(fp,"_END\n");
+            fclose(fp);
+        }
+    }
+    key = raise_event(event_name, type, NULL, destion);
+    LOGE("%-8s%-22s%-20s%s %s\n", event_name, key, get_current_time_long(0), type, destion);
+    free(key);
+    return 0;
 }

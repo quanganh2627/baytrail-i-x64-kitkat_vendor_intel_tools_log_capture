@@ -29,20 +29,20 @@
 #include <sys/un.h>
 #include <sys/select.h>
 #include <sys/time.h>
+#ifndef __TEST__
 #include <private/android_filesystem_config.h>
+#include <linux/android_alarm.h>
+#endif
 #include <linux/ioctl.h>
 #include <linux/rtc.h>
 #define LOG_TAG "CRASHLOG"
-#include <linux/android_alarm.h>
 #include "cutils/log.h"
 #include <sys/inotify.h>
 #include <cutils/properties.h>
 #include <sys/wait.h>
 #include <sys/sendfile.h>
 #include <sha1.h>
-#ifdef FULL_REPORT
 #include <backtrace.h>
-#endif
 #include <limits.h>
 #include "mmgr_cli.h"
 #include "mmgr_source.h"
@@ -87,7 +87,6 @@
 #define CRASHLOG_ERROR_DEAD "CRASHLOG_DEAD"
 #define CRASHLOG_ERROR_PATH "CRASHLOG_PATH"
 #define CRASHLOG_SWWDT_MISSING "SWWDT_MISSING"
-#define CRASHLOG_IPANIC_CORRUPTED "IPANIC_CORRUPTED"
 #define USBBOGUS "USBBOGUS"
 
 #define FILESIZE_MAX  (10*1024*1024)
@@ -150,14 +149,14 @@
 #define SDCARD_BZ_DIR "/mnt/sdcard/logs/bz"
 #define LOGS_DIR "/logs"
 #define EMMC_BZ_DIR "/logs/bz"
-#define LOGINFO_DIR "/logs/info/"
+#define LOGINFO_DIR "res/logs/info/"
 #define DROPBOX_DIR "/data/system/dropbox"
 #define LOGRESERVED "/logs/reserved"
 #define BZ_CURRENT_LOG "/logs/currentbzlog"
 #define CRASH_CURRENT_LOG "/logs/currentcrashlog"
 #define STATS_CURRENT_LOG "/logs/currentstatslog"
 #define APLOGS_CURRENT_LOG "/logs/currentaplogslog"
-#define HISTORY_FILE  "/logs/history_event"
+#define HISTORY_FILE  "res/logs/history_event"
 #define HISTORY_UPTIME "/logs/uptime"
 #define LOG_UUID "/logs/uuid.txt"
 #define LOG_BUILDID "/logs/buildid.txt"
@@ -247,24 +246,22 @@ struct config {
 pconfig first_modem_config = NULL; /* Points to first modem_config in list */
 pconfig current_modem_config = NULL; /* Points to current modem_config in list */
 //Variables containing paths of files triggering IPANIC & FABRICERR & WDT treatment
-char CURRENT_PANIC_CONSOLE_NAME[PATHMAX]={PANIC_CONSOLE_NAME};
-char CURRENT_PROC_FABRIC_ERROR_NAME[PATHMAX]={PROC_FABRIC_ERROR_NAME};
-char CURRENT_KERNEL_CMDLINE[PATHMAX]={KERNEL_CMDLINE};
+static char CURRENT_PANIC_CONSOLE_NAME[PATHMAX]={PANIC_CONSOLE_NAME};
+static char CURRENT_PROC_FABRIC_ERROR_NAME[PATHMAX]={PROC_FABRIC_ERROR_NAME};
+static char CURRENT_KERNEL_CMDLINE[PATHMAX]={KERNEL_CMDLINE};
 
-char *CRASH_DIR = NULL;
-char *STATS_DIR = NULL;
-char *APLOGS_DIR = NULL;
-char *BZ_DIR = NULL;
+static char *CRASH_DIR = NULL;
+static char *STATS_DIR = NULL;
+static char *APLOGS_DIR = NULL;
+static char *BZ_DIR = NULL;
 
-char buildVersion[PROPERTY_VALUE_MAX];
-char boardVersion[PROPERTY_VALUE_MAX];
-char uuid[256];
-int loop_uptime_event = 1;
-int test_flag = 0;
-#ifdef FULL_REPORT
-int index_cons = 0;
-#endif
-int WDCOUNT_START = 0;
+static char buildVersion[PROPERTY_VALUE_MAX];
+static char boardVersion[PROPERTY_VALUE_MAX];
+static char uuid[256];
+static int loop_uptime_event = 1;
+static int test_flag = 0;
+static int index_cons = 0;
+static int WDCOUNT_START = 0;
 // global variable to abort a clean procedure
 int abort_clean_sd = 0;
 // global variable to enable dynamic change of uptime frequency
@@ -292,6 +289,7 @@ static int do_mv(char *src, char *des)
     return 0;
 }
 
+#ifndef __TEST__
 static unsigned int android_name_to_id(const char *name)
 {
     const struct android_id_info *info = android_ids;
@@ -304,6 +302,7 @@ static unsigned int android_name_to_id(const char *name)
 
     return -1U;
 }
+#endif
 
 static unsigned int decode_uid(const char *s)
 {
@@ -311,8 +310,13 @@ static unsigned int decode_uid(const char *s)
 
     if (!s || *s == '\0')
         return -1U;
+#ifndef TEST_USER
     if (isalpha(s[0]))
-        return android_name_to_id(s);
+        return android_name_to_id(s, res);
+#else
+    /* HACK for testing only */
+    return TEST_USER;
+#endif
 
     errno = 0;
     v = (unsigned int)strtoul(s, 0, 0);
@@ -433,23 +437,13 @@ static void flush_aplog_atboot(char *mode, int dir, char* ts)
 {
     char cmd[512] = { '\0', };
     char log_boot_name[512] = { '\0', };
-    struct stat info;
 
     snprintf(log_boot_name, sizeof(log_boot_name)-1, "%s%d/%s_%s_%s", CRASH_DIR, dir, strrchr(APLOG_FILE_BOOT,'/')+1,mode,ts);
-    int status;
-#ifdef FULL_REPORT
-    status = system("/system/bin/logcat -b system -b main -b radio -b events -b kernel -v threadtime -d -f /logs/aplog_boot");
-#else
-    status = system("/system/bin/logcat -b system -b main -b radio -b events -v threadtime -d -f /logs/aplog_boot");
-#endif
-    if (status != 0) {
+    snprintf(cmd, sizeof(cmd)-1, "/system/bin/logcat -b system -b main -b radio -b events -b kernel -v threadtime -d -f %s", log_boot_name);
+    int status = system(cmd);
+    if (status != 0)
         LOGE("flush ap log from boot returns status: %d.\n", status);
-        return;
-    }
-    if(!stat(APLOG_FILE_BOOT,&info)) {
-        do_copy(APLOG_FILE_BOOT,log_boot_name,0);
-        remove(APLOG_FILE_BOOT);
-    }
+    do_chown(log_boot_name, PERM_USER, PERM_GROUP);
     return ;
 }
 
@@ -465,25 +459,12 @@ static void do_last_kmsg_copy(int dir)
 
 }
 
-#ifndef FULL_REPORT
-static void flush_aplog()
-{
-    int status = system("/system/bin/logcat -b system -b main -b radio -b events -v threadtime -d -f /logs/aplog");
-    if (status != 0)
-        LOGE("dump logcat returns status: %d.\n", status);
-    do_chown(APLOG_FILE_0, PERM_USER, PERM_GROUP);
-}
-#endif
-
 static void do_log_copy(char *mode, int dir, char* ts, int type)
 {
     char destion[PATHMAX];
     struct stat info;
 
     if(type == APLOG_TYPE){
-#ifndef FULL_REPORT
-        flush_aplog();
-#endif
         if(stat(APLOG_FILE_0, &info) == 0){
             snprintf(destion,sizeof(destion), "%s%d/%s_%s_%s", CRASH_DIR, dir,strrchr(APLOG_FILE_0,'/')+1,mode,ts);
             do_copy(APLOG_FILE_0,destion, FILESIZE_MAX);
@@ -493,9 +474,6 @@ static void do_log_copy(char *mode, int dir, char* ts, int type)
                     do_copy(APLOG_FILE_1,destion, FILESIZE_MAX);
                 }
             }
-#ifndef FULL_REPORT
-                remove(APLOG_FILE_0);
-#endif
         }
     }
     if(type == APLOG_STATS_TYPE){
@@ -635,19 +613,37 @@ oops:
 
 static int get_uptime(long long *time_ns)
 {
+#ifndef __LINUX__
     struct timespec ts;
-    int fd, result;
+    int result;
+    int fd;
+#else
+    struct timeval ts;
+#endif
 
+#ifndef __LINUX__
     fd = open("/dev/alarm", O_RDONLY);
-    if (fd < 0){
-        LOGE("can not open file: %s\n", "/dev/alarm");
+    if (fd <= 0) {
+        *error = errno;
+        LOGE("%s - Cannot open file: /dev/alarm: %s\n", __FUNCTION__,
+			strerror(errno));
         return -1;
     }
-    result =
-        ioctl(fd,
-                ANDROID_ALARM_GET_TIME(ANDROID_ALARM_ELAPSED_REALTIME), &ts);
+    result = ioctl(fd,
+		ANDROID_ALARM_GET_TIME(ANDROID_ALARM_ELAPSED_REALTIME), &ts);
     close(fd);
+    if (result < 0) {
+        *error = errno;
+        LOGE("%s - Cannot ioctl /dev/alarm: %s\n", __FUNCTION__,
+			strerror(errno));
+        return -1;
+    }
     *time_ns = (((long long) ts.tv_sec) * 1000000000LL) + ((long long) ts.tv_nsec);
+#else
+#include <sys/time.h>
+    gettimeofday(&ts, NULL);
+    *time_ns = (((long long) ts.tv_sec) * 1000000000LL) + ((long long) ts.tv_usec) * 1000LL;
+#endif
     return 0;
 }
 
@@ -811,6 +807,7 @@ static void read_prop_uid(char* source, char *filename, char *uid, char* default
         LOGE("Property %s not readable\n", source);
         return;
     }
+    /* BUG? if we got no property, we overwrite the file with "" */
     if (strcmp(uid, temp_uid) != 0) {
         strncpy(uid, temp_uid, sizeof(uid)-1);
         write_uid(filename, temp_uid);
@@ -1012,7 +1009,6 @@ static void create_minimal_crashfile(char* type, char* path, char* key, char* up
         FILE *fd_panic;
         DIR *d;
         struct dirent* de;
-        char value[PATHMAX] = "";
         d = opendir(path);
         if(!d) {
             LOGE("%s: Can't open dir %s\n",__FUNCTION__, path);
@@ -1028,20 +1024,10 @@ static void create_minimal_crashfile(char* type, char* path, char* key, char* up
                     LOGE("can not open file: %s\n", mpanicpath);
                     break;
                 }
+                char value[PATHMAX] = "";
                 fscanf(fd_panic, "%s", value);
                 fclose(fd_panic);
                 fprintf(fp,"DATA0=%s\n", value);
-                break;
-            } else if (strstr(name, "_crashdata")){ //MMGR case
-                snprintf(mpanicpath, sizeof(mpanicpath)-1, "%s/%s", path, name);
-                fd_panic = fopen(mpanicpath, "r");
-                if (fd_panic == NULL){
-                    LOGE("can not open file: %s\n", mpanicpath);
-                    break;
-                }
-                fscanf(fd_panic, "%s", value);
-                fclose(fd_panic);
-                fprintf(fp,"%s\n", value);
                 break;
             }
         }
@@ -1051,7 +1037,6 @@ static void create_minimal_crashfile(char* type, char* path, char* key, char* up
     fclose(fp);
 }
 
-#ifdef FULL_REPORT
 static void notify_crash_to_upload(char* event_id)
 {
     char cmd[512];
@@ -1067,7 +1052,6 @@ static void notify_crash_to_upload(char* event_id)
     if (status != 0)
         LOGI("notify crashreport status: %d.\n", status);
 }
-#endif
 
 static void notify_crashreport()
 {
@@ -1096,7 +1080,7 @@ static int history_file_updated(char *data, char* filters)
         p = strchr(cmd, ';');
         if (p) {
             size = p - cmd;
-        if ((size > 0) && ((unsigned int) size < sizeof(filter)))
+            if ((size > 0) && ((unsigned int) size < sizeof(filter)))
                 memcpy(filter, cmd, size);
             cmd = ++p;
             p = strstr(data, filter);
@@ -1382,20 +1366,18 @@ static int mv_modem_crash(char *spath, char *dpath)
 * filename that should trigger a processing
 * note: a watched directory can only have one mask value
 */
-struct wd_name wd_array[] = {
+static struct wd_name wd_array[] = {
     /* -------------Warning: if table is updated, don't forget to update also WDCOUNT and WDCOUNT_START in main function--- */
     {0, DROPBOX_DIR_MASK, SYSSERVER_WDT, DROPBOX_DIR, "system_server_watchdog"},
     {0, DROPBOX_DIR_MASK, ANR_CRASH, DROPBOX_DIR, "anr"},
     {0, TOMBSTONES_DIR_MASK, TOMB_CRASH, "/data/tombstones", "tombstone"},
     {0, DROPBOX_DIR_MASK, JAVA_CRASH, DROPBOX_DIR, "crash"},
-    {0, DROPBOX_DIR_MASK, LOST , DROPBOX_DIR, ".lost"}, /* for full dropbox */
-#ifdef FULL_REPORT
     {0, CORE_DIR_MASK, AP_COREDUMP ,"/logs/core", ".core"},
+    {0, DROPBOX_DIR_MASK, LOST , DROPBOX_DIR, ".lost"}, /* for full dropbox */
     {0, CORE_DIR_MASK, HPROF, "/logs/core", ".hprof"},
     {0, STATS_DIR_MASK, STATSTRIGGER, "/logs/stats", "_trigger"},
-    {0, APLOGS_DIR_MASK, CMDTRIGGER, "/logs/aplogs", "_cmd"},
-#endif
     {0, APLOGS_DIR_MASK, APLOGTRIGGER, "/logs/aplogs", "_trigger"},
+    {0, APLOGS_DIR_MASK, CMDTRIGGER, "/logs/aplogs", "_cmd"},
     /* -----------------------------above is dir, below is file------------------------------------------------------------ */
     {0, UPTIME_FILE_MASK, CURRENT_UPTIME, "/logs/uptime", ""},
     /* -------------------------above is AP, below is modem---------------------------------------------------------------- */
@@ -1405,7 +1387,7 @@ struct wd_name wd_array[] = {
 };
 
 
-int WDCOUNT = ((int)(sizeof(wd_array)/sizeof(struct wd_name)));
+static int WDCOUNT = ((int)(sizeof(wd_array)/sizeof(struct wd_name)));
 
  /**
  * @brief returns the watch descriptor of a watched directory declared in 'wd_name' array
@@ -1414,7 +1396,7 @@ int WDCOUNT = ((int)(sizeof(wd_array)/sizeof(struct wd_name)));
  *
  * @retval returns the watch descriptor value the input directory is associated with (otherwise it returns -1)
  */
-int get_watched_directory_wd( char *dir_name)
+static int get_watched_directory_wd( char *dir_name)
 {
     int i;
 
@@ -1426,23 +1408,20 @@ int get_watched_directory_wd( char *dir_name)
     return -1;
 }
 
-#ifdef FULL_REPORT
-
-void prepare_anr_or_uiwdt(char *destion)
+static void prepare_anr_or_uiwdt(char *destion)
 {
     char cmd[PATHMAX];
+
     if (!strcmp(".gz", &destion[strlen(destion) - 3])) {
-    /* extract gzip file */
+        /* extract gzip file */
         snprintf(cmd, sizeof(cmd), "gunzip %s", destion);
         system(cmd);
         destion[strlen(destion) - 3] = 0;
         do_chown(destion, PERM_USER, PERM_GROUP);
-
     }
-
 }
 
-void process_anr_or_uiwdt_tracefile(char *destion, int dir, int remove_path)
+static void process_anr_or_uiwdt_tracefile(char *destion, int dir, int remove_path)
 {
     char cmd[PATHMAX];
     int src, dest;
@@ -1472,7 +1451,7 @@ void process_anr_or_uiwdt_tracefile(char *destion, int dir, int remove_path)
                     break;
                 }
                 fstat(src, &stat_buf);
-                dest = open(dest_path, O_WRONLY|O_CREAT, 0600);
+                dest = open(dest_path, O_WRONLY|O_CREAT);
                 close(dest);
                 do_chmod(dest_path, "600");
                 do_chown(dest_path, PERM_USER, PERM_GROUP);
@@ -1490,9 +1469,7 @@ void process_anr_or_uiwdt_tracefile(char *destion, int dir, int remove_path)
                     LOGE("Failed to remove file %s:%s\n", tracefile, strerror(errno));
                 }
                 // parse
-
                 backtrace_parse_tombstone_file(dest_path);
-
                 if ((remove_path > 0) && unlink(dest_path) != 0) {
                     LOGE("Failed to remove file %s:%s\n", dest_path, strerror(errno));
                 }
@@ -1506,7 +1483,7 @@ void process_anr_or_uiwdt_tracefile(char *destion, int dir, int remove_path)
     do_chown(dest_path_symb, PERM_USER, PERM_GROUP);
 }
 
-void compress_aplog_folder(char *folder_path)
+static void compress_aplog_folder(char *folder_path)
 {
     char cmd[PATHMAX];
 
@@ -1559,7 +1536,8 @@ static int get_str_in_file(char *file, char *keyword, char *result, unsigned int
     return rc;
 }
 
-void backtrace_anr_uiwdt(char *dest, int dir)
+
+static void backtrace_anr_uiwdt(char *dest, int dir)
 {
     char value[PROPERTY_VALUE_MAX];
     property_get(PROP_ANR_USERSTACK, value, "0");
@@ -1568,7 +1546,7 @@ void backtrace_anr_uiwdt(char *dest, int dir)
     }
 }
 
-void monitor_crashenv(void)
+static void monitor_crashenv(void)
 {
     int status = system("/system/bin/monitor_crashenv");
     if (status != 0)
@@ -1576,49 +1554,7 @@ void monitor_crashenv(void)
     return ;
 }
 
-void check_running_power_service()
-{
-    char powerservice[PROPERTY_VALUE_MAX];
-    char powerenable[PROPERTY_VALUE_MAX];
-
-    property_get("init.svc.profile_power", powerservice, "");
-    property_get("persist.service.power.enable", powerenable, "");
-    if (strcmp(powerservice, "running") && !strcmp(powerenable, "1")) {
-        LOGE("power service stopped whereas property is set .. restarting\n");
-        property_set("ctl.start", "profile_power");
-    }
-}
-#else
-void prepare_anr_or_uiwdt(char *destion)
-{
-    char cmd[PATHMAX];
-
-    if (!strcmp(".gz", &destion[strlen(destion) - 3])) {
-        /* extract gzip file */
-        do_copy(destion,"/logs/tmp_anr_uiwdt.gz",0);
-        system("gunzip /logs/tmp_anr_uiwdt.gz");
-        do_chown("/logs/tmp_anr_uiwdt", PERM_USER, PERM_GROUP);
-        destion[strlen(destion) - 3] = 0;
-        do_copy("/logs/tmp_anr_uiwdt",destion,0);
-        remove("/logs/tmp_anr_uiwdt");
-    }
-}
-void monitor_crashenv(void) {}
-void backtrace_anr_uiwdt(char *dest, int dir) {}
-void check_running_power_service() {}
-void compress_aplog_folder(char *folder_path) {}
-static int get_str_in_file(char *file, char *keyword, char *result, unsigned int sizemax) {return -1;}
-#endif
-
-void init_mmgr_cli(void)
-{
-    LOGD("init_mmgr_cli begin");
-    init_mmgr_cli_source();
-
-    LOGD("init_mmgr_cli end");
-}
-
-static int crashlog_raise_infoerror(char *type, char *subtype)
+int orig_crashlog_raise_infoerror(char *type, char *subtype)
 {
     char date_tmp_2[32];
     time_t t;
@@ -1640,7 +1576,20 @@ static int crashlog_raise_infoerror(char *type, char *subtype)
     return 0;
 }
 
-void check_crashlog_dead()
+static void check_running_power_service_orig()
+{
+    char powerservice[PROPERTY_VALUE_MAX];
+    char powerenable[PROPERTY_VALUE_MAX];
+
+    property_get("init.svc.profile_power", powerservice, "");
+    property_get("persist.service.power.enable", powerenable, "");
+    if (strcmp(powerservice, "running") && !strcmp(powerenable, "1")) {
+        LOGE("power service stopped whereas property is set .. restarting\n");
+        property_set("ctl.start", "profile_power");
+    }
+}
+
+static void check_crashlog_dead()
 {
     char token[PROPERTY_VALUE_MAX];
     property_get("crashlogd.token", token, "");
@@ -1648,7 +1597,7 @@ void check_crashlog_dead()
          strcat(token, "1");
          property_set("crashlogd.token", token);
          if (!strncmp(token, "11", 2))
-             crashlog_raise_infoerror(ERROREVENT, CRASHLOG_ERROR_DEAD);
+             orig_crashlog_raise_infoerror(ERROREVENT, CRASHLOG_ERROR_DEAD);
     }
 }
 
@@ -1661,16 +1610,13 @@ static void sdcard_available(int mode)
 {
     struct stat info;
     char value[PROPERTY_VALUE_MAX];
-    DIR *d;
+    DIR *d = NULL;
 
     CRASH_DIR = EMMC_CRASH_DIR;
     STATS_DIR = EMMC_STATS_DIR;
     APLOGS_DIR = EMMC_APLOGS_DIR;
     BZ_DIR = EMMC_BZ_DIR;
 
-#ifndef FULL_REPORT
-    return;
-#else
     property_get(PROP_CRASH_MODE, value, "");
     if ((!strncmp(value, "lowmemory", 9)) || (mode == CRASH_MODE_NOSD))
         return;
@@ -1693,7 +1639,6 @@ static void sdcard_available(int mode)
         closedir(d);
     }
     return;
-#endif
 }
 
 static unsigned int find_dir(unsigned int max, int mode)
@@ -1816,7 +1761,7 @@ static unsigned int find_dir(unsigned int max, int mode)
 
 out_err:
     oldest = -1;
-    crashlog_raise_infoerror(ERROREVENT, CRASHLOG_ERROR_PATH);
+    orig_crashlog_raise_infoerror(ERROREVENT, CRASHLOG_ERROR_PATH);
 out:
     return oldest;
 }
@@ -2041,11 +1986,7 @@ static int update_history_on_cmd_delete(char* events)
           }
           close(fd);
     }
-    else {
-        if (data != 0)
-            free(data);
-        return 0;
-    }
+
     if (data != 0)
          free(data);
     return 1;
@@ -2057,7 +1998,7 @@ static int update_history_on_cmd_delete(char* events)
 * Parameters    :
 * char *format_1_time   -> set to format defined in TIME_FORMAT_1 (used for naming files )
 * char *format_2_time   -> set to format defined in TIME_FORMAT_2 (used for displayed messages or be written in files)*/
-void get_formated_times(char *format_1_time, char *format_2_time)
+static void get_formated_times(char *format_1_time, char *format_2_time)
 {
     time_t t;
     struct tm *time_tmp;
@@ -2082,7 +2023,7 @@ void get_formated_times(char *format_1_time, char *format_2_time)
 *   char *filename        -> path of watched directory/file
 *   char *name            -> name of the file inside the watched directory that has triggered the event
 *   unsigned int files    -> nb max of logs destination directories (crashlog, aplogs, bz... )*/
-void process_hprof_event(char *filename,  char *name, unsigned int files)
+static void process_hprof_event(char *filename,  char *name, unsigned int files)
 {
     char date_tmp[32];
     char date_tmp_2[32];
@@ -2119,7 +2060,7 @@ void process_hprof_event(char *filename,  char *name, unsigned int files)
 *   char *eventname       -> name of the watched event
 *   char *name            -> name of the file inside the watched directory that has triggered the event
 *   unsigned int files    -> nb max of logs destination directories (crashlog, aplogs, bz... )*/
-void process_modem_reset_event(char *filename, char *eventname, char *name,  unsigned int files)
+static void process_modem_reset_event(char *filename, char *eventname, char *name,  unsigned int files)
 {
     char date_tmp[32];
     char date_tmp_2[32];
@@ -2231,7 +2172,7 @@ void process_modem_generic(char *filename, char *name,  unsigned int files, int 
 *   char *eventname       -> name of the watched event
 *   char *name            -> name of the file inside the watched directory that has triggered the event
 *   unsigned int files    -> nb max of logs destination directories (crashlog, aplogs, bz... )*/
-void process_modem_crash_event(char *filename, char *eventname, char *name,  unsigned int files) {
+static void process_modem_crash_event(char *filename, char *eventname, char *name,  unsigned int files) {
 
     char date_tmp[32];
     char date_tmp_2[32];
@@ -2276,16 +2217,15 @@ void process_modem_crash_event(char *filename, char *eventname, char *name,  uns
 * Name          : process_full_dropbox_event
 * Description   : processes anr, javacrash and watchdog full dropbox events
 * Parameters    :
-*   char *filename        -> path of watched directory
 *   char *name            -> name of the file inside the watched directory that has triggered the event
 *   unsigned int files    -> nb max of logs destination directories (crashlog, aplogs, bz... )*/
-void process_full_dropbox_event(char *filename, char *name,  unsigned int files) {
+static void process_full_dropbox_event(char *name,  unsigned int files) {
 
     char date_tmp[32];
     char date_tmp_2[32];
     char key[SHA1_DIGEST_LENGTH+1];
     int dir;
-    char destion[PATHMAX], path[PATHMAX];
+    char destion[PATHMAX];
     char lostevent[32] = { '\0', };
     char lostevent_subtype[32] = { '\0', };
 
@@ -2313,10 +2253,7 @@ void process_full_dropbox_event(char *filename, char *name,  unsigned int files)
         notify_crashreport();
         return;
     }
-    /*copy the *.lost dropbox file*/
-    snprintf(path, sizeof(path),"%s/%s",filename,name);
-    snprintf(destion,sizeof(destion),"%s%d/%s", CRASH_DIR,dir,name);
-    do_copy(path, destion, 0);
+
     snprintf(destion,sizeof(destion),"%s%d/",CRASH_DIR,dir);
     LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, date_tmp_2, lostevent, destion);
     usleep(TIMEOUT_VALUE);
@@ -2333,7 +2270,7 @@ void process_full_dropbox_event(char *filename, char *name,  unsigned int files)
 * Parameters    :
 *   char *filename        -> path of watched directory/file
 *   char *name            -> name of the file inside the watched directory that has triggered the event*/
-void process_command(char *filename, char *name) {
+static void process_command(char *filename, char *name) {
 
     char path[PATHMAX];
     struct stat info;
@@ -2343,19 +2280,16 @@ void process_command(char *filename, char *name) {
     //extract the action and list of events from the commad file
     snprintf(path, sizeof(path),"%s/%s", filename, name);
     if ((!stat(path, &info))) {
-        if (!get_str_in_file(path,"ACTION=",action, sizeof(action)) && !get_str_in_file(path,"ARGS=",events, sizeof(events))) {
+         if (!get_str_in_file(path,"ACTION=",action, sizeof(action)) && !get_str_in_file(path,"ARGS=",events, sizeof(events))) {
             if ((!strncmp(action, "DELETE", 6)) && checkEvents(events)) {
-                if (!update_history_on_cmd_delete(events))
-                    LOGE("Can't update history_event on delete cmd for events=%s", events);
-            } else
-                LOGE("Invalid command file %s : invalid action or/and arguments", path);
-        } else
-            LOGE("Invalid command file %s : invalid keywords", path);
-        /*delete trigger file*/
-        remove(path);
-        return;
+               update_history_on_cmd_delete(events);
+               /*delete trigger file*/
+               remove(path);
+               return;
+            }
+         }
     }
-    LOGE("Invalid command : can't open file %s", path);
+    LOGE("Invalid command %s", path);
 }
 
 /*
@@ -2366,7 +2300,7 @@ void process_command(char *filename, char *name) {
 *   char *filename        -> path of watched directory/file
 *   char *name            -> name of the file inside the watched directory that has triggered the event
 *   unsigned int files    -> nb max of logs destination directories (crashlog, aplogs, bz... )*/
-void process_aplog_and_bz_trigger(char *filename, char *name,  unsigned int files) {
+static void process_aplog_and_bz_trigger(char *filename, char *name,  unsigned int files) {
 
     char date_tmp[32];
     char date_tmp_2[32];
@@ -2407,9 +2341,6 @@ void process_aplog_and_bz_trigger(char *filename, char *name,  unsigned int file
     int j,k;
     aplogIsPresent = 0;
     dir = -1;
-#ifndef FULL_REPORT
-    flush_aplog();
-#endif
     /*copy data file*/
     for( j=0; j < nbPacket ; j++){
         if(strstr(name, "aplog_trigger" ))
@@ -2512,9 +2443,6 @@ void process_aplog_and_bz_trigger(char *filename, char *name,  unsigned int file
         }
     }
 
-#ifndef FULL_REPORT
-    remove(APLOG_FILE_0);
-#endif
     /*delete trigger file*/
     if (filename) {
         snprintf(path, sizeof(path),"%s/%s",filename,name);
@@ -2531,7 +2459,7 @@ void process_aplog_and_bz_trigger(char *filename, char *name,  unsigned int file
 *   char *filename        -> path of watched directory/file
 *   char *name            -> name of the file inside the watched directory that has triggered the event
 *   unsigned int files    -> nb max of logs destination directories (crashlog, aplogs, bz... )*/
-void process_stats_trigger(char *filename, char *name,  unsigned int files) {
+void orig_process_stats_trigger(char *filename, char *name,  unsigned int files) {
 
     char date_tmp[32];
     char date_tmp_2[32];
@@ -2611,7 +2539,7 @@ void process_stats_trigger(char *filename, char *name,  unsigned int files) {
 *   char *filename        -> path of watched directory/file
 *   char *name            -> name of the file inside the watched directory that has triggered the event
 *   unsigned int files    -> nb max of logs destination directories (crashlog, aplogs, bz... )*/
-void process_info_and_error(char *filename, char *name,  unsigned int files) {
+static void process_info_and_error(char *filename, char *name,  unsigned int files) {
 
     char date_tmp[32];
     char date_tmp_2[32];
@@ -2702,7 +2630,7 @@ void process_info_and_error(char *filename, char *name,  unsigned int files) {
 *   unsigned int files    -> nb max of logs destination directories (crashlog, aplogs, bz... )
 *   int fd                -> file descriptor referring to the inotify instance
 *   char *current_key     -> key of the current event to upload once the dumpstate is done*/
-void process_anr_and_uiwatchdog_events(char *filename, char *eventname, char *name,  unsigned int files, int fd, char *current_key) {
+static void process_anr_and_uiwatchdog_events(char *filename, char *eventname, char *name,  unsigned int files, int fd, char *current_key) {
 
     char date_tmp[32];
     char date_tmp_2[32];
@@ -2742,7 +2670,7 @@ void process_anr_and_uiwatchdog_events(char *filename, char *eventname, char *na
         do_log_copy(eventname,dir,date_tmp,APLOG_TYPE);
         backtrace_anr_uiwdt(destion, dir);
         restart_profile1_srv();
-#ifdef FULL_REPORT
+
         if (strstr(name, "anr")) {
             snprintf(destion,sizeof(destion),"%s%d",CRASH_DIR,dir);
             char value[PROPERTY_VALUE_MAX];
@@ -2763,7 +2691,6 @@ void process_anr_and_uiwatchdog_events(char *filename, char *eventname, char *na
                 start_dumpstate_srv(CRASH_DIR, dir);
             }
         }
-#endif
         notify_crashreport();
     }
     return;
@@ -2780,7 +2707,7 @@ void process_anr_and_uiwatchdog_events(char *filename, char *eventname, char *na
 *   unsigned int files    -> nb max of logs destination directories (crashlog, aplogs, bz... )
 *   int fd                -> file descriptor referring to the inotify instance
 *   char *current_key     -> key of the current event to upload once the dumpstate is done*/
-void process_generic_events(char *filename, char *eventname, char *name,  unsigned int files, int fd, char *current_key) {
+static void process_generic_events(char *filename, char *eventname, char *name,  unsigned int files, int fd, char *current_key) {
 
     char date_tmp[32];
     char date_tmp_2[32];
@@ -2826,7 +2753,6 @@ void process_generic_events(char *filename, char *eventname, char *name,  unsign
             backtrace_anr_uiwdt(destion, dir);
             restart_profile1_srv();
         }
-#ifdef FULL_REPORT
         if(strstr(name, "anr") || strstr(name, "crash") || strstr(name, "tombstone")){
             snprintf(destion,sizeof(destion),"%s%d",CRASH_DIR,dir);
             char value[PROPERTY_VALUE_MAX];
@@ -2845,7 +2771,6 @@ void process_generic_events(char *filename, char *eventname, char *name,  unsign
                 start_dumpstate_srv(CRASH_DIR, dir);
             }
         }
-#endif
         notify_crashreport();
     }
     return;
@@ -2856,7 +2781,7 @@ void process_generic_events(char *filename, char *eventname, char *name,  unsign
 * Description   : processes uptime events
 * Parameters    :
 *   char *eventname       -> name of the watched event*/
-void process_uptime(char *eventname) {
+static void process_uptime(char *eventname) {
 
     long long tm;
     int hours, seconds, minutes;
@@ -2896,7 +2821,7 @@ void process_uptime(char *eventname) {
             loop_uptime_event = (hours / current_uptime_hour_frequency) + 1;
             notify_crashreport();
             restart_profile2_srv();
-            check_running_power_service();
+            check_running_power_service_orig();
         }
     }
 }
@@ -3074,7 +2999,7 @@ static int file_monitor_fd = -1;
  *
  * @return Initialized File Monitor module file descriptor.
  */
-int file_monitor_get_fd()
+static int file_monitor_get_fd()
 {
     return file_monitor_fd;
 }
@@ -3102,10 +3027,7 @@ static int file_monitor_init()
         wd = inotify_add_watch(file_monitor_fd, wd_array[i].filename,
                 wd_array[i].mask);
         if (wd < 0) {
-            LOGE("Can't add watch for %si, remove all existing watches.\n", wd_array[i].filename);
-            for (--i ; i >= 0 ; i--) {
-                inotify_rm_watch(file_monitor_fd, wd_array[i].wd);
-            }
+            LOGE("Can't add watch for %s.\n", wd_array[i].filename);
             return -1;
         }
         wd_array[i].wd = wd;
@@ -3116,49 +3038,6 @@ static int file_monitor_init()
 
     return 0;
 }
-
-/**
- * @brief Show the contents of an array of inotify_events
- *
- * Called when a problem occurred during the parsing of
- * the array to ease the debug
- *
- * @param buffer: buffer containing the inotify events
- * @param len: length of the buffer
- */
-void dump_inotify_events(char *buffer, unsigned int len,
-    char *lastevent) {
-
-    struct inotify_event *event;
-    int i;
-
-    LOGI("%s: Dump the wd_array:\n", __FUNCTION__);
-    for (i = WDCOUNT_START; i < WDCOUNT; i++) {
-        LOGI("%s: wd_array[%d]: filename=%s, wd=%d\n", __FUNCTION__, i, wd_array[i].filename, wd_array[i].wd);
-    }
-
-    while (1) {
-        if (len == 0) {
-            /* End of the buffer */
-            return;
-        }
-        event = (struct inotify_event*)buffer;
-        if (len < sizeof(struct inotify_event) ||
-            len < (sizeof(struct inotify_event) + event->len)) {
-            /* Not enought room the last event,
-             * get it from the lastevent */
-            event = (struct inotify_event*)lastevent;
-            len = 0;
-            if (!event->wd && !event->mask && !event->cookie && !event->len)
-                // no last event
-                return;
-        } else {
-            buffer += sizeof(struct inotify_event) + event->len;
-            len -= sizeof(struct inotify_event) + event->len;
-        }
-        LOGI("%s: event received (name=%s, wd=%d, mask=0x%x, len=%d)\n", __FUNCTION__, event->name, event->wd, event->mask, event->len);
-    }
- }
 
 /**
  * @brief Handle File Monitor processing of events
@@ -3175,33 +3054,16 @@ void dump_inotify_events(char *buffer, unsigned int len,
 static int file_monitor_handle(unsigned int files)
 {
     int wd;
-    int len = 0, orig_len;
-    char orig_buffer[sizeof(struct inotify_event)+PATHMAX], *buffer, lastevent[sizeof(struct inotify_event)+PATHMAX];
+    int index_prod = 0;
+    char buffer[PATHMAX];
+    char *offset = NULL;
     struct inotify_event *event;
+    int len, tmp_len;
     int i = 0;
     char key[SHA1_DIGEST_LENGTH+1];
+    char current_key[2][SHA1_DIGEST_LENGTH+1];
 
-    len = read(file_monitor_fd, orig_buffer, sizeof(orig_buffer));
-    if (len < 0) {
-        LOGE("%s: Cannot read file_monitor_fd, error is %s\n", __FUNCTION__, strerror(errno));
-        return -1;
-    }
-
-    buffer = &orig_buffer[0];
-    event = (struct inotify_event *)buffer;
-    orig_len = len;
-
-    /* Preinitialize lastevent (in case it was not used so it is not dumped) */
-    ((struct inotify_event *)lastevent)->wd = 0;
-    ((struct inotify_event *)lastevent)->mask = 0;
-    ((struct inotify_event *)lastevent)->cookie = 0;
-    ((struct inotify_event *)lastevent)->len = 0;
-
-#ifdef FULL_REPORT
-    static char current_key[2][SHA1_DIGEST_LENGTH+1] = {{0,},{0,}};
-    static int index_prod = 0;
-#endif
-
+    len = read(file_monitor_fd, buffer, sizeof(buffer));
     /* clean children to avoid zombie processes */
     while(waitpid(-1, NULL, WNOHANG) > 0){};
 
@@ -3267,19 +3129,17 @@ static int file_monitor_handle(unsigned int files)
         }
 
         /* for dir to be delete */
-        if((event->mask & IN_DELETE_SELF) ||(event->mask & IN_MOVE_SELF)) {
+        if((event->mask & IN_DELETE_SELF) ||(event->mask & IN_MOVE_SELF)){
             for (i = WDCOUNT_START; i < WDCOUNT; i++) {
                 if (event->wd != wd_array[i].wd)
                     continue;
                 mkdir(wd_array[i].filename, 0777);
-                inotify_rm_watch(file_monitor_fd, event->wd);
                 wd = inotify_add_watch(file_monitor_fd, wd_array[i].filename, wd_array[i].mask);
                 if (wd < 0) {
                     LOGE("Can't add watch for %s.\n", wd_array[i].filename);
                     return -1;
                 }
                 wd_array[i].wd = wd;
-                event->wd = -1;
                 LOGW("%s has been deleted or moved, we watch it again.\n", wd_array[i].filename);
             }
         }
@@ -3319,7 +3179,7 @@ static int file_monitor_handle(unsigned int files)
                     /* for full dropbox */
                     else if(strstr(event->name, wd_array[i].cmp) && (strstr(event->name, ".lost" ))){
 
-                        process_full_dropbox_event(wd_array[i].filename, event->name, files);
+                        process_full_dropbox_event(event->name, files);
                         break;
                     }
                     /* for hprof */
@@ -3329,13 +3189,11 @@ static int file_monitor_handle(unsigned int files)
                         break;
                     }
                     /* for cmd */
-#ifdef FULL_REPORT
                     else if((strcmp(wd_array[i].eventname, CMDTRIGGER)==0) && (strstr(event->name, "_cmd" ))){
 
                         process_command(wd_array[i].filename, event->name);
                         break;
                     }
-#endif
                     /* for aplog and bz trigger */
                     else if((strcmp(wd_array[i].eventname, APLOGTRIGGER)==0) && (strstr(event->name, "_trigger" ))){
 
@@ -3345,7 +3203,7 @@ static int file_monitor_handle(unsigned int files)
                     /* for STATS trigger */
                     else if((strcmp(wd_array[i].eventname,STATSTRIGGER)==0) && (strstr(event->name, "_trigger" ))){
 
-                        process_stats_trigger(wd_array[i].filename, event->name, files);
+                        orig_process_stats_trigger(wd_array[i].filename, event->name, files);
                         break;
                     }
                     /* for INFO & ERROR (using STATS watcher) */
@@ -3358,41 +3216,32 @@ static int file_monitor_handle(unsigned int files)
                     else if (strstr(event->name, wd_array[i].cmp) && ( strstr(event->name, "anr") || strstr(event->name, "system_server_watchdog"))) {
 
                         process_anr_and_uiwatchdog_events(wd_array[i].filename, wd_array[i].eventname, event->name, files, file_monitor_fd, key);
-#ifdef FULL_REPORT
+
                         //manage consecutive anr dumpstates: not null returned event key means an anr dumpstate has been launched
                         if (key [0] != '\0' ) {
-                            strncpy(current_key[index_prod],key,sizeof(key));
+                            strcpy(current_key[index_prod],key);
                             index_prod = (index_prod + 1) % 2;
                         }
-#endif
                         break;
                     }
                     /* for other case */
                     else if (strstr(event->name, wd_array[i].cmp)) {
 
                         process_generic_events(wd_array[i].filename, wd_array[i].eventname, event->name, files, file_monitor_fd, key);
-#ifdef FULL_REPORT
+
                         //manage consecutive dumpstates: not null returned event key means a dumpstate has been launched
                         if (key [0] != '\0' ) {
-                            strncpy(current_key[index_prod],key,sizeof(key));
+                            strcpy(current_key[index_prod],key);
                             index_prod = (index_prod + 1) % 2;
                         }
-#endif
                         break;
                     }
                 }
             }
-#ifdef FULL_REPORT
-            if(event->len && !strncmp(event->name, "dropbox-", 8) && (i==WDCOUNT) && event->wd != -1) {
-                if (current_key[index_cons][0] == 0) {
-                    LOGE("%s: Dropbox event received but event_id has not been set properly\n", __FUNCTION__);
-                    dump_inotify_events(orig_buffer, orig_len, lastevent);
-                    return -1;
-                }
+            if(event->len && !strncmp(event->name, "dropbox-", 8) && (i==WDCOUNT)){
                 //dumpstate is done so remove the watcher
                 inotify_rm_watch(file_monitor_fd, event->wd);
                 notify_crash_to_upload(current_key[index_cons]);
-                current_key[index_cons][0] = 0;
                 index_cons = (index_cons + 1) % 2;
             }
 #endif
@@ -3658,7 +3507,6 @@ static int do_monitor(unsigned int files)
     int select_result; /**< select result */
 
     file_monitor_init();
-    init_mmgr_cli();
 
     for(;;) {
 
@@ -3670,13 +3518,6 @@ static int do_monitor(unsigned int files)
             FD_SET(file_monitor_get_fd(), &read_fds);
             if (file_monitor_get_fd() > max)
                 max = file_monitor_get_fd();
-        }
-
-        //mmgr fd setup
-        if (mmgr_get_fd() > 0) {
-            FD_SET(mmgr_get_fd(), &read_fds);
-            if (mmgr_get_fd() > max)
-                max = mmgr_get_fd();
         }
 
         // Wait for events
@@ -3706,7 +3547,7 @@ static int do_monitor(unsigned int files)
     return -1;
 }
 
-void check_running_logs_service()
+static void check_running_logs_service()
 {
     char logservice[PROPERTY_VALUE_MAX];
     char logenable[PROPERTY_VALUE_MAX];
@@ -3719,7 +3560,7 @@ void check_running_logs_service()
     }
 }
 
-void do_timeup()
+static void do_timeup()
 {
     int fd;
 
@@ -3875,20 +3716,14 @@ static int crashlog_check_panic(char *reason, unsigned int files)
         else
             strcpy(crashtype, KERNEL_CRASH);
 
-        if (find_str_in_file(SAVED_CONSOLE_NAME, "sdhci_pci_power_up_host: host controller power up is done", NULL))
-             // An error is raised when the panic console file does not end normally
-             crashlog_raise_infoerror(ERROREVENT, CRASHLOG_IPANIC_CORRUPTED);
-
         if (!strncmp(crashtype, KERNEL_FAKE_CRASH, sizeof(KERNEL_FAKE_CRASH)))
              strcat(reason,"_FAKE");
-        else if (!strncmp(reason, "HWWDT_RESET_FAKE", 16))
-             strcpy(crashtype, KERNEL_FAKE_CRASH);
         else if (!strncmp(reason,"HWWDT_RESET", 11))
              strcpy(crashtype, KERNEL_HWWDT_CRASH);
          else if (strncmp(reason,"SWWDT_RESET", 11) != 0)
              // In some corner cases, the startupreason is not correctly set
              // In this case, an ERROR is sent to have correct SWWDT metrics
-             crashlog_raise_infoerror(ERROREVENT, CRASHLOG_SWWDT_MISSING);
+             orig_crashlog_raise_infoerror(ERROREVENT, CRASHLOG_SWWDT_MISSING);
 
         time(&t);
         time_tmp = localtime((const time_t *)&t);
@@ -4455,7 +4290,7 @@ static void read_startupreason(char *startupreason)
         }
     }
 }
-#ifdef FULL_REPORT
+
 static void update_logs_permission(void)
 {
     char value[PROPERTY_VALUE_MAX] = "0";
@@ -4470,9 +4305,6 @@ static void update_logs_permission(void)
         chmod(HISTORY_CORE_DIR,0777);
     }
 }
-#else
-static void update_logs_permission(void) {}
-#endif
 
 //This function manages the path containing files triggering IPANIC, FABRICERR and WDT events treatment
 //with a value read from a debug propertie
@@ -4489,6 +4321,7 @@ static void manage_ipanic_fabricerr_wdt_trigger_path(void)
     }
 }
 
+#ifndef __TEST__
 int main(int argc, char **argv)
 {
 
@@ -4513,11 +4346,7 @@ int main(int argc, char **argv)
 
     if (argc == 2) {
         if(!memcmp(argv[1], "-modem", 6)){
-#ifdef FULL_REPORT
-            WDCOUNT_START = 10;
-#else
-            WDCOUNT_START = 7;
-#endif
+            WDCOUNT_START = 9;
             WDCOUNT = WDCOUNT_START + 4;
             LOGI(" crashlogd only snoop modem \n");
         }
@@ -4543,6 +4372,14 @@ int main(int argc, char **argv)
 
     //Manage the path containing files triggering IPANIC and FABRICERR and WDT events
     manage_ipanic_fabricerr_wdt_trigger_path();
+
+    property_get(PROP_CRASH, value, "");
+    if (strncmp(value, "1", 1)){
+        if (stat(PANIC_CONSOLE_NAME, &info) == 0){
+            write_file(PANIC_CONSOLE_NAME, "1");
+        }
+        return -1;
+    }
 
     if (property_get(BUILD_FIELD, buildVersion, "") <=0){
         get_version_info(SYS_PROP, BUILD_FIELD, buildVersion);
@@ -4654,3 +4491,4 @@ next2:
 
     return do_monitor(files);
 }
+#endif
