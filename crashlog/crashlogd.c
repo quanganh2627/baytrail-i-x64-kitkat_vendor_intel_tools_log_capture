@@ -1670,16 +1670,10 @@ static unsigned int find_dir(unsigned int max, int mode)
        goto out_err;
     }
     closedir(d);
-#ifdef FULL_REPORT
-    if (!strstr(path, "sdcard")) {
-         char cmd[512] = { '\0', };
 
-         snprintf(cmd, sizeof(cmd)-1, "/system/bin/chown %s %s", PERM_USER, path);
-         int status = system(cmd);
-         if (status != 0)
-            LOGE("status chown %s: %d\n", cmd, status);
-   }
-#endif
+    if (!strstr(path, "sdcard"))
+        do_chown(path, PERM_USER, PERM_GROUP);
+
    goto out;
 
 out_err:
