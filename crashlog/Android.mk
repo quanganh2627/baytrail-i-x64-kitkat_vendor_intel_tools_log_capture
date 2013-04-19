@@ -22,6 +22,8 @@ LOCAL_SRC_FILES:= \
   crashlogd.c \
   mmgr_source.c
 
+LOCAL_CFLAGS += -DFULL_REPORT=1
+
 LOCAL_C_INCLUDES += \
   $(TARGET_OUT_HEADERS)/IFX-modem \
   device/intel/log_capture/backtrace
