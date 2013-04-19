@@ -550,7 +550,6 @@ static int get_version_info(char *fn, char *field, char *buf)
     int sz;
     int fd;
     int i = 0;
-    char *info = NULL;
     int len = -1;
     int p;
 
@@ -649,6 +648,10 @@ static void find_file_in_dir(char *name_file_found, char *dir_to_search, char *n
     DIR *d;
     struct dirent* de;
     d = opendir(dir_to_search);
+    if(!d) {
+        LOGE("%s: Can't open dir %s\n",__FUNCTION__, dir_to_search);
+        return;
+    }
     while ((de = readdir(d))) {
         const char *name = de->d_name;
         if (strstr(name, name_file_to_match)){
@@ -715,8 +718,6 @@ static void write_uid(char* filename, char *uuid_value)
 static void read_proc_uid(char* source, char *filename, char *uid, char* pattern)
 {
     char temp_uid[256];
-    struct stat info;
-    FILE *fd;
 
     if ((source && filename && uid && pattern) == 0)
         return;
@@ -734,8 +735,6 @@ static void read_proc_uid(char* source, char *filename, char *uid, char* pattern
 static void read_prop_uid(char* source, char *filename, char *uid, char* default_value)
 {
     char temp_uid[PROPERTY_VALUE_MAX];
-    struct stat info;
-    FILE *fd;
 
     if ((source && filename && uid && default_value) == 0)
         return;
@@ -870,6 +869,11 @@ static void create_minimal_crashfile(char* type, char* path, char* key, char* up
         struct dirent* de;
         char value[PATHMAX] = "";
         d = opendir(path);
+        if(!d) {
+            LOGE("%s: Can't open dir %s\n",__FUNCTION__, path);
+            fclose(fp);
+            return;
+        }
         while ((de = readdir(d))) {
             const char *name = de->d_name;
             if (strstr(name, "mpanic")){
@@ -993,7 +997,6 @@ static void history_file_write(char *event, char *type, char *subtype, char *log
     char uptime[32];
     struct stat info;
     long long tm=0;
-    time_t t;
     int hours, seconds, minutes;
     FILE *to;
     char tmp[PATHMAX];
@@ -1768,9 +1771,7 @@ static int find_str_in_file(char *file, char *keyword, char *tail)
     int rc = 0;
     FILE *fd1;
     struct stat info;
-    int brtw, brtr;
-    char *p;
-    int filelen,tmp,stringlen,buflen;
+    int buflen;
 
     if (stat(file, &info) < 0)
         return -1;
@@ -1878,6 +1879,7 @@ static int update_history_on_cmd_delete(char* events)
 
     data = (char *)malloc(sz + 2);
     if (data == 0) {
+        close(fd);
         return 0;
     }
     if (read(fd, data, sz) != sz) {
@@ -2176,7 +2178,6 @@ void process_aplog_and_bz_trigger(char *filename, char *name,  unsigned int file
     char path[PATHMAX];
     char destion[PATHMAX];
     struct stat info;
-    char *p;
     char tmp[PATHMAX] = {'\0',};
     int nbPacket,aplogDepth;
     int aplogIsPresent;
@@ -2288,7 +2289,7 @@ void process_aplog_and_bz_trigger(char *filename, char *name,  unsigned int file
             compress_aplog_folder(destion);
             //copy bz_trigger file content
             snprintf(destion,sizeof(destion),"%s%d/bz_description", BZ_DIR,dir);
-            snprintf(path, sizeof(path),"%s/%s",filename,name);
+            snprintf(path, sizeof(path),"/logs/aplogs/%s",BZTRIGGER);
             do_copy(path,destion,0);
             get_formated_times(date_tmp,date_tmp_2);
             compute_key(key, BZEVENT, BZMANUAL);
@@ -2836,7 +2837,7 @@ static int manage_duplicate_dropbox_events(struct inotify_event *event, unsigned
 
         if (timestamp_value != -1) {
             struct tm *time;
-            memset(&time, 0, sizeof(struct tm));
+            memset(&time, 0, sizeof(time));
             time = localtime(&timestamp_value);
             PRINT_TIME(human_readable_date, TIME_FORMAT_2, time);
         }
@@ -3003,11 +3004,23 @@ static int file_monitor_handle(unsigned int files)
             /* Not enought room for an empty event */
             LOGI("%s: incomplete inotify_event received (%d bytes), complete it\n", __FUNCTION__, len);
             /* copy the last bytes received */
-            memcpy(lastevent, buffer, len);
+            if(len <= sizeof(lastevent))
+                memcpy(lastevent, buffer, len);
+            else {
+                LOGE("%s: Cannot copy buffer\n", __FUNCTION__);
+                return -1;
+            }
             /* read the missing bytes to get the full length */
-            if ( read(file_monitor_fd, &lastevent[len], (int)sizeof(struct inotify_event)-len)
+            if( sizeof(struct inotify_event) <= sizeof(lastevent)) {
+                if ( read(file_monitor_fd, &lastevent[len], (int)sizeof(struct inotify_event)-len)
                     != (int)sizeof(struct inotify_event) - len) {
-                LOGE("%s: Cannot complete the last inotify_event received (structure part) - %s\n",
+                    LOGE("%s: Cannot complete the last inotify_event received (structure part) - %s\n",
+                    __FUNCTION__, strerror(errno));
+                    return -1;
+                }
+            }
+            else {
+                LOGE("%s: Cannot read missing bytes, not enought space in lastevent\n",
                     __FUNCTION__, strerror(errno));
                 return -1;
             }
@@ -3457,6 +3470,7 @@ static int do_monitor(unsigned int files)
                 mmgr_handle(files);
             }
         }
+
     }
     close_mmgr_cli_source();
     LOGE("Exiting main monitor loop");
@@ -4007,8 +4021,6 @@ static void reset_swupdate(void)
 static void uptime_history(char *lastuptime)
 {
     FILE *to;
-    int fd;
-    struct stat info;
 
     char name[32];
     char date_tmp[32];
@@ -4135,10 +4147,8 @@ int main(int argc, char **argv)
     int ret = 0;
     unsigned int files = 0xFFFFFFFF;
     char date_tmp[32];
-    struct stat info;
     time_t t;
     char destion[PATHMAX];
-    char *vinfo;
     pid_t pid;
     unsigned int dir;
     char key[SHA1_DIGEST_LENGTH+1];
