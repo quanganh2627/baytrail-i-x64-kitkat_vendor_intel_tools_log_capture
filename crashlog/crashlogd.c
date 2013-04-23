@@ -2480,8 +2480,18 @@ void process_aplog_and_bz_trigger(char *filename, char *name,  unsigned int file
         if(aplogIsPresent == 0)
             break;
     }
+
     //for bz_trigger, treats bz_trigger file content and logs one BZEVENT event in history_event
-    if(-1!=dir && !strncmp(name, BZTRIGGER, sizeof(BZTRIGGER))) {
+    if(!strncmp(name, BZTRIGGER, sizeof(BZTRIGGER))) {
+        //In case of bz_trigger with APLOG=0 which means bz type="enhancement" and so no logs needed.
+        if((aplogDepth == 0) && (dir == -1)) {
+            dir = find_dir(files,BZ_MODE);
+            if (dir == -1) {
+                LOGE("find dir %d for BZ trigger failed\n", files);
+            }
+        }
+
+        if(-1 != dir) {
             snprintf(destion,sizeof(destion),"%s%d/", BZ_DIR,dir);
             compress_aplog_folder(destion);
             //copy bz_trigger file content
@@ -2499,6 +2509,7 @@ void process_aplog_and_bz_trigger(char *filename, char *name,  unsigned int file
             del_file_more_lines(HISTORY_FILE);
             notify_crashreport();
             restart_profile2_srv();
+        }
     }
 
 #ifndef FULL_REPORT
