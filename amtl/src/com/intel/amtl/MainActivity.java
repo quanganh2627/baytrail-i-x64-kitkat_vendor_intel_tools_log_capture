@@ -45,6 +45,7 @@
  * 2.2.12 - 2013-02-19 - BZ 86854 - Add checks to avoid NullPointerException
  * 2.3.0  - 2013-02-25 - BZ 88485 - Config file for platform specificities
  * 2.3.1  - 2013-03-14 - BZ 92443 - Usb logging based on SPH driver status
+ * 2.3.2  - 2013-04-02 - BZ 89945 - Remove SDCARD button in Settings menu
  * ============================================================================
  */
 
@@ -52,6 +53,7 @@ package com.intel.amtl;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.AsyncTask;
 import android.os.Bundle;
@@ -84,6 +86,8 @@ public class MainActivity extends Activity {
     private AmtlCore core;
 
     private PlatformConfig platformConfig;
+
+    private TelephonyStack telStackSetter;
 
     /* Create advanced menu */
     @Override
@@ -186,14 +190,39 @@ public class MainActivity extends Activity {
 
         /* Get application core */
         try {
+            telStackSetter = new TelephonyStack();
             this.core = AmtlCore.get();
             this.core.setContext(this.getApplicationContext());
             this.platformConfig = PlatformConfig.get();
             this.initTask = new AsyncMainActivityInitTask();
             /* let's init our AmtlCore in a background thread to release the UI thread asap. */
             this.initTask.execute((Void)null);
-
-        } catch (AmtlCoreException e) {
+        } catch (AmtlModemCoreException e) {
+            this.core = null;
+            this.platformConfig = PlatformConfig.get();
+            if (platformConfig.getPlatformVersion().equals("saltbay")) {
+                UIHelper.message_warning(this, "WARNING",
+                    "The telephony stack is disabled. Would you like to enable it?",
+                    new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int whichButton) {
+                            String value = "0";
+                            String text = "A platform reboot will be needed to take this "
+                                + "modification into account";
+                            if (DialogInterface.BUTTON_POSITIVE == whichButton) {
+                                value = "1";
+                            }
+                            telStackSetter.setState(value);
+                            if (DialogInterface.BUTTON_NEGATIVE == whichButton) {
+                               text = "AMTL will exit";
+                            }
+                            UIHelper.exitDialog(MainActivity.this, "WARNING", text);
+                    }
+                });
+            } else {
+                UIHelper.exitDialog(this, "ERROR", e.getMessage() + "\nAMTL will exit.");
+            }
+       } catch (AmtlCoreException e) {
             /* Failed to initialize application core */
             this.core = null;
             Log.e(AmtlCore.TAG, MODULE + ": " + e.getMessage());

@@ -84,6 +84,7 @@ int mdm_CORE_DUMP(mmgr_cli_event_t *ev)
         LOGW("FAILED_WITH_PANIC_ID");
         LOGD("panic id: %d", cd->panic_id);
         cur_data.extra_int = cd->panic_id;
+        break;
     case E_CD_SUCCEED_WITHOUT_PANIC_ID:
         LOGD("No panic id");
         // use -2 value to indicate an empty panic ID to crashlogd

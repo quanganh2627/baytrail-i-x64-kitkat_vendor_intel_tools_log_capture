@@ -25,6 +25,16 @@ import android.content.DialogInterface;
 public class UIHelper {
 
     /* Print pop-up message with ok and cancel buttons */
+    public static void message_warning(final Activity A, String title, String message, DialogInterface.OnClickListener listener) {
+        new AlertDialog.Builder(A)
+            .setTitle(title)
+            .setMessage(message)
+            .setPositiveButton(android.R.string.ok, listener)
+            .setNegativeButton("Cancel", listener)
+            .show();
+    }
+
+    /* Print pop-up message with ok and cancel buttons */
     public static void message_warning(final Activity A, String title, String message) {
         new AlertDialog.Builder(A)
         .setTitle(title)
