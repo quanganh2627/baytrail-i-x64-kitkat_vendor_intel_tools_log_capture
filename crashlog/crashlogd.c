@@ -1963,8 +1963,7 @@ static void clean_crashlog_in_sd(char *dir_to_search, int max)
             snprintf(path, sizeof(path)-1, "%s/%s", dir_to_search, name);
             if ((strstr(path, SDCARD_CRASH_DIR) ||
                (strstr(path, SDCARD_STATS_DIR)) ||
-               (strstr(path, SDCARD_APLOGS_DIR)) ||
-               (strstr(path, SDCARD_BZ_DIR))))
+               (strstr(path, SDCARD_APLOGS_DIR)) ))
                 if (find_str_in_file(HISTORY_FILE, path, NULL)) {
                     if  (remove_folder(path) < 0)
                         LOGE("failed to remove folder %s", path);
@@ -4354,7 +4353,6 @@ static void reset_swupdate(void)
     reset_crashlog();
     reset_statslog();
     reset_aplogslog();
-    reset_bzlog();
     reset_history();
 }
 
