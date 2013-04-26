@@ -334,7 +334,7 @@ public class AmtlCore implements ModemEventListener {
         this.services.stop_service();
         this.modemCfg.setXsio(this.gsmtty, this.platformConfig.getCoredumpXsio());
         this.modemCfg.setTraceLevel(this.gsmtty, CustomCfg.TRACE_LEVEL_BB_3G,
-                (this.platformConfig.getPlatformVersion()).equals("clovertrail"));
+                (this.platformConfig.getPlatformVersion()).equals("redhookbay"));
         this.modemCfg.setTraceStatus(this.gsmtty,CustomCfg.TRACE_ENABLED);
         this.services.enable_service(Services.MTS_DISABLE, this.futCfg,
                 this.futCustomCfg.offlineLogging);
@@ -430,7 +430,7 @@ public class AmtlCore implements ModemEventListener {
         boolean isCoredump = ((xsioToSet == this.platformConfig.getCoredumpXsio())
                 && (futCustomCfg.traceLevel != CustomCfg.TRACE_LEVEL_NONE)
                 && (futCustomCfg.traceStatus == CustomCfg.TRACE_DISABLED)
-                && ((this.platformConfig.getPlatformVersion()).equals("clovertrail")));
+                && ((this.platformConfig.getPlatformVersion()).equals("redhookbay")));
         /* Apply configuration */
         this.services.stop_service();
         if (xsioToSet != -1) {
