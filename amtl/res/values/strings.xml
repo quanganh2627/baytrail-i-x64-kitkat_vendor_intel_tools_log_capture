@@ -31,6 +31,7 @@
     <string name="settings_hsi_frequencies_txt">HSI frequencies</string>
     <string name="settings_activate_txt">ACTIVATE</string>
     <string name="settings_mux_txt">Enable MUX traces</string>
+    <string name="settings_telephony_txt">Enable telephony stack</string>
     <string name="settings_add_traces_txt">Enable additional traces \n (LG1 LLT)</string>
     <string name="settings_none">NONE</string>
 </resources>

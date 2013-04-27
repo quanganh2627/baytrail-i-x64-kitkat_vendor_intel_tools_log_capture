@@ -53,6 +53,7 @@ package com.intel.amtl;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.AsyncTask;
 import android.os.Bundle;
@@ -85,6 +86,8 @@ public class MainActivity extends Activity {
     private AmtlCore core;
 
     private PlatformConfig platformConfig;
+
+    private TelephonyStack telStackSetter;
 
     /* Create advanced menu */
     @Override
@@ -187,14 +190,39 @@ public class MainActivity extends Activity {
 
         /* Get application core */
         try {
+            telStackSetter = new TelephonyStack();
             this.core = AmtlCore.get();
             this.core.setContext(this.getApplicationContext());
             this.platformConfig = PlatformConfig.get();
             this.initTask = new AsyncMainActivityInitTask();
             /* let's init our AmtlCore in a background thread to release the UI thread asap. */
             this.initTask.execute((Void)null);
-
-        } catch (AmtlCoreException e) {
+        } catch (AmtlModemCoreException e) {
+            this.core = null;
+            this.platformConfig = PlatformConfig.get();
+            if (platformConfig.getPlatformVersion().equals("saltbay")) {
+                UIHelper.message_warning(this, "WARNING",
+                    "The telephony stack is disabled. Would you like to enable it?",
+                    new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int whichButton) {
+                            String value = "0";
+                            String text = "A platform reboot will be needed to take this "
+                                + "modification into account";
+                            if (DialogInterface.BUTTON_POSITIVE == whichButton) {
+                                value = "1";
+                            }
+                            telStackSetter.setState(value);
+                            if (DialogInterface.BUTTON_NEGATIVE == whichButton) {
+                               text = "AMTL will exit";
+                            }
+                            UIHelper.exitDialog(MainActivity.this, "WARNING", text);
+                    }
+                });
+            } else {
+                UIHelper.exitDialog(this, "ERROR", e.getMessage() + "\nAMTL will exit.");
+            }
+       } catch (AmtlCoreException e) {
             /* Failed to initialize application core */
             this.core = null;
             Log.e(AmtlCore.TAG, MODULE + ": " + e.getMessage());

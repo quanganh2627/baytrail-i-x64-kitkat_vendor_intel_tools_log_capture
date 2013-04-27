@@ -112,7 +112,7 @@ public class AmtlCore implements ModemEventListener {
     private PlatformConfig platformConfig;
 
     /* Constructor */
-    private AmtlCore() throws AmtlCoreException {
+    private AmtlCore() throws AmtlCoreException, AmtlModemCoreException {
         Log.i(TAG, MODULE + ": create application core");
 
         try {
@@ -125,7 +125,7 @@ public class AmtlCore implements ModemEventListener {
             throw new AmtlCoreException("Modem Status Manager client could not be instantiated." +
                     " Make sur his device has STMD or MMGR deployed.");
         } catch (MmgrClientException ex) {
-            throw new AmtlCoreException(ex.getMessage());
+            throw new AmtlModemCoreException(ex.getMessage());
         } catch (ExceptionInInitializerError ex) {
             throw new AmtlCoreException("AMTL library not found, please install it first");
         }
@@ -149,7 +149,7 @@ public class AmtlCore implements ModemEventListener {
 
             if (!this.modemStatusManager.
                     waitForModemStatus(ModemStatus.UP, MODEM_STATUS_TIMEOUT_MS)) {
-                throw new AmtlCoreException("Modem is not ready.");
+                throw new AmtlModemCoreException("Modem is not ready.");
             }
             this.currentStatus = ModemStatus.UP;
         } catch (MmgrClientException ex) {
@@ -180,7 +180,7 @@ public class AmtlCore implements ModemEventListener {
     }
 
     /* Get a reference of AMTL core application: singleton design pattern */
-    protected static AmtlCore get() throws AmtlCoreException {
+    protected static AmtlCore get() throws AmtlCoreException, AmtlModemCoreException {
         if (core == null) {
             core = new AmtlCore();
         }

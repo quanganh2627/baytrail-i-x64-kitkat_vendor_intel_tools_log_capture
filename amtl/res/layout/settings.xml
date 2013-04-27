@@ -264,5 +264,33 @@
 	                    android:layout_height="wrap_content" />
 	            </TableRow>
 	        </TableLayout>
+            <View
+	            android:id="@+id/TelephonyStackView"
+	            android:layout_width="wrap_content"
+	            android:layout_height="4px"
+	            android:layout_marginTop="20px"
+	            android:layout_marginBottom="20px"
+	            android:background="#C0C0C0" />
+	        <TableLayout
+	            android:id="@+id/TableLayoutTelephonyStack"
+	            android:layout_width="fill_parent"
+	            android:layout_height="wrap_content"
+	            android:stretchColumns="0" >
+	            <TableRow
+	                android:id="@+id/TableRowAddTraces"
+	                android:layout_width="wrap_content"
+	                android:layout_height="wrap_content">
+	                <TextView
+		                android:id="@+id/textViewTelStack"
+		                android:layout_width="fill_parent"
+		                android:layout_height="wrap_content"
+		                android:text="@string/settings_telephony_txt"
+		                android:textAppearance="?android:attr/textAppearanceLarge" />
+		            <CheckBox
+		                android:id="@+id/telephony_stack_checkBox"
+		                android:layout_width="wrap_content"
+		                android:layout_height="wrap_content" />
+	            </TableRow>
+	        </TableLayout>
     </LinearLayout>
 </ScrollView>

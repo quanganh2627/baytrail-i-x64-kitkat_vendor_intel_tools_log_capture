@@ -67,6 +67,10 @@ public class SettingsActivity extends Activity {
     private CheckBox checkbox_mux;
     private CheckBox checkbox_additional_traces;
     private TextView header_additional_traces;
+    private CheckBox telephony_stack;
+    private TextView telStackTextView;
+    private boolean telephony_stack_start;
+    private TelephonyStack telStackSetter;
     /* when set_trace_file_size is called by the listener on emmc button */
     /* button_location_emmc is not considered as checked yet */
 
@@ -266,6 +270,11 @@ public class SettingsActivity extends Activity {
         checkbox_mux.setChecked(cfg.muxTrace == CustomCfg.MUX_TRACE_ON);
     }
 
+    private void set_telephony_stack() {
+        boolean state = telStackSetter.getState();
+        telephony_stack.setChecked(state);
+    }
+
     /* Set Additional traces checkbox state */
     private void set_checkbox_add_traces() {
         checkbox_additional_traces.setChecked(cfg.addTraces == CustomCfg.ADD_TRACES_ON);
@@ -278,6 +287,7 @@ public class SettingsActivity extends Activity {
         set_log_size_button();
         set_offline_logging_button();
         set_checkbox_mux();
+        set_telephony_stack();
         set_checkbox_add_traces();
         invalidate();
     }
@@ -294,6 +304,7 @@ public class SettingsActivity extends Activity {
             (cfg.traceLocation != curCfg.traceLocation)
                 || (cfg.traceLevel != curCfg.traceLevel)
                 || (cfg.traceFileSize != curCfg.traceFileSize)
+                || telephony_stack_start != telStackSetter.getState()
                 || (cfg.offlineLogging != curCfg.offlineLogging));
     }
 
@@ -560,6 +571,10 @@ public class SettingsActivity extends Activity {
         /* Activate check box */
         checkbox_activate = (CheckBox) findViewById (R.id.activate_checkBox);
 
+        /* telephony stack check box */
+        telephony_stack = (CheckBox) findViewById (R.id.telephony_stack_checkBox);
+        telStackTextView = (TextView) findViewById (R.id.textViewTelStack);
+
         /* MUX traces check box */
         checkbox_mux = (CheckBox) findViewById (R.id.mux_checkBox);
 
@@ -586,6 +601,8 @@ public class SettingsActivity extends Activity {
         AmtlCore.exitIfNull(button_offline_logging_usb, this);
         AmtlCore.exitIfNull(button_offline_logging_none, this);
         AmtlCore.exitIfNull(checkbox_activate, this);
+        AmtlCore.exitIfNull(telephony_stack, this);
+        AmtlCore.exitIfNull(telStackTextView, this);
         AmtlCore.exitIfNull(checkbox_mux, this);
         AmtlCore.exitIfNull(checkbox_additional_traces, this);
         AmtlCore.exitIfNull(header_additional_traces, this);
@@ -612,7 +629,19 @@ public class SettingsActivity extends Activity {
             cfg.muxTrace = curCfg.muxTrace;
             cfg.addTraces = curCfg.addTraces;
 
+            telStackSetter = new TelephonyStack();
+            telephony_stack_start = telStackSetter.getState();
             update_settings_menu();
+
+            if (!platformConfig.getPlatformVersion().equals("saltbay")) {
+                telephony_stack.setVisibility(View.GONE);
+                telStackTextView.setVisibility(View.GONE);
+            }
+
+        } catch (AmtlModemCoreException e) {
+            /* Failed to initialize application core */
+            Log.e(AmtlCore.TAG, MODULE + ": " + e.getMessage());
+            UIHelper.message_pop_up(this, "ERROR",e.getMessage());
         } catch (AmtlCoreException e) {
             /* Failed to initialize application core */
             this.core = null;
@@ -646,6 +675,18 @@ public class SettingsActivity extends Activity {
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
                 cfg.muxTrace = (isChecked) ? CustomCfg.MUX_TRACE_ON: CustomCfg.MUX_TRACE_OFF;
                 core.setMuxTrace(cfg.muxTrace);
+            }
+        });
+
+        /* Listener on telephony_stack Checkbox */
+        telephony_stack.setOnCheckedChangeListener(new OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                String value = "0";
+                if (isChecked) {
+                    value = "1";
+                }
+                telStackSetter.setState(value);
             }
         });
 
