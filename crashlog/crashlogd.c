@@ -469,7 +469,13 @@ static void do_last_kmsg_copy(int dir)
 #ifndef FULL_REPORT
 static void flush_aplog()
 {
-    int status = system("/system/bin/logcat -b system -b main -b radio -b events -v threadtime -d -f /logs/aplog");
+    struct stat info;
+    int status;
+
+    if(stat(APLOG_FILE_0, &info) == 0){
+        remove(APLOG_FILE_0);
+    }
+    status = system("/system/bin/logcat -b system -b main -b radio -b events -v threadtime -d -f /logs/aplog");
     if (status != 0)
         LOGE("dump logcat returns status: %d.\n", status);
     do_chown(APLOG_FILE_0, PERM_USER, PERM_GROUP);
@@ -1510,9 +1516,27 @@ void process_anr_or_uiwdt_tracefile(char *destion, int dir, int remove_path)
 void compress_aplog_folder(char *folder_path)
 {
     char cmd[PATHMAX];
+    char spath[PATHMAX];
+    DIR *d;
+    struct dirent* de;
 
     snprintf(cmd, sizeof(cmd), "gzip %s/aplog*", folder_path);
     system(cmd);
+
+    d = opendir(folder_path);
+    if (d == 0) {
+         return;
+    }
+    else {
+        while ((de = readdir(d)) != 0) {
+           if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, ".."))
+               continue;
+           snprintf(spath, sizeof(spath)-1,  "%s/%s", folder_path, de->d_name);
+           do_chown(spath, PERM_USER, PERM_GROUP);
+        }
+        closedir(d);
+    }
+
 }
 
 static int get_str_in_file(char *file, char *keyword, char *result, unsigned int sizemax)
@@ -1813,7 +1837,7 @@ static unsigned int find_dir(unsigned int max, int mode)
     if (!strstr(path, "sdcard"))
         do_chown(path, PERM_USER, PERM_GROUP);
 
-   goto out;
+    goto out;
 
 out_err:
     oldest = -1;
@@ -3223,6 +3247,11 @@ static int file_monitor_handle(unsigned int files)
             }
             /* read the missing bytes to get the full length */
             if( sizeof(struct inotify_event) <= sizeof(lastevent)) {
+                if (len >= sizeof(lastevent)) {
+                    LOGE("%s: Out of bounds of lastevent array.\n", __FUNCTION__);
+                    return -1;
+                }
+
                 if ( read(file_monitor_fd, &lastevent[len], (int)sizeof(struct inotify_event)-len)
                     != (int)sizeof(struct inotify_event) - len) {
                     LOGE("%s: Cannot complete the last inotify_event received (structure part) - %s\n",
@@ -3250,6 +3279,11 @@ static int file_monitor_handle(unsigned int files)
             event = (struct inotify_event*)lastevent;
             /* The event was truncated */
             LOGI("%s: truncated inotify_event received (%d bytes missing), complete it\n", __FUNCTION__, missing_bytes);
+
+            if( len > sizeof(lastevent)) {
+                LOGE("%s: not enough space on array lastevent.\n", __FUNCTION__);
+                return -1;
+            }
             /* copy the last bytes received */
             memcpy(lastevent, buffer, len);
             /* now, reads the full last event, including its name field */
