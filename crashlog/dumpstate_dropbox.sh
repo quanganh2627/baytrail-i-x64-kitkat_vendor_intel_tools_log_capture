@@ -22,7 +22,12 @@ sleep 35
 sleep 1
 
 # make files readable
-ispathinsdcard=`echo $storagePath | grep "mnt.*sdcard" | wc -l`
+if [ -f "/system/xbin/wc" ] ; then
+  ispathinsdcard=`echo $storagePath | grep "mnt.*sdcard" | wc -l`
+else
+  ispathinsdcard=0
+fi
+
 if [ $ispathinsdcard == 0 ] ; then
   chown system.log $dumpstate.txt
   chown system.log $dropbox
