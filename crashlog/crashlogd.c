@@ -96,7 +96,6 @@
 #define CMDSIZE_MAX   (21*20) + 1
 #define UPTIME_FREQUENCY (5 * 60)
 #define TIMEOUT_VALUE (20*1000)
-#define MINUTE_VALUE (60)
 #define UPTIME_HOUR_FREQUENCY 12
 #define SIZE_FOOTPRINT_MAX (PROPERTY_VALUE_MAX + 1) * 11
 #define BUILD_FIELD "ro.build.version.incremental"
@@ -713,19 +712,30 @@ static void copy_dir(void *arguments)
     struct arg_copy *args = (struct arg_copy *)arguments;
     DIR *d;
     struct dirent* de;
-    char dir_src[512] = { '\0', };
-    char dir_des[512] = { '\0', };
+    char dir_src[PATHMAX] = { '\0', };
+    char dir_des[PATHMAX] = { '\0', };
+    int cp_time_val;
     //need a local copy at the beginning
     snprintf(dir_src, sizeof(dir_src), "%s", args->orig);
     snprintf(dir_des, sizeof(dir_des), "%s", args->dest);
+    cp_time_val = args->time_val;
+    //free parameter the sooner to avoid any possible leak
+    free(args);
     d = opendir(dir_src);
-    if (args->time_val > 0){
-        sleep(args->time_val);
+    if(!d) {
+        LOGE("%s: Can't open dir %s\n",__FUNCTION__, dir_src);
+        return;
+    }
+    if (cp_time_val > 0){
+        sleep(cp_time_val);
     }
     while ((de = readdir(d))) {
+        //protection for . and .. "default folder"
+        if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, ".."))
+          continue;
         const char *name = de->d_name;
-        char src[512] = { '\0', };
-        char des[512] = { '\0', };
+        char src[PATHMAX] = { '\0', };
+        char des[PATHMAX] = { '\0', };
         //TO DO : rework the "/" part
         snprintf(src, sizeof(src), "%s/%s", dir_src,name);
         snprintf(des, sizeof(des), "%s/%s", dir_des,name);
@@ -962,7 +972,7 @@ static void build_footprint(char *id)
 
 //This function creates a minimal crashfile (without DATA0, DATA1 and DATA2 fields)
 //Note:DATA0 is filled for Modem Panic case only
-static void create_minimal_crashfile(char* type, char* path, char* key, char* uptime, char* date)
+static void create_minimal_crashfile(char* type, char* path, char* key, char* uptime, char* date, int data_ready)
 {
     FILE *fp;
     char fullpath[PATHMAX];
@@ -1013,6 +1023,7 @@ static void create_minimal_crashfile(char* type, char* path, char* key, char* up
     else {
         fprintf(fp,"TYPE=%s\n", type);
     }
+    fprintf(fp,"DATA_READY=%d\n", data_ready);
     //MPANIC crash : fill DATA0 field
     if (!strcmp(MODEM_CRASH,type)){
         LOGI("Modem panic detected : generating DATA0\n");
@@ -1144,7 +1155,7 @@ static int history_file_updated(char *data, char* filters)
     return updated;
 }
 
-static void history_file_write(char *event, char *type, char *subtype, char *log, char* lastuptime, char* key, char* date_tmp_2)
+static void history_file_write_ex(char *event, char *type, char *subtype, char *log, char* lastuptime, char* key, char* date_tmp_2, int data_ready)
 {
     char uptime[32];
     struct stat info;
@@ -1193,9 +1204,9 @@ static void history_file_write(char *event, char *type, char *subtype, char *log
         fprintf(to, "%-8s%-22s%-20s%s %s\n", event, key, date_tmp_2, type, tmp);
         fclose(to);
         if (!strncmp(event, CRASHEVENT, sizeof(CRASHEVENT)))
-            create_minimal_crashfile(subtype, tmp, key, uptime, date_tmp_2);
+            create_minimal_crashfile(subtype, tmp, key, uptime, date_tmp_2, data_ready);
         else if(!strncmp(event, BZEVENT, sizeof(BZEVENT)))
-            create_minimal_crashfile(event, tmp, key, uptime, date_tmp_2);
+            create_minimal_crashfile(event, tmp, key, uptime, date_tmp_2, data_ready);
     } else if (type != NULL) {
 
         to = fopen(HISTORY_FILE, "a");
@@ -1220,6 +1231,13 @@ static void history_file_write(char *event, char *type, char *subtype, char *log
     }
     return;
 }
+
+//proxy function for history_file_write_ex with data ready parameter
+static void history_file_write(char *event, char *type, char *subtype, char *log, char* lastuptime, char* key, char* date_tmp_2)
+{
+    history_file_write_ex(event,type,subtype,log,lastuptime,key,date_tmp_2,1);
+}
+
 
 static int del_file_more_lines(char *fn)
 {
@@ -2202,6 +2220,7 @@ void process_modem_generic(char *filename, char *name,  unsigned int files, int 
     char destion[PATHMAX];
     int wd;
     int ret = 0;
+    int data_ready = 1;
     pthread_t thread;
 
     pconfig curConfig = get_generic_config(name,first_modem_config);
@@ -2230,17 +2249,26 @@ void process_modem_generic(char *filename, char *name,  unsigned int files, int 
     //massive copy of directory found for type "directory"
     do_log_copy(curConfig->eventname,dir,date_tmp,APLOG_TYPE);
     if (curConfig->type ==1){
-        //need to be static as it used in other thread
-        static struct arg_copy args;
-        args.time_val = MINUTE_VALUE * 2 ;
-        snprintf(args.orig,sizeof(args.orig),"%s",path);
-        snprintf(args.dest,sizeof(args.dest),"%s",destion);
-        ret = pthread_create(&thread, NULL, (void *)copy_dir, (void *)&args);
+        struct arg_copy * args =  malloc(sizeof(struct arg_copy));
+        if(!args) {
+            LOGE("%s:malloc failed\n", __FUNCTION__);
+            return;
+        }
+        //time in seconds( should be less than phone doctor timer)
+        args->time_val = 100 ;
+        strncpy(args->orig,path,sizeof(args->orig));
+        strncpy(args->dest,destion,sizeof(args->orig));
+        ret = pthread_create(&thread, NULL, (void *)copy_dir, (void *)args);
         if (ret < 0) {
             LOGE("pthread_create copy dir error");
+            free(args);
+            //if ret >=0 free is done inside copy_dir
+        }else{
+            //backgroung thread is running. Event should be tagged not ready
+            data_ready = 0;
         }
     }
-    history_file_write(CRASHEVENT, curConfig->eventname, NULL, destion, NULL, key, date_tmp_2);
+    history_file_write_ex(CRASHEVENT, curConfig->eventname, NULL, destion, NULL, key, date_tmp_2, data_ready);
     del_file_more_lines(HISTORY_FILE);
     //TO DO : define when path should be removed
     //remove(path);
@@ -4063,6 +4091,11 @@ void store_config(char *section, struct config_handle a_conf_handle){
         tmp = get_value(section,"eventname",&a_conf_handle);
         if (tmp){
             newconf->eventname = malloc(strlen(tmp)+1);/* add 1 for \0 */
+            if(!newconf->eventname) {
+                LOGE("%s:malloc failed\n", __FUNCTION__);
+                free_config(newconf);
+                return;
+            }
             strncpy(newconf->eventname,tmp,strlen(tmp));
             newconf->eventname[strlen(tmp)]= '\0';
         }else{
@@ -4074,6 +4107,11 @@ void store_config(char *section, struct config_handle a_conf_handle){
         tmp = get_value(section,"matching_pattern",&a_conf_handle);
         if (tmp){
             newconf->matching_pattern = malloc(strlen(tmp)+1);/* add 1 for \0 */
+            if(!newconf->matching_pattern) {
+                LOGE("%s:malloc failed\n", __FUNCTION__);
+                free_config(newconf);
+                return;
+            }
             strncpy(newconf->matching_pattern,tmp,strlen(tmp));
             newconf->matching_pattern[strlen(tmp)]= '\0';
         }else{
@@ -4343,8 +4381,9 @@ static void reset_crashlog(void)
     fclose(fd);
 }
 
-static void reset_logs(char *path)
+static void reset_logs(char *path, int remove_dir)
 {
+    unsigned char isFile =0x8;
     char file[PATHMAX];
     DIR *d;
     struct dirent* de;
@@ -4357,8 +4396,15 @@ static void reset_logs(char *path)
         if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, ".."))
             continue;
         else {
-            snprintf(file, sizeof(file), "%s/%s", path, de->d_name);
-            remove(file);
+            if ( de->d_type == isFile) {
+                snprintf(file, sizeof(file), "%s/%s", path, de->d_name);
+                remove(file);
+            }else if (remove_dir==1){
+                //TO improve : delete folder content recursively?
+                //with current implementation remove will fail on folder with content
+                snprintf(file, sizeof(file), "%s/%s", path, de->d_name);
+                remove(file);
+            }
         }
     }
     closedir(d);
@@ -4407,9 +4453,10 @@ static void reset_bzlog(void)
 }
 static void reset_swupdate(void)
 {
-    reset_logs(HISTORY_CORE_DIR);
-    reset_logs(LOGS_MODEM_DIR);
-    reset_logs(LOGS_GPS_DIR);
+    reset_logs(HISTORY_CORE_DIR, 1);
+    //don't remove folder for modemcrash
+    reset_logs(LOGS_MODEM_DIR, 0);
+    reset_logs(LOGS_GPS_DIR, 1);
     remove(MODEM_UUID);
     reset_crashlog();
     reset_statslog();
