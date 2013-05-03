@@ -46,6 +46,8 @@
 #include <limits.h>
 #include "mmgr_cli.h"
 #include "mmgr_source.h"
+#include "config.h"
+
 #define CRASHEVENT "CRASH"
 #define STATSEVENT "STATS"
 #define INFOEVENT "INFO"
@@ -93,6 +95,7 @@
 #define CMDSIZE_MAX   (21*20) + 1
 #define UPTIME_FREQUENCY (5 * 60)
 #define TIMEOUT_VALUE (20*1000)
+#define MINUTE_VALUE (60)
 #define UPTIME_HOUR_FREQUENCY 12
 #define SIZE_FOOTPRINT_MAX (PROPERTY_VALUE_MAX + 1) * 11
 #define BUILD_FIELD "ro.build.version.incremental"
@@ -184,6 +187,7 @@
 #define ANR_DUPLICATE_DATA "anr_duplicate_data.txt"
 #define JAVACRASH_DUPLICATE_DATA "javacrash_duplicate_data.txt"
 #define UIWDT_DUPLICATE_DATA "uiwdt_duplicate_data.txt"
+#define EXTRA_NAME "EXTRA"
 
 
 #define MODEM_SHUTDOWN_TRIGGER "/logs/modemcrash/mshutdown.txt"
@@ -196,6 +200,9 @@
 
 // Add blankphone trigger
 #define BLANKPHONE_FILE "/logs/flashing/blankphone_file"
+#define CRASHLOG_CONF_PATH "/system/etc/crashlog.conf"
+#define NOTIFY_CONF_PATTERN "INOTIFY"
+#define GENERAL_CONF_PATTERN "GENERAL"
 
 #define CMDDELETE 1
 
@@ -209,7 +216,7 @@
 #define STATS_DIR_MASK IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF
 #define APLOGS_DIR_MASK IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF
 #define UPTIME_FILE_MASK IN_CLOSE_WRITE
-#define MODEMCRASH_DIR_MASK IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF
+#define MODEMCRASH_DIR_MASK IN_CLOSE_WRITE|IN_DELETE_SELF|IN_CREATE|IN_MOVE_SELF
 
 
 #define PRINT_TIME(var_tmp, format_time, local_time) { \
@@ -217,6 +224,28 @@
     var_tmp[31]=0;                                     \
 }
 
+struct wd_name {
+    int wd;
+    int mask;
+    char *eventname;
+    char *filename;
+    char *cmp;
+};
+
+typedef struct config * pconfig;
+
+
+struct config {
+    int type;  /* 0 => file 1 => directory */
+    pchar matching_pattern; /* pattern to check when notified */
+    pchar eventname; /* event name to generate when pattern found */
+    pconfig next;
+    char path[PATHMAX];
+    struct wd_name wd_config;
+};
+
+pconfig first_modem_config = NULL; /* Points to first modem_config in list */
+pconfig current_modem_config = NULL; /* Points to current modem_config in list */
 //Variables containing paths of files triggering IPANIC & FABRICERR & WDT treatment
 char CURRENT_PANIC_CONSOLE_NAME[PATHMAX]={PANIC_CONSOLE_NAME};
 char CURRENT_PROC_FABRIC_ERROR_NAME[PATHMAX]={PROC_FABRIC_ERROR_NAME};
@@ -238,6 +267,8 @@ int index_cons = 0;
 int WDCOUNT_START = 0;
 // global variable to abort a clean procedure
 int abort_clean_sd = 0;
+// global variable to enable dynamic change of uptime frequency
+int current_uptime_hour_frequency = UPTIME_HOUR_FREQUENCY;
 
 static int do_mv(char *src, char *des)
 {
@@ -550,7 +581,6 @@ static int get_version_info(char *fn, char *field, char *buf)
     int sz;
     int fd;
     int i = 0;
-    char *info = NULL;
     int len = -1;
     int p;
 
@@ -649,12 +679,52 @@ static void find_file_in_dir(char *name_file_found, char *dir_to_search, char *n
     DIR *d;
     struct dirent* de;
     d = opendir(dir_to_search);
+    if(!d) {
+        LOGE("%s: Can't open dir %s\n",__FUNCTION__, dir_to_search);
+        return;
+    }
     while ((de = readdir(d))) {
         const char *name = de->d_name;
         if (strstr(name, name_file_to_match)){
             sprintf(name_file_found, "%s", name);
             break;
         }
+    }
+    closedir(d);
+}
+
+//ARGS for thread creation and copy_dir
+struct arg_copy {
+    int time_val;
+    char orig[PATHMAX];
+    char dest[PATHMAX];
+};
+
+
+static void copy_dir(void *arguments)
+{
+    struct arg_copy *args = (struct arg_copy *)arguments;
+    DIR *d;
+    struct dirent* de;
+    char dir_src[512] = { '\0', };
+    char dir_des[512] = { '\0', };
+    //need a local copy at the beginning
+    snprintf(dir_src, sizeof(dir_src), "%s", args->orig);
+    snprintf(dir_des, sizeof(dir_des), "%s", args->dest);
+    d = opendir(dir_src);
+    if (args->time_val > 0){
+        sleep(args->time_val);
+    }
+    while ((de = readdir(d))) {
+        const char *name = de->d_name;
+        char src[512] = { '\0', };
+        char des[512] = { '\0', };
+        //TO DO : rework the "/" part
+        snprintf(src, sizeof(src), "%s/%s", dir_src,name);
+        snprintf(des, sizeof(des), "%s/%s", dir_des,name);
+        int status = do_copy(src, des, 0);
+        if (status != 0)
+            LOGE("copy error for %s.\n",name);
     }
     closedir(d);
 }
@@ -715,8 +785,6 @@ static void write_uid(char* filename, char *uuid_value)
 static void read_proc_uid(char* source, char *filename, char *uid, char* pattern)
 {
     char temp_uid[256];
-    struct stat info;
-    FILE *fd;
 
     if ((source && filename && uid && pattern) == 0)
         return;
@@ -734,8 +802,6 @@ static void read_proc_uid(char* source, char *filename, char *uid, char* pattern
 static void read_prop_uid(char* source, char *filename, char *uid, char* default_value)
 {
     char temp_uid[PROPERTY_VALUE_MAX];
-    struct stat info;
-    FILE *fd;
 
     if ((source && filename && uid && default_value) == 0)
         return;
@@ -749,6 +815,84 @@ static void read_prop_uid(char* source, char *filename, char *uid, char* default
         strncpy(uid, temp_uid, sizeof(uid)-1);
         write_uid(filename, temp_uid);
     }
+}
+
+//to get pconfig if it exists
+pconfig get_generic_config(char* event_name, pconfig config_to_match) {
+    pconfig result = NULL;
+    pconfig tmp_config = config_to_match;
+    while (tmp_config) {
+        if (strstr(event_name, tmp_config->matching_pattern)){
+            result = tmp_config;
+            break;
+        }
+        tmp_config = tmp_config->next;
+    }
+    return result;
+}
+
+//to check if process should be done on generic events
+int generic_match(char* event_name, pconfig config_to_match) {
+    int result = 0;
+    pconfig tmp_comfig = get_generic_config(event_name,config_to_match);
+    if (tmp_comfig) {
+        result =1;
+    }
+    return result;
+}
+
+//to check if process should be done on generic events with a WD paramer
+pconfig generic_match_by_wd(char* event_name, pconfig config_to_match, int wd) {
+    pconfig result = NULL;
+    pconfig tmp_config = get_generic_config(event_name,config_to_match);
+    if (tmp_config) {
+        if (tmp_config->wd_config.wd == wd){
+            result = tmp_config;
+        }
+    }
+    return result;
+}
+
+/*
+* Name          : generic_add_watch
+* Description   : This function add watcher for generic config loaded
+*/
+void generic_add_watch(pconfig config_to_watch, int fd){
+    pconfig tmp_config = config_to_watch;
+    while (tmp_config) {
+        if (strlen( tmp_config->path)>0){
+            //add watch and store it
+            tmp_config->wd_config.wd = inotify_add_watch(fd, tmp_config->path, MODEMCRASH_DIR_MASK);
+            LOGI("generic_add_watch : %s\n", tmp_config->path);
+            if (tmp_config->wd_config.wd < 0) {
+                LOGE("Can't add watch for %s.\n", tmp_config->path);
+            }else{
+                //store WD in config WD
+                tmp_config->wd_config.mask = MODEMCRASH_DIR_MASK;
+                tmp_config->wd_config.filename = tmp_config->path;
+                tmp_config->wd_config.eventname = EXTRA_NAME;
+            }
+        }
+        tmp_config = tmp_config->next;
+    }
+}
+
+/*
+* Name          : free_config
+* Description   : This function free the config structure created
+*/
+void free_config(pconfig first)
+{
+    pconfig nextconfig;
+    pconfig current = first;
+    while (current){
+        nextconfig = current->next;
+        free(current->eventname);
+        free(current->matching_pattern);
+        free(current);
+        current = nextconfig;
+    }
+    first=NULL;
 }
 
 static void build_footprint(char *id)
@@ -870,6 +1014,11 @@ static void create_minimal_crashfile(char* type, char* path, char* key, char* up
         struct dirent* de;
         char value[PATHMAX] = "";
         d = opendir(path);
+        if(!d) {
+            LOGE("%s: Can't open dir %s\n",__FUNCTION__, path);
+            fclose(fp);
+            return;
+        }
         while ((de = readdir(d))) {
             const char *name = de->d_name;
             if (strstr(name, "mpanic")){
@@ -993,7 +1142,6 @@ static void history_file_write(char *event, char *type, char *subtype, char *log
     char uptime[32];
     struct stat info;
     long long tm=0;
-    time_t t;
     int hours, seconds, minutes;
     FILE *to;
     char tmp[PATHMAX];
@@ -1226,13 +1374,6 @@ static int mv_modem_crash(char *spath, char *dpath)
 
 }
 
-struct wd_name {
-    int wd;
-    int mask;
-    char *eventname;
-    char *filename;
-    char *cmp;
-};
 
 /**
 * @brief structure containing directories watched by crashlogd
@@ -1667,16 +1808,10 @@ static unsigned int find_dir(unsigned int max, int mode)
        goto out_err;
     }
     closedir(d);
-#ifdef FULL_REPORT
-    if (!strstr(path, "sdcard")) {
-         char cmd[512] = { '\0', };
 
-         snprintf(cmd, sizeof(cmd)-1, "/system/bin/chown %s %s", PERM_USER, path);
-         int status = system(cmd);
-         if (status != 0)
-            LOGE("status chown %s: %d\n", cmd, status);
-   }
-#endif
+    if (!strstr(path, "sdcard"))
+        do_chown(path, PERM_USER, PERM_GROUP);
+
    goto out;
 
 out_err:
@@ -1768,9 +1903,7 @@ static int find_str_in_file(char *file, char *keyword, char *tail)
     int rc = 0;
     FILE *fd1;
     struct stat info;
-    int brtw, brtr;
-    char *p;
-    int filelen,tmp,stringlen,buflen;
+    int buflen;
 
     if (stat(file, &info) < 0)
         return -1;
@@ -1830,8 +1963,7 @@ static void clean_crashlog_in_sd(char *dir_to_search, int max)
             snprintf(path, sizeof(path)-1, "%s/%s", dir_to_search, name);
             if ((strstr(path, SDCARD_CRASH_DIR) ||
                (strstr(path, SDCARD_STATS_DIR)) ||
-               (strstr(path, SDCARD_APLOGS_DIR)) ||
-               (strstr(path, SDCARD_BZ_DIR))))
+               (strstr(path, SDCARD_APLOGS_DIR)) ))
                 if (find_str_in_file(HISTORY_FILE, path, NULL)) {
                     if  (remove_folder(path) < 0)
                         LOGE("failed to remove folder %s", path);
@@ -1878,6 +2010,7 @@ static int update_history_on_cmd_delete(char* events)
 
     data = (char *)malloc(sz + 2);
     if (data == 0) {
+        close(fd);
         return 0;
     }
     if (read(fd, data, sz) != sz) {
@@ -2023,6 +2156,72 @@ void process_modem_reset_event(char *filename, char *eventname, char *name,  uns
     del_file_more_lines(HISTORY_FILE);
     notify_crashreport();
 }
+
+
+/*
+* Name          : process_modem_generic
+* Description   : processes modem generic events
+* Parameters    :
+*   char *filename        -> path of watched directory/file
+*   char *eventname       -> name of the watched event
+*   char *name            -> name of the file inside the watched directory that has triggered the event
+*   unsigned int files    -> nb max of logs destination directories (crashlog, aplogs, bz... )
+*   int fd                -> file descriptor referring to the inotify instance */
+void process_modem_generic(char *filename, char *name,  unsigned int files, int fd) {
+
+    char date_tmp[32];
+    char date_tmp_2[32];
+    char key[SHA1_DIGEST_LENGTH+1];
+    int dir;
+    char path[PATHMAX];
+    char destion[PATHMAX];
+    int wd;
+    int ret = 0;
+    pthread_t thread;
+
+    pconfig curConfig = get_generic_config(name,first_modem_config);
+    if(!curConfig){
+        LOGE("no generic configuration found\n");
+        return;
+    }
+
+    get_formated_times(date_tmp,date_tmp_2);
+    compute_key(key, CRASHEVENT, curConfig->eventname);
+    snprintf(path, sizeof(path),"%s/%s",filename,name);
+    dir = find_dir(files,CRASH_MODE);
+    if (dir == -1) {
+        LOGE("find dir %d for modem generic crash failed\n", files);
+        LOGE("%-8s%-22s%-20s%s\n", CRASHEVENT, key, date_tmp_2, curConfig->eventname);
+        history_file_write(CRASHEVENT, curConfig->eventname, NULL, NULL, NULL, key, date_tmp_2);
+        del_file_more_lines(HISTORY_FILE);
+        remove(path);
+        notify_crashreport();
+        return;
+    }
+    snprintf(destion,sizeof(destion),"%s%d/", CRASH_DIR,dir);
+    LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, date_tmp_2, curConfig->eventname, destion);
+    usleep(TIMEOUT_VALUE);
+
+    //massive copy of directory found for type "directory"
+    do_log_copy(curConfig->eventname,dir,date_tmp,APLOG_TYPE);
+    if (curConfig->type ==1){
+        //need to be static as it used in other thread
+        static struct arg_copy args;
+        args.time_val = MINUTE_VALUE * 2 ;
+        snprintf(args.orig,sizeof(args.orig),"%s",path);
+        snprintf(args.dest,sizeof(args.dest),"%s",destion);
+        ret = pthread_create(&thread, NULL, (void *)copy_dir, (void *)&args);
+        if (ret < 0) {
+            LOGE("pthread_create copy dir error");
+        }
+    }
+    history_file_write(CRASHEVENT, curConfig->eventname, NULL, destion, NULL, key, date_tmp_2);
+    del_file_more_lines(HISTORY_FILE);
+    //TO DO : define when path should be removed
+    //remove(path);
+    notify_crashreport();
+}
+
 
 /*
 * Name          : process_modem_crash_event
@@ -2176,7 +2375,6 @@ void process_aplog_and_bz_trigger(char *filename, char *name,  unsigned int file
     char path[PATHMAX];
     char destion[PATHMAX];
     struct stat info;
-    char *p;
     char tmp[PATHMAX] = {'\0',};
     int nbPacket,aplogDepth;
     int aplogIsPresent;
@@ -2282,13 +2480,23 @@ void process_aplog_and_bz_trigger(char *filename, char *name,  unsigned int file
         if(aplogIsPresent == 0)
             break;
     }
+
     //for bz_trigger, treats bz_trigger file content and logs one BZEVENT event in history_event
-    if(-1!=dir && !strncmp(name, BZTRIGGER, sizeof(BZTRIGGER))) {
+    if(!strncmp(name, BZTRIGGER, sizeof(BZTRIGGER))) {
+        //In case of bz_trigger with APLOG=0 which means bz type="enhancement" and so no logs needed.
+        if((aplogDepth == 0) && (dir == -1)) {
+            dir = find_dir(files,BZ_MODE);
+            if (dir == -1) {
+                LOGE("find dir %d for BZ trigger failed\n", files);
+            }
+        }
+
+        if(-1 != dir) {
             snprintf(destion,sizeof(destion),"%s%d/", BZ_DIR,dir);
             compress_aplog_folder(destion);
             //copy bz_trigger file content
             snprintf(destion,sizeof(destion),"%s%d/bz_description", BZ_DIR,dir);
-            snprintf(path, sizeof(path),"%s/%s",filename,name);
+            snprintf(path, sizeof(path),"/logs/aplogs/%s",BZTRIGGER);
             do_copy(path,destion,0);
             get_formated_times(date_tmp,date_tmp_2);
             compute_key(key, BZEVENT, BZMANUAL);
@@ -2301,6 +2509,7 @@ void process_aplog_and_bz_trigger(char *filename, char *name,  unsigned int file
             del_file_more_lines(HISTORY_FILE);
             notify_crashreport();
             restart_profile2_srv();
+        }
     }
 
 #ifndef FULL_REPORT
@@ -2675,7 +2884,7 @@ void process_uptime(char *eventname) {
         if (!abort_clean_sd)
             clean_crashlog_in_sd(SDCARD_LOGS_DIR, 10);
         /*Update event every 12 hours*/
-        if ((hours / UPTIME_HOUR_FREQUENCY) >= loop_uptime_event) {
+        if ((hours / current_uptime_hour_frequency) >= loop_uptime_event) {
 
             time(&t);
             time_tmp = localtime((const time_t *)&t);
@@ -2684,7 +2893,7 @@ void process_uptime(char *eventname) {
             LOGE("%-8s%-22s%-20s%s\n", PER_UPTIME, key, date_tmp_2, date_tmp);
             history_file_write(PER_UPTIME, NULL, NULL, NULL, date_tmp, key, date_tmp_2);
             del_file_more_lines(HISTORY_FILE);
-            loop_uptime_event = (hours / UPTIME_HOUR_FREQUENCY) + 1;
+            loop_uptime_event = (hours / current_uptime_hour_frequency) + 1;
             notify_crashreport();
             restart_profile2_srv();
             check_running_power_service();
@@ -2836,7 +3045,7 @@ static int manage_duplicate_dropbox_events(struct inotify_event *event, unsigned
 
         if (timestamp_value != -1) {
             struct tm *time;
-            memset(&time, 0, sizeof(struct tm));
+            memset(&time, 0, sizeof(time));
             time = localtime(&timestamp_value);
             PRINT_TIME(human_readable_date, TIME_FORMAT_2, time);
         }
@@ -2902,6 +3111,8 @@ static int file_monitor_init()
         wd_array[i].wd = wd;
         LOGI("%s has been snooped\n", wd_array[i].filename);
     }
+    //add generic watch here
+    generic_add_watch(first_modem_config,file_monitor_fd);
 
     return 0;
 }
@@ -3003,12 +3214,24 @@ static int file_monitor_handle(unsigned int files)
             /* Not enought room for an empty event */
             LOGI("%s: incomplete inotify_event received (%d bytes), complete it\n", __FUNCTION__, len);
             /* copy the last bytes received */
-            memcpy(lastevent, buffer, len);
+            if(len <= sizeof(lastevent))
+                memcpy(lastevent, buffer, len);
+            else {
+                LOGE("%s: Cannot copy buffer\n", __FUNCTION__);
+                return -1;
+            }
             /* read the missing bytes to get the full length */
-            if ( read(file_monitor_fd, &lastevent[len], (int)sizeof(struct inotify_event)-len)
+            if( sizeof(struct inotify_event) <= sizeof(lastevent)) {
+                if ( read(file_monitor_fd, &lastevent[len], (int)sizeof(struct inotify_event)-len)
                     != (int)sizeof(struct inotify_event) - len) {
-                LOGE("%s: Cannot complete the last inotify_event received (structure part) - %s\n",
+                    LOGE("%s: Cannot complete the last inotify_event received (structure part) - %s\n",
                     __FUNCTION__, strerror(errno));
+                    return -1;
+                }
+            }
+            else {
+                LOGE("%s: Cannot read missing bytes, not enought space in lastevent\n",
+                    __FUNCTION__);
                 return -1;
             }
             event = (struct inotify_event*)lastevent;
@@ -3173,6 +3396,24 @@ static int file_monitor_handle(unsigned int files)
                 index_cons = (index_cons + 1) % 2;
             }
 #endif
+        }else {
+            //directory case
+            for (i = WDCOUNT_START; i < WDCOUNT; i++) {
+                if (event->wd != wd_array[i].wd)
+                    continue;
+                /* for modem generic */
+                //TO IMPROVE : change flag management and put this in main loop
+                if(strstr("/logs/modemcrash", wd_array[i].filename) && (generic_match(event->name,first_modem_config))){
+                    process_modem_generic(wd_array[i].filename, event->name, files, file_monitor_fd);
+                    break;
+                }
+            }
+            pconfig check_config = generic_match_by_wd(event->name,first_modem_config,event->wd);
+            if(check_config){
+                    process_modem_generic(check_config->wd_config.filename, event->name, files, file_monitor_fd);
+            }else{
+                LOGE("Directory not catched %s.\n", event->name);
+            }
         }
     }
     return 0;
@@ -3457,8 +3698,10 @@ static int do_monitor(unsigned int files)
                 mmgr_handle(files);
             }
         }
+
     }
     close_mmgr_cli_source();
+    free_config(first_modem_config);
     LOGE("Exiting main monitor loop");
     return -1;
 }
@@ -3741,6 +3984,127 @@ static int crashlog_check_modem_shutdown(char *reason, unsigned int files)
     return 0;
 }
 
+
+
+//this function requires a init_config_file before to work properly
+void store_config(char *section, struct config_handle a_conf_handle){
+    //for the moment, only modem is supported
+    pchar module;
+    pchar tmp;
+
+    module = get_value_def(section,"module","UNDEFINED",&a_conf_handle);
+    if (strcmp(module,"modem")){
+        //for the moment, only modem is valid, code to removed when more modules are managed
+        LOGE("extra configuration not supported for : %s\n",module);
+        return;
+    }else{
+        LOGI("storing configuration : %s\n",section);
+        //pconfig INIT
+        pconfig newconf = malloc(sizeof(struct config));
+        if(!newconf) {
+            LOGE("%s:malloc failed\n", __FUNCTION__);
+            return;
+        }
+        newconf->next   = NULL;
+        newconf->eventname = NULL;
+        newconf->matching_pattern = NULL;
+        //TO IMPROVE replace harcoded value with array in parameter
+        //Event name
+        tmp = get_value(section,"eventname",&a_conf_handle);
+        if (tmp){
+            newconf->eventname = malloc(strlen(tmp)+1);/* add 1 for \0 */
+            strncpy(newconf->eventname,tmp,strlen(tmp));
+            newconf->eventname[strlen(tmp)]= '\0';
+        }else{
+            LOGE("wrong configuration for %s on %s \n",section,"eventname");
+            free_config(newconf);
+            return;
+        }
+        //matching_pattern
+        tmp = get_value(section,"matching_pattern",&a_conf_handle);
+        if (tmp){
+            newconf->matching_pattern = malloc(strlen(tmp)+1);/* add 1 for \0 */
+            strncpy(newconf->matching_pattern,tmp,strlen(tmp));
+            newconf->matching_pattern[strlen(tmp)]= '\0';
+        }else{
+            LOGE("wrong configuration for %s on %s \n",section,"matching_pattern");
+            free_config(newconf);
+            return;
+        }
+        //type
+        tmp = get_value_def(section,"type","file",&a_conf_handle);
+        if (tmp){
+            if (!strcmp(tmp,"dir")){
+                newconf->type = 1;
+            }else{
+                newconf->type = 0;
+            }
+        }else{
+            LOGE("wrong configuration for %s on %s \n",section,"type");
+            free_config(newconf);
+            return;
+        }
+        //path
+        tmp = get_value(section,"path_trigger",&a_conf_handle);
+        if (tmp){
+            snprintf(newconf->path, sizeof(newconf->path), "%s", tmp);
+            LOGE("path loaded :  %s \n",newconf->path);
+        }else{
+            LOGW("missing configuration for %s on %s \n",section,"path_trigger");
+            //path is not mandatory, config is still valid
+        }
+        if (first_modem_config==NULL){
+            first_modem_config = newconf;
+        }else{
+            current_modem_config->next = newconf;
+        }
+        current_modem_config = newconf;
+    }
+}
+
+void load_config_by_pattern(char *section_pattern, char *key_pattern, struct config_handle a_conf_handle){
+    pchar cur_section_name;
+    LOGI("checking : %s\n",section_pattern );
+
+    cur_section_name = get_first_section_name( section_pattern,&a_conf_handle);
+    while (cur_section_name &&(sk_exists(cur_section_name, key_pattern, &a_conf_handle))){
+        LOGI("storing config for :%s\n", cur_section_name);
+        store_config(cur_section_name, a_conf_handle);
+        cur_section_name = get_next_section_name( section_pattern,&a_conf_handle);
+    }
+}
+
+void load_config(){
+    struct stat info;
+    char cur_extra_section[PATHMAX];
+    struct config_handle my_conf_handle;
+    //Check if config file exists
+    if (stat(CRASHLOG_CONF_PATH, &info) == 0) {
+        LOGI("Loading specific crashlog config\n");
+
+        my_conf_handle.first=NULL;
+        my_conf_handle.current=NULL;
+        if (init_config_file(CRASHLOG_CONF_PATH, &my_conf_handle)>=0){
+            //General config - uptime
+            //TO IMPROVE : general config strategy to define properly
+            if (sk_exists(GENERAL_CONF_PATTERN,"uptime_frequency",&my_conf_handle)){
+                pchar tmp = get_value(GENERAL_CONF_PATTERN,"uptime_frequency",&my_conf_handle);
+                if (tmp){
+                    int i_tmp = atoi(tmp);
+                    if (i_tmp > 0){
+                        current_uptime_hour_frequency = i_tmp;
+                    }
+                }
+            }
+            load_config_by_pattern(NOTIFY_CONF_PATTERN,"matching_pattern",my_conf_handle);
+            //ADD other config pattern HERE
+            free_config_file(&my_conf_handle);
+        }else{
+            LOGI("specific crashlog config not found\n");
+        }
+    }
+}
+
 static int crashlog_check_recovery(unsigned int files)
 {
     char date_tmp[32];
@@ -4000,15 +4364,12 @@ static void reset_swupdate(void)
     reset_crashlog();
     reset_statslog();
     reset_aplogslog();
-    reset_bzlog();
     reset_history();
 }
 
 static void uptime_history(char *lastuptime)
 {
     FILE *to;
-    int fd;
-    struct stat info;
 
     char name[32];
     char date_tmp[32];
@@ -4135,10 +4496,8 @@ int main(int argc, char **argv)
     int ret = 0;
     unsigned int files = 0xFFFFFFFF;
     char date_tmp[32];
-    struct stat info;
     time_t t;
     char destion[PATHMAX];
-    char *vinfo;
     pid_t pid;
     unsigned int dir;
     char key[SHA1_DIGEST_LENGTH+1];
@@ -4179,6 +4538,8 @@ int main(int argc, char **argv)
             }
         }
     }
+    //first thing to do : load configuration
+    load_config();
 
     //Manage the path containing files triggering IPANIC and FABRICERR and WDT events
     manage_ipanic_fabricerr_wdt_trigger_path();

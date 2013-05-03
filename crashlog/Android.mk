@@ -20,7 +20,8 @@ include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES:= \
   crashlogd.c \
-  mmgr_source.c
+  mmgr_source.c \
+  config.c
 
 LOCAL_CFLAGS += -DFULL_REPORT=1
 
