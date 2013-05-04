@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
- * ============================================================================
+ * ================================================================================================
  * AMTL version:
  *
  * The AMTL versioning convention uses three digits as the following scheme:
@@ -46,7 +46,8 @@
  * 2.3.0  - 2013-02-25 - BZ 88485 - Config file for platform specificities
  * 2.3.1  - 2013-03-14 - BZ 92443 - Usb logging based on SPH driver status
  * 2.3.2  - 2013-04-02 - BZ 89945 - Remove SDCARD button in Settings menu
- * ============================================================================
+ * 2.3.3  - 2013-04-22 - BZ 102551 - Do not check config during shutdown if AMTL is not open
+ * ================================================================================================
  */
 
 package com.intel.amtl;
