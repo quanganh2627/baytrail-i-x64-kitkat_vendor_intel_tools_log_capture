@@ -47,7 +47,6 @@
 #include "mmgr_cli.h"
 #include "mmgr_source.h"
 #include "config.h"
-#include <logreader.h>
 
 #define CRASHEVENT "CRASH"
 #define STATSEVENT "STATS"
@@ -3722,7 +3721,6 @@ static int do_monitor(unsigned int files)
 
     file_monitor_init();
     init_mmgr_cli();
-    logreader_init();
 
     for(;;) {
 
@@ -3743,13 +3741,6 @@ static int do_monitor(unsigned int files)
                 max = mmgr_get_fd();
         }
 
-        // LogReader fd setup
-        if (logreader_get_fd() > 0) {
-            FD_SET(logreader_get_fd(), &read_fds);
-            if (logreader_get_fd() > max)
-                max = logreader_get_fd();
-        }
-
         // Wait for events
         select_result = select(max+1, &read_fds, NULL, NULL, NULL);
 
@@ -3763,22 +3754,15 @@ static int do_monitor(unsigned int files)
             if (FD_ISSET(file_monitor_get_fd(), &read_fds)) {
                 file_monitor_handle(files);
             }
-
             // mmgr monitor
             if (FD_ISSET(mmgr_get_fd(), &read_fds)) {
                 LOGD("mmgr fd set");
                 mmgr_handle(files);
             }
-
-            // LogReader
-            if (FD_ISSET(logreader_get_fd(), &read_fds)) {
-                logreader_handle();
-            }
         }
 
     }
     close_mmgr_cli_source();
-    logreader_exit();
     free_config(first_modem_config);
     LOGE("Exiting main monitor loop");
     return -1;
