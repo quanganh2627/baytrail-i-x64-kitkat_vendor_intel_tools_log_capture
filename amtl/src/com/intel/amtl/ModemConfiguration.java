@@ -56,6 +56,13 @@ public class ModemConfiguration {
             = "at+xsystrace=0,\"bb_sw=1;3g_sw=1;digrf=0\",,\"oct=3\"\r\n";
     private static final String AT_SET_XSYSTRACE_LEVEL_BB_3G_DIGRF_RED
             = "at+xsystrace=0,\"digrf=1;bb_sw=1;3g_sw=1\",\"digrf=0x84\",\"oct=3\"\r\n";
+    /* XSYSTRACE AT commands for 7160 */
+    private static final String AT_SET_XSYSTRACE_LEVEL_BB_SALT
+            = "at+xsystrace=0,\"bb_sw=1;3g_sw=0;digrfx=0\",,\"oct=4\"\r\n";
+    private static final String AT_SET_XSYSTRACE_LEVEL_BB_3G_SALT
+            = "at+xsystrace=0,\"bb_sw=1;3g_sw=1;digrfx=0\",,\"oct=4\"\r\n";
+    private static final String AT_SET_XSYSTRACE_LEVEL_BB_3G_DIGRF_SALT
+            = "at+xsystrace=0,\"digrfx=1;bb_sw=1;3g_sw=1\",\"digrfx=0x0003\",\"oct=4\"\r\n";
 
     /* TRACE AT commands */
     private static final String AT_GET_TRACE = "at+trace?\r\n";
@@ -63,6 +70,7 @@ public class ModemConfiguration {
     private static final String AT_SET_TRACE_LEVEL_ENABLE = "at+trace=1\r\n";
 
     private PlatformConfig platformConfig;
+    private String platformVersion;
 
     public void ModemConfiguration () {
         this.platformConfig = PlatformConfig.get();
@@ -136,12 +144,14 @@ public class ModemConfiguration {
                 int indexOfBb;
                 int indexOf3g;
                 int indexOfDigrf;
+                int indexOfDigrfx;
                 String modemResponse;
 
                 /* Only the states of bb_sw, 3g_sw and digrf are needed */
                 indexOfBb = subModemValue.indexOf("0)");
                 indexOf3g = subModemValue.indexOf("4)");
                 indexOfDigrf = subModemValue.indexOf("10)");
+                indexOfDigrfx = subModemValue.indexOf("19)");
                 /* the index has changed because carriage return has been replaced by spaces */
                 indexOk = subModemValue.indexOf("OK");
 
@@ -150,7 +160,16 @@ public class ModemConfiguration {
                 } else {
                     modemResponse = subModemValue.substring(indexOfBb,indexOfBb + 13);
                     modemResponse += " " + subModemValue.substring(indexOf3g,indexOf3g + 13);
-                    modemResponse += " " + subModemValue.substring(indexOfDigrf,indexOfDigrf + 14);
+                    this.platformConfig = PlatformConfig.get();
+                    platformVersion = this.platformConfig.getPlatformVersion();
+                    if (platformVersion.equals("saltbay")
+                            || platformVersion.equals("ctpscaleht")) {
+                        modemResponse += " "
+                                + subModemValue.substring(indexOfDigrfx,indexOfDigrfx + 15);
+                    } else {
+                        modemResponse += " "
+                                + subModemValue.substring(indexOfDigrf,indexOfDigrf + 14);
+                    }
                     modemResponse += "  " + subModemValue.substring(indexOk,indexOk + 2);
                     Log.d(AmtlCore.TAG, MODULE + ": modem response : " + modemResponse);
                 }
@@ -173,7 +192,7 @@ public class ModemConfiguration {
     private int getTraceLevelValue(String s) {
         int ret = CustomCfg.TRACE_LEVEL_NONE;
         if ((s.contains("bb_sw: Oct")) && (s.contains("3g_sw: Oct"))
-                && (s.contains("digrf: Oct"))) {
+                && ((s.contains("digrf: Oct")) || (s.contains("digrfx: Oct")))) {
             ret = CustomCfg.TRACE_LEVEL_BB_3G_DIGRF;
         } else if ((s.contains("bb_sw: Oct")) && (s.contains("3g_sw: Oct"))) {
             ret = CustomCfg.TRACE_LEVEL_BB_3G;
@@ -207,12 +226,20 @@ public class ModemConfiguration {
 
     /* Set trace level */
     protected void setTraceLevel(RandomAccessFile f, int level, boolean isCoredump) {
+        this.platformConfig = PlatformConfig.get();
+        platformVersion = this.platformConfig.getPlatformVersion();
         String sysTraceBb = (isCoredump)
                 ? AT_SET_XSYSTRACE_LEVEL_BB_RED : AT_SET_XSYSTRACE_LEVEL_BB;
         String sysTrace3G = (isCoredump)
                 ? AT_SET_XSYSTRACE_LEVEL_BB_3G_RED : AT_SET_XSYSTRACE_LEVEL_BB_3G;
         String sysTraceDigrf = (isCoredump)
                 ? AT_SET_XSYSTRACE_LEVEL_BB_3G_DIGRF_RED : AT_SET_XSYSTRACE_LEVEL_BB_3G_DIGRF;
+        sysTraceBb = (platformVersion.equals("saltbay") || platformVersion.equals("ctpscaleht"))
+                ? AT_SET_XSYSTRACE_LEVEL_BB_SALT : sysTraceBb;
+        sysTrace3G = (platformVersion.equals("saltbay") || platformVersion.equals("ctpscaleht"))
+                ? AT_SET_XSYSTRACE_LEVEL_BB_3G_SALT : sysTrace3G;
+        sysTraceDigrf = (platformVersion.equals("saltbay") || platformVersion.equals("ctpscaleht"))
+                ? AT_SET_XSYSTRACE_LEVEL_BB_3G_DIGRF_SALT : sysTraceDigrf;
         try {
             switch (level) {
             case CustomCfg.TRACE_LEVEL_BB:
