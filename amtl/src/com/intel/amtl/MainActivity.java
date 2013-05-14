@@ -50,6 +50,7 @@
  * 2.3.4  - 2013-04-22 - BZ 102551 - Do not check config during shutdown if AMTL is not open
  * 2.3.5  - 2013-05-17 - BZ 108608 - Add disable telephony stack
  * 2.3.6  - 2013-05-31 - BZ 97339 - Disable cancelling AlertDialog by touching outside the popup
+ * 2.3.7  - 2013-05-31 - BZ 104738 - Add notification that mux traces are not persistent
  * ================================================================================================
  */
 

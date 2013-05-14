@@ -453,13 +453,8 @@ public class AmtlCore implements ModemEventListener {
 
     /* Enable/Disable Additional traces */
     protected void setAdditionalTraces(int addTraces) {
-        if (addTraces == CustomCfg.ADD_TRACES_ON) {
-            this.modemCfg.setAdditionalTracesOn(this.gsmtty);
-            this.isAddTracesEnabled = true;
-        } else {
-            this.modemCfg.setAdditionalTracesOff(this.gsmtty);
-            this.isAddTracesEnabled = false;
-        }
+        this.modemCfg.setAdditionalTracesOn(this.gsmtty);
+        this.isAddTracesEnabled = true;
     }
 
     /* Force AMTL Core to update its internal modem configuration values */
