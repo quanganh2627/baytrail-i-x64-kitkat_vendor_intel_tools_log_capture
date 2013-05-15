@@ -3232,6 +3232,7 @@ static int file_monitor_handle(unsigned int files)
     struct inotify_event *event;
     int i = 0;
     char key[SHA1_DIGEST_LENGTH+1];
+    int missing_bytes;
 
     len = read(file_monitor_fd, orig_buffer, sizeof(orig_buffer));
     if (len < 0) {
@@ -3266,21 +3267,16 @@ static int file_monitor_handle(unsigned int files)
             /* Not enought room for an empty event */
             LOGI("%s: incomplete inotify_event received (%d bytes), complete it\n", __FUNCTION__, len);
             /* copy the last bytes received */
-            if(len <= sizeof(lastevent))
+            if(len <= (int)sizeof(lastevent))
                 memcpy(lastevent, buffer, len);
             else {
                 LOGE("%s: Cannot copy buffer\n", __FUNCTION__);
                 return -1;
             }
             /* read the missing bytes to get the full length */
-            if( sizeof(struct inotify_event) <= sizeof(lastevent)) {
-                if (len >= sizeof(lastevent)) {
-                    LOGE("%s: Out of bounds of lastevent array.\n", __FUNCTION__);
-                    return -1;
-                }
-
-                if ( read(file_monitor_fd, &lastevent[len], (int)sizeof(struct inotify_event)-len)
-                    != (int)sizeof(struct inotify_event) - len) {
+            missing_bytes = (int)sizeof(struct inotify_event)-len;
+            if(((int) len + missing_bytes) < ((int)sizeof(lastevent))) {
+                if (read(file_monitor_fd, &lastevent[len], missing_bytes) != missing_bytes ){
                     LOGE("%s: Cannot complete the last inotify_event received (structure part) - %s\n",
                     __FUNCTION__, strerror(errno));
                     return -1;
@@ -3307,7 +3303,7 @@ static int file_monitor_handle(unsigned int files)
             /* The event was truncated */
             LOGI("%s: truncated inotify_event received (%d bytes missing), complete it\n", __FUNCTION__, missing_bytes);
 
-            if( len > sizeof(lastevent)) {
+            if( len > (int)sizeof(lastevent)) {
                 LOGE("%s: not enough space on array lastevent.\n", __FUNCTION__);
                 return -1;
             }
