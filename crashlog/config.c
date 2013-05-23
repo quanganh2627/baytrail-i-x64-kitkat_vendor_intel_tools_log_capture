@@ -343,7 +343,7 @@ static psection find_base_section(pchar base_section, pconfig_handle  conf_handl
     }
     //generate test pattern : expected pattern is [section_name "label"]
     char test_section[MAXLEN];
-    snprintf(test_section,sizeof(test_section)+2,"%s """,base_section);
+    snprintf(test_section,sizeof(test_section),"%s \"",base_section);
     while (conf_handle->current) {
         if (strncmp( conf_handle->current->name,test_section,strlen(test_section))==0){
             result=conf_handle->current;
