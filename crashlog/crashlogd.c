@@ -159,6 +159,7 @@
 #define HISTORY_FILE  "/logs/history_event"
 #define HISTORY_UPTIME "/logs/uptime"
 #define LOG_UUID "/logs/uuid.txt"
+#define LOG_SPID "/logs/spid.txt"
 #define LOG_BUILDID "/logs/buildid.txt"
 #define MODEM_UUID "/logs/modemid.txt"
 #define KERNEL_CMDLINE "/proc/cmdline"
@@ -167,6 +168,12 @@
 #define PANIC_CONSOLE_NAME "/proc/emmc_ipanic_console"
 #define PROC_FABRIC_ERROR_NAME "/proc/ipanic_fabric_err"
 #define PROC_UUID  "/proc/emmc0_id_entry"
+#define SYS_SPID_1  "/sys/spid/vendor_id"
+#define SYS_SPID_2  "/sys/spid/manufacturer_id"
+#define SYS_SPID_3  "/sys/spid/customer_id"
+#define SYS_SPID_4  "/sys/spid/platform_family_id"
+#define SYS_SPID_5  "/sys/spid/product_line_id"
+#define SYS_SPID_6  "/sys/spid/hardware_id"
 #define LAST_KMSG "/proc/last_kmsg"
 #define LAST_KMSG_FILE "last_kmsg"
 #define TIMESTAMP_MAX_SIZE 10 /* Unix style timestamp on 10 characters max.*/
@@ -910,6 +917,39 @@ static void read_prop_uid(char* source, char *filename, char *uid, char* default
         strncpy(uid, temp_uid, sizeof(uid)-1);
         write_uid(filename, temp_uid);
     }
+}
+
+
+static void spid_read_concat(const char *path, char *complete_value)
+{
+    char temp_spid[5]="XXXX\0";
+    if (file_read_value(path, temp_spid, "XXXX\0") != 0) {
+        LOGE("spid_read_concat : %s error\n", path);
+    }
+    strncat(complete_value,"-",1);
+    strncat(complete_value,temp_spid, sizeof(temp_spid));
+}
+
+static void read_sys_spid(char *filename)
+{
+    char complete_spid[256];
+    char temp_spid[5]="XXXX\0";
+
+    if (filename == 0)
+        return;
+
+    if (file_read_value(SYS_SPID_1, temp_spid, "XXXX\0") != 0) {
+        LOGE("%s error\n", SYS_SPID_1);
+    }
+    snprintf(complete_spid, sizeof(complete_spid), "%s", temp_spid);
+
+    spid_read_concat(SYS_SPID_2,complete_spid);
+    spid_read_concat(SYS_SPID_3,complete_spid);
+    spid_read_concat(SYS_SPID_4,complete_spid);
+    spid_read_concat(SYS_SPID_5,complete_spid);
+    spid_read_concat(SYS_SPID_6,complete_spid);
+
+    write_uid(filename, complete_spid);
 }
 
 //to get pconfig if it exists
@@ -4708,6 +4748,7 @@ int main(int argc, char **argv)
         get_version_info(SYS_PROP, BOARD_FIELD, boardVersion);
     }
     read_proc_uid(PROC_UUID, LOG_UUID, uuid, "Medfield");
+    read_sys_spid(LOG_SPID);
 
     sdcard_available(CRASH_MODE);
 
