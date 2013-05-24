@@ -47,7 +47,6 @@
 #include "mmgr_cli.h"
 #include "mmgr_source.h"
 #include "config.h"
-#include <logreader.h>
 
 #define CRASHEVENT "CRASH"
 #define STATSEVENT "STATS"
@@ -344,7 +343,7 @@ static int do_chmod(char *file, char *mod)
     return 0;
 }
 
-static int do_chown(char *file, char *uid, char *gid)
+static int do_chown(const char *file, char *uid, char *gid)
 {
     if (strstr(file, SDCARD_CRASH_DIR))
         return 0;
@@ -353,6 +352,85 @@ static int do_chown(char *file, char *uid, char *gid)
         return -errno;
 
     return 0;
+}
+
+ssize_t do_read(int fd, void *buf, size_t len)
+{
+    ssize_t nr;
+    while (1) {
+        nr = read(fd, buf, len);
+        if ((nr < 0) && (errno == EAGAIN || errno == EINTR))
+            continue;
+        return nr;
+    }
+}
+
+ssize_t do_write(int fd, const void *buf, size_t len)
+{
+    ssize_t nr;
+    while (1) {
+        nr = write(fd, buf, len);
+        if ((nr < 0) && (errno == EAGAIN || errno == EINTR))
+            continue;
+        return nr;
+    }
+}
+
+static int do_copy_eof(const char *src, const char *des)
+{
+    int buflen;
+    char buffer[4*1024];
+    int rc = 0;
+    int fd1 = -1, fd2 = -1;
+    struct stat info;
+    int r_count, w_count;
+
+    if (stat(src, &info) < 0)
+        return -1;
+
+    if ((fd1 = open(src, O_RDONLY)) < 0){
+        LOGE("%s: can not open file: %s\n", __FUNCTION__, src);
+        goto out_err;
+    }
+
+    if ((fd2 = open(des, O_WRONLY | O_CREAT | O_TRUNC, 0660)) < 0){
+        LOGE("%s: can not open file: %s\n", __FUNCTION__, des);
+        goto out_err;
+    }
+
+    while (1) {
+        r_count = do_read(fd1, buffer, 4*1014);
+        if (r_count < 0) {
+            LOGE("%s: read failed, err:%s", __FUNCTION__, strerror(errno));
+            goto out_err;
+        }
+        if (r_count == 0)
+            break;
+
+        w_count = do_write(fd2, buffer, r_count);
+        if (w_count < 0) {
+            LOGE("%s: write failed, err:%s", __FUNCTION__, strerror(errno));
+            goto out_err;
+        }
+        if (r_count != w_count) {
+            LOGE("%s: write failed, r_count:%d w_count:%d",
+                 __FUNCTION__, r_count, w_count);
+            goto out_err;
+        }
+    }
+
+    rc = 0;
+    goto out;
+out_err:
+    rc = -1;
+out:
+    if (fd1 >= 0)
+        close(fd1);
+    if (fd2 >= 0)
+        close(fd2);
+
+    do_chown(des, PERM_USER, PERM_GROUP);
+    return rc;
 }
 
 static int do_copy(char *src, char *des, int limit)
@@ -3233,6 +3311,7 @@ static int file_monitor_handle(unsigned int files)
     struct inotify_event *event;
     int i = 0;
     char key[SHA1_DIGEST_LENGTH+1];
+    int missing_bytes;
 
     len = read(file_monitor_fd, orig_buffer, sizeof(orig_buffer));
     if (len < 0) {
@@ -3267,21 +3346,16 @@ static int file_monitor_handle(unsigned int files)
             /* Not enought room for an empty event */
             LOGI("%s: incomplete inotify_event received (%d bytes), complete it\n", __FUNCTION__, len);
             /* copy the last bytes received */
-            if(len <= sizeof(lastevent))
+            if(len <= (int)sizeof(lastevent))
                 memcpy(lastevent, buffer, len);
             else {
                 LOGE("%s: Cannot copy buffer\n", __FUNCTION__);
                 return -1;
             }
             /* read the missing bytes to get the full length */
-            if( sizeof(struct inotify_event) <= sizeof(lastevent)) {
-                if (len >= sizeof(lastevent)) {
-                    LOGE("%s: Out of bounds of lastevent array.\n", __FUNCTION__);
-                    return -1;
-                }
-
-                if ( read(file_monitor_fd, &lastevent[len], (int)sizeof(struct inotify_event)-len)
-                    != (int)sizeof(struct inotify_event) - len) {
+            missing_bytes = (int)sizeof(struct inotify_event)-len;
+            if(((int) len + missing_bytes) < ((int)sizeof(lastevent))) {
+                if (read(file_monitor_fd, &lastevent[len], missing_bytes) != missing_bytes ){
                     LOGE("%s: Cannot complete the last inotify_event received (structure part) - %s\n",
                     __FUNCTION__, strerror(errno));
                     return -1;
@@ -3308,7 +3382,7 @@ static int file_monitor_handle(unsigned int files)
             /* The event was truncated */
             LOGI("%s: truncated inotify_event received (%d bytes missing), complete it\n", __FUNCTION__, missing_bytes);
 
-            if( len > sizeof(lastevent)) {
+            if( len > (int)sizeof(lastevent)) {
                 LOGE("%s: not enough space on array lastevent.\n", __FUNCTION__);
                 return -1;
             }
@@ -3722,7 +3796,6 @@ static int do_monitor(unsigned int files)
 
     file_monitor_init();
     init_mmgr_cli();
-    logreader_init();
 
     for(;;) {
 
@@ -3743,13 +3816,6 @@ static int do_monitor(unsigned int files)
                 max = mmgr_get_fd();
         }
 
-        // LogReader fd setup
-        if (logreader_get_fd() > 0) {
-            FD_SET(logreader_get_fd(), &read_fds);
-            if (logreader_get_fd() > max)
-                max = logreader_get_fd();
-        }
-
         // Wait for events
         select_result = select(max+1, &read_fds, NULL, NULL, NULL);
 
@@ -3763,22 +3829,15 @@ static int do_monitor(unsigned int files)
             if (FD_ISSET(file_monitor_get_fd(), &read_fds)) {
                 file_monitor_handle(files);
             }
-
             // mmgr monitor
             if (FD_ISSET(mmgr_get_fd(), &read_fds)) {
                 LOGD("mmgr fd set");
                 mmgr_handle(files);
             }
-
-            // LogReader
-            if (FD_ISSET(logreader_get_fd(), &read_fds)) {
-                logreader_handle();
-            }
         }
 
     }
     close_mmgr_cli_source();
-    logreader_exit();
     free_config(first_modem_config);
     LOGE("Exiting main monitor loop");
     return -1;
@@ -3887,10 +3946,10 @@ static int crashlog_check_fabric(char *reason, unsigned int files)
 
         strcpy(crashtype, FABRIC_ERROR);
         for (i = 0; i < sizeof(ft_array)/sizeof(struct fabric_type); i++)
-            if (!find_str_in_file(SAVED_FABRIC_ERROR_NAME, ft_array[i].keyword, ft_array[i].tail))
+            if (!find_str_in_file(CURRENT_PROC_FABRIC_ERROR_NAME, ft_array[i].keyword, ft_array[i].tail))
                    strncpy(crashtype, ft_array[i].name, sizeof(crashtype)-1);
-        if ((!find_str_in_file(SAVED_FABRIC_ERROR_NAME, fake[0].keyword, fake[0].tail)) &&
-          (!find_str_in_file(SAVED_FABRIC_ERROR_NAME, fake[1].keyword, fake[1].tail))) {
+        if ((!find_str_in_file(CURRENT_PROC_FABRIC_ERROR_NAME, fake[0].keyword, fake[0].tail)) &&
+          (!find_str_in_file(CURRENT_PROC_FABRIC_ERROR_NAME, fake[1].keyword, fake[1].tail))) {
                    strncpy(crashtype, fake[0].name, sizeof(crashtype)-1);
                    if (!strncmp(reason, "HWWDT_RESET", 11))
                        strcat(reason,"_FAKE");
@@ -3914,7 +3973,7 @@ static int crashlog_check_fabric(char *reason, unsigned int files)
         destion[0] = '\0';
         snprintf(destion, sizeof(destion), "%s%d/%s_%s.txt", CRASH_DIR, dir,
                 FABRIC_ERROR_NAME, date_tmp);
-        do_copy(SAVED_FABRIC_ERROR_NAME, destion, FILESIZE_MAX);
+        do_copy_eof(CURRENT_PROC_FABRIC_ERROR_NAME, destion);
         do_last_kmsg_copy(dir);
 
         destion[0] = '\0';
