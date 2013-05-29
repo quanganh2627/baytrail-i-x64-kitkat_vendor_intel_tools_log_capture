@@ -1197,7 +1197,7 @@ static void notify_crash_to_upload(char* event_id)
     if (strcmp(boot_state, "1"))
         return;
 
-    snprintf(cmd,sizeof(cmd)-1,"am broadcast -n com.intel.crashreport/.NotificationReceiver -a com.intel.crashreport.intent.CRASH_LOGS_COPY_FINISHED -c android.intent.category.ALTERNATIVE --es %s %s",
+    snprintf(cmd,sizeof(cmd)-1,"am broadcast -n com.intel.crashreport/.specific.NotificationReceiver -a com.intel.crashreport.intent.CRASH_LOGS_COPY_FINISHED -c android.intent.category.ALTERNATIVE --es %s %s",
              "com.intel.crashreport.extra.EVENT_ID",event_id);
     int status = system(cmd);
     if (status != 0)
@@ -1213,7 +1213,7 @@ static void notify_crashreport()
     if (strcmp(boot_state, "1"))
         return;
 
-    int status = system("am broadcast -n com.intel.crashreport/.NotificationReceiver -a com.intel.crashreport.intent.CRASH_NOTIFY -c android.intent.category.ALTERNATIVE");
+    int status = system("am broadcast -n com.intel.crashreport/.specific.NotificationReceiver -a com.intel.crashreport.intent.CRASH_NOTIFY -c android.intent.category.ALTERNATIVE");
     if (status != 0)
         LOGI("notify crashreport status: %d.\n", status);
 }
