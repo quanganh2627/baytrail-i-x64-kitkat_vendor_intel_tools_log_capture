@@ -65,7 +65,7 @@ public class AmtlCore implements ModemEventListener {
     private static final long MODEM_STATUS_TIMEOUT_MS = 2000;
 
     /* AMTL Core reference: singleton design pattern */
-    private static AmtlCore core;
+    protected static AmtlCore core;
 
     private ModemStatus currentStatus = ModemStatus.NONE;
 

@@ -45,33 +45,17 @@ public class ShutdownService extends Service {
     }
 
     @Override
-    public void onCreate() {
-        super.onCreate();
-        /* Get application core */
-        try {
-            core = AmtlCore.get();
-            this.core.setContext(this.getApplicationContext());
-        } catch (AmtlModemCoreException e) {
-            Log.e(AmtlCore.TAG, MODULE + ": failed to get Amtl core");
-            this.stopSelf();
-        } catch (AmtlCoreException e) {
-            Log.e(AmtlCore.TAG, MODULE + ": failed to get Amtl core");
-            this.stopSelf();
-        }
-    }
-
-    @Override
     public void onStart(Intent intent, int startId) {
         new AsyncShutdownServiceInitTask().execute((Void)null);
     }
 
     private synchronized void init() {
-        if (this.core != null) {
+        if (AmtlCore.core != null) {
             /* If configuration has changed, tells AmtlCore to apply the new configuration */
-            if (this.core.rebootNeeded()) {
+            if (AmtlCore.core.rebootNeeded()) {
                 Log.i(AmtlCore.TAG, MODULE + ": apply new configuration");
                 try {
-                    if (this.core.signalToSend()) {
+                    if (AmtlCore.core.signalToSend()) {
                         try {
                             AmtlCore.rtm.exec("start pti_sigusr1");
                             android.os.SystemClock.sleep(PTI_KILL_WAIT);
@@ -79,7 +63,7 @@ public class ShutdownService extends Service {
                             Log.e(AmtlCore.TAG, MODULE + ": can't send sigusr1 signal");
                         }
                     }
-                    this.core.applyCfg();
+                    AmtlCore.core.applyCfg();
                     Runnable displayToast = new Runnable() {
                         @Override
                         public void run() {
