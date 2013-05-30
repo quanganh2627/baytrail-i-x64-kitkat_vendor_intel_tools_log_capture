@@ -22,23 +22,29 @@ import android.os.SystemProperties;
 
 public class TelephonyStack {
 
-    public static final String PERSIST_TELEPHONY = "persist.service.telephony";
+    public static final String PERSIST_TELEPHONY = "persist.service.telephony.off";
+    private String Enabled = "0";
+    private String Disabled = "1";
 
     /* Constructor */
     TelephonyStack() {
     }
 
-    boolean getState() {
-        String value = SystemProperties.get(PERSIST_TELEPHONY, "0");
-        boolean state = false;
-        if (value.equals("1")) {
-            state = true;
+    boolean isEnabled() {
+        String value = SystemProperties.get(PERSIST_TELEPHONY, Enabled);
+        boolean state = true;
+        if (value.equals(Disabled)) {
+            state = false;
         }
         return state;
     }
 
-    void setState(String state) {
-        SystemProperties.set(PERSIST_TELEPHONY, state);
+    void enableStack() {
+        SystemProperties.set(PERSIST_TELEPHONY, Enabled);
+    }
+
+    void disableStack() {
+        SystemProperties.set(PERSIST_TELEPHONY, Disabled);
     }
 }
 

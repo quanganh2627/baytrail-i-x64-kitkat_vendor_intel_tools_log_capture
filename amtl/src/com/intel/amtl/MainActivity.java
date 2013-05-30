@@ -48,6 +48,7 @@
  * 2.3.2  - 2013-04-02 - BZ 89945 - Remove SDCARD button in Settings menu
  * 2.3.3  - 2013-04-26 - BZ 101758 - Change digrf into digrfx on 7160
  * 2.3.4  - 2013-04-22 - BZ 102551 - Do not check config during shutdown if AMTL is not open
+ * 2.3.5  - 2013-05-17 - BZ 108608 - Add disable telephony stack
  * ================================================================================================
  */
 
@@ -202,19 +203,19 @@ public class MainActivity extends Activity {
         } catch (AmtlModemCoreException e) {
             this.core = null;
             this.platformConfig = PlatformConfig.get();
-            if (platformConfig.getPlatformVersion().equals("saltbay")) {
+            telStackSetter = new TelephonyStack();
+
+            if (!telStackSetter.isEnabled()) {
                 UIHelper.message_warning(this, "WARNING",
                     "The telephony stack is disabled. Would you like to enable it?",
                     new DialogInterface.OnClickListener() {
                         @Override
                         public void onClick(DialogInterface dialog, int whichButton) {
-                            String value = "0";
                             String text = "A platform reboot will be needed to take this "
                                 + "modification into account";
                             if (DialogInterface.BUTTON_POSITIVE == whichButton) {
-                                value = "1";
+                                telStackSetter.enableStack();
                             }
-                            telStackSetter.setState(value);
                             if (DialogInterface.BUTTON_NEGATIVE == whichButton) {
                                text = "AMTL will exit";
                             }
