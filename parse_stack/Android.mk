@@ -22,7 +22,7 @@ LOCAL_SRC_FILES:= \
 	parse_stack.c
 
 LOCAL_C_INCLUDES += \
-  device/intel/log_capture/backtrace
+  vendor/intel/tools/log_capture/backtrace
 
 LOCAL_MODULE_TAGS := eng debug
 LOCAL_MODULE:= parse_stack
