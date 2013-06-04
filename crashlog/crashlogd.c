@@ -3966,7 +3966,7 @@ struct fabric_type ft_array[] = {
 };
 struct fabric_type fake[] = {
     {"DW2:", "02608002", "FABRIC_FAKE"},
-    {"DW3:", "40102ff4", "FABRIC_FAKE"},
+    {"DW3:", "ffd04100", "FABRIC_FAKE"},
 };
 
 static int crashlog_check_fabric(char *reason, unsigned int files)
