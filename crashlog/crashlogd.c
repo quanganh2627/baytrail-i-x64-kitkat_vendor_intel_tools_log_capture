@@ -222,7 +222,8 @@
 #define STATS_DIR_MASK IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF
 #define APLOGS_DIR_MASK IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF
 #define UPTIME_FILE_MASK IN_CLOSE_WRITE
-#define MODEMCRASH_DIR_MASK IN_CLOSE_WRITE|IN_DELETE_SELF|IN_CREATE|IN_MOVE_SELF
+#define MODEMCRASH_DIR_MASK IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF
+#define VBCRASH_DIR_MASK IN_CLOSE_WRITE|IN_DELETE_SELF|IN_CREATE|IN_MOVE_SELF
 
 
 #define PRINT_TIME(var_tmp, format_time, local_time) { \
@@ -243,10 +244,12 @@ typedef struct config * pconfig;
 
 struct config {
     int type;  /* 0 => file 1 => directory */
+    int event_class; /* 0 => CRASH 1 => ERROR  2=> INFO */
     pchar matching_pattern; /* pattern to check when notified */
     pchar eventname; /* event name to generate when pattern found */
     pconfig next;
     char path[PATHMAX];
+    char path_linked[PATHMAX];
     struct wd_name wd_config;
 };
 
@@ -922,8 +925,8 @@ static void read_prop_uid(char* source, char *filename, char *uid, char* default
 
 static void spid_read_concat(const char *path, char *complete_value)
 {
-    char temp_spid[5]="XXXX\0";
-    if (file_read_value(path, temp_spid, "XXXX\0") != 0) {
+    char temp_spid[5]="XXXX";
+    if (file_read_value(path, temp_spid, "XXXX") != 0) {
         LOGE("spid_read_concat : %s error\n", path);
     }
     strncat(complete_value,"-",1);
@@ -933,12 +936,12 @@ static void spid_read_concat(const char *path, char *complete_value)
 static void read_sys_spid(char *filename)
 {
     char complete_spid[256];
-    char temp_spid[5]="XXXX\0";
+    char temp_spid[5]="XXXX";
 
     if (filename == 0)
         return;
 
-    if (file_read_value(SYS_SPID_1, temp_spid, "XXXX\0") != 0) {
+    if (file_read_value(SYS_SPID_1, temp_spid, "XXXX") != 0) {
         LOGE("%s error\n", SYS_SPID_1);
     }
     snprintf(complete_spid, sizeof(complete_spid), "%s", temp_spid);
@@ -962,6 +965,22 @@ pconfig get_generic_config(char* event_name, pconfig config_to_match) {
             break;
         }
         tmp_config = tmp_config->next;
+    }
+    return result;
+}
+
+//to get pconfig if it exists with path argument
+pconfig get_generic_config_by_path(char* path_searched, pconfig config_to_match) {
+    pconfig result = NULL;
+    pconfig tmp_config = config_to_match;
+    if (path_searched){
+        while (tmp_config) {
+            if(strncmp(path_searched, tmp_config->path, strlen(path_searched))==0) {
+                result = tmp_config;
+                break;
+            }
+            tmp_config = tmp_config->next;
+        }
     }
     return result;
 }
@@ -997,13 +1016,13 @@ void generic_add_watch(pconfig config_to_watch, int fd){
     while (tmp_config) {
         if (strlen( tmp_config->path)>0){
             //add watch and store it
-            tmp_config->wd_config.wd = inotify_add_watch(fd, tmp_config->path, MODEMCRASH_DIR_MASK);
+            tmp_config->wd_config.wd = inotify_add_watch(fd, tmp_config->path, VBCRASH_DIR_MASK);
             LOGI("generic_add_watch : %s\n", tmp_config->path);
             if (tmp_config->wd_config.wd < 0) {
                 LOGE("Can't add watch for %s.\n", tmp_config->path);
             }else{
                 //store WD in config WD
-                tmp_config->wd_config.mask = MODEMCRASH_DIR_MASK;
+                tmp_config->wd_config.mask = VBCRASH_DIR_MASK;
                 tmp_config->wd_config.filename = tmp_config->path;
                 tmp_config->wd_config.eventname = EXTRA_NAME;
             }
@@ -2320,6 +2339,36 @@ void process_modem_reset_event(char *filename, char *eventname, char *name,  uns
 
 
 /*
+* Name          : str_simple_replace
+* Description   : replace the searched sequence by the replace sequence
+*                   warning : it only works with sequence with the same size
+* Parameters    :
+*   char *str        -> full string to be processed
+*   char *search            -> sequence to be replaced
+*   char * replace    ->  string sequence used to replace searched sequence
+* @return 0 on success, -1 on error or nothing to replace. */
+int str_simple_replace(char *str, char *search, char *replace)
+{
+    char *f;
+    //warning search and replace should have the same size
+    if (strlen(search)!= strlen(replace)){
+        LOGE("str_simple_replace : size error");
+        return -1;
+    }
+    f = strstr(str, search);
+    if (f != NULL) {
+        strncpy(f,replace,strlen(replace));
+        //tmp trace to remove
+        LOGE("str_simple_replace : OK  : %s %s %s", str, search, replace);
+        return 0;
+    }else{
+        //nothing to replace => error
+        return -1;
+    }
+}
+
+
+/*
 * Name          : process_modem_generic
 * Description   : processes modem generic events
 * Parameters    :
@@ -2335,37 +2384,68 @@ void process_modem_generic(char *filename, char *name,  unsigned int files, int 
     char key[SHA1_DIGEST_LENGTH+1];
     int dir;
     char path[PATHMAX];
+    char path_linked[PATHMAX];
+    char name_linked[PATHMAX];
     char destion[PATHMAX];
+    char event_class[PATHMAX];
+    FILE *fp;
+    char fullpath[PATHMAX];
+    int event_mode;
     int wd;
     int ret = 0;
     int data_ready = 1;
+    int generate_data = 0;
     pthread_t thread;
+    pconfig linkedConfig=NULL;
 
     pconfig curConfig = get_generic_config(name,first_modem_config);
     if(!curConfig){
         LOGE("no generic configuration found\n");
         return;
     }
-
+    //select event type
+    if (curConfig->event_class == 0){
+        strncpy(event_class,CRASHEVENT, sizeof(event_class));
+        event_mode = CRASH_MODE;
+    }else if (curConfig->event_class == 1){
+        strncpy(event_class,ERROREVENT, sizeof(event_class));
+        event_mode = STATS_MODE;
+    }else if (curConfig->event_class == 2){
+        strncpy(event_class,INFOEVENT, sizeof(event_class));
+        event_mode = STATS_MODE;
+    }else{
+        //default mode = crash mode
+        strncpy(event_class,CRASHEVENT, sizeof(event_class));
+        event_mode = CRASH_MODE;
+    }
+    //adding security NULL character
+    event_class[sizeof(event_class)-1] = '\0';
     get_formated_times(date_tmp,date_tmp_2);
-    compute_key(key, CRASHEVENT, curConfig->eventname);
+    compute_key(key, event_class, curConfig->eventname);
     snprintf(path, sizeof(path),"%s/%s",filename,name);
-    dir = find_dir(files,CRASH_MODE);
+    dir = find_dir(files,event_mode);
     if (dir == -1) {
         LOGE("find dir %d for modem generic crash failed\n", files);
-        LOGE("%-8s%-22s%-20s%s\n", CRASHEVENT, key, date_tmp_2, curConfig->eventname);
-        history_file_write(CRASHEVENT, curConfig->eventname, NULL, NULL, NULL, key, date_tmp_2);
+        LOGE("%-8s%-22s%-20s%s\n", event_class, key, date_tmp_2, curConfig->eventname);
+        history_file_write(event_class, curConfig->eventname, NULL, NULL, NULL, key, date_tmp_2);
         del_file_more_lines(HISTORY_FILE);
         remove(path);
         notify_crashreport();
         return;
     }
-    snprintf(destion,sizeof(destion),"%s%d/", CRASH_DIR,dir);
-    LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, date_tmp_2, curConfig->eventname, destion);
+    //update event_dir should be done after find_dir call
+    if (event_mode == STATS_MODE){
+        snprintf(destion,sizeof(destion),"%s%d/", STATS_DIR,dir);
+    }else if (event_mode == CRASH_MODE) {
+        snprintf(destion,sizeof(destion),"%s%d/", CRASH_DIR,dir);
+    }
+
+    LOGE("%-8s%-22s%-20s%s %s\n", event_class, key, date_tmp_2, curConfig->eventname, destion);
     usleep(TIMEOUT_VALUE);
 
     //massive copy of directory found for type "directory"
     do_log_copy(curConfig->eventname,dir,date_tmp,APLOG_TYPE);
+
     if (curConfig->type ==1){
         struct arg_copy * args =  malloc(sizeof(struct arg_copy));
         if(!args) {
@@ -2375,7 +2455,7 @@ void process_modem_generic(char *filename, char *name,  unsigned int files, int 
         //time in seconds( should be less than phone doctor timer)
         args->time_val = 100 ;
         strncpy(args->orig,path,sizeof(args->orig));
-        strncpy(args->dest,destion,sizeof(args->orig));
+        strncpy(args->dest,destion,sizeof(args->dest));
         ret = pthread_create(&thread, NULL, (void *)copy_dir, (void *)args);
         if (ret < 0) {
             LOGE("pthread_create copy dir error");
@@ -2385,8 +2465,58 @@ void process_modem_generic(char *filename, char *name,  unsigned int files, int 
             //backgroung thread is running. Event should be tagged not ready
             data_ready = 0;
         }
+
+        if (strlen(curConfig->path_linked)>0){
+            //now copy linked data
+            linkedConfig = get_generic_config_by_path(curConfig->path_linked,first_modem_config);
+            if (linkedConfig){
+                strncpy(name_linked,name,sizeof(name_linked));
+                if (!str_simple_replace(name_linked,curConfig->matching_pattern,linkedConfig->matching_pattern)){
+                    //only do the copy if name has been replaced
+                    struct arg_copy * args_linked =  malloc(sizeof(struct arg_copy));
+                    if(!args_linked) {
+                        LOGE("%s:malloc failed\n", __FUNCTION__);
+                        return;
+                    }
+                    //time in seconds( should be less than phone doctor timer)
+                    args_linked->time_val = 100 ;
+                    snprintf(path_linked, sizeof(path_linked),"%s/%s",curConfig->path_linked,name_linked);
+                    strncpy(args_linked->orig,path_linked,sizeof(args_linked->orig));
+                    strncpy(args_linked->dest,destion,sizeof(args_linked->dest));
+                    ret = pthread_create(&thread, NULL, (void *)copy_dir, (void *)args_linked);
+                    if (ret < 0) {
+                        LOGE("pthread_create copy linked dir error");
+                        free(args_linked);
+                        //if ret >=0 free is done inside copy_dir
+                    }
+                }
+            }
+        }
+        //generating DATAREADY (if required)
+        if (strstr(event_class , ERROREVENT)) {
+            snprintf(fullpath, sizeof(fullpath)-1, "%s/%s_errorevent", destion,curConfig->eventname );
+            generate_data = 1;
+        }else if (strstr(event_class , INFOEVENT)) {
+            snprintf(fullpath, sizeof(fullpath)-1, "%s/%s_infoevent", destion,curConfig->eventname );
+            generate_data = 1;
+        }else{
+            //we don't need to generate data
+            generate_data = 0;
+        }
+
+        if (generate_data == 1){
+            fp = fopen(fullpath,"w");
+            if (fp == NULL){
+                LOGE("can not create file: %s\n", fullpath);
+            }else{
+                //Fill DATAREADY field
+                fprintf(fp,"DATAREADY=%d\n", data_ready);
+                fprintf(fp,"_END\n");
+                fclose(fp);
+            }
+        }
     }
-    history_file_write_ex(CRASHEVENT, curConfig->eventname, NULL, destion, NULL, key, date_tmp_2, data_ready);
+    history_file_write_ex(event_class, curConfig->eventname, NULL, destion, NULL, key, date_tmp_2, data_ready);
     del_file_more_lines(HISTORY_FILE);
     //TO DO : define when path should be removed
     //remove(path);
@@ -4235,11 +4365,38 @@ void store_config(char *section, struct config_handle a_conf_handle){
         tmp = get_value(section,"path_trigger",&a_conf_handle);
         if (tmp){
             snprintf(newconf->path, sizeof(newconf->path), "%s", tmp);
-            LOGE("path loaded :  %s \n",newconf->path);
+            LOGI("path loaded :  %s \n",newconf->path);
         }else{
             LOGW("missing configuration for %s on %s \n",section,"path_trigger");
             //path is not mandatory, config is still valid
         }
+        //path_linked
+        tmp = get_value(section,"path_linked",&a_conf_handle);
+        if (tmp){
+            snprintf(newconf->path_linked, sizeof(newconf->path_linked), "%s", tmp);
+            LOGI("path_linked loaded :  %s \n",newconf->path_linked);
+        }else{
+        //path_linked is not mandatory, config is still valid
+            newconf->path_linked[0] = '\0';
+        }
+
+        //event_class
+        tmp = get_value_def(section,"event_class","CRASH",&a_conf_handle);
+        if (tmp){
+            if (!strcmp(tmp,"CRASH")){
+                newconf->event_class = 0;
+            }else if (!strcmp(tmp,"ERROR")){
+                newconf->event_class = 1;
+            }else if (!strcmp(tmp,"INFO")){
+                newconf->event_class = 2;
+            }else{
+                newconf->event_class = 0;
+            }
+        }else{
+            //default value is CRASH
+            newconf->event_class = 0;
+        }
+
         if (first_modem_config==NULL){
             first_modem_config = newconf;
         }else{
