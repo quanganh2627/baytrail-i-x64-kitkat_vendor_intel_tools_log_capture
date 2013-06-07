@@ -163,7 +163,7 @@ public class ModemConfiguration {
                     this.platformConfig = PlatformConfig.get();
                     platformVersion = this.platformConfig.getPlatformVersion();
                     if (platformVersion.equals("saltbay")
-                            || platformVersion.equals("ctpscaleht")) {
+                            || platformVersion.equals("ctp7160")) {
                         modemResponse += " "
                                 + subModemValue.substring(indexOfDigrfx,indexOfDigrfx + 15);
                     } else {
@@ -234,11 +234,11 @@ public class ModemConfiguration {
                 ? AT_SET_XSYSTRACE_LEVEL_BB_3G_RED : AT_SET_XSYSTRACE_LEVEL_BB_3G;
         String sysTraceDigrf = (isCoredump)
                 ? AT_SET_XSYSTRACE_LEVEL_BB_3G_DIGRF_RED : AT_SET_XSYSTRACE_LEVEL_BB_3G_DIGRF;
-        sysTraceBb = (platformVersion.equals("saltbay") || platformVersion.equals("ctpscaleht"))
+        sysTraceBb = (platformVersion.equals("saltbay") || platformVersion.equals("ctp7160"))
                 ? AT_SET_XSYSTRACE_LEVEL_BB_SALT : sysTraceBb;
-        sysTrace3G = (platformVersion.equals("saltbay") || platformVersion.equals("ctpscaleht"))
+        sysTrace3G = (platformVersion.equals("saltbay") || platformVersion.equals("ctp7160"))
                 ? AT_SET_XSYSTRACE_LEVEL_BB_3G_SALT : sysTrace3G;
-        sysTraceDigrf = (platformVersion.equals("saltbay") || platformVersion.equals("ctpscaleht"))
+        sysTraceDigrf = (platformVersion.equals("saltbay") || platformVersion.equals("ctp7160"))
                 ? AT_SET_XSYSTRACE_LEVEL_BB_3G_DIGRF_SALT : sysTraceDigrf;
         try {
             switch (level) {
