@@ -27,7 +27,8 @@ static void priv_prepare_anruiwdt(char *destion)
         snprintf(cmd, sizeof(cmd), "gunzip %s", destion);
         system(cmd);
         destion[len-3] = 0;
-        do_chown(destion, PERM_USER, PERM_GROUP);
+        if (do_chown(destion, PERM_USER, PERM_GROUP)!=0) {
+            LOGE("%s: do_chown failed : status=%s...\n", __FUNCTION__, strerror(errno));}
     }
 }
 
@@ -120,6 +121,10 @@ int process_anruiwdt_event(struct watch_entry *entry, struct inotify_event *even
     char *key;
     int dir;
 
+    /* Check for duplicate dropbox event first */
+    if ( manage_duplicate_dropbox_events(event) )
+        return 1;
+
     dir = find_new_crashlog_dir(CRASH_MODE);
     snprintf(path, sizeof(path),"%s/%s", entry->eventpath, event->name);
     if (dir < 0 || !file_exists(path)) {
@@ -140,7 +145,6 @@ int process_anruiwdt_event(struct watch_entry *entry, struct inotify_event *even
     do_log_copy(entry->eventname, dir, dateshort, APLOG_TYPE);
     backtrace_anruiwdt(destion, dir);
     restart_profile_srv(1);
-    remove(path);
     snprintf(destion, sizeof(destion), "%s%d", CRASH_DIR, dir);
     key = raise_event(CRASHEVENT, entry->eventname, NULL, destion);
     LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, get_current_time_long(0), entry->eventname, destion);

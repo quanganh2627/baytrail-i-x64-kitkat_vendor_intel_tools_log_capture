@@ -5,6 +5,10 @@
 #define DATE_FORMAT_SHORT   "%Y%m%d"
 #define TIME_FORMAT_SHORT   "%Y%m%d%H%M%S"
 #define TIME_FORMAT_LONG    "%Y-%m-%d/%H:%M:%S  "
+#define PRINT_TIME(var_tmp, format_time, local_time) {              \
+    strftime(var_tmp, TIME_FORMAT_LENGTH, format_time, local_time); \
+    var_tmp[TIME_FORMAT_LENGTH-1]=0;                                \
+    }
 
 char *get_time_formated(char *format, char *dest);
 
@@ -49,6 +53,7 @@ void check_crashlog_died();
 int raise_infoerror(char *type, char *subtype);
 char *raise_event(char *event, char *type, char *subtype, char *log);
 char *raise_event_nouptime(char *event, char *type, char *subtype, char *log);
+char *raise_event_bootuptime(char *event, char *type, char *subtype, char *log);
 void create_infoevent(char* filename, char* data0, char* data1,
     char* data2);
 void notify_crashreport();

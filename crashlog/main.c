@@ -32,7 +32,6 @@
 extern char gbuildversion[PROPERTY_VALUE_MAX];
 extern char gboardversion[PROPERTY_VALUE_MAX];
 extern char guuid[256];
-extern int gabortcleansd;
 
 int gmaxfiles = MAX_DIRS;
 char *CRASH_DIR = NULL;
@@ -206,7 +205,7 @@ static void early_check(char *encryptstate, int test) {
     crashlog_check_startupreason(startupreason);
     crashlog_check_recovery();
 
-    key = raise_event(SYS_REBOOT, startupreason, NULL, NULL);
+    key = raise_event_bootuptime(SYS_REBOOT, startupreason, NULL, NULL);
     datelong = get_current_time_long(0);
     LOGE("%-8s%-22s%-20s%s\n", SYS_REBOOT, key, datelong, startupreason);
     free(key);
@@ -354,9 +353,11 @@ int do_monitor() {
         FD_ZERO(&read_fds);
 
         // File monitor fd setup
-        FD_SET(file_monitor_fd, &read_fds);
-        if (file_monitor_fd > max)
-            max = file_monitor_fd;
+        if ( file_monitor_fd > 0 ) {
+            FD_SET(file_monitor_fd, &read_fds);
+            if (file_monitor_fd > max)
+                max = file_monitor_fd;
+        }
 
         //mmgr fd setup
         if (mmgr_get_fd() > 0) {
@@ -409,19 +410,10 @@ int main(int argc, char **argv) {
     }
 
     if (argc == 2) {
-        if(!strcmp(argv[1], "-modem")){
-            /*WDCOUNT_START = 11;
-            WDCOUNT = WDCOUNT_START + 4;*/
-            LOGI(" crashlogd only snoop modem \n");
-        }
-        else if(!strcmp(argv[1], "-test")){
+        if(!strcmp(argv[1], "-test")){
             test_flag = 1;
         }
-        else if(!strcmp(argv[1], "-nomodem")){
-            /*WDCOUNT = (WDCOUNT - 3);*/
-            LOGI(" crashlogd only snoop AP \n");
-        }
-        else{
+        else {
             errno = 0;
             gmaxfiles = strtol(argv[1], NULL, 0);
 

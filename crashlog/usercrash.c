@@ -14,7 +14,7 @@ static void backup_apcoredump(unsigned int dir, char* name, char* path) {
     char des[512] = { '\0', };
     snprintf(des, sizeof(des), "%s%d/%s", CRASH_DIR, dir, name);
     int status = do_copy_tail(path, des, 0);
-    if (status != 0)
+    if (status < 0)
         LOGE("backup ap core dump status: %d.\n",status);
     else
         remove(path);
@@ -32,6 +32,9 @@ static int priv_process_usercrash_event(struct watch_entry *entry, struct inotif
     char destion[PATHMAX];
     char *key;
     int dir;
+    /* Check for duplicate dropbox event first */
+    if (entry->eventtype == JAVACRASH_TYPE && manage_duplicate_dropbox_events(event) )
+        return 1;
 
     dir = find_new_crashlog_dir(CRASH_MODE);
     snprintf(path, sizeof(path),"%s/%s", entry->eventpath, event->name);
@@ -51,6 +54,7 @@ static int priv_process_usercrash_event(struct watch_entry *entry, struct inotif
     switch (entry->eventtype) {
         case APCORE_TYPE:
             backup_apcoredump(dir, event->name, path);
+            do_log_copy(entry->eventname, dir, get_current_time_short(1), APLOG_TYPE);
             break;
         case TOMBSTONE_TYPE:
         case JAVACRASH_TYPE:
@@ -58,21 +62,26 @@ static int priv_process_usercrash_event(struct watch_entry *entry, struct inotif
             do_log_copy(entry->eventname, dir, get_current_time_short(1), APLOG_TYPE);
             break;
         case HPROF_TYPE:
+            remove(path);
             break;
         default:
             LOGE("%s: Unexpected type of event(%d)\n", __FUNCTION__, entry->eventtype);
+            break;
     }
-    remove(path);
     snprintf(destion, sizeof(destion), "%s%d", CRASH_DIR, dir);
     key = raise_event(CRASHEVENT, entry->eventname, NULL, destion);
     LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, get_current_time_long(0), entry->eventname, destion);
-    if ( (entry->eventtype != TOMBSTONE_TYPE && entry->eventtype != JAVACRASH_TYPE)
-        || !start_dumpstate_srv(CRASH_DIR, dir, key) ) {
-        /*
-         * Didn't start the dumpstate server
-         * (already running or not necessary)
-         */
+    switch (entry->eventtype) {
+    case TOMBSTONE_TYPE:
+    case JAVACRASH_TYPE:
+        if ( start_dumpstate_srv(CRASH_DIR, dir, key) <= 0 )
+            /* Didn't start the dumpstate server (already running or failed) */
+            free(key);
+        break;
+    default:
+        /* Event is nor JAVACRASH neither TOMBSTONE : no dumpstate necessary*/
         free(key);
+        break;
     }
     return 1;
 }

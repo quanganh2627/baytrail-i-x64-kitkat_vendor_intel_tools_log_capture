@@ -21,10 +21,18 @@ enum {
     MODE_BZ
 };
 
+/* Mode used to cache a file into a buffer*/
 #define CACHE_TAIL      0
 #define CACHE_START     1
 
-int cache_file(char *filename, char **records, int maxrecords, int cachemode);
+/* returns a negative value on error or the number of lines read */
+/*
+* Name          : cache_file
+* Description   : copy source file lines into buffer.
+*                 returns a negative value on error or the number of lines read
+*                 offset value is used to skip the file's first lines
+*/
+int cache_file(char *filename, char **records, int maxrecords, int cachemode, int offset);
 
 static inline int file_exists(char *filename) {
     struct stat info;

@@ -1,6 +1,6 @@
 #include "crashutils.h"
 #include "fsutils.h"
-#include "config.h"
+#include "privconfig.h"
 
 #include <stdlib.h>
 
@@ -55,7 +55,9 @@ static int check_aplogs_tobackup(char *filename) {
 }
 
 static void set_ipanic_crashtype_and_reason(char *crashtype, char *reason) {
+    char *key;
 
+    /* Set crash type according to pattern found in Ipanic console file or according to startup reason value*/
     if ( find_str_in_file(SAVED_CONSOLE_NAME, "Kernel panic - not syncing: Kernel Watchdog", NULL))
         strcpy(crashtype, KERNEL_SWWDT_CRASH);
     else if  ( find_str_in_file(SAVED_CONSOLE_NAME, "EIP is at pmu_sc_irq", NULL) || !strncmp(reason,"HWWDT_RESET", 11))
@@ -63,22 +65,25 @@ static void set_ipanic_crashtype_and_reason(char *crashtype, char *reason) {
         // It is marked as a kernel panic linked to a HW watdchog
         // to create a link between these 2 critical crashes
         strcpy(crashtype, KERNEL_HWWDT_CRASH);
-    else if ( find_str_in_file(SAVED_CONSOLE_NAME, "EIP is at panic_dbg_set", NULL)  || 
-                find_str_in_file(SAVED_CONSOLE_NAME, "EIP is at kwd_trigger_open", NULL)) {
+    else if ( find_str_in_file(SAVED_CONSOLE_NAME, "EIP is at panic_dbg_set", NULL)  || find_str_in_file(SAVED_CONSOLE_NAME, "EIP is at kwd_trigger_open", NULL))
         strcpy(crashtype, KERNEL_FAKE_CRASH);
-        strcat(reason,"_FAKE");
-    } else if (!strncmp(reason, "HWWDT_RESET_FAKE", 16)) {
-        strcpy(crashtype, KERNEL_FAKE_CRASH);
-    }
     else
         strcpy(crashtype, KERNEL_CRASH);
 
-    if ( !strncmp(reason,"SWWDT_RESET", 11) ) {
-         // In some corner cases, the startupreason is not correctly set
+    if (!find_str_in_file(SAVED_CONSOLE_NAME, "sdhci_pci_power_up_host: host controller power up is done", NULL)) {
+        // An error is raised when the panic console file does not end normally
+       raise_infoerror(ERROREVENT, IPANIC_CORRUPTED);
+    }
+    if (!strncmp(crashtype, KERNEL_FAKE_CRASH, sizeof(KERNEL_FAKE_CRASH)))
+         strcat(reason,"_FAKE");
+    else if (!strncmp(reason, "HWWDT_RESET_FAKE", 16))
+         strcpy(crashtype, KERNEL_FAKE_CRASH);
+    else if (!strncmp(reason,"HWWDT_RESET", 11))
+         strcpy(crashtype, KERNEL_HWWDT_CRASH);
+    else if (strncmp(reason,"SWWDT_RESET", 11) != 0) {
+         // In some corner cases, the startup reason is not correctly set
          // In this case, an ERROR is sent to have correct SWWDT metrics
-         char *key = raise_event(CRASHEVENT, ERROREVENT, CRASHLOG_SWWDT_MISSING, NULL);
-         LOGE("%-8s%-22s%-20s%s\n", ERROREVENT, key, get_current_time_long(0), CRASHLOG_SWWDT_MISSING);
-         free(key);
+         raise_infoerror(ERROREVENT, CRASHLOG_SWWDT_MISSING);
     }
 }
 

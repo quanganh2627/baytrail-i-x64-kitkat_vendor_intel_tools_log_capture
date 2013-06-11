@@ -26,11 +26,6 @@ char gboardversion[PROPERTY_VALUE_MAX] = {0,};
 char guuid[256] = {0,};
 int gabortcleansd = 0;
 
-#define PRINT_TIME(var_tmp, format_time, local_time) {              \
-    strftime(var_tmp, TIME_FORMAT_LENGTH, format_time, local_time); \
-    var_tmp[TIME_FORMAT_LENGTH-1]=0;                                \
-    }
-
 static struct tm *gcurrenttime = NULL;
 
 char *get_time_formated(char *format, char *dest) {
@@ -195,16 +190,28 @@ static char *priv_raise_event(char *event, char *type, char *subtype, char *log,
     struct history_entry entry;
     char key[SHA1_DIGEST_LENGTH+1];
     char newuptime[32], *puptime = NULL;
+    char lastbootuptime[24];
     int res, hours;
     const char *datelong = get_current_time_long(1);
 
-    if (add_uptime) {
+    /* UPTIME      : event uptime value is get from system
+     * UPTIME_BOOT : event uptime value get from history file first line
+     * NO_UPTIME   : no event uptime value */
+    switch(add_uptime) {
+    case UPTIME :
         puptime = &newuptime[0];
         if ((res = get_uptime_string(newuptime, &hours)) < 0) {
             LOGE("%s failed: Cannot get the uptime - %s\n",
                 __FUNCTION__, strerror(-res));
             return NULL;
         }
+        break;
+    case UPTIME_BOOT :
+        if (!get_lastboot_uptime(lastbootuptime))
+            puptime = &lastbootuptime[0];
+        break;
+    default : /* NO_UPTIME */
+        break;
     }
 
     if (!event) {
@@ -229,22 +236,30 @@ static char *priv_raise_event(char *event, char *type, char *subtype, char *log,
         errno = -res;
         return NULL;
     }
-    if ( log && (res = create_minimal_crashfile(subtype, log, key, puptime, datelong)) != 0) {
-        LOGE("%s: Cannot create a minimal crashfile in %s - %s.\n", __FUNCTION__,
-            entry.log, strerror(-res));
-        errno = -res;
-        return NULL;
+    if (!strncmp(event, CRASHEVENT, sizeof(CRASHEVENT)) || !strncmp(event, BZEVENT, sizeof(BZEVENT))) {
+        /* Creating a minimal crashfile is required if log not null */
+        if ( log && (res = create_minimal_crashfile( (!strncmp(event, CRASHEVENT, sizeof(CRASHEVENT)) ? subtype : event),
+                log, key, puptime, datelong)) != 0) {
+            LOGE("%s: Cannot create a minimal crashfile in %s - %s.\n", __FUNCTION__,
+                entry.log, strerror(-res));
+            errno = -res;
+            return NULL;
+        }
     }
     notify_crashreport();
     return strdup(key);
 }
 
 char *raise_event_nouptime(char *event, char *type, char *subtype, char *log) {
-    return priv_raise_event(event, type, subtype, log, 0);
+    return priv_raise_event(event, type, subtype, log, NO_UPTIME);
 }
 
 char *raise_event(char *event, char *type, char *subtype, char *log) {
-    return priv_raise_event(event, type, subtype, log, 1);
+    return priv_raise_event(event, type, subtype, log, UPTIME);
+}
+
+char *raise_event_bootuptime(char *event, char *type, char *subtype, char *log) {
+    return priv_raise_event(event, type, subtype, log, UPTIME_BOOT);
 }
 
 void restart_profile_srv(int serveridx) {
@@ -276,7 +291,7 @@ void check_running_power_service() {
     property_get("init.svc.profile_power", powerservice, "");
     property_get("persist.service.power.enable", powerenable, "");
     if (strcmp(powerservice, "running") && !strcmp(powerenable, "1")) {
-        //LOGE("power service stopped whereas property is set .. restarting\n");
+        LOGE("power service stopped whereas property is set .. restarting\n");
         start_daemon("profile_power");
     }
 }
@@ -606,9 +621,9 @@ int raise_infoerror(char *type, char *subtype) {
     char *key;
     int status;
 
-    if ((key = raise_event_nouptime(NULL, type, subtype, LOGINFO_DIR)) == NULL)
+    if ((key = raise_event(NULL, type, subtype, LOGINFO_DIR)) == NULL)
         return -errno;
-
+    LOGE("%-8s%-22s%-20s%s\n", type, key, get_current_time_long(0), subtype);
     free(key);
     unlink(LOGRESERVED);
     status = system("/system/bin/monitor_crashenv");
@@ -719,4 +734,3 @@ void clean_crashlog_in_sd(char *dir_to_search, int max) {
     // abort clean of legacy log folder when there is no more folders expect the ones in history_event
     gabortcleansd = (i < max);
 }
-

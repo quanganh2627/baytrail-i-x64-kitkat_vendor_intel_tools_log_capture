@@ -1,7 +1,7 @@
 #include "inotify_handler.h"
 #include "crashutils.h"
 #include "fsutils.h"
-#include "config.h"
+#include "privconfig.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -16,14 +16,29 @@ static void compress_aplog_folder(char *folder_path)
     system(cmd);
 }
 
+/**
+* Name          : process_log_event
+* Description   : This function manages treatment for aplog and bz triggers.
+*                 In APLOG mode :
+*                    - The number of packet represents the number of events and then 'crashlog' directories to be created.
+*                    - The depth is the number of aplog to be copied in each created event 'crashlog' directorie.
+*                 In BZ mode :
+*                    - The number of copied aplog is equal to (nb of packet X depth)
+*                 The depth value is first tried to be read from the trigger file ( in this case the number of packet is 1 by default).
+*                 If reading failed or if file is empty, those values are read from properties.
+* Parameters    :
+*   char *rootdir     -> path of watched directory
+*   char *triggername -> name of the file inside the watched directory that has triggered the event
+*   mode              -> mode (BZ or APLOG)
+ */
 static int process_log_event(char *rootdir, char *triggername, int mode) {
     char *key;
-    int dir;
+    int dir = -1;
     char path[PATHMAX];
-    char destion[PATHMAX];
+    char destination[PATHMAX];
     char tmp[PATHMAX] = {'\0',};
     int nbPacket,aplogDepth;
-    int aplogIsPresent;
+    int aplogIsPresent, DepthValueRead = 0;
     char value[PROPERTY_VALUE_MAX];
     const char *logrootdir, *suppl_to_copy;
     char *event, *type;
@@ -52,31 +67,30 @@ static int process_log_event(char *rootdir, char *triggername, int mode) {
             return -1;
             break;
     }
-
     snprintf(path, sizeof(path),"%s/%s", rootdir, triggername);
-    if (file_exists(path) &&
-            get_value_in_file(path,"APLOG=", tmp, sizeof(tmp))) {
-        aplogDepth = atoi(tmp);
-        nbPacket = 1;
-    } else {
-        /* file not found or not containing the 'APLOG=' field,
-         * fall back to the properties
-         */
-        property_get(PROP_APLOG_DEPTH, value, APLOG_DEPTH_DEF);
-        aplogDepth = atoi(value);
-        if (aplogDepth < 0)
-            aplogDepth = 0;
-
-        property_get(PROP_APLOG_NB_PACKET, value, APLOG_NB_PACKET_DEF);
-        nbPacket = atoi(value);
-        if (nbPacket < 0)
-            nbPacket = 0;
+    if (file_exists(path) ) {
+        LOGI("Received trigger file %s for %s", path, ( (mode == MODE_BZ) ? "BZ" : "APLOG" ));
+        if ( !get_value_in_file(path,"APLOG=", tmp, sizeof(tmp)) && atoi(tmp) >= 0 ) {
+            //if a value is specified inside trigger file, it overrides property value
+            aplogDepth = atoi(tmp);
+            nbPacket = 1;
+            DepthValueRead = 1;
+        }
     }
-
-    if (!nbPacket || !aplogDepth) {
-        LOGE("%s: %s detected but invalid nbpackets(%d) and depth(%d)!\n",
-            __FUNCTION__, triggername, nbPacket, aplogDepth);
-        return -1;
+    /* When no value has been read from trigger file, fall back to values read from the properties */
+    if (!DepthValueRead ) {
+       /* Get Aplog depth (number of aplogs per packet) */
+       property_get(PROP_APLOG_DEPTH, value, APLOG_DEPTH_DEF);
+       aplogDepth = atoi(value);
+       if (aplogDepth < 0)
+           aplogDepth = 0;
+       /* Get nb of packets */
+       property_get(PROP_APLOG_NB_PACKET, value, APLOG_NB_PACKET_DEF);
+       nbPacket = atoi(value);
+       if (nbPacket < 0)
+           nbPacket = 0;
+       LOGD("%s: No values read from trigger file %s so get values from properties : Aplog Depth (%d) and Packet Nb (%d)", __FUNCTION__,
+               path ,aplogDepth, nbPacket);
     }
 
     /* copy data file */
@@ -93,46 +107,54 @@ static int process_log_event(char *rootdir, char *triggername, int mode) {
             aplogIsPresent = file_exists(path);
             if( !aplogIsPresent ) break;
 
-            if( ( newdirperpacket && (logidx == 0) ) ||
-                    (!newdirperpacket && (packetidx == 0) && (logidx == 0) ) ) {
+            if( ( newdirperpacket && (logidx == 0) ) || (!newdirperpacket && (packetidx == 0) && (logidx == 0) ) ) {
                 dir = find_new_crashlog_dir(mode);
                 if (dir < 0) {
                     LOGE("%s: Cannot get a valid new crash directory for %s...\n", __FUNCTION__, triggername);
                     return -1;
-                 }
-                 if (newdirperpacket)
-                    snprintf(destion,sizeof(destion),"%s%d/aplog.%d", logrootdir,dir,(packetidx*aplogDepth)+logidx);
-                 else snprintf(destion,sizeof(destion),"%s%d/aplog", logrootdir,dir);
+                }
             }
-            do_copy_tail(path, destion, 0);
+            /* Set destination file*/
+            snprintf(destination,sizeof(destination),"%s%d/aplog.%d", logrootdir,dir,(packetidx*aplogDepth)+logidx);
+
+            do_copy_tail(path, destination, 0);
         }
 	    /* When a new crashlog dir is created per packet, send an event per dir */
-        if( newdirperpacket ) {
-            snprintf(destion,sizeof(destion),"%s%d/", logrootdir, dir);
-            compress_aplog_folder(destion);
-            key = raise_event(event, type, NULL, destion);
-            LOGE("%-8s%-22s%-20s%s %s\n", event, key, get_current_time_long(0), type, destion);
+        if( newdirperpacket && (dir != -1) ) {
+            snprintf(destination,sizeof(destination),"%s%d/", logrootdir, dir);
+            compress_aplog_folder(destination);
+            key = raise_event(event, type, NULL, destination);
+            LOGE("%-8s%-22s%-20s%s %s\n", event, key, get_current_time_long(0), type, destination);
             free(key);
             if (rootdir)
                 restart_profile_srv(2);
         }
     }
     /* When no new crashlog dir is created per packet, send an event only at the end */
+    /* For bz_trigger, treats bz_trigger file content and logs one BZEVENT event in history_event */
+    /* In case of bz_trigger with APLOG=0 which means bz type="enhancement" and so no logs needed. */
     if( !newdirperpacket ) {
-            if (suppl_to_copy) {
-                snprintf(destion,sizeof(destion),"%s%d/%s", logrootdir, dir, suppl_to_copy);
-                snprintf(path, sizeof(path),"%s/%s",rootdir,triggername);
-                do_copy_tail(path,destion,0);
-            }
-            snprintf(destion,sizeof(destion),"%s%d/", logrootdir,dir);
-            if (do_screenshot) {
-                do_screenshot_copy(path, destion);
-            }
-            compress_aplog_folder(destion);
-            key = raise_event(event, type, NULL, destion);
-            LOGE("%-8s%-22s%-20s%s %s\n", event, key, get_current_time_long(0), type, destion);
-            free(key);
-            restart_profile_srv(2);
+        if ( dir == -1 ) {
+            dir = find_new_crashlog_dir(mode);
+            if (dir < 0) {
+                LOGE("%s: Cannot get a valid new crash directory for %s...\n", __FUNCTION__, triggername);
+                return -1;
+             }
+        }
+        if (suppl_to_copy) {
+            snprintf(destination,sizeof(destination),"%s%d/%s", logrootdir, dir, suppl_to_copy);
+            snprintf(path, sizeof(path),"%s/%s",rootdir,triggername);
+            do_copy_tail(path,destination,0);
+        }
+        snprintf(destination,sizeof(destination),"%s%d/", logrootdir,dir);
+        if (do_screenshot) {
+            do_screenshot_copy(path, destination);
+        }
+        compress_aplog_folder(destination);
+        key = raise_event(event, type, NULL, destination);
+        LOGE("%-8s%-22s%-20s%s %s\n", event, key, get_current_time_long(0), type, destination);
+        free(key);
+        restart_profile_srv(2);
     }
 
     /*delete trigger file*/
@@ -143,14 +165,15 @@ static int process_log_event(char *rootdir, char *triggername, int mode) {
 
 int process_aplog_event(struct watch_entry *entry, struct inotify_event *event) {
 
-    return process_log_event(entry->eventpath, event->name, MODE_APLOGS);
+    return process_log_event(entry->eventpath, event->name,
+            ( (event->name[0] == 'b' && event->name[1] == 'z') ? MODE_BZ : MODE_APLOGS ));/*event->name necessary not null*/
 }
 
 int process_stat_event(struct watch_entry *entry, struct inotify_event *event) {
     unsigned int j = 0;
     char type[20] = { '\0', };
     char path[PATHMAX];
-    char destion[PATHMAX];
+    char destination[PATHMAX];
     char tmp_data_name[PATHMAX];
     const char *dateshort = get_current_time_short(1);
     char *key, *p, tmp[32];
@@ -174,18 +197,18 @@ int process_stat_event(struct watch_entry *entry, struct inotify_event *event) {
 
     /* copy data file */
     if ( p ) {
-        find_matching_file(tmp, entry->eventpath, tmp_data_name);
+        find_matching_file(entry->eventpath, tmp, tmp_data_name);
         snprintf(path, sizeof(path), "%s/%s", entry->eventpath, tmp_data_name);
-        snprintf(destion, sizeof(destion), "%s%d/%s", STATS_DIR, dir, tmp_data_name);
-        do_copy(path, destion, 0);
+        snprintf(destination, sizeof(destination), "%s%d/%s", STATS_DIR, dir, tmp_data_name);
+        do_copy(path, destination, MAXFILESIZE);
         remove(path);
     }
     /*copy trigger file*/
     snprintf(path, sizeof(path),"%s/%s",entry->eventpath,event->name);
-    snprintf(destion,sizeof(destion),"%s%d/%s", STATS_DIR,dir,event->name);
-    do_copy(path, destion, 0);
+    snprintf(destination,sizeof(destination),"%s%d/%s", STATS_DIR,dir,event->name);
+    do_copy(path, destination, MAXFILESIZE);
     remove(path);
-    snprintf(destion,sizeof(destion),"%s%d/", STATS_DIR,dir);
+    snprintf(destination,sizeof(destination),"%s%d/", STATS_DIR,dir);
     /*create type */
     snprintf(tmp,sizeof(tmp),"%s",event->name);
     p = strstr(tmp,"_trigger");
@@ -202,8 +225,8 @@ int process_stat_event(struct watch_entry *entry, struct inotify_event *event) {
         usleep(TIMEOUT_VALUE);
         do_log_copy(type,dir,dateshort,APLOG_STATS_TYPE);
     }
-    key = raise_event(STATSEVENT, type, NULL, NULL);
-    LOGE("%-8s%-22s%-20s%s %s\n", STATSEVENT, key, get_current_time_long(0), type, destion);
+    key = raise_event(STATSEVENT, type, NULL, destination);
+    LOGE("%-8s%-22s%-20s%s %s\n", STATSEVENT, key, get_current_time_long(0), type, destination);
     free(key);
     return 0;
 }

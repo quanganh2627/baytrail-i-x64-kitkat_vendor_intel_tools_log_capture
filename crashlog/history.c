@@ -9,6 +9,7 @@
 #include <string.h>
 #include <fcntl.h>
 #include <stdio.h>
+#include <sha1.h>
 
 #define HISTORY_FIRST_LINE_FMT  "#V1.0 " UPTIME_EVNAME "   %-24s\n"
 #define HISTORY_BLANK_LINE1     "#V1.0 " UPTIME_EVNAME "   0000:00:00              \n"
@@ -17,11 +18,20 @@
 static char *historycache[MAX_RECORDS];
 static int nextline = -1;
 static int loop_uptime_event = 1;
+/* last uptime value set at device boot only */
+static char lastbootuptime[24] = "0000:00:00";
+
+int get_lastboot_uptime(char bootuptime[24]) {
+    if (lastbootuptime[0] != 0) {
+        strncpy(bootuptime, lastbootuptime, 24);
+        return 0;
+    }
+    return -1;
+}
 
 int get_uptime_string(char newuptime[24], int *hours) {
     long long tm;
     int seconds, minutes, res;
-
     tm = get_uptime(1, &res);
     if (res) return res;
 
@@ -33,15 +43,46 @@ int get_uptime_string(char newuptime[24], int *hours) {
         minutes, seconds) == 3 ? 0 : -errno);
 }
 
-static int get_timed_firstline(char *buffer, int *hours, char lastuptime[24]) {
+/**
+* Name          : get_timed_firstline
+* Description   : computes first line to be written in history file.
+*                 returns 0 if success. errno if failure.
+* Parameters    :
+*  buffer     : the string containing the line well formatted
+*  hours      : the number of elapsed hours since last boot
+*  lastuptime : the time elapsed since last boot under well formatted string format
+*  refresh    : flag to force refresh or to take last computed value
+*/
+static int get_timed_firstline(char *buffer, int *hours, char lastuptime[24], int refresh) {
+
+    static int saved_hours = 0;
+    static char saved_lastuptime[24] = {0,};
+    /* to not refresh and already initialized */
+    if (!refresh && saved_lastuptime[0] != 0) {
+        *hours = saved_hours;
+        lastuptime = saved_lastuptime;
+        return (sprintf(buffer, HISTORY_FIRST_LINE_FMT, lastuptime) > 0 ? 0 : -errno);
+    }
+    /* not initialized yet or to refresh */
     if (get_uptime_string(lastuptime, hours) != 0)
         return -errno;
-    return (sprintf(buffer, HISTORY_FIRST_LINE_FMT, lastuptime) == 1 ? 0 : -errno);
+
+    if (sprintf(buffer, HISTORY_FIRST_LINE_FMT, lastuptime) > 0) {
+        /* save to static variables for next call without refreshing */
+        saved_hours = *hours;
+        strcpy(saved_lastuptime, lastuptime);
+        return 0;
+    }
+    else {
+        /*Re-initialize to force refresh next time */
+        saved_hours = 0;
+        saved_lastuptime[0] = 0;
+        return -errno;
+    }
 }
 
 static int cache_history_file() {
     int res;
-
     if ( !file_exists(HISTORY_FILE) ) {
         char firstline[MAXLINESIZE];
         char lastuptime[24];
@@ -51,20 +92,20 @@ static int cache_history_file() {
 
         do_chmod(HISTORY_FILE, "644");
         do_chown(HISTORY_FILE, PERM_USER, PERM_GROUP);
-        get_timed_firstline(firstline, &tmp, lastuptime);
+        get_timed_firstline(firstline, &tmp, lastuptime, 1);
         fprintf(to, "%s", firstline);
         fprintf(to, HISTORY_BLANK_LINE2);
         fclose(to);
     }
+    /* Cache the history file without the 2 first lines */
+    res = cache_file(HISTORY_FILE, (char**)historycache, MAX_RECORDS, CACHE_TAIL, 2);
 
-    res = cache_file(HISTORY_FILE, (char**)historycache, MAX_RECORDS,
-        CACHE_TAIL);
     if ( res < 0 ) {
         LOGE("%s: Cannot cache the contents of %s - %s.\n",
             __FUNCTION__, HISTORY_FILE, strerror(-res));
         return res;
     }
-    nextline = (res + 1) % MAX_RECORDS;
+    nextline = res % MAX_RECORDS;
     return res;
 }
 
@@ -83,7 +124,6 @@ int reset_history_cache() {
 
 static void entry_to_history_line(struct history_entry *entry,
     char newline[MAXLINESIZE]) {
-
     newline[0] = 0;
     if (entry->log != NULL) {
         char *ptr;
@@ -114,7 +154,9 @@ int update_history_file(struct history_entry *entry) {
     /* historycache is a circular buffer indexed with next index */
     int index = 0, fd, res;
     char newline[MAXLINESIZE];
-
+    char firstline[MAXLINESIZE];
+    char lastuptime[24];
+    int tmp;
     if (!entry || !entry->key ||
             !entry->eventtime)
         return -EINVAL;
@@ -130,8 +172,9 @@ int update_history_file(struct history_entry *entry) {
     }
 
     entry_to_history_line(entry, newline);
+
     if (newline[0] == 0) {
-        LOGE("%s: Cannot build the hisotry line for entry %s - %s.\n",
+        LOGE("%s: Cannot build the history line for entry %s - %s.\n",
             __FUNCTION__, entry->key, strerror(errno));
         return -errno;
     }
@@ -140,6 +183,7 @@ int update_history_file(struct history_entry *entry) {
     if ( historycache[nextline] == NULL ) {
         /* Still have some room */
         if ( (historycache[nextline] = strdup(newline)) == NULL) {
+            newline[strlen(newline) - 1] = 0; /*Remove trailing character for display purpose*/
             LOGE("%s: Cannot copy the line %s - %s.\n", __FUNCTION__,
                 newline, strerror(nextline));
             return -errno;
@@ -148,14 +192,18 @@ int update_history_file(struct history_entry *entry) {
         /* We can just write the new line at the end of the file */
         res = append_file(HISTORY_FILE, newline);
         if (res > 0) return 0;
+        newline[strlen(newline) - 1] = 0; /*Remove trailing character for display purpose*/
         LOGE("%s: Cannot append the line %s to %s- %s.\n", __FUNCTION__,
             newline, HISTORY_FILE, strerror(-res));
         return res;
     }
 
     /* The buffer is full */
+    LOGD("%s : History cache buffer is full\n", __FUNCTION__);
+
     free(historycache[nextline]);
     if ( (historycache[nextline] = strdup(newline)) == NULL) {
+        newline[strlen(newline) - 1] = 0; /*Remove trailing character for display purpose*/
         LOGE("%s: Cannot copy the line %s - %s.\n", __FUNCTION__,
             newline, strerror(nextline));
         return -errno;
@@ -169,6 +217,25 @@ int update_history_file(struct history_entry *entry) {
         LOGE("%s: Cannot create %s\n", HISTORY_FILE, strerror(errno));
         return -errno;
     }
+    /* Write the two first lines : get 'lastuptime' last computed value */
+    if ( get_timed_firstline(firstline, &tmp, lastuptime, 0) == 0 ) {
+        if ( (write(fd, firstline, strlen(firstline))) != (int)strlen(firstline) ) {
+            close(fd);
+            return -errno;
+        }
+    }
+    else {
+        LOGE("%s: can't get timed first line for history file", __FUNCTION__);
+        if ( write(fd, HISTORY_BLANK_LINE1, strlen(HISTORY_BLANK_LINE1)) != (int)strlen(HISTORY_BLANK_LINE1) ) {
+           close(fd);
+           return -errno;
+       }
+    }
+    if ( write(fd, HISTORY_BLANK_LINE2, strlen(HISTORY_BLANK_LINE2)) != (int)strlen(HISTORY_BLANK_LINE2) ) {
+       close(fd);
+       return -errno;
+   }
+
     /* Copy the buffer from nextline to the end */
     for (index = nextline ; index < MAX_RECORDS ; index++) {
         if (write(fd, historycache[index], strlen(historycache[index]))
@@ -192,10 +259,8 @@ int update_history_file(struct history_entry *entry) {
 int uptime_history() {
     FILE *to;
     int res;
-    char lastuptime[32];
     char name[32];
     const char *datelong = get_current_time_long(1);
-
     to = fopen(HISTORY_FILE, "r");
     if (to == NULL) {
         res = errno;
@@ -203,7 +268,7 @@ int uptime_history() {
             HISTORY_FILE, strerror(errno));
         return -res;
     }
-    fscanf(to, "#V1.0 %16s%24s\n", name, lastuptime);
+    fscanf(to, "#V1.0 %16s%24s\n", name, lastbootuptime);
     fclose(to);
     if (memcmp(name, "CURRENTUPTIME", sizeof("CURRENTUPTIME"))) {
         LOGE("%s: Bad first line; cannot continue\n",
@@ -221,14 +286,17 @@ int uptime_history() {
     fprintf(to, HISTORY_BLANK_LINE1);
     strcpy(name, PER_UPTIME);
     fseek(to, 0, SEEK_END);
-    fprintf(to, "%-8s00000000000000000000  %-20s%s\n", name, datelong, lastuptime);
+    fprintf(to, "%-8s00000000000000000000  %-20s%s\n", name, datelong, lastbootuptime);
     fclose(to);
     return 0;
 }
 
+/**
+* Name          : reset_uptime_history
+* Description   : cache the history file, write the 2 first lines
+*/
 int reset_uptime_history() {
     FILE *to;
-
     if ( nextline < 0 && cache_history_file() < 0) {
         LOGE("%s: Cannot cache %s - %s.\n", __FUNCTION__,
             HISTORY_FILE, strerror(errno));
@@ -259,7 +327,6 @@ int reset_uptime_history() {
 int history_has_event(char *eventdir) {
 
     int idx;
-
     if (!eventdir) return -EINVAL;
 
     if ( nextline < 0 && cache_history_file() < 0) {
@@ -278,8 +345,7 @@ int history_has_event(char *eventdir) {
 
 /*
 * Name          : add_uptime_event
-* Description   : adds an uptime event to the history file
-*                   and upload an event if 12hours passed
+* Description   : adds an uptime event to the history file and upload an event if 12hours passed
 * Parameters    :
 */
 int add_uptime_event() {
@@ -287,13 +353,14 @@ int add_uptime_event() {
     FILE *fd;
     char firstline[MAXLINESIZE];
     char lastuptime[24];
-
     fd = fopen(HISTORY_FILE, "r+");
     if (fd == NULL) return -errno;
 
-    res = get_timed_firstline(firstline, &hours, lastuptime);
-    if (res) return res;
-
+    res = get_timed_firstline(firstline, &hours, lastuptime, 1);
+    if ( res != 0 ) {
+        LOGE("%s: can't get timed first line for history file", __FUNCTION__);
+        return res;
+    }
     errno = 0;
     fprintf(fd, firstline, &hours);
     fclose(fd);
@@ -312,39 +379,40 @@ int add_uptime_event() {
     return 0;
 }
 
-/*
+/**
 * Name          : update_history_on_cmd_delete
 * Description   : This function updates the history_event on a CMDDELETE command
 *                 The line of the history event containing one of events list is updated:
 *                 The CRASH keyword is replaced by DELETE keyword
 *                 The crashlog folder is removed
 * Parameters    :
-*   char *events          -> list of events */
+*   char *events          -> chain containing events separated by comma
+**/
 int update_history_on_cmd_delete(char *events) {
-    char **crashdirs = NULL, crashdir[MAXLINESIZE], line[MAXLINESIZE];
+    char **events_list = NULL, crashdir[MAXLINESIZE], line[MAXLINESIZE], eventid[SHA1_DIGEST_LENGTH+1];
     int nbpatterns, maxpatterns = 10, maxpatternsize = 48, res, idx;
     FILE *fd;
-
     fd = fopen(HISTORY_FILE, "r+");
     if (!fd) {
         LOGE("%s: Unable to open %s - %s\n",
             __FUNCTION__, HISTORY_FILE, strerror(errno));
         return -1;
     }
-
-    crashdirs = commachain_to_fixedarray(events, maxpatternsize, maxpatterns, &nbpatterns);
+    /* Get events list from input events comma chain*/
+    events_list = commachain_to_fixedarray(events, maxpatternsize, maxpatterns, &nbpatterns);
     if (nbpatterns <= 0) {
         LOGE("%s: Not patterns found in %s... stop the operation\n",
             __FUNCTION__, events);
+        fclose(fd);
         return -1;
     }
-
+    /*read each line of history file and check if event id matches one of the list*/
     while (freadline(fd, line) > 0) {
-        res = sscanf(line, "CRASH %*s %*s %*s %s\n", crashdir);
-        if (res == 1) {
+        res = sscanf(line, "CRASH %s %*s %*s %s\n", eventid, crashdir);
+        if (res == 2) {
             /* Found a crash line, check the patterns */
             for (idx = 0 ; idx < nbpatterns ; idx++)
-                if (strstr(crashdir, crashdirs[idx])) {
+                if (strstr(eventid, events_list[idx])) {
                     fseek(fd, -strlen(line), SEEK_CUR);
                     fwrite("DELETE", 1, 6, fd);
                     fseek(fd, strlen(line)-6, SEEK_CUR);
@@ -352,11 +420,12 @@ int update_history_on_cmd_delete(char *events) {
                 }
         }
     }
-
+    /*free allocated resources*/
     for (idx = 0 ; idx < maxpatterns ; idx++) {
-        free(crashdirs[idx]);
+        free(events_list[idx]);
     }
-    free(crashdirs);
+    free(events_list);
+    fclose(fd);
     return 0;
 }
 

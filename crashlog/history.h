@@ -14,6 +14,7 @@ struct history_entry {
     char* eventtime;
 };
 
+int get_lastboot_uptime(char lastbootuptime[24]);
 int get_uptime_string(char newuptime[24], int *hours);
 int update_history_file(struct history_entry *entry);
 int reset_uptime_history();

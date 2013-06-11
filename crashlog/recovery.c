@@ -1,11 +1,11 @@
 #include "crashutils.h"
 #include "fsutils.h"
-#include "config.h"
+#include "privconfig.h"
 
 #include <stdlib.h>
 
 int crashlog_check_recovery() {
-    char destion[PATHMAX];
+    char destination[PATHMAX];
     int dir;
     char *key;
 
@@ -26,14 +26,15 @@ int crashlog_check_recovery() {
     }
 
     //copy log
-    destion[0] = '\0';
-    snprintf(destion, sizeof(destion), "%s%s", destion, "recovery_last_log");
-    do_copy(RECOVERY_ERROR_LOG, destion, MAXFILESIZE);
+    destination[0] = '\0';
+    snprintf(destination, sizeof(destination), "%s%d/%s", CRASH_DIR, dir, "recovery_last_log");
+    if (do_copy(RECOVERY_ERROR_LOG, destination, MAXFILESIZE) < 0)
+        LOGE("%s: %s copy failed", __FUNCTION__, RECOVERY_ERROR_LOG);
     do_last_kmsg_copy(dir);
-    destion[0] = '\0';
-    snprintf(destion, sizeof(destion), "%s%d/", CRASH_DIR, dir);
-    key = raise_event(CRASHEVENT, RECOVERY_ERROR, NULL, destion);
-    LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, get_current_time_long(0), RECOVERY_ERROR, destion);
+    destination[0] = '\0';
+    snprintf(destination, sizeof(destination), "%s%d/", CRASH_DIR, dir);
+    key = raise_event(CRASHEVENT, RECOVERY_ERROR, NULL, destination);
+    LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, get_current_time_long(0), RECOVERY_ERROR, destination);
     remove(RECOVERY_ERROR_TRIGGER);
     free(key);
 

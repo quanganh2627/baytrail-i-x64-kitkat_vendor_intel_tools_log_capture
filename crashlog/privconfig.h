@@ -51,6 +51,7 @@
 #define KERNEL_HWWDT_CRASH      "IPANIC_HWWDT"
 #define FABRIC_FAKE_CRASH       "FABRIC_FAKE"
 #define KERNEL_FAKE_CRASH       "IPANIC_FAKE"
+#define IPANIC_CORRUPTED        "IPANIC_CORRUPTED"
 #define MODEM_SHUTDOWN          "MSHUTDOWN"
 #define BZTRIGGER               "bz_trigger"
 #define SCREENSHOT_PATTERN      "SCREENSHOT="
@@ -113,6 +114,12 @@ enum {
     APLOG_TYPE = 0,
     BPLOG_TYPE,
     APLOG_STATS_TYPE,
+};
+/*Define uptime mode for raise_event function */
+enum {
+    NO_UPTIME = 0,
+    UPTIME,
+    UPTIME_BOOT,
 };
 
 /* DIM returns the dimention of an array */

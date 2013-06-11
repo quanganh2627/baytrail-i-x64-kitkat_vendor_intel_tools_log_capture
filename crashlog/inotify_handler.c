@@ -96,14 +96,13 @@ int init_inotify_handler() {
             }
             return res;
         }
-        LOGI("%s has been snooped\n", wd_array[i].eventpath);
+        LOGI("%s, wd=%d has been snooped\n", wd_array[i].eventpath, wd_array[i].wd);
     }
     return fd;
 }
 
 static struct watch_entry *get_event_entry(int wd, char *eventname) {
     int idx;
-
     for (idx = 0 ; idx < (int)DIM(wd_array) ; idx++) {
         if ( wd_array[idx].wd == wd ) {
             if ( !eventname && !wd_array[idx].eventpattern )
@@ -118,7 +117,6 @@ static struct watch_entry *get_event_entry(int wd, char *eventname) {
 
 /**
  * @brief Show the contents of an array of inotify_events
- *
  * Called when a problem occurred during the parsing of
  * the array to ease the debug
  *
@@ -131,9 +129,9 @@ static void dump_inotify_events(char *buffer, unsigned int len,
     struct inotify_event *event;
     int i;
 
-    LOGI("%s: Dump the wd_array:\n", __FUNCTION__);
+    LOGD("%s: Dump the wd_array:\n", __FUNCTION__);
     for (i = 0; i < (int)DIM(wd_array) ; i++) {
-        LOGI("%s: wd_array[%d]: filename=%s, wd=%d\n", __FUNCTION__, i, wd_array[i].eventpath, wd_array[i].wd);
+        LOGD("%s: wd_array[%d]: filename=%s, wd=%d\n", __FUNCTION__, i, wd_array[i].eventpath, wd_array[i].wd);
     }
 
     while (1) {
@@ -154,7 +152,7 @@ static void dump_inotify_events(char *buffer, unsigned int len,
             buffer += sizeof(struct inotify_event) + event->len;
             len -= sizeof(struct inotify_event) + event->len;
         }
-        LOGI("%s: event received (name=%s, wd=%d, mask=0x%x, len=%d)\n", __FUNCTION__, event->name, event->wd, event->mask, event->len);
+        LOGD("%s: event received (name=%s, wd=%d, mask=0x%x, len=%d)\n", __FUNCTION__, event->name, event->wd, event->mask, event->len);
     }
 }
 
@@ -169,7 +167,7 @@ static void dump_inotify_events(char *buffer, unsigned int len,
  * @return 0 on success, -1 on error.
  */
 int receive_inotify_events(int inotify_fd) {
-    int len = 0, orig_len, idx;
+    int len = 0, orig_len, idx, wd;
     char orig_buffer[sizeof(struct inotify_event)+PATHMAX], *buffer, lastevent[sizeof(struct inotify_event)+PATHMAX];
     struct inotify_event *event;
     struct watch_entry *entry;
@@ -245,39 +243,43 @@ int receive_inotify_events(int inotify_fd) {
              * a dropbox final event... */
             if (event->len > 8 && !strncmp(event->name, "dropbox-", 8)) {
                 /* dumpstate is done so remove the watcher */
-                LOGI("%s: Received a dropbox event(%s)...",
+                LOGD("%s: Received a dropbox event(%s)...",
                     __FUNCTION__, event->name);
                 inotify_rm_watch(inotify_fd, event->wd);
                 finalize_dropbox_pending_event(event);
                 continue;
             }
+            /* Manage case where a watched directory is deleted*/
+            if ( event->mask & (IN_DELETE_SELF | IN_MOVE_SELF) ) {
+                /* Recreate the dir and reinstall the watch */
+                for (idx = 0 ; idx < (int)DIM(wd_array) ; idx++) {
+                    if ( wd_array[idx].wd == event->wd )
+                        entry = &wd_array[idx];
+                }
+                if ( entry && entry->eventpath ) {
+                    mkdir(entry->eventpath, 0777); /* TO DO : restoring previous rights/owner/group ?*/
+                    inotify_rm_watch(inotify_fd, event->wd);
+                    wd = inotify_add_watch(inotify_fd, entry->eventpath, entry->eventmask);
+                    if ( wd < 0 ) {
+                        LOGE("Can't add watch for %s.\n", entry->eventpath);
+                        return -1;
+                    }
+                    LOGW("%s: watched directory %s : \'%s\' has been created and snooped",__FUNCTION__,
+                            (event->mask & (IN_DELETE_SELF) ? "deleted" : "moved"), entry->eventpath);
+                    /* if the watch was duplicated, set it for all the entries */
+                    for (idx = 0 ; idx < (int)DIM(wd_array) ; idx++) {
+                        if (wd_array[idx].wd == event->wd)
+                            wd_array[idx].wd = wd;
+                    }
+                    /* Do nothing more on directory events */
+                    continue;
+                }
+            }
             /* Stray event... */
-            LOGI("%s: Can't handle the event \"%s\", no valid entry found, drop it...\n",
+            LOGD("%s: Can't handle the event \"%s\", no valid entry found, drop it...\n",
                 __FUNCTION__, (event->len ? event->name : "empty event"));
             continue;
         }
-
-        if ( event->mask & IN_ISDIR ) {
-            if ( event->mask & (IN_DELETE_SELF | IN_MOVE_SELF) ) {
-                /* Recreate the dir and reinstall the watch */
-                int wd;
-                mkdir(entry->eventpath, 0777);
-                inotify_rm_watch(inotify_fd, event->wd);
-                wd = inotify_add_watch(inotify_fd, entry->eventpath, entry->eventmask);
-                if ( wd < 0 ) {
-                    LOGE("Can't add watch for %s.\n", entry->eventpath);
-                    return -1;
-                }
-                /* if the watch was duplicated, set it for all the entries */
-                for (idx = 0 ; idx < (int)DIM(wd_array) ; idx++) {
-                    if (wd_array[idx].wd == event->wd)
-                        wd_array[idx].wd = wd;
-                }
-            }
-            /* Do nothing more on directory events */
-            continue;
-        }
-
         if ( entry->pcallback && entry->pcallback(entry, event) < 0 ) {
             LOGE("%s: Can't handle the event %s...\n", __FUNCTION__,
                 event->name);
@@ -288,4 +290,3 @@ int receive_inotify_events(int inotify_fd) {
 
     return 0;
 }
-

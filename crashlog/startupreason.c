@@ -1,6 +1,6 @@
 #include "crashutils.h"
 #include "fsutils.h"
-#include "config.h"
+#include "privconfig.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -99,7 +99,7 @@ void read_startupreason(char *startupreason)
 
 int crashlog_check_startupreason(char *reason) {
     const char *dateshort = get_current_time_short(1);
-    char destion[PATHMAX];
+    char destination[PATHMAX];
     int dir;
     char *key;
 
@@ -117,10 +117,10 @@ int crashlog_check_startupreason(char *reason) {
         return -1;
     }
 
-    destion[0] = '\0';
-    snprintf(destion, sizeof(destion), "%s%d/", CRASH_DIR, dir);
-    key = raise_event_nouptime(CRASHEVENT, "WDT", NULL, destion);
-    LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, get_current_time_long(0), "WDT", destion);
+    destination[0] = '\0';
+    snprintf(destination, sizeof(destination), "%s%d/", CRASH_DIR, dir);
+    key = raise_event(CRASHEVENT, "WDT", reason, destination);
+    LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, get_current_time_long(0), "WDT", destination);
     flush_aplog_atboot("WDT", dir, dateshort);
     usleep(TIMEOUT_VALUE);
     do_log_copy("WDT", dir, dateshort, APLOG_TYPE);

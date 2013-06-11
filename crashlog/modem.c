@@ -1,7 +1,7 @@
 #include "inotify_handler.h"
 #include "crashutils.h"
 #include "fsutils.h"
-#include "config.h"
+#include "privconfig.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -67,11 +67,15 @@ int process_modem_event(struct watch_entry *entry, struct inotify_event *event) 
     }
 
     snprintf(destion,sizeof(destion),"%s%d", CRASH_DIR,dir);
-    int status = copy_modemcoredump(entry->eventpath, destion);
-    if (status != 0)
-        LOGE("backup modem core dump status: %d.\n", status);
-    snprintf(destion,sizeof(destion),"%s%d/", CRASH_DIR, dir);
-
+    /*Copy Coredump only if event is a modem crash*/
+    if (entry->eventtype == MDMCRASH_TYPE ) {
+        int status = copy_modemcoredump(entry->eventpath, destion);
+        if (status != 0)
+            LOGE("backup modem core dump status: %d.\n", status);
+    }
+    snprintf(destion,sizeof(destion),"%s%d/%s", CRASH_DIR, dir, event->name);
+    do_copy_tail(path, destion, MAXFILESIZE);
+    snprintf(destion,sizeof(destion),"%s%d", CRASH_DIR, dir);
     usleep(TIMEOUT_VALUE);
     do_log_copy(entry->eventname, dir, dateshort, APLOG_TYPE);
     do_log_copy(entry->eventname, dir, dateshort, BPLOG_TYPE);

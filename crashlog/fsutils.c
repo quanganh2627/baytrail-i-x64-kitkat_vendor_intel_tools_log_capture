@@ -1,5 +1,6 @@
 #include "fsutils.h"
 #include "privconfig.h"
+#include "crashutils.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -254,17 +255,24 @@ int find_new_crashlog_dir(int mode) {
         current = 0;
     } else {
         LOGE("%s: Cannot open file %s - error is %s.\n", __FUNCTION__, path, strerror(errno));
+        raise_infoerror(ERROREVENT, CRASHLOG_ERROR_PATH);
         return -1;
     }
     /* Open it in write mode now to create and write the new current */
     if ( (fd = fopen(path, "w")) == NULL ){
         LOGE("%s: Cannot open the file %s in write mode\n", __FUNCTION__, path);
+        raise_infoerror(ERROREVENT, CRASHLOG_ERROR_PATH);
         return -1;
     }
     fprintf(fd, "%4d", ((current+1) % gmaxfiles));
-    fclose(fd);
 
-    snprintf(path, sizeof(path),  "%s%d", dir, current);
+    errno = 0;
+    if (fclose(fd)!=0) {
+        /* File closure could failed in some cases (full partition)*/
+        LOGE("%s: fclose on %s failed - error is %s", __FUNCTION__, path, strerror(errno));
+    }
+
+    snprintf(path, sizeof(path), "%s%d", dir, current);
     /* Call rmfr which will fail if the path does not exist
      * but doesn't matter as we create it afterwards
      */
@@ -273,6 +281,7 @@ int find_new_crashlog_dir(int mode) {
     /* Create a fresh directory */
     if (mkdir(path, 0777) == -1) {
         LOGE("%s: Cannot create dir %s\n", __FUNCTION__, path);
+        raise_infoerror(ERROREVENT, CRASHLOG_ERROR_PATH);
         return -errno;
     }
     if (!strstr(path, "sdcard"))
@@ -508,6 +517,7 @@ int do_copy(char *src, char *dest, int limit) {
          */
         close(fsrc);
         close(fdest);
+        do_chown(dest, PERM_USER, PERM_GROUP);
         return 0;
     }
 
@@ -605,16 +615,21 @@ int quicksort(void *array, int dim, int pivot) {
     return 0;
 }
 
-/* returns a negative value on error or the number of lines read */
-int cache_file(char *filename, char **records, int maxrecords, int cachemode) {
+/*
+* Name          : cache_file
+* Description   : copy source file lines into buffer.
+*                 returns a negative value on error or the number of lines read and copied into the buffer.
+*                 offset value is used to skip the file's first lines.
+*/
+int cache_file(char *filename, char **records, int maxrecords, int cachemode, int offset) {
 
     char curline[MAXLINESIZE];
-    int fd, res = 0, index;
+    int fd, res = 0, index, line_idx = 0;
 
     if (cachemode != CACHE_START && cachemode != CACHE_TAIL) {
         return -EINVAL;
     }
-    if ( !filename || !records ) {
+    if ( !filename || !records || (offset < 0) || (offset >= maxrecords)) {
         return -EINVAL;
     }
     if (maxrecords == 0) return 0;
@@ -632,17 +647,21 @@ int cache_file(char *filename, char **records, int maxrecords, int cachemode) {
                 /* readline failed, cleanup and exit */
                 goto do_cleanup;
             }
-            if (res == 0) {
-                /* file terminated */
-                close(fd);
-                return index;
+            /*Start to copy line in the buffer when line number is equal to offset value*/
+            if ( line_idx >= offset) {
+                if (res == 0) {
+                    /* file terminated */
+                    close(fd);
+                    return (index - offset);
+                }
+                /* add a new line to our buffer */
+                records[index - offset] = strdup(curline);
+                if (records[index - offset] == NULL) {
+                    res = -errno;
+                    goto do_cleanup;
+                }
             }
-            /* add a new file to our buffer */
-            records[index] = strdup(curline);
-            if (records[index] == NULL) {
-                res = -errno;
-                goto do_cleanup;
-            }
+            line_idx++;
         }
         close(fd);
         return index;
@@ -651,17 +670,21 @@ int cache_file(char *filename, char **records, int maxrecords, int cachemode) {
     if (cachemode == CACHE_TAIL) {
         int curindex = 0, count = 0;
         while((res = readline(fd, curline)) > 0) {
-            /* add a new file to our buffer */
-            if (records[curindex] != NULL)
-                free(records[curindex]);
-            records[curindex] = strdup(curline);
-            if (records[curindex] == NULL) {
-                res = -errno;
-                goto do_cleanup;
+            /*Start to copy line when line number is equal to offset value*/
+            if ( line_idx >= offset) {
+                /* add a new file to our buffer */
+                if (records[curindex] != NULL)
+                    free(records[curindex]);
+                records[curindex] = strdup(curline);
+                if (records[curindex] == NULL) {
+                    res = -errno;
+                    goto do_cleanup;
+                }
+                curindex = (curindex + 1) % maxrecords;
+                if (count < maxrecords)
+                    count++;
             }
-            curindex = (curindex + 1) % maxrecords;
-            if (count < maxrecords)
-                count++;
+            line_idx++;
         }
         if ( res < 0) {
             /* readline failed, cleanup and exit */
@@ -762,8 +785,9 @@ int read_file_prop_uid(char* propsource, char *filename, char *uid, char* defaul
 }
 
 void do_log_copy(char *mode, int dir, const char* timestamp, int type) {
-    char destion[PATHMAX], *logfile0, *logfile1, *extension;
+    char destination[PATHMAX], *logfile0, *logfile1, *extension;
     struct stat info;
+    char *dir_pattern = CRASH_DIR;
 
     switch (type) {
         case APLOG_TYPE:
@@ -771,6 +795,8 @@ void do_log_copy(char *mode, int dir, const char* timestamp, int type) {
             logfile0 = APLOG_FILE_0;
             logfile1 = APLOG_FILE_1;
             extension = "";
+            if (type == APLOG_STATS_TYPE)
+                dir_pattern = STATS_DIR;
             break;
         case BPLOG_TYPE:
             logfile0 = BPLOG_FILE_0;
@@ -781,14 +807,13 @@ void do_log_copy(char *mode, int dir, const char* timestamp, int type) {
             /* Ignore unknown type, just return */
             return;
     }
-
     if(stat(logfile0, &info) == 0) {
-        snprintf(destion,sizeof(destion), "%s%d/%s_%s_%s%s", CRASH_DIR, dir, strrchr(logfile0,'/')+1, mode, timestamp, extension);
-        do_copy_tail(logfile0, destion, MAXFILESIZE);
+        snprintf(destination,sizeof(destination), "%s%d/%s_%s_%s%s", dir_pattern, dir, strrchr(logfile0,'/')+1, mode, timestamp, extension);
+        do_copy_tail(logfile0, destination, MAXFILESIZE);
         if(info.st_size < 1*MB) {
             if(stat(logfile1, &info) == 0) {
-                snprintf(destion,sizeof(destion), "%s%d/%s_%s_%s%s", CRASH_DIR, dir, strrchr(logfile1,'/')+1, mode, timestamp, extension);
-                do_copy_tail(logfile1, destion, MAXFILESIZE);
+                snprintf(destination,sizeof(destination), "%s%d/%s_%s_%s%s", dir_pattern, dir, strrchr(logfile1,'/')+1, mode, timestamp, extension);
+                do_copy_tail(logfile1, destination, MAXFILESIZE);
             }
         }
     }
