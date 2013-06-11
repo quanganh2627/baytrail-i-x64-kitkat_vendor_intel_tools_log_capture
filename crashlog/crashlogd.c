@@ -1675,7 +1675,7 @@ void compress_aplog_folder(char *folder_path)
     DIR *d;
     struct dirent* de;
 
-    snprintf(cmd, sizeof(cmd), "gzip %s/aplog*", folder_path);
+    snprintf(cmd, sizeof(cmd), "gzip %s/[ab]plog*", folder_path);
     system(cmd);
 
     d = opendir(folder_path);
@@ -2679,6 +2679,7 @@ void process_aplog_and_bz_trigger(char *filename, char *name,  unsigned int file
     char tmp[PATHMAX] = {'\0',};
     int nbPacket,aplogDepth;
     int aplogIsPresent;
+    int bplogFlag = 0;
     struct stat sb;
     char value[PROPERTY_VALUE_MAX];
 
@@ -2701,6 +2702,11 @@ void process_aplog_and_bz_trigger(char *filename, char *name,  unsigned int file
             if (!get_str_in_file(path,"APLOG=", tmp, sizeof(tmp))) {
                 aplogDepth = atoi(tmp);
                 nbPacket = 1;
+            }
+            //Read bplog flag value specified inside trigger file
+            tmp[0] = '\0';
+            if (!get_str_in_file(path,"BPLOG=", tmp, sizeof(tmp))) {
+                bplogFlag = atoi(tmp);
             }
         }
         LOGI("received trigger file %s for aplog or bz", path);
@@ -2793,6 +2799,13 @@ void process_aplog_and_bz_trigger(char *filename, char *name,  unsigned int file
         }
 
         if(-1 != dir) {
+
+            //In case of bz_trigger with BPLOG=1, copy bplog file
+            if((bplogFlag == 1)) {
+                snprintf(destion,sizeof(destion),"%s%d/bplog", BZ_DIR,dir);
+                do_copy(BPLOG_FILE_0, destion, FILESIZE_MAX);
+            }
+
             snprintf(destion,sizeof(destion),"%s%d/", BZ_DIR,dir);
             compress_aplog_folder(destion);
             //copy bz_trigger file content
