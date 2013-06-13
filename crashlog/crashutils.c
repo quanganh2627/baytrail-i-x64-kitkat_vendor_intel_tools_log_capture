@@ -726,10 +726,9 @@ void clean_crashlog_in_sd(char *dir_to_search, int max) {
         while ((de = readdir(d))) {
             const char *name = de->d_name;
             snprintf(path, sizeof(path)-1, "%s/%s", dir_to_search, name);
-            if ((strstr(path, SDCARD_CRASH_DIR) ||
-               (strstr(path, SDCARD_STATS_DIR)) ||
-               (strstr(path, SDCARD_APLOGS_DIR)) ||
-               (strstr(path, SDCARD_BZ_DIR))))
+            if ( (strstr(path, SDCARD_CRASH_DIR) ||
+                 (strstr(path, SDCARD_STATS_DIR)) ||
+                 (strstr(path, SDCARD_APLOGS_DIR))) )
                 if (history_has_event(path)) {
                     if  (rmfr(path) < 0)
                         LOGE("failed to remove folder %s", path);

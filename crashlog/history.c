@@ -20,6 +20,7 @@ static int nextline = -1;
 static int loop_uptime_event = 1;
 /* last uptime value set at device boot only */
 static char lastbootuptime[24] = "0000:00:00";
+extern int gabortcleansd;
 
 int get_lastboot_uptime(char bootuptime[24]) {
     if (lastbootuptime[0] != 0) {
@@ -361,13 +362,17 @@ int add_uptime_event() {
         LOGE("%s: can't get timed first line for history file", __FUNCTION__);
         return res;
     }
+    /* Clean obsolete legacy crashlog folders at each uptime event */
+    if (!gabortcleansd)
+        clean_crashlog_in_sd(SDCARD_LOGS_DIR, 10);
+
+    /* Update history file first line (uptime line) */
     errno = 0;
     fprintf(fd, firstline, &hours);
     fclose(fd);
     if (errno != 0) {
         return -errno;
     }
-
     /* Send an uptime event every 12 hours */
     if ((hours / UPTIME_HOUR_FREQUENCY) >= loop_uptime_event) {
         char *key = raise_event(PER_UPTIME, "", NULL, NULL);
