@@ -7,14 +7,33 @@
 #include <sys/stat.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <dirent.h>
 
 static void compress_aplog_folder(char *folder_path)
 {
 #ifdef FULL_REPORT
     char cmd[PATHMAX];
+    char spath[PATHMAX];
+    DIR *d;
+    struct dirent* de;
 
+    /* Compress aplog files */
     snprintf(cmd, sizeof(cmd), "gzip %s/aplog*", folder_path);
     system(cmd);
+    /* Change owner and group of those aplog files */
+    d = opendir(folder_path);
+    if (d == 0) {
+         return;
+    }
+    else {
+        while ((de = readdir(d)) != 0) {
+           if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, ".."))
+               continue;
+           snprintf(spath, sizeof(spath)-1,  "%s/%s", folder_path, de->d_name);
+           do_chown(spath, PERM_USER, PERM_GROUP);
+        }
+        closedir(d);
+    }
 #endif
 }
 

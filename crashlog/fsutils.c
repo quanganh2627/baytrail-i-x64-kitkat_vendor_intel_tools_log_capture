@@ -793,7 +793,13 @@ int read_file_prop_uid(char* propsource, char *filename, char *uid, char* defaul
 #ifndef FULL_REPORT
 static void flush_aplog()
 {
-    int status = system("/system/bin/logcat -b system -b main -b radio -b events -v threadtime -d -f /logs/aplog");
+    struct stat info;
+    int status;
+
+    if(stat(APLOG_FILE_0, &info) == 0){
+        remove(APLOG_FILE_0);
+    }
+    status = system("/system/bin/logcat -b system -b main -b radio -b events -v threadtime -d -f /logs/aplog");
     if (status != 0)
         LOGE("dump logcat returns status: %d.\n", status);
     do_chown(APLOG_FILE_0, PERM_USER, PERM_GROUP);

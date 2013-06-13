@@ -354,7 +354,7 @@ void process_info_and_error(char *filename, char *name) {
     char file_ext[20];
     char type[20] = { '\0', };
     char tmp_data_name[PATHMAX];
-    const char *key;
+    char *key;
 
     if (strstr(name, "_infoevent" )){
         snprintf(name_event,sizeof(name_event),"%s",INFOEVENT);

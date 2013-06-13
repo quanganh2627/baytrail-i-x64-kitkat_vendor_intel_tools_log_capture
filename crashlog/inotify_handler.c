@@ -209,6 +209,11 @@ int receive_inotify_events(int inotify_fd) {
             }
             /* read the missing bytes to get the full length */
             if( sizeof(struct inotify_event) <= sizeof(lastevent)) {
+                /* Robustness : check 'lastevent' array size before reading inotify fd*/
+                if ((unsigned int)len >= sizeof(lastevent)) {
+                    LOGE("%s: Out of bounds of lastevent array.\n", __FUNCTION__);
+                    return -1;
+                }
                 if ( read(inotify_fd, &lastevent[len], (int)sizeof(struct inotify_event)-len)
                     != (int)sizeof(struct inotify_event) - len) {
                     LOGE("%s: Cannot complete the last inotify_event received (structure part) - %s\n", __FUNCTION__, strerror(errno));
@@ -234,6 +239,12 @@ int receive_inotify_events(int inotify_fd) {
             event = (struct inotify_event*)lastevent;
             /* The event was truncated */
             LOGI("%s: truncated inotify_event received (%d bytes missing), complete it\n", __FUNCTION__, missing_bytes);
+
+            /* Robustness : check 'lastevent' array size before reading inotify fd*/
+            if( (unsigned int)len > sizeof(lastevent) ) {
+                LOGE("%s: not enough space on array lastevent.\n", __FUNCTION__);
+                return -1;
+            }
             /* copy the last bytes received */
             memcpy(lastevent, buffer, len);
             /* now, reads the full last event, including its name field */
