@@ -13,6 +13,10 @@ sleep 5
 timestamp=`date +'%Y-%m-%d-%H-%M-%S'`
 dumpstate=$storagePath/dumpstate-$timestamp
 dropbox=$storagePath/dropbox-$timestamp.txt
+path_tmp=$storagePath/tmp
+echo $storagePath > $path_tmp
+sdcard=`sed 's/[^sdcard]//g' $path_tmp`
+rm $path_tmp
 
 # run dumpstate and dropbox
 /system/bin/dumpstate -o $dumpstate $@
@@ -22,16 +26,11 @@ sleep 35
 sleep 1
 
 # make files readable
-if [ -f "/system/xbin/wc" ] ; then
-  ispathinsdcard=`echo $storagePath | grep "mnt.*sdcard" | wc -l`
-else
-  ispathinsdcard=0
-fi
 
-if [ $ispathinsdcard == 0 ] ; then
-  chown system.log $dumpstate.txt
-  chown system.log $dropbox
-else
+if [ $sdcard == "sdcardscras" ] ; then
   chown root.sdcard_rw $dumpstate.txt
   chown root.sdcard_rw $dropbox
+else
+  chown system.log $dumpstate.txt
+  chown system.log $dropbox
 fi
