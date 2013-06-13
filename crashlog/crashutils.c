@@ -186,7 +186,7 @@ char **commachain_to_fixedarray(char *chain,
     return array;
 }
 
-static char *priv_raise_event(char *event, char *type, char *subtype, char *log, int add_uptime) {
+static char *priv_raise_event(char *event, char *type, char *subtype, char *log, int add_uptime, int data_ready) {
     struct history_entry entry;
     char key[SHA1_DIGEST_LENGTH+1];
     char newuptime[32], *puptime = NULL;
@@ -239,7 +239,7 @@ static char *priv_raise_event(char *event, char *type, char *subtype, char *log,
     if (!strncmp(event, CRASHEVENT, sizeof(CRASHEVENT)) || !strncmp(event, BZEVENT, sizeof(BZEVENT))) {
         /* Creating a minimal crashfile is required if log not null */
         if ( log && (res = create_minimal_crashfile( (!strncmp(event, CRASHEVENT, sizeof(CRASHEVENT)) ? subtype : event),
-                log, key, puptime, datelong)) != 0) {
+                log, key, puptime, datelong, data_ready)) != 0) {
             LOGE("%s: Cannot create a minimal crashfile in %s - %s.\n", __FUNCTION__,
                 entry.log, strerror(-res));
             errno = -res;
@@ -251,15 +251,19 @@ static char *priv_raise_event(char *event, char *type, char *subtype, char *log,
 }
 
 char *raise_event_nouptime(char *event, char *type, char *subtype, char *log) {
-    return priv_raise_event(event, type, subtype, log, NO_UPTIME);
+    return priv_raise_event(event, type, subtype, log, NO_UPTIME, 1);
 }
 
 char *raise_event(char *event, char *type, char *subtype, char *log) {
-    return priv_raise_event(event, type, subtype, log, UPTIME);
+    return priv_raise_event(event, type, subtype, log, UPTIME, 1);
 }
 
 char *raise_event_bootuptime(char *event, char *type, char *subtype, char *log) {
-    return priv_raise_event(event, type, subtype, log, UPTIME_BOOT);
+    return priv_raise_event(event, type, subtype, log, UPTIME_BOOT, 1);
+}
+
+char *raise_event_dataready(char *event, char *type, char *subtype, char *log, int data_ready) {
+    return priv_raise_event(event, type, subtype, log, UPTIME, data_ready);
 }
 
 void restart_profile_srv(int serveridx) {
@@ -525,7 +529,7 @@ void start_daemon(const char *daemonname) {
 
 //This function creates a minimal crashfile (without DATA0, DATA1 and DATA2 fields)
 //Note:DATA0 is filled for Modem Panic case only
-int create_minimal_crashfile(const char* type, const char* path, char* key, const char* uptime, const char* date)
+int create_minimal_crashfile(const char* type, const char* path, char* key, const char* uptime, const char* date, int data_ready)
 {
     FILE *fp;
     char fullpath[PATHMAX];
@@ -571,6 +575,7 @@ int create_minimal_crashfile(const char* type, const char* path, char* key, cons
     else {
         fprintf(fp,"TYPE=%s\n", type);
     }
+    fprintf(fp,"DATA_READY=%d\n", data_ready);
     //MPANIC crash : fill DATA0 field
     if (!strcmp(MDMCRASH_EVNAME, type)){
         LOGI("Modem panic detected : generating DATA0\n");

@@ -78,6 +78,7 @@ int do_chown(char *file, char *uid, char *gid);
 int do_copy_tail(char *src, char *dest, int limit);
 int do_copy(char *src, char *dest, int limit);
 int rmfr(char *path);
+int rmfr_specific(char *path, int remove_dir);
 
 void copy_dir(void *arguments);
 

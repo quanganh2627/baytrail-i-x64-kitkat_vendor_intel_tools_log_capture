@@ -320,19 +320,15 @@ int find_matching_file(char *dir_to_search, char *pattern, char *filename_found)
 }
 
 int rmfr(char *path) {
-#ifdef USE_SYSTEM_CMDS
-    char *cmd[PATHMAX + 20];
-    cmd[0] = 0;
-    snprintf(cmd, sizeof(cmd)-1, "/system/bin/rm -fr %s", path);
-    if (cmd[0] == 0 || system(cmd) == -1 ) {
-            return errno;
-    }
-    return 0;
-#else
+    return rmfr_specific(path, 1);
+}
+
+int rmfr_specific(char *path, int remove_dir) {
     DIR *d;
     struct dirent *de;
     char fsentry[PATHMAX];
     int subres = 0;
+    unsigned char isFile = 0x8;
 
     /* Check for a simple file or link first */
     if ( !unlink(path) ) return 0;
@@ -352,19 +348,24 @@ int rmfr(char *path) {
     while ((de = readdir(d)) != NULL) {
         if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, ".."))
             continue;
-        snprintf(fsentry, sizeof(fsentry), "%s/%s", path, de->d_name);
-        if ( unlink(path) ) {
-            if (errno == EISDIR)
-                subres = rmfr(fsentry);
-            if (subres) return subres;
+        /* Remove file in every case and remove directory if required */
+        if ( de->d_type == isFile || (de->d_type != isFile && remove_dir) ) {
+            snprintf(fsentry, sizeof(fsentry), "%s/%s", path, de->d_name);
+            if ( unlink(path) ) {
+                if (errno == EISDIR)
+                    subres = rmfr(fsentry);
+                if (subres) return subres;
+            }
         }
     }
     closedir(d);
-
-    /* Finally deletes the empty directory */
-    return rmdir(path);
-#endif
+    if (remove_dir)
+        /* Finally delete the empty directory */
+        return rmdir(path);
+    else
+        return 0;
 }
+
 
 #ifndef USE_SYSTEM_CMDS
 static mode_t get_mode(const char *s)
@@ -852,19 +853,30 @@ void copy_dir(void *arguments)
     struct arg_copy *args = (struct arg_copy *)arguments;
     DIR *d;
     struct dirent* de;
-    char dir_src[512] = { '\0', };
-    char dir_des[512] = { '\0', };
+    char dir_src[PATHMAX] = { '\0', };
+    char dir_des[PATHMAX] = { '\0', };
+    int cp_time_val;
     //need a local copy at the beginning
     snprintf(dir_src, sizeof(dir_src), "%s", args->orig);
     snprintf(dir_des, sizeof(dir_des), "%s", args->dest);
+    cp_time_val = args->time_val;
+    //free parameter the sooner to avoid any possible leak
+    free(args);
     d = opendir(dir_src);
-    if (args->time_val > 0){
-        sleep(args->time_val);
+    if(!d) {
+        LOGE("%s: Can't open dir %s\n",__FUNCTION__, dir_src);
+        return;
+    }
+    if (cp_time_val > 0){
+        sleep(cp_time_val);
     }
     while ((de = readdir(d))) {
+        //protection for . and .. "default folder"
+        if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, ".."))
+          continue;
         const char *name = de->d_name;
-        char src[512] = { '\0', };
-        char des[512] = { '\0', };
+        char src[PATHMAX] = { '\0', };
+        char des[PATHMAX] = { '\0', };
         //TO DO : rework the "/" part
         snprintf(src, sizeof(src), "%s/%s", dir_src,name);
         snprintf(des, sizeof(des), "%s/%s", dir_des,name);

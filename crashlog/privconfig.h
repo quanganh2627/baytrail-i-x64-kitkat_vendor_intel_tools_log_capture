@@ -26,7 +26,6 @@
 #define TIMEOUT_VALUE           (20*1000)
 #define CMDSIZE_MAX             ((21*20) + 1)
 #define UPTIME_FREQUENCY        (5 * 60)
-#define MINUTE_VALUE            (60)
 #define MMGRMAXSTRING           (20)
 #define MMGRMAXEXTRA            (512)
 

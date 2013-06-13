@@ -113,7 +113,13 @@ static int swupdated(char *buildname) {
     return 1;
 }
 
-static void reset_logdir(char *path) {
+/**
+ * @brief Remove directory content. Only files in directory if remove_dir = 0.
+ * Otherwise, all directory content is removed recursively.
+ *
+ * @return void.
+ */
+static void reset_logdir(char *path, int remove_dir) {
     struct stat info;
 
     if (stat(path,&info)) {
@@ -121,9 +127,11 @@ static void reset_logdir(char *path) {
             path, strerror(errno));
         return;
     }
-    rmfr(path);
-    mkdir(path, info.st_mode);
-    chown(path, info.st_uid, info.st_gid);
+    rmfr_specific(path, remove_dir);
+    if (remove_dir) {
+        mkdir(path, info.st_mode);
+        chown(path, info.st_uid, info.st_gid);
+    }
 }
 
 static void reset_file(char *filename) {
@@ -141,9 +149,10 @@ static void reset_file(char *filename) {
 
 static void reset_after_swupdate(void)
 {
-    reset_logdir(HISTORY_CORE_DIR);
-    reset_logdir(LOGS_MODEM_DIR);
-    reset_logdir(LOGS_GPS_DIR);
+    reset_logdir(HISTORY_CORE_DIR, 1);
+    /* don't remove folder for modemcrash */
+    reset_logdir(LOGS_MODEM_DIR, 0);
+    reset_logdir(LOGS_GPS_DIR, 1);
     remove(MODEM_UUID);
     reset_file(CRASH_CURRENT_LOG);
     reset_file(STATS_CURRENT_LOG);

@@ -104,7 +104,7 @@ void store_config(char *section, struct config_handle a_conf_handle){
         //pconfig INIT
         pconfig newconf = malloc(sizeof(struct config));
         if(!newconf) {
-            LOGE("%s:malloc failed\n", __FUNCTION__);
+            LOGE("%s: newconf malloc failed\n", __FUNCTION__);
             return;
         }
         newconf->next   = NULL;
@@ -115,6 +115,11 @@ void store_config(char *section, struct config_handle a_conf_handle){
         tmp = get_value(section,"eventname",&a_conf_handle);
         if (tmp){
             newconf->eventname = malloc(strlen(tmp)+1);/* add 1 for \0 */
+            if(!newconf->eventname) {
+                LOGE("%s:malloc failed\n", __FUNCTION__);
+                free_config(newconf);
+                return;
+            }
             strncpy(newconf->eventname,tmp,strlen(tmp));
             newconf->eventname[strlen(tmp)]= '\0';
         }else{
@@ -126,6 +131,11 @@ void store_config(char *section, struct config_handle a_conf_handle){
         tmp = get_value(section,"matching_pattern",&a_conf_handle);
         if (tmp){
             newconf->matching_pattern = malloc(strlen(tmp)+1);/* add 1 for \0 */
+            if(!newconf->matching_pattern) {
+                LOGE("%s: matching pattern malloc failed\n", __FUNCTION__);
+                free_config(newconf);
+                return;
+            }
             strncpy(newconf->matching_pattern,tmp,strlen(tmp));
             newconf->matching_pattern[strlen(tmp)]= '\0';
         }else{

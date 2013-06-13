@@ -54,6 +54,7 @@ int raise_infoerror(char *type, char *subtype);
 char *raise_event(char *event, char *type, char *subtype, char *log);
 char *raise_event_nouptime(char *event, char *type, char *subtype, char *log);
 char *raise_event_bootuptime(char *event, char *type, char *subtype, char *log);
+char *raise_event_dataready(char *event, char *type, char *subtype, char *log, int data_ready);
 void create_infoevent(char* filename, char* data0, char* data1,
     char* data2);
 void notify_crashreport();
@@ -65,7 +66,7 @@ void check_running_power_service();
 
 int get_build_board_versions(char *filename, char *buildver, char *boardver);
 const char *get_build_footprint();
-int create_minimal_crashfile(const char* type, const char* path, char* key, const char* uptime, const char* date);
+int create_minimal_crashfile(const char* type, const char* path, char* key, const char* uptime, const char* date, int data_ready);
 
 
 void process_info_and_error(char *filename, char *name);

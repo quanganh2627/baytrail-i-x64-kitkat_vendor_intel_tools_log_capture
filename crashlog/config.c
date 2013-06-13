@@ -64,6 +64,10 @@ static void config_trim(pchar s)
 */
 static void add_section(pchar config, pconfig_handle  conf_handle) {
     psection newsect = malloc(sizeof(struct section));
+    if(!newsect) {
+        LOGE("%s:malloc failed\n", __FUNCTION__);
+        return;
+    }
     if (conf_handle->first == NULL){
     // start the chain off
         conf_handle->first = newsect;
@@ -73,6 +77,13 @@ static void add_section(pchar config, pconfig_handle  conf_handle) {
      }
     conf_handle->current = newsect;
     newsect->name = malloc(strlen(config));
+    if(!newsect->name) {
+        if(newsect) {
+            free(newsect);
+        }
+        LOGE("%s:malloc failed\n", __FUNCTION__);
+        return;
+    }
     strncpy(newsect->name,config+1,strlen(config)-1); /*+1 for removing [ char */
     newsect->name[strlen(config)-2]= '\0';
     newsect->kvlist = NULL;
@@ -111,12 +122,33 @@ static int add_kv_pair(pchar config,pconfig_handle  conf_handle) {
     }
 
     newkv = malloc(sizeof(struct kv));
+    if(!newkv) {
+        LOGE("%s: newkv malloc failed\n", __FUNCTION__);
+        return 0;
+    }
     key=malloc(p+1);
+    if(!key) {
+        if (newkv){
+            free(newkv);
+        }
+        LOGE("%s: key malloc failed\n", __FUNCTION__);
+        return 0;
+    }
     strncpy(key,config,p);
     key[p]='\0';
 
     valuelen = strlen(config)-p-1;
     value= malloc(valuelen+1); /* add 1 for \0 */
+    if(!value) {
+        if (newkv){
+            free(newkv);
+        }
+        if (key){
+            free(key);
+        }
+        LOGE("%s: key value malloc failed\n", __FUNCTION__);
+        return 0;
+    }
     strncpy(value,config+p+1,valuelen );
     value[valuelen]='\0';
 

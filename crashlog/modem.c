@@ -143,7 +143,7 @@ int process_modem_generic(struct watch_entry *entry, struct inotify_event *event
     char path[PATHMAX];
     char destion[PATHMAX];
     int wd;
-    int ret = 0;
+    int ret = 0, data_ready = 1;
     pthread_t thread;
 
     pconfig curConfig = get_generic_config(event->name, g_first_modem_config);
@@ -169,18 +169,26 @@ int process_modem_generic(struct watch_entry *entry, struct inotify_event *event
     //massive copy of directory found for type "directory"
     do_log_copy(curConfig->eventname, dir, date_tmp, APLOG_TYPE);
     if (curConfig->type ==1){
-        //need to be static as it used in other thread
-        static struct arg_copy args;
-        args.time_val = MINUTE_VALUE * 2;
-        snprintf(args.orig,sizeof(args.orig),"%s",path);
-        snprintf(args.dest,sizeof(args.dest),"%s",destion);
-        ret = pthread_create(&thread, NULL, (void *)copy_dir, (void *)&args);
+        struct arg_copy * args =  malloc(sizeof(struct arg_copy));
+        if(!args) {
+            LOGE("%s: malloc failed\n", __FUNCTION__);
+            return -1;
+        }
+        //time in seconds( should be less than phone doctor timer)
+        args->time_val = 100 ;
+        strncpy(args->orig,path,sizeof(args->orig));
+        strncpy(args->dest,destion,sizeof(args->orig));
+        ret = pthread_create(&thread, NULL, (void *)copy_dir, (void *)args);
         if (ret < 0) {
-            LOGE("%s: pthread_create copy dir error (%d)", __FUNCTION__, ret);
+            LOGE("%s: pthread_create copy dir error", __FUNCTION__);
+            free(args);
+            //if ret >=0 free is done inside copy_dir
+        }else{
+            //backgroung thread is running. Event should be tagged not ready
+            data_ready = 0;
         }
     }
-    //key = raise_event(CRASHEVENT, curConfig->eventname, NULL, destion);
-    key = raise_event(CRASHEVENT, curConfig->eventname, NULL, destion);
+    key = raise_event_dataready(CRASHEVENT, curConfig->eventname, NULL, destion, data_ready);
     LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, get_current_time_long(0), curConfig->eventname, destion);
     //rmfr(path); //TO DO : define when path should be removed
     free(key);
