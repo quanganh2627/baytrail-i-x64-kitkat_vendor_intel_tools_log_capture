@@ -148,8 +148,9 @@ static int process_log_event(char *rootdir, char *triggername, int mode) {
              }
         }
         if (suppl_to_copy) {
+            /* For BZ copy trigger file */
             snprintf(destination,sizeof(destination),"%s%d/%s", logrootdir, dir, suppl_to_copy);
-            snprintf(path, sizeof(path),"%s/%s",rootdir,triggername);
+            snprintf(path, sizeof(path),"%s/%s", APLOG_DIR, BZTRIGGER);
             do_copy_tail(path,destination,0);
         }
         snprintf(destination,sizeof(destination),"%s%d/", logrootdir,dir);

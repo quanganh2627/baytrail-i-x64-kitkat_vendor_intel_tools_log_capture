@@ -201,12 +201,22 @@ int receive_inotify_events(int inotify_fd) {
             /* Not enought room for an empty event */
             LOGI("%s: incomplete inotify_event received (%d bytes), complete it\n", __FUNCTION__, len);
             /* copy the last bytes received */
-            memcpy(lastevent, buffer, len);
+            if( (unsigned int)len <= sizeof(lastevent) )
+                memcpy(lastevent, buffer, len);
+            else {
+                LOGE("%s: Cannot copy buffer\n", __FUNCTION__);
+                return -1;
+            }
             /* read the missing bytes to get the full length */
-            if ( read(inotify_fd, &lastevent[len], len-sizeof(struct inotify_event))
-                    != len-(int)sizeof(struct inotify_event)) {
-                LOGE("%s: Cannot complete the last inotify_event received (structure part) - %s\n",
-                    __FUNCTION__, strerror(errno));
+            if( sizeof(struct inotify_event) <= sizeof(lastevent)) {
+                if ( read(inotify_fd, &lastevent[len], (int)sizeof(struct inotify_event)-len)
+                    != (int)sizeof(struct inotify_event) - len) {
+                    LOGE("%s: Cannot complete the last inotify_event received (structure part) - %s\n", __FUNCTION__, strerror(errno));
+                    return -1;
+                }
+            }
+            else {
+                LOGE("%s: Cannot read missing bytes, not enought space in lastevent\n", __FUNCTION__);
                 return -1;
             }
             event = (struct inotify_event*)lastevent;

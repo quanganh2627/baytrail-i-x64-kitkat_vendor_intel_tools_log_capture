@@ -578,6 +578,11 @@ int create_minimal_crashfile(const char* type, const char* path, char* key, cons
         DIR *d;
         struct dirent* de;
         d = opendir(path);
+        if(!d) {
+            LOGE("%s: Can't open dir %s\n",__FUNCTION__, path);
+            fclose(fp);
+            return -1;
+        }
         while ((de = readdir(d))) {
             const char *name = de->d_name;
             int ismpanic, iscrashdata = 0;
