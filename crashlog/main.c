@@ -234,22 +234,6 @@ static void get_crash_env(char *crypt_state, char *encrypt_progress, char *decry
         LOGI("Test Mode : ipanic, fabricerr and wdt trigger path is %s\n", value);
     }
 
-    /* TODO: Need to check this algorithm is correct and equivalent to the original version */
-    if ( property_get(PROP_CRASH, value, "") > 0) {
-        if (strncmp(value, "1", 1)) {
-            LOGI("%s - PROP_CRASH(%s) set, force a crash and exit\n", __FUNCTION__, PROP_CRASH);
-            if ( file_exists(PANIC_CONSOLE_NAME) ) {
-                /* Force a kernel panic */
-                overwrite_file(PANIC_CONSOLE_NAME, "1");
-            } else {
-                LOGI("%s - Cannot force a crash, the crash entry (%s) does not exist\n", __FUNCTION__, PANIC_CONSOLE_NAME);
-            }
-            /* Just in case the crash didn't succeed */
-            /* QUESTION: Shouldn't we force crashlogd service to stop before exiting so it does not get restarted immediately */
-            exit(-1);
-        }
-    }
-
     /*
      * Open SYS_PROP and get gbuildversion and gboardversion
      * if not got from properties
@@ -290,7 +274,7 @@ static void get_crash_env(char *crypt_state, char *encrypt_progress, char *decry
     property_get("vold.encrypt_progress",encrypt_progress,"");
     property_get("vold.decrypt", decrypt, "");
     property_get("crashlogd.token", token, "");
-
+#ifdef FULL_REPORT
     if (property_get(PROP_COREDUMP, value, "") <= 0) {
         LOGE("Property %s not readable - core dump capture is disabled\n", PROP_COREDUMP);
     } else if ( value[0] == '1' ) {
@@ -298,6 +282,7 @@ static void get_crash_env(char *crypt_state, char *encrypt_progress, char *decry
         chmod(LOGS_DIR,0777);
         chmod(HISTORY_CORE_DIR,0777);
     }
+#endif
 }
 
 /**
@@ -335,11 +320,13 @@ int do_monitor() {
     set_watch_entry_callback(ANR_TYPE,          process_anruiwdt_event);
     set_watch_entry_callback(TOMBSTONE_TYPE,    process_usercrash_event);
     set_watch_entry_callback(JAVACRASH_TYPE,    process_usercrash_event);
+#ifdef FULL_REPORT
     set_watch_entry_callback(HPROF_TYPE,        process_hprof_event);
     set_watch_entry_callback(STATTRIG_TYPE,     process_stat_event);
-    set_watch_entry_callback(APLOGTRIG_TYPE,    process_aplog_event);
     set_watch_entry_callback(CMDTRIG_TYPE,      process_command_event);
     set_watch_entry_callback(APCORE_TYPE,       process_apcore_event);
+#endif
+    set_watch_entry_callback(APLOGTRIG_TYPE,    process_aplog_event);
     set_watch_entry_callback(LOST_TYPE,         process_lost_event);
     set_watch_entry_callback(UPTIME_TYPE,       process_uptime_event);
     set_watch_entry_callback(MDMCRASH_TYPE,     process_modem_event);
@@ -455,8 +442,9 @@ int main(int argc, char **argv) {
         LOGE("pthread_create error");
         return -1;
     }
-
+#ifdef FULL_REPORT
     system("/system/bin/monitor_crashenv");
+#endif
     check_crashlog_died();
 
     return do_monitor();

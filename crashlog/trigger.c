@@ -10,10 +10,12 @@
 
 static void compress_aplog_folder(char *folder_path)
 {
+#ifdef FULL_REPORT
     char cmd[PATHMAX];
 
     snprintf(cmd, sizeof(cmd), "gzip %s/aplog*", folder_path);
     system(cmd);
+#endif
 }
 
 /**
@@ -92,7 +94,11 @@ static int process_log_event(char *rootdir, char *triggername, int mode) {
        LOGD("%s: No values read from trigger file %s so get values from properties : Aplog Depth (%d) and Packet Nb (%d)", __FUNCTION__,
                path ,aplogDepth, nbPacket);
     }
-
+#ifndef FULL_REPORT
+    /* Manage APLOG=0 which means bz type="enhancement"*/
+    if ( aplogDepth != 0 )
+        flush_aplog();
+#endif
     /* copy data file */
     for( packetidx = 0; packetidx < nbPacket ; packetidx++) {
         if(newdirperpacket)
@@ -156,6 +162,10 @@ static int process_log_event(char *rootdir, char *triggername, int mode) {
         free(key);
         restart_profile_srv(2);
     }
+
+#ifndef FULL_REPORT
+    remove(APLOG_FILE_0);
+#endif
 
     /*delete trigger file*/
     snprintf(path, sizeof(path),"%s/%s",rootdir, triggername);

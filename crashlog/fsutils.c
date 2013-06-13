@@ -194,6 +194,10 @@ int get_sdcard_paths(int mode) {
     APLOGS_DIR = EMMC_APLOGS_DIR;
     BZ_DIR = EMMC_BZ_DIR;
 
+#ifndef FULL_REPORT
+    return 0;
+#else
+
     property_get(PROP_CRASH_MODE, value, "");
     if ((!strncmp(value, "lowmemory", 9)) || (mode == MODE_CRASH_NOSD))
         return 0;
@@ -210,6 +214,7 @@ int get_sdcard_paths(int mode) {
         closedir(d);
     }
     return -errno;
+#endif
 }
 
 int find_new_crashlog_dir(int mode) {
@@ -284,6 +289,7 @@ int find_new_crashlog_dir(int mode) {
         raise_infoerror(ERROREVENT, CRASHLOG_ERROR_PATH);
         return -errno;
     }
+
     if (!strstr(path, "sdcard"))
         do_chown(path, PERM_USER, PERM_GROUP);
 
@@ -784,6 +790,16 @@ int read_file_prop_uid(char* propsource, char *filename, char *uid, char* defaul
     return 0;
 }
 
+#ifndef FULL_REPORT
+static void flush_aplog()
+{
+    int status = system("/system/bin/logcat -b system -b main -b radio -b events -v threadtime -d -f /logs/aplog");
+    if (status != 0)
+        LOGE("dump logcat returns status: %d.\n", status);
+    do_chown(APLOG_FILE_0, PERM_USER, PERM_GROUP);
+}
+#endif
+
 void do_log_copy(char *mode, int dir, const char* timestamp, int type) {
     char destination[PATHMAX], *logfile0, *logfile1, *extension;
     struct stat info;
@@ -792,6 +808,9 @@ void do_log_copy(char *mode, int dir, const char* timestamp, int type) {
     switch (type) {
         case APLOG_TYPE:
         case APLOG_STATS_TYPE:
+#ifndef FULL_REPORT
+            flush_aplog();
+#endif
             logfile0 = APLOG_FILE_0;
             logfile1 = APLOG_FILE_1;
             extension = "";
@@ -816,5 +835,8 @@ void do_log_copy(char *mode, int dir, const char* timestamp, int type) {
                 do_copy_tail(logfile1, destination, MAXFILESIZE);
             }
         }
+#ifndef FULL_REPORT
+        remove(APLOG_FILE_0);
+#endif
     }
 }

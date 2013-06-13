@@ -25,11 +25,15 @@ struct watch_entry wd_array[] = {
     {0, DROPBOX_DIR_MASK,   ANR_TYPE,       ANR_EVNAME,         DROPBOX_DIR,        "anr",                      NULL},
     {0, TOMBSTONE_DIR_MASK, TOMBSTONE_TYPE, TOMBSTONE_EVNAME,   TOMBSTONE_DIR,      "tombstone",                NULL},
     {0, DROPBOX_DIR_MASK,   JAVACRASH_TYPE, JAVACRASH_EVNAME,   DROPBOX_DIR,        "crash",                    NULL},
+#ifdef FULL_REPORT
     {0, CORE_DIR_MASK,      APCORE_TYPE,    APCORE_EVNAME,      HISTORY_CORE_DIR,   ".core",                    NULL},
     {0, CORE_DIR_MASK,      HPROF_TYPE,     HPROF_EVNAME,       HISTORY_CORE_DIR,   ".hprof",                   NULL},
     {0, STAT_DIR_MASK,      STATTRIG_TYPE,  STATSTRIG_EVNAME,   STAT_DIR,           "_trigger",                 NULL},
+#endif
     {0, APLOG_DIR_MASK,     APLOGTRIG_TYPE, APLOGTRIG_EVNAME,   APLOG_DIR,          "_trigger",                 NULL},
+#ifdef FULL_REPORT
     {0, APLOG_DIR_MASK,     CMDTRIG_TYPE,   CMDTRIG_EVNAME,     APLOG_DIR,          "_cmd",                     NULL},
+#endif
     /* -----------------------------above is dir, below is file------------------------------------------------------------ */
     {0, UPTIME_MASK,        UPTIME_TYPE,    UPTIME_EVNAME,      UPTIME_FILE,        NULL,                      NULL},
     /* -------------------------above is AP, below is modem---------------------------------------------------------------- */
@@ -239,6 +243,7 @@ int receive_inotify_events(int inotify_fd) {
 
         entry = get_event_entry(event->wd, (event->len ? event->name : NULL));
         if ( !entry ) {
+#ifdef FULL_REPORT
             /* Didn't find any entry for this event, check for
              * a dropbox final event... */
             if (event->len > 8 && !strncmp(event->name, "dropbox-", 8)) {
@@ -249,6 +254,7 @@ int receive_inotify_events(int inotify_fd) {
                 finalize_dropbox_pending_event(event);
                 continue;
             }
+#endif
             /* Manage case where a watched directory is deleted*/
             if ( event->mask & (IN_DELETE_SELF | IN_MOVE_SELF) ) {
                 /* Recreate the dir and reinstall the watch */

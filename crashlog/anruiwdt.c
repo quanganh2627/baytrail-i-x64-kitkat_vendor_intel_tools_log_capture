@@ -8,7 +8,9 @@
 #include <stdio.h>
 
 #include <cutils/properties.h>
+#ifdef FULL_REPORT
 #include <backtrace.h>
+#endif
 
 #include "crashutils.h"
 #include "privconfig.h"
@@ -16,6 +18,7 @@
 #include "dropbox.h"
 #include "fsutils.h"
 
+#ifdef FULL_REPORT
 static void priv_prepare_anruiwdt(char *destion)
 {
     char cmd[PATHMAX];
@@ -31,7 +34,26 @@ static void priv_prepare_anruiwdt(char *destion)
             LOGE("%s: do_chown failed : status=%s...\n", __FUNCTION__, strerror(errno));}
     }
 }
+#else
+static void priv_prepare_anruiwdt(char *destion)
+{
+    char cmd[PATHMAX];
+    int len = strlen(destion);
+    if (len < 4) return;
 
+    if ( destion[len-3] == '.' && destion[len-2] == 'g' && destion[len-1] == 'z') {
+        /* extract gzip file */
+        do_copy_tail(destion,"/logs/tmp_anr_uiwdt.gz",0);
+        system("gunzip /logs/tmp_anr_uiwdt.gz");
+        do_chown("/logs/tmp_anr_uiwdt", PERM_USER, PERM_GROUP);
+        destion[strlen(destion) - 3] = 0;
+        do_copy_tail("/logs/tmp_anr_uiwdt",destion,0);
+        remove("/logs/tmp_anr_uiwdt");
+    }
+}
+#endif
+
+#ifdef FULL_REPORT
 static void process_anruiwdt_tracefile(char *destion, int dir, int removeunparsed)
 {
     char cmd[PATHMAX];
@@ -99,14 +121,17 @@ static void process_anruiwdt_tracefile(char *destion, int dir, int removeunparse
     snprintf(dest_path_symb, sizeof(dest_path_symb), "%s_symbol", dest_path);
     do_chown(dest_path_symb, PERM_USER, PERM_GROUP);
 }
+#endif
 
 static void backtrace_anruiwdt(char *dest, int dir) {
+#ifdef FULL_REPORT
     char value[PROPERTY_VALUE_MAX];
 
     property_get(PROP_ANR_USERSTACK, value, "0");
     if (strncmp(value, "1", 1)) {
         process_anruiwdt_tracefile(dest, dir, 0);
     }
+#endif
 }
 
 /*
@@ -149,12 +174,14 @@ int process_anruiwdt_event(struct watch_entry *entry, struct inotify_event *even
     key = raise_event(CRASHEVENT, entry->eventname, NULL, destion);
     LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, get_current_time_long(0), entry->eventname, destion);
     switch (entry->eventtype) {
+#ifdef FULL_REPORT
         case ANR_TYPE:
             if (start_dumpstate_srv(CRASH_DIR, dir, key) <= 0) {
                 /* Finally raise the event as the dumpstate server is busy or failed to be started */
                 free(key);
             }
             break;
+#endif
         default:
             free(key);
             break;

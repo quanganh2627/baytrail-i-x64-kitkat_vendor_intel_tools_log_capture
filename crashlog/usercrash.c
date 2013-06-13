@@ -74,10 +74,12 @@ static int priv_process_usercrash_event(struct watch_entry *entry, struct inotif
     switch (entry->eventtype) {
     case TOMBSTONE_TYPE:
     case JAVACRASH_TYPE:
+#ifdef FULL_REPORT
         if ( start_dumpstate_srv(CRASH_DIR, dir, key) <= 0 )
             /* Didn't start the dumpstate server (already running or failed) */
             free(key);
         break;
+#endif
     default:
         /* Event is nor JAVACRASH neither TOMBSTONE : no dumpstate necessary*/
         free(key);

@@ -285,6 +285,7 @@ void restart_profile_srv(int serveridx) {
 }
 
 void check_running_power_service() {
+#ifdef FULL_REPORT
     char powerservice[PROPERTY_VALUE_MAX];
     char powerenable[PROPERTY_VALUE_MAX];
 
@@ -294,6 +295,7 @@ void check_running_power_service() {
         LOGE("power service stopped whereas property is set .. restarting\n");
         start_daemon("profile_power");
     }
+#endif
 }
 
 int get_build_board_versions(char *filename, char *buildver, char *boardver) {
@@ -626,9 +628,11 @@ int raise_infoerror(char *type, char *subtype) {
     LOGE("%-8s%-22s%-20s%s\n", type, key, get_current_time_long(0), subtype);
     free(key);
     unlink(LOGRESERVED);
+#ifdef FULL_REPORT
     status = system("/system/bin/monitor_crashenv");
     if (status != 0)
         LOGE("monitor_crashenv status: %d.\n", status);
+#endif
     return 0;
 }
 

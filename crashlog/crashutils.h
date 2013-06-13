@@ -57,7 +57,6 @@ char *raise_event_bootuptime(char *event, char *type, char *subtype, char *log);
 void create_infoevent(char* filename, char* data0, char* data1,
     char* data2);
 void notify_crashreport();
-void notify_crash_to_upload(char* event_id);
 char *create_crashdir_move_crashfile(char *origpath, char *crashfile, int copylogs);
 
 void start_daemon(const char *daemonname);
