@@ -181,6 +181,7 @@ enum {
 #define APLOG_DIR               LOGS_DIR "/aplogs"
 #define DROPBOX_DIR             DATA_DIR "/system/dropbox"
 #define TOMBSTONE_DIR           DATA_DIR "/tombstones"
+#define SYS_SPID_DIR            RESDIR "/sys/spid"
 
 /* FILES */
 #define SYS_PROP                SYS_DIR "/build.prop"
@@ -205,6 +206,7 @@ enum {
 #define APLOG_FILE_BOOT         LOGS_DIR "/aplog_boot"
 #define BLANKPHONE_FILE         LOGS_DIR "/flashing/blankphone_file"
 #define MODEM_SHUTDOWN_TRIGGER  LOGS_DIR "/modemcrash/mshutdown.txt"
+#define LOG_SPID                LOGS_DIR "/spid.txt"
 #define LAST_KMSG_FILE          "last_kmsg"
 #define CONSOLE_NAME            "emmc_ipanic_console"
 #define THREAD_NAME             "emmc_ipanic_threads"
@@ -223,6 +225,12 @@ enum {
 #define SAVED_FABRIC_ERROR_NAME PANIC_DIR "/" FABRIC_ERROR_NAME
 #define RECOVERY_ERROR_TRIGGER  CACHE_DIR "/recovery/recoveryfail"
 #define RECOVERY_ERROR_LOG      CACHE_DIR "/recovery/last_log"
+#define SYS_SPID_1              SYS_SPID_DIR "/vendor_id"
+#define SYS_SPID_2              SYS_SPID_DIR "/manufacturer_id"
+#define SYS_SPID_3              SYS_SPID_DIR "/customer_id"
+#define SYS_SPID_4              SYS_SPID_DIR "/platform_family_id"
+#define SYS_SPID_5              SYS_SPID_DIR "/product_line_id"
+#define SYS_SPID_6              SYS_SPID_DIR "/hardware_id"
 #define ANR_DUPLICATE_INFOERROR "anr_duplicate_infoevent"
 #define ANR_DUPLICATE_DATA      "anr_duplicate_data.txt"
 #define UIWDT_DUPLICATE_DATA    "uiwdt_duplicate_data.txt"

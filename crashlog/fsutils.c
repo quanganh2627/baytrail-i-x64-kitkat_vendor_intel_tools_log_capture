@@ -492,7 +492,7 @@ ssize_t do_write(int fd, const void *buf, size_t len)
 int do_copy_eof(const char *src, const char *des)
 {
     int buflen;
-    char buffer[4*1024];
+    char buffer[CPBUFFERSIZE];
     int rc = 0;
     int fd1 = -1, fd2 = -1;
     struct stat info;
@@ -512,7 +512,7 @@ int do_copy_eof(const char *src, const char *des)
     }
 
     while (1) {
-        r_count = do_read(fd1, buffer, 4*1014);
+        r_count = do_read(fd1, buffer, CPBUFFERSIZE);
         if (r_count < 0) {
             LOGE("%s: read failed, err:%s", __FUNCTION__, strerror(errno));
             goto out_err;
@@ -580,7 +580,6 @@ int do_copy_tail(char *src, char *dest, int limit) {
     do_chown(dest, PERM_USER, PERM_GROUP);
     return rc;
 }
-
 
 int do_copy(char *src, char *dest, int limit) {
     int rc = 0;
