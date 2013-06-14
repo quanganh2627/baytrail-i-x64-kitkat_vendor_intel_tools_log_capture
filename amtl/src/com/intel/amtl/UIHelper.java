@@ -25,81 +25,87 @@ import android.content.DialogInterface;
 public class UIHelper {
 
     /* Print pop-up message with ok and cancel buttons */
-    public static void message_warning(final Activity A, String title, String message, DialogInterface.OnClickListener listener) {
+    public static void message_warning(final Activity A, String title, String message,
+            DialogInterface.OnClickListener listener) {
         new AlertDialog.Builder(A)
-            .setTitle(title)
-            .setMessage(message)
-            .setPositiveButton(android.R.string.ok, listener)
-            .setNegativeButton("Cancel", listener)
-            .show();
+                .setTitle(title)
+                .setMessage(message)
+                .setCancelable(false)
+                .setPositiveButton("OK", listener)
+                .setNegativeButton("Cancel", listener)
+                .show();
     }
 
     /* Print pop-up message with ok and cancel buttons */
     public static void message_warning(final Activity A, String title, String message) {
         new AlertDialog.Builder(A)
-        .setTitle(title)
-        .setMessage(message)
-        .setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int whichButton) {
-                /* Nothing to do */
-            }
-        })
-        .setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int whichButton) {
-                /* Exit application */
-                A.finish();
-            }
-        })
-        .show();
+                .setTitle(title)
+                .setMessage(message)
+                .setCancelable(false)
+                .setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int whichButton) {
+                        /* Nothing to do */
+                    }
+                })
+                .setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int whichButton) {
+                        /* Exit application */
+                        A.finish();
+                    }
+                })
+                .show();
     }
 
     /* Print pop-up message with ok button */
     public static void message_pop_up(Activity A, String title, String message) {
         new AlertDialog.Builder(A)
-        .setTitle(title)
-        .setMessage(message)
-        .setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                /* Nothing to do, waiting for user to press OK button */
-            }
-        })
-        .show();
+                .setTitle(title)
+                .setMessage(message)
+                .setCancelable(false)
+                .setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        /* Nothing to do, waiting for user to press OK button */
+                    }
+                })
+                .show();
     }
 
     /* Print a dialog before exiting application */
     public static void exitDialog(final Activity A, String title, String message) {
         new AlertDialog.Builder(A)
-        .setTitle(title)
-        .setMessage(message)
-        .setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                A.finish();
-            }
-        })
-        .show();
+                .setTitle(title)
+                .setMessage(message)
+                .setCancelable(false)
+                .setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        A.finish();
+                    }
+                })
+                .show();
     }
 
     /* Print pop-up message with ok and cancel buttons */
     public static void messageExitActivity(final Activity A, String title, String message) {
         new AlertDialog.Builder(A)
-        .setTitle(title)
-        .setMessage(message)
-        .setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int whichButton) {
-                A.finish();
-            }
-        })
-        .setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int whichButton) {
-                /* Nothing to do */
-            }
-        })
-        .show();
+                .setTitle(title)
+                .setMessage(message)
+                .setCancelable(false)
+                .setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int whichButton) {
+                        A.finish();
+                    }
+                })
+                .setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int whichButton) {
+                        /* Nothing to do */
+                    }
+                })
+                .show();
     }
 }

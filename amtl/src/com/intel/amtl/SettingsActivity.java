@@ -26,6 +26,7 @@ import android.widget.CheckBox;
 import android.widget.CompoundButton;
 import android.widget.CompoundButton.OnCheckedChangeListener;
 import android.widget.RadioButton;
+import android.widget.Switch;
 import android.widget.TextView;
 
 import java.io.IOException;
@@ -64,17 +65,17 @@ public class SettingsActivity extends Activity {
     private CompoundButton button_offline_logging_usb;
     private CompoundButton button_offline_logging_none;
     private CheckBox checkbox_activate;
-    private CheckBox checkbox_mux;
-    private CheckBox checkbox_additional_traces;
+    private Switch switch_mux;
+    private Switch switch_additional_traces;
     private TextView header_additional_traces;
-    private CheckBox telephony_stack;
-    private boolean telephonyStackEnabled;
-    private TelephonyStack telStackSetter;
+    private Switch switch_telephony_stack;
+
     /* when set_trace_file_size is called by the listener on emmc button */
     /* button_location_emmc is not considered as checked yet */
 
     private boolean invalidateFlag;
     private boolean isUsbEnabled = true;
+    private boolean telephonyStackEnabled;
 
     private AmtlCore core;
 
@@ -82,6 +83,8 @@ public class SettingsActivity extends Activity {
     private CustomCfg cfg;
 
     private PlatformConfig platformConfig;
+
+    private TelephonyStack telStackSetter;
 
     /* Update other buttons after enabling coredump, pti, usb ape or modem as trace location */
     private void callOnlineButtonListerner() {
@@ -264,19 +267,19 @@ public class SettingsActivity extends Activity {
         }
     }
 
-    /* Set MUX trace checkbox state */
-    private void set_checkbox_mux() {
-        checkbox_mux.setChecked(cfg.muxTrace == CustomCfg.MUX_TRACE_ON);
+    /* Set MUX trace switch state */
+    private void set_switch_mux() {
+        switch_mux.setChecked(cfg.muxTrace == CustomCfg.MUX_TRACE_ON);
     }
 
     private void set_telephony_stack() {
         boolean state = telStackSetter.isEnabled();
-        telephony_stack.setChecked(state);
+        switch_telephony_stack.setChecked(state);
     }
 
-    /* Set Additional traces checkbox state */
-    private void set_checkbox_add_traces() {
-        checkbox_additional_traces.setChecked(cfg.addTraces == CustomCfg.ADD_TRACES_ON);
+    /* Set Additional traces switch state */
+    private void set_switch_add_traces() {
+        switch_additional_traces.setChecked(cfg.addTraces == CustomCfg.ADD_TRACES_ON);
     }
 
     /* Update settings menu buttons when opening settings*/
@@ -285,9 +288,9 @@ public class SettingsActivity extends Activity {
         set_trace_level_button();
         set_log_size_button();
         set_offline_logging_button();
-        set_checkbox_mux();
+        set_switch_mux();
         set_telephony_stack();
-        set_checkbox_add_traces();
+        set_switch_add_traces();
         invalidate();
     }
 
@@ -570,17 +573,17 @@ public class SettingsActivity extends Activity {
         /* Activate check box */
         checkbox_activate = (CheckBox) findViewById (R.id.activate_checkBox);
 
-        /* telephony stack check box */
-        telephony_stack = (CheckBox) findViewById (R.id.telephony_stack_checkBox);
+        /* telephony stack switch */
+        switch_telephony_stack = (Switch) findViewById (R.id.telephony_stack_switch);
 
-        /* MUX traces check box */
-        checkbox_mux = (CheckBox) findViewById (R.id.mux_checkBox);
+        /* MUX traces switch */
+        switch_mux = (Switch) findViewById (R.id.mux_switch);
 
-        /* Additional traces check box and header */
-        checkbox_additional_traces = (CheckBox) findViewById (R.id.additional_traces_checkBox);
+        /* Additional traces switch and header */
+        switch_additional_traces = (Switch) findViewById (R.id.additional_traces_switch);
         header_additional_traces = (TextView) findViewById (R.id.textView7);
 
-        /* Check if the buttons and checkboxes are not null */
+        /* Check if the buttons,checkboxes and switches are not null */
         AmtlCore.exitIfNull(button_location_emmc, this);
         AmtlCore.exitIfNull(button_location_sdcard, this);
         AmtlCore.exitIfNull(button_location_coredump, this);
@@ -599,9 +602,9 @@ public class SettingsActivity extends Activity {
         AmtlCore.exitIfNull(button_offline_logging_usb, this);
         AmtlCore.exitIfNull(button_offline_logging_none, this);
         AmtlCore.exitIfNull(checkbox_activate, this);
-        AmtlCore.exitIfNull(telephony_stack, this);
-        AmtlCore.exitIfNull(checkbox_mux, this);
-        AmtlCore.exitIfNull(checkbox_additional_traces, this);
+        AmtlCore.exitIfNull(switch_telephony_stack, this);
+        AmtlCore.exitIfNull(switch_mux, this);
+        AmtlCore.exitIfNull(switch_additional_traces, this);
         AmtlCore.exitIfNull(header_additional_traces, this);
 
         checkbox_activate.setChecked(false);
@@ -625,6 +628,11 @@ public class SettingsActivity extends Activity {
             cfg.offlineLogging = curCfg.offlineLogging;
             cfg.muxTrace = curCfg.muxTrace;
             cfg.addTraces = curCfg.addTraces;
+
+            if (cfg.traceStatus == CustomCfg.TRACE_DISABLED) {
+                switch_additional_traces.setEnabled(false);
+                header_additional_traces.setTextColor(android.graphics.Color.GRAY);
+            }
 
             telStackSetter = new TelephonyStack();
             telephonyStackEnabled = telStackSetter.isEnabled();
@@ -661,17 +669,22 @@ public class SettingsActivity extends Activity {
             button_location_pti_modem.setVisibility(View.GONE);
         }
 
-        /* Listener on MUX trace Checkbox */
-        checkbox_mux.setOnCheckedChangeListener(new OnCheckedChangeListener() {
+        /* Listener on MUX trace switch */
+        switch_mux.setOnCheckedChangeListener(new OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
                 cfg.muxTrace = (isChecked) ? CustomCfg.MUX_TRACE_ON: CustomCfg.MUX_TRACE_OFF;
                 core.setMuxTrace(cfg.muxTrace);
+                if (isChecked) {
+                    UIHelper.message_pop_up(SettingsActivity.this,
+                            "WARNING", "Traces are not persistent: if you reboot the board,"
+                            + " MUX traces will have to be activated again");
+                }
             }
         });
 
-        /* Listener on telephony_stack Checkbox */
-        telephony_stack.setOnCheckedChangeListener(new OnCheckedChangeListener() {
+        /* Listener on telephony_stack switch */
+        switch_telephony_stack.setOnCheckedChangeListener(new OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
                 if (isChecked) {
@@ -683,19 +696,20 @@ public class SettingsActivity extends Activity {
             }
         });
 
-        /* Listener on Additional traces Checkbox */
-        checkbox_additional_traces.setOnCheckedChangeListener(new OnCheckedChangeListener() {
+        /* Listener on Additional traces switch */
+        switch_additional_traces.setOnCheckedChangeListener(new OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-                cfg.addTraces = (isChecked) ? CustomCfg.ADD_TRACES_ON: CustomCfg.ADD_TRACES_OFF;
-                core.isAddTracesEnabled = isChecked;
-                core.setAdditionalTraces(cfg.addTraces);
                 if (isChecked) {
+                    cfg.addTraces = CustomCfg.ADD_TRACES_ON;
+                    core.isAddTracesEnabled = true;
+                    core.setAdditionalTraces(cfg.addTraces);
                     UIHelper.message_pop_up(SettingsActivity.this,
                             "WARNING", "Traces are not persistent");
                 } else {
                     UIHelper.message_pop_up(SettingsActivity.this, "WARNING",
                             "To disable additional traces please reboot");
+                    switch_additional_traces.setChecked(true);
                 }
             }
         });
