@@ -21,6 +21,8 @@ static int loop_uptime_event = 1;
 /* last uptime value set at device boot only */
 static char lastbootuptime[24] = "0000:00:00";
 extern int gabortcleansd;
+// global variable to enable dynamic change of uptime frequency
+int gcurrent_uptime_hour_frequency = UPTIME_HOUR_FREQUENCY;
 
 int get_lastboot_uptime(char bootuptime[24]) {
     if (lastbootuptime[0] != 0) {
@@ -373,11 +375,11 @@ int add_uptime_event() {
     if (errno != 0) {
         return -errno;
     }
-    /* Send an uptime event every 12 hours */
-    if ((hours / UPTIME_HOUR_FREQUENCY) >= loop_uptime_event) {
+    /* Send an uptime event every 12 hours (by default, depending on uptime frequency value set)*/
+    if ((hours / gcurrent_uptime_hour_frequency) >= loop_uptime_event) {
         char *key = raise_event(PER_UPTIME, "", NULL, NULL);
         free(key);
-        loop_uptime_event = (hours / UPTIME_HOUR_FREQUENCY) + 1;
+        loop_uptime_event = (hours / gcurrent_uptime_hour_frequency) + 1;
         restart_profile_srv(2);
         check_running_power_service();
     }

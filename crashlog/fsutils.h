@@ -12,6 +12,13 @@
 #include <errno.h>
 #include <stdio.h>
 
+//ARGS for thread creation and copy_dir
+struct arg_copy {
+    int time_val;
+    char orig[PATHMAX];
+    char dest[PATHMAX];
+};
+
 /* Modes used for get_sdcard_paths */
 enum {
     MODE_CRASH = 0,
@@ -71,5 +78,7 @@ int do_chown(char *file, char *uid, char *gid);
 int do_copy_tail(char *src, char *dest, int limit);
 int do_copy(char *src, char *dest, int limit);
 int rmfr(char *path);
+
+void copy_dir(void *arguments);
 
 #endif /* __FSUTILS_H__ */

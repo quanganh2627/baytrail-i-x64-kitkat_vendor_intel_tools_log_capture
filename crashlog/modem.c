@@ -2,11 +2,15 @@
 #include "crashutils.h"
 #include "fsutils.h"
 #include "privconfig.h"
+#include "config_handler.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <dirent.h>
 #include <stdlib.h>
+#include <sha1.h>
+
+extern pconfig g_first_modem_config;
 
 static int copy_modemcoredump(char *spath, char *dpath) {
     char src[PATHMAX];
@@ -117,5 +121,68 @@ int crashlog_check_modem_shutdown() {
     free(key);
     remove(MODEM_SHUTDOWN_TRIGGER);
 
+    return 0;
+}
+
+/*
+* Name          : process_modem_generic
+* Description   : processes modem generic events
+* Parameters    :
+*   char *filename        -> path of watched directory/file
+*   char *eventname       -> name of the watched event
+*   char *name            -> name of the file inside the watched directory that has triggered the event
+*   unsigned int files    -> nb max of logs destination directories (crashlog, aplogs, bz... )
+*   int fd                -> file descriptor referring to the inotify instance */
+//void process_modem_generic(char *filename, char *name,  unsigned int files, int fd) {
+int process_modem_generic(struct watch_entry *entry, struct inotify_event *event, int fd) {
+
+    char date_tmp[32];
+    char date_tmp_2[32];
+    char *key;
+    int dir;
+    char path[PATHMAX];
+    char destion[PATHMAX];
+    int wd;
+    int ret = 0;
+    pthread_t thread;
+
+    pconfig curConfig = get_generic_config(event->name, g_first_modem_config);
+    if(!curConfig){
+        LOGE("%s: no generic configuration found\n",  __FUNCTION__);
+        return -1;
+    }
+    snprintf(path, sizeof(path),"%s/%s", entry->eventpath, event->name);
+
+    dir = find_new_crashlog_dir(CRASH_MODE);
+    if (dir < 0) {
+        LOGE("%s: find_new_crashlog_dir failed\n", __FUNCTION__);
+        key = raise_event(CRASHEVENT, curConfig->eventname, NULL, NULL);
+        LOGE("%-8s%-22s%-20s%s\n", CRASHEVENT, key, get_current_time_long(0), curConfig->eventname);
+        rmfr(path);
+        free(key);
+        return -1;
+    }
+
+    snprintf(destion,sizeof(destion),"%s%d/", CRASH_DIR,dir);
+    usleep(TIMEOUT_VALUE);
+
+    //massive copy of directory found for type "directory"
+    do_log_copy(curConfig->eventname, dir, date_tmp, APLOG_TYPE);
+    if (curConfig->type ==1){
+        //need to be static as it used in other thread
+        static struct arg_copy args;
+        args.time_val = MINUTE_VALUE * 2;
+        snprintf(args.orig,sizeof(args.orig),"%s",path);
+        snprintf(args.dest,sizeof(args.dest),"%s",destion);
+        ret = pthread_create(&thread, NULL, (void *)copy_dir, (void *)&args);
+        if (ret < 0) {
+            LOGE("%s: pthread_create copy dir error (%d)", __FUNCTION__, ret);
+        }
+    }
+    //key = raise_event(CRASHEVENT, curConfig->eventname, NULL, destion);
+    key = raise_event(CRASHEVENT, curConfig->eventname, NULL, destion);
+    LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, get_current_time_long(0), curConfig->eventname, destion);
+    //rmfr(path); //TO DO : define when path should be removed
+    free(key);
     return 0;
 }

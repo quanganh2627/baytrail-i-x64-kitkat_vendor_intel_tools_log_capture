@@ -13,6 +13,7 @@
 #include "fabric.h"
 #include "modem.h"
 #include "panic.h"
+#include "config_handler.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -32,6 +33,8 @@
 extern char gbuildversion[PROPERTY_VALUE_MAX];
 extern char gboardversion[PROPERTY_VALUE_MAX];
 extern char guuid[256];
+
+extern pconfig g_first_modem_config;
 
 int gmaxfiles = MAX_DIRS;
 char *CRASH_DIR = NULL;
@@ -375,6 +378,7 @@ int do_monitor() {
     }
 
     close_mmgr_cli_source();
+    free_config(g_first_modem_config);
     LOGE("Exiting main monitor loop\n");
     return -1;
 }
@@ -413,6 +417,9 @@ int main(int argc, char **argv) {
             }
         }
     }
+
+    /* first thing to do : load configuration */
+    load_config();
 
     /* Get the properties and read the local files to set properly the env variables */
     get_crash_env(crypt_state, encrypt_progress, decrypt, token);

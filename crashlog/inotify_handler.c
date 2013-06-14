@@ -2,6 +2,8 @@
 #include "privconfig.h"
 #include "crashutils.h"
 #include "dropbox.h"
+#include "modem.h"
+#include "config_handler.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -10,6 +12,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
+
+extern pconfig g_first_modem_config;
 
 /**
 * @brief structure containing directories watched by crashlogd
@@ -102,6 +106,9 @@ int init_inotify_handler() {
         }
         LOGI("%s, wd=%d has been snooped\n", wd_array[i].eventpath, wd_array[i].wd);
     }
+    //add generic watch here
+    generic_add_watch(g_first_modem_config, fd);
+
     return fd;
 }
 
@@ -262,20 +269,33 @@ int receive_inotify_events(int inotify_fd) {
             len -= sizeof(struct inotify_event) + event->len;
         }
 
-        entry = get_event_entry(event->wd, (event->len ? event->name : NULL));
-        if ( !entry ) {
-#ifdef FULL_REPORT
-            /* Didn't find any entry for this event, check for
-             * a dropbox final event... */
-            if (event->len > 8 && !strncmp(event->name, "dropbox-", 8)) {
-                /* dumpstate is done so remove the watcher */
-                LOGD("%s: Received a dropbox event(%s)...",
-                    __FUNCTION__, event->name);
-                inotify_rm_watch(inotify_fd, event->wd);
-                finalize_dropbox_pending_event(event);
+        /* Check the kind of the subject of this event (file or directory?) */
+        if (!(event->mask & IN_ISDIR)) {
+            /* event concerns a file into a watched directory */
+            entry = get_event_entry(event->wd, (event->len ? event->name : NULL));
+            if ( !entry ) {
+    #ifdef FULL_REPORT
+                /* Didn't find any entry for this event, check for
+                 * a dropbox final event... */
+                if (event->len > 8 && !strncmp(event->name, "dropbox-", 8)) {
+                    /* dumpstate is done so remove the watcher */
+                    LOGD("%s: Received a dropbox event(%s)...",
+                        __FUNCTION__, event->name);
+                    inotify_rm_watch(inotify_fd, event->wd);
+                    finalize_dropbox_pending_event(event);
+                    continue;
+                }
+    #endif
+
+                /* Stray event... */
+                LOGD("%s: Can't handle the event \"%s\", no valid entry found, drop it...\n",
+                    __FUNCTION__, (event->len ? event->name : "empty event"));
                 continue;
             }
-#endif
+        }
+        /*event concerns a watched directory itself */
+        else {
+            entry = NULL;
             /* Manage case where a watched directory is deleted*/
             if ( event->mask & (IN_DELETE_SELF | IN_MOVE_SELF) ) {
                 /* Recreate the dir and reinstall the watch */
@@ -302,10 +322,32 @@ int receive_inotify_events(int inotify_fd) {
                     continue;
                 }
             }
-            /* Stray event... */
-            LOGD("%s: Can't handle the event \"%s\", no valid entry found, drop it...\n",
-                __FUNCTION__, (event->len ? event->name : "empty event"));
-            continue;
+            else {
+                for (idx = 0 ; idx < (int)DIM(wd_array) ; idx++) {
+                    if ( wd_array[idx].wd != event->wd )
+                        continue;
+                    entry = &wd_array[idx];
+        //            for (i = WDCOUNT_START; i < WDCOUNT; i++) {
+        //                if (event->wd != wd_array[i].wd)
+        //                    continue;
+                    /* for modem generic */
+                    /* TO IMPROVE : change flag management and put this in main loop */
+                    //if(strstr("/logs/modemcrash", wd_array[i].filename) && (generic_match(event->name,g_first_modem_config))){
+                    if(strstr(LOGS_MODEM_DIR, entry->eventpath) && (generic_match(event->name, g_first_modem_config))){
+                        //process_modem_generic(wd_array[i].filename, event->name, files, file_monitor_fd);
+                        process_modem_generic(entry, event, inotify_fd);
+                        break;
+                    }
+                }
+                pconfig check_config = generic_match_by_wd(event->name, g_first_modem_config, event->wd);
+                if(check_config){
+                        process_modem_generic( &check_config->wd_config, event, inotify_fd);
+                }else{
+                    LOGE("%s: Directory not catched %s.\n", __FUNCTION__, event->name);
+                }
+                /* Do nothing more on directory events */
+                continue;
+            }
         }
         if ( entry->pcallback && entry->pcallback(entry, event) < 0 ) {
             LOGE("%s: Can't handle the event %s...\n", __FUNCTION__,
@@ -317,3 +359,4 @@ int receive_inotify_events(int inotify_fd) {
 
     return 0;
 }
+

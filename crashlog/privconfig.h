@@ -26,6 +26,7 @@
 #define TIMEOUT_VALUE           (20*1000)
 #define CMDSIZE_MAX             ((21*20) + 1)
 #define UPTIME_FREQUENCY        (5 * 60)
+#define MINUTE_VALUE            (60)
 #define MMGRMAXSTRING           (20)
 #define MMGRMAXEXTRA            (512)
 
@@ -79,6 +80,9 @@
 #define MDMCRASH_EVNAME         "MPANIC"
 #define APIMR_EVNAME            "APIMR"
 #define MRST_EVNAME             "MRESET"
+#define EXTRA_NAME              "EXTRA"
+#define NOTIFY_CONF_PATTERN     "INOTIFY"
+#define GENERAL_CONF_PATTERN    "GENERAL"
 
 /*
  * Take care that this enum is ALWAYS aligned with
@@ -226,7 +230,7 @@ enum {
 #define JAVACRASH_DUPLICATE_DATA        "javacrash_duplicate_data.txt"
 #define JAVACRASH_DUPLICATE_INFOERROR   "javacrash_duplicate_infoevent"
 #define UIWDT_DUPLICATE_INFOERROR       "uiwdt_duplicate_infoevent"
-
+#define CRASHLOG_CONF_PATH              "/system/etc/crashlog.conf"
 
 /* MACROS */
 #define MIN(a,b)                ((a) < (b) ? (a) : (b))

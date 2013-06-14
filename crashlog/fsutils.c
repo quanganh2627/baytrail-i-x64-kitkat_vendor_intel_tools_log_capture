@@ -846,3 +846,31 @@ void do_log_copy(char *mode, int dir, const char* timestamp, int type) {
 #endif
     }
 }
+
+void copy_dir(void *arguments)
+{
+    struct arg_copy *args = (struct arg_copy *)arguments;
+    DIR *d;
+    struct dirent* de;
+    char dir_src[512] = { '\0', };
+    char dir_des[512] = { '\0', };
+    //need a local copy at the beginning
+    snprintf(dir_src, sizeof(dir_src), "%s", args->orig);
+    snprintf(dir_des, sizeof(dir_des), "%s", args->dest);
+    d = opendir(dir_src);
+    if (args->time_val > 0){
+        sleep(args->time_val);
+    }
+    while ((de = readdir(d))) {
+        const char *name = de->d_name;
+        char src[512] = { '\0', };
+        char des[512] = { '\0', };
+        //TO DO : rework the "/" part
+        snprintf(src, sizeof(src), "%s/%s", dir_src,name);
+        snprintf(des, sizeof(des), "%s/%s", dir_des,name);
+        int status = do_copy(src, des, 0);
+        if (status != 0)
+            LOGE("copy error for %s.\n",name);
+    }
+    closedir(d);
+}
