@@ -74,7 +74,8 @@ int append_file(char *filename, char *text);
 int overwrite_file(char *filename, char *value);
 
 int do_chmod(char *path, char *mode);
-int do_chown(char *file, char *uid, char *gid);
+int do_chown(const char *file, char *uid, char *gid);
+int do_copy_eof(const char *src, const char *des);
 int do_copy_tail(char *src, char *dest, int limit);
 int do_copy(char *src, char *dest, int limit);
 int rmfr(char *path);

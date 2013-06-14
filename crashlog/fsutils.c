@@ -445,7 +445,7 @@ static unsigned int decode_uid(const char *s, int *res)
 #endif
 }
 
-int do_chown(char *file, char *uid, char *gid)
+int do_chown(const char *file, char *uid, char *gid)
 {
     unsigned int duid, dgid;
     int result = 0;
@@ -465,6 +465,85 @@ int do_chown(char *file, char *uid, char *gid)
         return -errno;
 
     return 0;
+}
+
+ssize_t do_read(int fd, void *buf, size_t len)
+{
+    ssize_t nr;
+    while (1) {
+        nr = read(fd, buf, len);
+        if ((nr < 0) && (errno == EAGAIN || errno == EINTR))
+            continue;
+        return nr;
+    }
+}
+
+ssize_t do_write(int fd, const void *buf, size_t len)
+{
+    ssize_t nr;
+    while (1) {
+        nr = write(fd, buf, len);
+        if ((nr < 0) && (errno == EAGAIN || errno == EINTR))
+            continue;
+        return nr;
+    }
+}
+
+int do_copy_eof(const char *src, const char *des)
+{
+    int buflen;
+    char buffer[4*1024];
+    int rc = 0;
+    int fd1 = -1, fd2 = -1;
+    struct stat info;
+    int r_count, w_count;
+
+    if (stat(src, &info) < 0)
+        return -1;
+
+    if ((fd1 = open(src, O_RDONLY)) < 0){
+        LOGE("%s: can not open file: %s\n", __FUNCTION__, src);
+        goto out_err;
+    }
+
+    if ((fd2 = open(des, O_WRONLY | O_CREAT | O_TRUNC, 0660)) < 0){
+        LOGE("%s: can not open file: %s\n", __FUNCTION__, des);
+        goto out_err;
+    }
+
+    while (1) {
+        r_count = do_read(fd1, buffer, 4*1014);
+        if (r_count < 0) {
+            LOGE("%s: read failed, err:%s", __FUNCTION__, strerror(errno));
+            goto out_err;
+        }
+        if (r_count == 0)
+            break;
+
+        w_count = do_write(fd2, buffer, r_count);
+        if (w_count < 0) {
+            LOGE("%s: write failed, err:%s", __FUNCTION__, strerror(errno));
+            goto out_err;
+        }
+        if (r_count != w_count) {
+            LOGE("%s: write failed, r_count:%d w_count:%d",
+                 __FUNCTION__, r_count, w_count);
+            goto out_err;
+        }
+    }
+
+    rc = 0;
+    goto out;
+out_err:
+    rc = -1;
+out:
+    if (fd1 >= 0)
+        close(fd1);
+    if (fd2 >= 0)
+        close(fd2);
+
+    do_chown(des, PERM_USER, PERM_GROUP);
+    return rc;
 }
 
 int do_copy_tail(char *src, char *dest, int limit) {

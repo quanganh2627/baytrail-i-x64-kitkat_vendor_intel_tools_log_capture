@@ -34,7 +34,7 @@ int crashlog_check_fabric(char *reason, int test) {
 
     /* Looks for fake fabrics */
     for (i = 0; i < DIM(fabric_fakes_array); i++) {
-        if ( find_str_in_file(SAVED_FABRIC_ERROR_NAME, fabric_fakes_array[i].keyword, fabric_fakes_array[i].tail) > 0 ) {
+        if ( find_str_in_file(CURRENT_PROC_FABRIC_ERROR_NAME, fabric_fakes_array[i].keyword, fabric_fakes_array[i].tail) > 0 ) {
             /* Got it, it's a fake!! */
             strncpy(crashtype, fabric_fakes_array[i].name, sizeof(crashtype)-1);
             if (!strncmp(reason, "HWWDT_RESET", strlen("HWWDT_RESET")))
@@ -46,7 +46,7 @@ int crashlog_check_fabric(char *reason, int test) {
     if (crashtype[0] == 0) {
         /* Not a fake, checks for the type in the know fabrics list */
         for (i = 0; i < DIM(fabric_types_array); i++) {
-            if ( find_str_in_file(SAVED_FABRIC_ERROR_NAME, fabric_types_array[i].keyword, fabric_types_array[i].tail) > 0 ) {
+            if ( find_str_in_file(CURRENT_PROC_FABRIC_ERROR_NAME, fabric_types_array[i].keyword, fabric_types_array[i].tail) > 0 ) {
                /* Got it! */
                strncpy(crashtype, fabric_types_array[i].name, sizeof(crashtype)-1);
                break;
@@ -70,7 +70,7 @@ int crashlog_check_fabric(char *reason, int test) {
     destination[0] = '\0';
     snprintf(destination, sizeof(destination), "%s%d/%s_%s.txt", CRASH_DIR, dir,
             FABRIC_ERROR_NAME, dateshort);
-    do_copy(SAVED_FABRIC_ERROR_NAME, destination, MAXFILESIZE);
+    do_copy_eof(CURRENT_PROC_FABRIC_ERROR_NAME, destination);
     do_last_kmsg_copy(dir);
 
     destination[0] = '\0';
