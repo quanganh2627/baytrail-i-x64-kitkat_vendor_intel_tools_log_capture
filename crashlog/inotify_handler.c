@@ -178,7 +178,7 @@ static void dump_inotify_events(char *buffer, unsigned int len,
  * @return 0 on success, -1 on error.
  */
 int receive_inotify_events(int inotify_fd) {
-    int len = 0, orig_len, idx, wd;
+    int len = 0, orig_len, idx, wd, missing_bytes;
     char orig_buffer[sizeof(struct inotify_event)+PATHMAX], *buffer, lastevent[sizeof(struct inotify_event)+PATHMAX];
     struct inotify_event *event;
     struct watch_entry *entry;
@@ -205,7 +205,7 @@ int receive_inotify_events(int inotify_fd) {
             return 0;
         }
         if ((unsigned int)len < sizeof(struct inotify_event)) {
-            /* Not enought room for an empty event */
+            /* Not enough room for an empty event */
             LOGI("%s: incomplete inotify_event received (%d bytes), complete it\n", __FUNCTION__, len);
             /* copy the last bytes received */
             if( (unsigned int)len <= sizeof(lastevent) )
@@ -215,14 +215,9 @@ int receive_inotify_events(int inotify_fd) {
                 return -1;
             }
             /* read the missing bytes to get the full length */
-            if( sizeof(struct inotify_event) <= sizeof(lastevent)) {
-                /* Robustness : check 'lastevent' array size before reading inotify fd*/
-                if ((unsigned int)len >= sizeof(lastevent)) {
-                    LOGE("%s: Out of bounds of lastevent array.\n", __FUNCTION__);
-                    return -1;
-                }
-                if ( read(inotify_fd, &lastevent[len], (int)sizeof(struct inotify_event)-len)
-                    != (int)sizeof(struct inotify_event) - len) {
+            missing_bytes = (int)sizeof(struct inotify_event)-len;
+            if(((int) len + missing_bytes) < ((int)sizeof(lastevent))) {
+                if (read(inotify_fd, &lastevent[len], missing_bytes) != missing_bytes ){
                     LOGE("%s: Cannot complete the last inotify_event received (structure part) - %s\n", __FUNCTION__, strerror(errno));
                     return -1;
                 }
@@ -268,8 +263,8 @@ int receive_inotify_events(int inotify_fd) {
             buffer += sizeof(struct inotify_event) + event->len;
             len -= sizeof(struct inotify_event) + event->len;
         }
-
-        /* Check the kind of the subject of this event (file or directory?) */
+        /* Handle the event read from the buffer*/
+        /* First check the kind of the subject of this event (file or directory?) */
         if (!(event->mask & IN_ISDIR)) {
             /* event concerns a file into a watched directory */
             entry = get_event_entry(event->wd, (event->len ? event->name : NULL));
@@ -327,14 +322,9 @@ int receive_inotify_events(int inotify_fd) {
                     if ( wd_array[idx].wd != event->wd )
                         continue;
                     entry = &wd_array[idx];
-        //            for (i = WDCOUNT_START; i < WDCOUNT; i++) {
-        //                if (event->wd != wd_array[i].wd)
-        //                    continue;
                     /* for modem generic */
                     /* TO IMPROVE : change flag management and put this in main loop */
-                    //if(strstr("/logs/modemcrash", wd_array[i].filename) && (generic_match(event->name,g_first_modem_config))){
                     if(strstr(LOGS_MODEM_DIR, entry->eventpath) && (generic_match(event->name, g_first_modem_config))){
-                        //process_modem_generic(wd_array[i].filename, event->name, files, file_monitor_fd);
                         process_modem_generic(entry, event, inotify_fd);
                         break;
                     }
