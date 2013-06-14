@@ -19,7 +19,7 @@ struct fabric_type fabric_types_array[] = {
 
 struct fabric_type fabric_fakes_array[] = {
     {"DW2:", "02608002", "FABRIC_FAKE"},
-    {"DW3:", "40102ff4", "FABRIC_FAKE"},
+    {"DW3:", "ffd04100", "FABRIC_FAKE"},
 };
 
 int crashlog_check_fabric(char *reason, int test) {
