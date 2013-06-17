@@ -26,19 +26,19 @@ extern "C" {
 #endif
 
 /*
- * Class:     com_intel_amtl_GsmttyManager
+ * Class:     com_intel_amtl_modem_Gsmtty
  * Method:    OpenSerial
  * Signature: (Ljava/lang/String;I)I;
  */
 
-JNIEXPORT jint JNICALL Java_com_intel_amtl_GsmttyManager_OpenSerial(JNIEnv *,
+JNIEXPORT jint JNICALL Java_com_intel_amtl_modem_Gsmtty_OpenSerial(JNIEnv *,
         jobject, jstring, jint);
 /*
- * Class:     com_intel_amtl_GsmttyManager
+ * Class:     com_intel_amtl_modem_Gsmtty
  * Method:    CloseSerial
  * Signature: (I)I;
  */
-JNIEXPORT jint JNICALL Java_com_intel_amtl_GsmttyManager_CloseSerial(JNIEnv *, jobject, jint);
+JNIEXPORT jint JNICALL Java_com_intel_amtl_modem_Gsmtty_CloseSerial(JNIEnv *, jobject, jint);
 
 #ifdef __cplusplus
 }
