@@ -2358,8 +2358,6 @@ int str_simple_replace(char *str, char *search, char *replace)
     f = strstr(str, search);
     if (f != NULL) {
         strncpy(f,replace,strlen(replace));
-        //tmp trace to remove
-        LOGE("str_simple_replace : OK  : %s %s %s", str, search, replace);
         return 0;
     }else{
         //nothing to replace => error
@@ -2471,6 +2469,8 @@ void process_modem_generic(char *filename, char *name,  unsigned int files, int 
             linkedConfig = get_generic_config_by_path(curConfig->path_linked,first_modem_config);
             if (linkedConfig){
                 strncpy(name_linked,name,sizeof(name_linked));
+                //adding security NULL character
+                name_linked[sizeof(name_linked)-1] = '\0';
                 if (!str_simple_replace(name_linked,curConfig->matching_pattern,linkedConfig->matching_pattern)){
                     //only do the copy if name has been replaced
                     struct arg_copy * args_linked =  malloc(sizeof(struct arg_copy));
