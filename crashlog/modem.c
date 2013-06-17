@@ -133,11 +133,11 @@ int crashlog_check_modem_shutdown() {
 *   char *name            -> name of the file inside the watched directory that has triggered the event
 *   unsigned int files    -> nb max of logs destination directories (crashlog, aplogs, bz... )
 *   int fd                -> file descriptor referring to the inotify instance */
-//void process_modem_generic(char *filename, char *name,  unsigned int files, int fd) {
 int process_modem_generic(struct watch_entry *entry, struct inotify_event *event, int fd) {
 
-    char date_tmp[32];
-    char date_tmp_2[32];
+    //char date_tmp[32];
+    //char date_tmp_2[32];
+    const char *dateshort = get_current_time_short(1);
     char *key;
     int dir;
     char path[PATHMAX];
@@ -167,7 +167,7 @@ int process_modem_generic(struct watch_entry *entry, struct inotify_event *event
     usleep(TIMEOUT_VALUE);
 
     //massive copy of directory found for type "directory"
-    do_log_copy(curConfig->eventname, dir, date_tmp, APLOG_TYPE);
+    do_log_copy(curConfig->eventname, dir, dateshort, APLOG_TYPE);
     if (curConfig->type ==1){
         struct arg_copy * args =  malloc(sizeof(struct arg_copy));
         if(!args) {

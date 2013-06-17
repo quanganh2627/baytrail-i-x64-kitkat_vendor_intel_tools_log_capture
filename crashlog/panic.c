@@ -1,6 +1,8 @@
 #include "crashutils.h"
 #include "fsutils.h"
 #include "privconfig.h"
+#include "inotify_handler.h"
+#include "trigger.h"
 
 #include <stdlib.h>
 
@@ -40,6 +42,8 @@ static int check_aplogs_tobackup(char *filename) {
             memcpy(patterns_array[idx], prepattern, prepatternlen);
         }
         res = find_oneofstrings_in_file(filename, (char**)patterns_array, nbpatterns);
+        if (res)
+            process_log_event(NULL, NULL, MODE_APLOGS);
         /* Cleanup the patterns_array allocated in commchain... */
         for (idx = 0 ; idx < nbrecords ; idx++) {
             free(patterns_array[idx]);
@@ -49,6 +53,8 @@ static int check_aplogs_tobackup(char *filename) {
     else {
         /* By default, searches for the single following pattern... */
         res = find_str_in_file(filename, "EIP is at SGXInitialise", NULL);
+        if (res)
+            process_log_event(NULL, NULL, MODE_APLOGS);
     }
 
     return res;
@@ -60,7 +66,7 @@ static void set_ipanic_crashtype_and_reason(char *crashtype, char *reason) {
     /* Set crash type according to pattern found in Ipanic console file or according to startup reason value*/
     if ( find_str_in_file(SAVED_CONSOLE_NAME, "Kernel panic - not syncing: Kernel Watchdog", NULL))
         strcpy(crashtype, KERNEL_SWWDT_CRASH);
-    else if  ( find_str_in_file(SAVED_CONSOLE_NAME, "EIP is at pmu_sc_irq", NULL) || !strncmp(reason,"HWWDT_RESET", 11))
+    else if  ( find_str_in_file(SAVED_CONSOLE_NAME, "EIP is at pmu_sc_irq", NULL) )
         // This panic is triggered by a fabric error
         // It is marked as a kernel panic linked to a HW watdchog
         // to create a link between these 2 critical crashes

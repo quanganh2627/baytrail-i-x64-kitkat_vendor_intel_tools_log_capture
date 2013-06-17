@@ -52,7 +52,7 @@ static void compress_aplog_folder(char *folder_path)
 *   char *triggername -> name of the file inside the watched directory that has triggered the event
 *   mode              -> mode (BZ or APLOG)
  */
-static int process_log_event(char *rootdir, char *triggername, int mode) {
+int process_log_event(char *rootdir, char *triggername, int mode) {
     char *key;
     int dir = -1;
     char path[PATHMAX];
@@ -84,18 +84,21 @@ static int process_log_event(char *rootdir, char *triggername, int mode) {
             break;
         default:
             LOGE("%s: Mode %d not supported, cannot process log event for %s!\n",
-                __FUNCTION__, mode, triggername);
+                    __FUNCTION__, mode, (triggername ? triggername : "no trigger file") );
             return -1;
             break;
     }
-    snprintf(path, sizeof(path),"%s/%s", rootdir, triggername);
-    if (file_exists(path) ) {
-        LOGI("Received trigger file %s for %s", path, ( (mode == MODE_BZ) ? "BZ" : "APLOG" ));
-        if ( !get_value_in_file(path,"APLOG=", tmp, sizeof(tmp)) && atoi(tmp) >= 0 ) {
-            //if a value is specified inside trigger file, it overrides property value
-            aplogDepth = atoi(tmp);
-            nbPacket = 1;
-            DepthValueRead = 1;
+    if (rootdir && triggername)
+    {
+        snprintf(path, sizeof(path),"%s/%s", rootdir, triggername);
+        if (file_exists(path) ) {
+            LOGI("Received trigger file %s for %s", path, ( (mode == MODE_BZ) ? "BZ" : "APLOG" ));
+            if ( !get_value_in_file(path,"APLOG=", tmp, sizeof(tmp)) && atoi(tmp) >= 0 ) {
+                //if a value is specified inside trigger file, it overrides property value
+                aplogDepth = atoi(tmp);
+                nbPacket = 1;
+                DepthValueRead = 1;
+            }
         }
     }
     /* When no value has been read from trigger file, fall back to values read from the properties */
@@ -110,8 +113,8 @@ static int process_log_event(char *rootdir, char *triggername, int mode) {
        nbPacket = atoi(value);
        if (nbPacket < 0)
            nbPacket = 0;
-       LOGD("%s: No values read from trigger file %s so get values from properties : Aplog Depth (%d) and Packet Nb (%d)", __FUNCTION__,
-               path ,aplogDepth, nbPacket);
+       LOGD("%s: Trigger file not usable so get values from properties : Aplog Depth (%d) and Packet Nb (%d)", __FUNCTION__,
+               aplogDepth, nbPacket);
     }
 #ifndef FULL_REPORT
     /* Manage APLOG=0 which means bz type="enhancement"*/
@@ -135,7 +138,8 @@ static int process_log_event(char *rootdir, char *triggername, int mode) {
             if( ( newdirperpacket && (logidx == 0) ) || (!newdirperpacket && (packetidx == 0) && (logidx == 0) ) ) {
                 dir = find_new_crashlog_dir(mode);
                 if (dir < 0) {
-                    LOGE("%s: Cannot get a valid new crash directory for %s...\n", __FUNCTION__, triggername);
+                    LOGE("%s: Cannot get a valid new crash directory for %s...\n", __FUNCTION__,
+                            (triggername ? triggername : "no trigger file"));
                     return -1;
                 }
             }
@@ -162,7 +166,8 @@ static int process_log_event(char *rootdir, char *triggername, int mode) {
         if ( dir == -1 ) {
             dir = find_new_crashlog_dir(mode);
             if (dir < 0) {
-                LOGE("%s: Cannot get a valid new crash directory for %s...\n", __FUNCTION__, triggername);
+                LOGE("%s: Cannot get a valid new crash directory for %s...\n", __FUNCTION__,
+                        (triggername ? triggername : "no trigger file"));
                 return -1;
              }
         }

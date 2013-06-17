@@ -455,7 +455,6 @@ int main(int argc, char **argv) {
     char decrypt[PROPERTY_VALUE_MAX];
     char token[PROPERTY_VALUE_MAX];
     char encryptstate[16] = { '\0', };
-    int gabortcleansd = 0;
 
     /* Check the args */
     if (argc > 2) {

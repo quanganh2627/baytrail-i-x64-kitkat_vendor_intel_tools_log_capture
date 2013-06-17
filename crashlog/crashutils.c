@@ -551,7 +551,7 @@ int create_minimal_crashfile(const char* type, const char* path, char* key, cons
     fp = fopen(fullpath,"w");
     if (fp == NULL)
     {
-        LOGE("can not open file: %s\n", fullpath);
+        LOGE("%s: can not open file: %s\n", __FUNCTION__, fullpath);
         return -errno;
     }
 
@@ -597,7 +597,7 @@ int create_minimal_crashfile(const char* type, const char* path, char* key, cons
                 snprintf(mpanicpath, sizeof(mpanicpath)-1, "%s/%s", path, name);
                 fd_panic = fopen(mpanicpath, "r");
                 if (fd_panic == NULL){
-                    LOGE("can not open file: %s\n", mpanicpath);
+                    LOGE("%s: can not open file: %s\n", __FUNCTION__, mpanicpath);
                     break;
                 }
                 char value[PATHMAX] = "";
@@ -679,7 +679,7 @@ int do_screenshot_copy(char* bz_description, char* bzdir) {
 
     fd1 = fopen(bz_description,"r");
     if(fd1 == NULL){
-        LOGE("can not open file: %s\n", bz_description);
+        LOGE("%s: can not open file: %s\n", __FUNCTION__, bz_description);
         return -1;
     }
 
@@ -734,9 +734,11 @@ void clean_crashlog_in_sd(char *dir_to_search, int max) {
             if ( (strstr(path, SDCARD_CRASH_DIR) ||
                  (strstr(path, SDCARD_STATS_DIR)) ||
                  (strstr(path, SDCARD_APLOGS_DIR))) )
-                if (history_has_event(path)) {
+                /* If current path is not written in the history file, it's a legacy folder to remove */
+                if (!history_has_event(path)) {
+                    LOGD("%s : remove legacy crash folder %s", __FUNCTION__, path);
                     if  (rmfr(path) < 0)
-                        LOGE("failed to remove folder %s", path);
+                        LOGE("%s: failed to remove folder %s", __FUNCTION__, path);
                     i++;
                     if (i >= max)
                        break;

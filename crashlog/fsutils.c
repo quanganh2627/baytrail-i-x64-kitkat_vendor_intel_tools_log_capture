@@ -107,7 +107,6 @@ int find_str_in_file(char *filename, char *keyword, char *tail) {
 
     if (keyword == NULL || filename == NULL)
         return -EINVAL;
-
     fd = open(filename, O_RDONLY);
     if(fd <= 0)
         return -errno;
@@ -132,7 +131,6 @@ int find_str_in_file(char *filename, char *keyword, char *tail) {
         if (taillen > linesize) continue;
 
         /* Do the tail's check*/
-        //printf("Compare the tail of %s to %s\n", buffer, tail);
         if ( !strncmp(&buffer[linesize - taillen], tail, taillen) ) break;
     }
 
@@ -498,17 +496,21 @@ int do_copy_eof(const char *src, const char *des)
     struct stat info;
     int r_count, w_count;
 
-    if (stat(src, &info) < 0)
-        return -1;
+    if (src == NULL || des == NULL) return -EINVAL;
 
-    if ((fd1 = open(src, O_RDONLY)) < 0){
+    if (stat(src, &info) < 0) {
         LOGE("%s: can not open file: %s\n", __FUNCTION__, src);
-        goto out_err;
+        return -errno;
     }
 
-    if ((fd2 = open(des, O_WRONLY | O_CREAT | O_TRUNC, 0660)) < 0){
+    if ( ( fd1 = open(src, O_RDONLY) ) < 0 ) {
+        return -errno;
+    }
+
+    if ( ( fd2 = open(des, O_WRONLY | O_CREAT | O_TRUNC, 0660) ) < 0) {
         LOGE("%s: can not open file: %s\n", __FUNCTION__, des);
-        goto out_err;
+        close(fd1);
+        return -errno;
     }
 
     while (1) {

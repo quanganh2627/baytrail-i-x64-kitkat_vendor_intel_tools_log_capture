@@ -58,7 +58,7 @@ void generic_add_watch(pconfig config_to_watch, int fd){
             tmp_config->wd_config.wd = inotify_add_watch(fd, tmp_config->path, MDMCRASH_DIR_MASK);
             LOGI("generic_add_watch : %s\n", tmp_config->path);
             if (tmp_config->wd_config.wd < 0) {
-                LOGE("Can't add watch for %s.\n", tmp_config->path);
+                LOGE("Can't add watch for %s - %s.\n", tmp_config->path, strerror(errno));
             }else{
                 //store WD in config WD
                 tmp_config->wd_config.eventmask = MDMCRASH_DIR_MASK;
