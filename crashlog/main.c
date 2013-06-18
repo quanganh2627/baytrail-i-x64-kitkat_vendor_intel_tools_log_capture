@@ -260,7 +260,7 @@ static void early_check(char *encryptstate, int test) {
 void spid_read_concat(const char *path, char *complete_value)
 {
     FILE *fd;
-    char temp_spid[5]="XXXX\0";
+    char temp_spid[5]="XXXX";
 
     fd = fopen(path, "r");
     if (fd != NULL && fscanf(fd, "%s", temp_spid) == 1)
@@ -278,7 +278,7 @@ void read_sys_spid(char *filename)
 {
     FILE *fd;
     char complete_spid[256];
-    char temp_spid[5]="XXXX\0";
+    char temp_spid[5]="XXXX";
 
     if (filename == 0)
         return;

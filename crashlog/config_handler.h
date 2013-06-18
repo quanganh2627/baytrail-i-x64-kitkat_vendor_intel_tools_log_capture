@@ -35,14 +35,17 @@ typedef struct config * pconfig;
 
 struct config {
     int type;  /* 0 => file 1 => directory */
+    int event_class; /* 0 => CRASH 1 => ERROR  2=> INFO */
     pchar matching_pattern; /* pattern to check when notified */
     pchar eventname; /* event name to generate when pattern found */
     pconfig next;
     char path[PATHMAX];
+    char path_linked[PATHMAX];
     struct watch_entry wd_config;
 };
 
 pconfig get_generic_config(char* event_name, pconfig config_to_match);
+pconfig get_generic_config_by_path(char* path_searched, pconfig config_to_match);
 int generic_match(char* event_name, pconfig config_to_match);
 void generic_add_watch(pconfig config_to_watch, int fd);
 pconfig generic_match_by_wd(char* event_name, pconfig config_to_match, int wd);

@@ -107,4 +107,6 @@ int rmfr_specific(char *path, int remove_dir);
 
 void copy_dir(void *arguments);
 
+int str_simple_replace(char *str, char *search, char *replace);
+
 #endif /* __FSUTILS_H__ */

@@ -49,6 +49,22 @@ pconfig get_generic_config(char* event_name, pconfig config_to_match) {
     return result;
 }
 
+//to get pconfig if it exists with path argument
+pconfig get_generic_config_by_path(char* path_searched, pconfig config_to_match) {
+    pconfig result = NULL;
+    pconfig tmp_config = config_to_match;
+    if (path_searched){
+        while (tmp_config) {
+            if(strncmp(path_searched, tmp_config->path, strlen(path_searched))==0) {
+                result = tmp_config;
+                break;
+            }
+            tmp_config = tmp_config->next;
+        }
+    }
+    return result;
+}
+
 //to check if process should be done on generic events
 int generic_match(char* event_name, pconfig config_to_match) {
     int result = 0;
@@ -79,13 +95,13 @@ void generic_add_watch(pconfig config_to_watch, int fd){
     while (tmp_config) {
         if (strlen( tmp_config->path)>0){
             //add watch and store it
-            tmp_config->wd_config.wd = inotify_add_watch(fd, tmp_config->path, MDMCRASH_DIR_MASK);
+            tmp_config->wd_config.wd = inotify_add_watch(fd, tmp_config->path, VBCRASH_DIR_MASK);
             LOGI("generic_add_watch : %s\n", tmp_config->path);
             if (tmp_config->wd_config.wd < 0) {
                 LOGE("Can't add watch for %s - %s.\n", tmp_config->path, strerror(errno));
             }else{
                 //store WD in config WD
-                tmp_config->wd_config.eventmask = MDMCRASH_DIR_MASK;
+                tmp_config->wd_config.eventmask = VBCRASH_DIR_MASK;
                 tmp_config->wd_config.eventpath = tmp_config->path;
                 tmp_config->wd_config.eventname = EXTRA_NAME;
             }
@@ -184,10 +200,36 @@ void store_config(char *section, struct config_handle a_conf_handle){
         tmp = get_value(section,"path_trigger",&a_conf_handle);
         if (tmp){
             snprintf(newconf->path, sizeof(newconf->path), "%s", tmp);
-            LOGE("path loaded :  %s \n",newconf->path);
+            LOGI("path loaded :  %s \n",newconf->path);
         }else{
             LOGW("missing configuration for %s on %s \n",section,"path_trigger");
             //path is not mandatory, config is still valid
+        }
+        //path_linked
+        tmp = get_value(section,"path_linked",&a_conf_handle);
+        if (tmp){
+            snprintf(newconf->path_linked, sizeof(newconf->path_linked), "%s", tmp);
+            LOGI("path_linked loaded :  %s \n",newconf->path_linked);
+        }else{
+        //path_linked is not mandatory, config is still valid
+            newconf->path_linked[0] = '\0';
+        }
+
+        //event_class
+        tmp = get_value_def(section,"event_class","CRASH",&a_conf_handle);
+        if (tmp){
+            if (!strcmp(tmp,"CRASH")){
+                newconf->event_class = 0;
+            }else if (!strcmp(tmp,"ERROR")){
+                newconf->event_class = 1;
+            }else if (!strcmp(tmp,"INFO")){
+                newconf->event_class = 2;
+            }else{
+                newconf->event_class = 0;
+            }
+        }else{
+            //default value is CRASH
+            newconf->event_class = 0;
         }
         if (g_first_modem_config==NULL){
             g_first_modem_config = newconf;

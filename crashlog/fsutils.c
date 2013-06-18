@@ -990,3 +990,30 @@ void copy_dir(void *arguments)
     }
     closedir(d);
 }
+
+/*
+* Name          : str_simple_replace
+* Description   : replace the searched sequence by the replace sequence
+*                   warning : it only works with sequence with the same size
+* Parameters    :
+*   char *str         -> full string to be processed
+*   char *search      -> sequence to be replaced
+*   char * replace    ->  string sequence used to replace searched sequence
+* @return 0 on success, -1 on error or nothing to replace. */
+int str_simple_replace(char *str, char *search, char *replace)
+{
+    char *f;
+    //warning search and replace should have the same size
+    if (strlen(search)!= strlen(replace)){
+        LOGE("%s: str_simple_replace : size error", __FUNCTION__);
+        return -1;
+    }
+    f = strstr(str, search);
+    if (f != NULL) {
+        strncpy(f,replace,strlen(replace));
+        return 0;
+    }else{
+        //nothing to replace => error
+        return -1;
+    }
+}
