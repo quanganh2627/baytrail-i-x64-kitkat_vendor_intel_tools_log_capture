@@ -91,7 +91,7 @@ int finalize_dropbox_pending_event(const struct inotify_event __attribute__((unu
         return -1;
 
     snprintf(cmd,sizeof(cmd)-1,"am broadcast -n com.intel.crashreport"
-        "/.NotificationReceiver -a com.intel.crashreport.intent.CRASH_LOGS_COPY_FINISHED "
+        "/.specific.NotificationReceiver -a com.intel.crashreport.intent.CRASH_LOGS_COPY_FINISHED "
         "-c android.intent.category.ALTERNATIVE --es com.intel.crashreport.extra.EVENT_ID %s",
         gcurrent_key);
 

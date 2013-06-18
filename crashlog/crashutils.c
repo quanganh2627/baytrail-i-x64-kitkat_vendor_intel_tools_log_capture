@@ -651,7 +651,7 @@ void notify_crashreport() {
     if (strcmp(boot_state, "1"))
         return;
 
-    int status = system("am broadcast -n com.intel.crashreport/.NotificationReceiver -a com.intel.crashreport.intent.CRASH_NOTIFY -c android.intent.category.ALTERNATIVE");
+    int status = system("am broadcast -n com.intel.crashreport/.specific.NotificationReceiver -a com.intel.crashreport.intent.CRASH_NOTIFY -c android.intent.category.ALTERNATIVE");
     if (status != 0)
         LOGI("notify crashreport status: %d.\n", status);
 }
