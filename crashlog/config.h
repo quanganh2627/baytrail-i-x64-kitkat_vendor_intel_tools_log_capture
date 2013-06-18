@@ -14,7 +14,18 @@
  * limitations under the License.
  */
 
-
+/**
+ * @file config.h
+ * @brief File containing definitions of functions used to handle config(s)
+ * for crashlogd.
+ *
+ * This file contains definitions of functions used to load and handles config(s)
+ * for crashlogd.
+ * A config is loaded from a *.conf file and is made of sections and each section
+ * composed of a list of key-value couples.
+ * A config is then used to configure crashlogd behavior.
+ * One or several configs can be loaded.
+ */
 
 typedef char * pchar;
 typedef struct kv * pkv;
