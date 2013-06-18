@@ -14,6 +14,16 @@
  * limitations under the License.
  */
 
+/**
+ * @file mmgr_source.h
+ * @brief File containing functions to handle modem manager source and events
+ * coming from this source.
+ *
+ * This file contains the functions to handle the modem manager source (init,
+ * closure, events reading from socket) and the functions to process the
+ * different kinds of events read from this source.
+ */
+
 #ifndef MMGR_SOURCE_H_INCLUDED
 #define MMGR_SOURCE_H_INCLUDED
 

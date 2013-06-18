@@ -13,6 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/**
+ * @file config.c
+ * @brief File containing functions used to handle config(s) for crashlogd.
+ *
+ * This file contains the functions used to load and handles config(s)
+ * for crashlogd.
+ * A config is loaded from a *.conf file and is made of sections and each section
+ * composed of a list of key-value couples.
+ * A config is then used to configure crashlogd behavior.
+ * One or several configs can be loaded.
+ */
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
