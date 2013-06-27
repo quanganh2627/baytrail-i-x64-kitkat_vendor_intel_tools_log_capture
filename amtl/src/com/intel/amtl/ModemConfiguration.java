@@ -94,6 +94,9 @@ public class ModemConfiguration {
                 rsp_byte[i+bCount] = rsp_byte_tmp[i];
             }
             bCount += bRead;
+            if (bCount < 4) {
+                return -1;
+            }
         }
         /* find "OK\r\n" at reponse end */
         while (rsp_byte[bCount-4] != 0x4f || rsp_byte[bCount-3] != 0x4b
