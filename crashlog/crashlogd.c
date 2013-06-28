@@ -1112,7 +1112,9 @@ static void build_footprint(char *id)
 
 //This function creates a minimal crashfile (without DATA0, DATA1 and DATA2 fields)
 //Note:DATA0 is filled for Modem Panic case only
-static void create_minimal_crashfile(char* type, char* path, char* key, char* uptime, char* date, int data_ready)
+static void create_minimal_crashfile(char* event, char* type, char* path,
+                                     char* key, char* uptime, char* date,
+                                     int data_ready)
 {
     FILE *fp;
     char fullpath[PATHMAX];
@@ -1144,12 +1146,7 @@ static void create_minimal_crashfile(char* type, char* path, char* key, char* up
     }
 
     //Fill crashfile
-    if (!strncmp(type,BZEVENT,sizeof(BZEVENT))) {
-        fprintf(fp,"EVENT=BZ\n");
-    }
-    else {
-        fprintf(fp,"EVENT=CRASH\n");
-    }
+    fprintf(fp,"EVENT=%s\n", event);
     fprintf(fp,"ID=%s\n", key);
     fprintf(fp,"SN=%s\n", uuid);
     fprintf(fp,"DATE=%s\n", date);
@@ -1157,12 +1154,7 @@ static void create_minimal_crashfile(char* type, char* path, char* key, char* up
     fprintf(fp,"BUILD=%s\n", footprint);
     fprintf(fp,"BOARD=%s\n", boardVersion);
     fprintf(fp,"IMEI=%s\n", imei);
-    if (!strncmp(type,BZEVENT,sizeof(BZEVENT))) {
-        fprintf(fp,"TYPE=MANUAL\n");
-    }
-    else {
-        fprintf(fp,"TYPE=%s\n", type);
-    }
+    fprintf(fp,"TYPE=%s\n", type);
     fprintf(fp,"DATA_READY=%d\n", data_ready);
     //MPANIC crash : fill DATA0 field
     if (!strcmp(MODEM_CRASH,type)){
@@ -1344,9 +1336,12 @@ static void history_file_write_ex(char *event, char *type, char *subtype, char *
         fprintf(to, "%-8s%-22s%-20s%s %s\n", event, key, date_tmp_2, type, tmp);
         fclose(to);
         if (!strncmp(event, CRASHEVENT, sizeof(CRASHEVENT)))
-            create_minimal_crashfile(subtype, tmp, key, uptime, date_tmp_2, data_ready);
+            create_minimal_crashfile(event, subtype, tmp, key, uptime, date_tmp_2, data_ready);
         else if(!strncmp(event, BZEVENT, sizeof(BZEVENT)))
-            create_minimal_crashfile(event, tmp, key, uptime, date_tmp_2, data_ready);
+            create_minimal_crashfile(event, BZMANUAL, tmp, key, uptime, date_tmp_2, data_ready);
+        else if(!strncmp(event, INFOEVENT, sizeof(INFOEVENT)) &&
+                !strncmp(type, "FIRMWARE", sizeof("FIRMWARE")))
+            create_minimal_crashfile(event, type, tmp, key, uptime, date_tmp_2, data_ready);
     } else if (type != NULL) {
 
         to = fopen(HISTORY_FILE, "a");
@@ -4161,6 +4156,14 @@ struct fabric_type fake[] = {
     {"DW3:", "ffd04100", "FABRIC_FAKE"},
 };
 
+enum {
+    F_INFORMATIVE_MSG
+};
+
+static const struct fabric_type fabric_event[] = {
+    [ F_INFORMATIVE_MSG ] = {"DW0:", "f506", "FIRMWARE"},
+};
+
 static int crashlog_check_fabric(char *reason, unsigned int files)
 {
     char date_tmp[32];
@@ -4169,6 +4172,7 @@ static int crashlog_check_fabric(char *reason, unsigned int files)
     time_t t;
     char destion[PATHMAX];
     char crashtype[32] = {'\0'};
+    char event_name[10] = CRASHEVENT;
     int dir;
     unsigned int i = 0;
     char key[SHA1_DIGEST_LENGTH+1];
@@ -4186,6 +4190,15 @@ static int crashlog_check_fabric(char *reason, unsigned int files)
                    if (!strncmp(reason, "HWWDT_RESET", 11))
                        strcat(reason,"_FAKE");
         }
+        if (!find_str_in_file(CURRENT_PROC_FABRIC_ERROR_NAME,
+                              fabric_event[F_INFORMATIVE_MSG].keyword,
+                              fabric_event[F_INFORMATIVE_MSG].tail)) {
+            /* Informative_Msg from fabric -> info event */
+            strncpy(event_name, INFOEVENT, sizeof(event_name)-1);
+            strncpy(crashtype, fabric_event[F_INFORMATIVE_MSG].name,
+                    sizeof(crashtype)-1);
+        }
+
         time(&t);
         time_tmp = localtime((const time_t *)&t);
         PRINT_TIME(date_tmp, TIME_FORMAT_1, time_tmp);
@@ -4194,9 +4207,9 @@ static int crashlog_check_fabric(char *reason, unsigned int files)
 
         if (dir == -1) {
             LOGE("find dir %d for check fabric failed\n", files);
-            compute_key(key, CRASHEVENT, crashtype);
-            LOGE("%-8s%-22s%-20s%s\n", CRASHEVENT, key, date_tmp_2, crashtype);
-            history_file_write(CRASHEVENT, crashtype, NULL, NULL, NULL, key, date_tmp_2);
+            compute_key(key, event_name, crashtype);
+            LOGE("%-8s%-22s%-20s%s\n", event_name, key, date_tmp_2, crashtype);
+            history_file_write(event_name, crashtype, NULL, NULL, NULL, key, date_tmp_2);
             del_file_more_lines(HISTORY_FILE);
             //Need to return 0 to avoid closing crashlogd
             return 0;
@@ -4210,9 +4223,9 @@ static int crashlog_check_fabric(char *reason, unsigned int files)
 
         destion[0] = '\0';
         snprintf(destion,sizeof(destion),"%s%d/",CRASH_DIR,dir);
-        compute_key(key, CRASHEVENT, crashtype);
-        LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, date_tmp_2, crashtype, destion);
-        history_file_write(CRASHEVENT, crashtype, NULL, destion, NULL, key, date_tmp_2);
+        compute_key(key, event_name, crashtype);
+        LOGE("%-8s%-22s%-20s%s %s\n", event_name, key, date_tmp_2, crashtype, destion);
+        history_file_write(event_name, crashtype, NULL, destion, NULL, key, date_tmp_2);
         del_file_more_lines(HISTORY_FILE);
     }
     return 0;
