@@ -22,9 +22,23 @@
 mmgr_cli_handle_t *mmgr_hdl = NULL;
 static int mmgr_monitor_fd[2];
 
+static void mdm_sendack(e_mmgr_requests_t id_request)
+{
+    if (mmgr_hdl) {
+        mmgr_cli_requests_t request;
+        request.id = id_request;
+        if (mmgr_cli_send_msg(mmgr_hdl, &request) != E_ERR_CLI_SUCCEED) {
+            LOGE("Could not send ACK for event %d to MMGR", id_request);
+        }
+    } else {
+        LOGE("No MMGR handle to send ACK for event %d to MMGR", id_request);
+    }
+}
+
 int mdm_SHUTDOWN(mmgr_cli_event_t *ev)
 {
     LOGD("Received E_MMGR_NOTIFY_MODEM_SHUTDOWN");
+    mdm_sendack(E_MMGR_ACK_MODEM_SHUTDOWN);
     struct mmgr_data cur_data;
     strncpy(cur_data.string,"MMODEMOFF\0",sizeof(cur_data.string));
     write(mmgr_monitor_fd[1], &cur_data, sizeof( struct mmgr_data));
