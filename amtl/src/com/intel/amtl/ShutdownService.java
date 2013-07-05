@@ -55,6 +55,7 @@ public class ShutdownService extends Service {
             if (AmtlCore.core.rebootNeeded()) {
                 Log.i(AmtlCore.TAG, MODULE + ": apply new configuration");
                 try {
+                    AmtlCore.core.setMmgrProperty();
                     if (AmtlCore.core.signalToSend()) {
                         try {
                             AmtlCore.rtm.exec("start pti_sigusr1");

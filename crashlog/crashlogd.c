@@ -156,6 +156,8 @@
 #define CRASH_CURRENT_LOG "/logs/currentcrashlog"
 #define STATS_CURRENT_LOG "/logs/currentstatslog"
 #define APLOGS_CURRENT_LOG "/logs/currentaplogslog"
+#define SDSIZE_CURRENT_LOG "/logs/currentsdsize"
+#define SDSIZE_SYSTEM_CMD "du -sk /mnt/sdcard/logs/ > /logs/currentsdsize"
 #define HISTORY_FILE  "/logs/history_event"
 #define HISTORY_UPTIME "/logs/uptime"
 #define LOG_UUID "/logs/uuid.txt"
@@ -278,6 +280,7 @@ int WDCOUNT_START = 0;
 int abort_clean_sd = 0;
 // global variable to enable dynamic change of uptime frequency
 int current_uptime_hour_frequency = UPTIME_HOUR_FREQUENCY;
+long current_sd_size_limit = LONG_MAX;
 
 static int do_mv(char *src, char *des)
 {
@@ -1675,7 +1678,7 @@ void compress_aplog_folder(char *folder_path)
     DIR *d;
     struct dirent* de;
 
-    snprintf(cmd, sizeof(cmd), "gzip %s/aplog*", folder_path);
+    snprintf(cmd, sizeof(cmd), "gzip %s/[ab]plog*", folder_path);
     system(cmd);
 
     d = opendir(folder_path);
@@ -1832,6 +1835,42 @@ void check_crashlog_dead()
     }
 }
 
+long get_sd_size()
+{
+    FILE *fd;
+    long l_size=0;
+    //first calculate SDSIZE folder with the result of a du command
+    int status = system(SDSIZE_SYSTEM_CMD);
+    if (status != 0){
+        LOGE("get_sd_size status: %d.\n", status);
+    }
+    //then read the result
+    fd = fopen(SDSIZE_CURRENT_LOG, "r");
+    if (fd == NULL){
+        LOGE("can not open file: %s\n", SDSIZE_CURRENT_LOG);
+        //if size could not be calculated, we consider size at zero value
+        return 0;
+    }
+    if (fscanf(fd, "%ld", &l_size)==EOF) {
+        l_size = 0;
+    }
+    if (fd != NULL){
+        fclose(fd);
+    }
+    return l_size;
+}
+
+int sdcard_allowed()
+{
+    //now check remain size on SD
+    if (get_sd_size() > current_sd_size_limit){
+        LOGE("SD not allowed - current_sd_size_limit reached: %ld.\n", current_sd_size_limit);
+        return 0;
+    }else{
+        return 1;
+    }
+}
+
 #define CRASH_MODE 0
 #define CRASH_MODE_NOSD 1
 #define STATS_MODE 2
@@ -1851,8 +1890,10 @@ static void sdcard_available(int mode)
 #ifndef FULL_REPORT
     return;
 #else
+
+
     property_get(PROP_CRASH_MODE, value, "");
-    if ((!strncmp(value, "lowmemory", 9)) || (mode == CRASH_MODE_NOSD))
+    if ((!strncmp(value, "lowmemory", 9)) || (mode == CRASH_MODE_NOSD) || !sdcard_allowed())
         return;
 
     if ((stat(SDCARD_LOGS_DIR, &info) == 0) && (d = opendir(SDCARD_LOGS_DIR))){
@@ -1888,6 +1929,7 @@ static unsigned int find_dir(unsigned int max, int mode)
     char *dir;
 
     sdcard_available(mode);
+
 
     switch(mode){
     case CRASH_MODE:
@@ -2679,6 +2721,7 @@ void process_aplog_and_bz_trigger(char *filename, char *name,  unsigned int file
     char tmp[PATHMAX] = {'\0',};
     int nbPacket,aplogDepth;
     int aplogIsPresent;
+    int bplogFlag = 0;
     struct stat sb;
     char value[PROPERTY_VALUE_MAX];
 
@@ -2701,6 +2744,11 @@ void process_aplog_and_bz_trigger(char *filename, char *name,  unsigned int file
             if (!get_str_in_file(path,"APLOG=", tmp, sizeof(tmp))) {
                 aplogDepth = atoi(tmp);
                 nbPacket = 1;
+            }
+            //Read bplog flag value specified inside trigger file
+            tmp[0] = '\0';
+            if (!get_str_in_file(path,"BPLOG=", tmp, sizeof(tmp))) {
+                bplogFlag = atoi(tmp);
             }
         }
         LOGI("received trigger file %s for aplog or bz", path);
@@ -2793,6 +2841,13 @@ void process_aplog_and_bz_trigger(char *filename, char *name,  unsigned int file
         }
 
         if(-1 != dir) {
+
+            //In case of bz_trigger with BPLOG=1, copy bplog file
+            if((bplogFlag == 1)) {
+                snprintf(destion,sizeof(destion),"%s%d/bplog", BZ_DIR,dir);
+                do_copy(BPLOG_FILE_0, destion, FILESIZE_MAX);
+            }
+
             snprintf(destion,sizeof(destion),"%s%d/", BZ_DIR,dir);
             compress_aplog_folder(destion);
             //copy bz_trigger file content
@@ -4093,6 +4148,13 @@ struct fabric_type ft_array[] = {
     {"DW0:", "f502", "INSTERR"},
     {"DW0:", "f504", "SRAMECCERR"},
     {"DW0:", "00dd", "HWWDTLOGERR"},
+    {"DW3:", "0000e101", "MEMERR"},
+    {"DW3:", "0000e102", "INSTERR"},
+    {"DW3:", "0000e104", "SRAMECCERR"},
+    {"DW3:", "0000e107", "SCUWDT"},
+    {"DW3:", "0000e108", "PLLLOCKERR"},
+    {"DW3:", "0000e10a", "KERNELHANG"},
+    {"DW3:", "0000e10b", "CHAABIHANG"},
 };
 struct fabric_type fake[] = {
     {"DW2:", "02608002", "FABRIC_FAKE"},
@@ -4422,6 +4484,8 @@ void load_config(){
     struct stat info;
     char cur_extra_section[PATHMAX];
     struct config_handle my_conf_handle;
+    int i_tmp;
+    long l_tmp;
     //Check if config file exists
     if (stat(CRASHLOG_CONF_PATH, &info) == 0) {
         LOGI("Loading specific crashlog config\n");
@@ -4434,9 +4498,19 @@ void load_config(){
             if (sk_exists(GENERAL_CONF_PATTERN,"uptime_frequency",&my_conf_handle)){
                 pchar tmp = get_value(GENERAL_CONF_PATTERN,"uptime_frequency",&my_conf_handle);
                 if (tmp){
-                    int i_tmp = atoi(tmp);
+                    i_tmp = atoi(tmp);
                     if (i_tmp > 0){
                         current_uptime_hour_frequency = i_tmp;
+                    }
+                }
+            }
+
+            if (sk_exists(GENERAL_CONF_PATTERN,"sd_size_limit",&my_conf_handle)){
+                pchar tmp = get_value(GENERAL_CONF_PATTERN,"sd_size_limit",&my_conf_handle);
+                if (tmp){
+                    l_tmp = atol(tmp);
+                    if (l_tmp > 0){
+                        current_sd_size_limit = l_tmp;
                     }
                 }
             }
