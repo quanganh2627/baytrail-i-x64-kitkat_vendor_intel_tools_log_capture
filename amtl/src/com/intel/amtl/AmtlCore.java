@@ -677,15 +677,6 @@ public class AmtlCore implements ModemEventListener {
         return SignalToSend;
     }
 
-    /* Set MMGR property to 1 if logging is enabled by AMTL, 0 if disabled */
-        protected void setMmgrProperty() {
-            String propertyValue = "0";
-            if (this.futCfg != PredefinedCfg.TRACE_DISABLE) {
-                propertyValue = "1";
-            }
-            SystemProperties.set("persist.service.mmgr.log", propertyValue);
-        }
-
     /* Exit from Amtl if a TextView is null */
     static protected void exitIfNull (TextView tv, Activity a) {
         if (tv == null) {
