@@ -281,6 +281,7 @@ int abort_clean_sd = 0;
 // global variable to enable dynamic change of uptime frequency
 int current_uptime_hour_frequency = UPTIME_HOUR_FREQUENCY;
 long current_sd_size_limit = LONG_MAX;
+int current_serial_device_id = 0;
 
 static int do_mv(char *src, char *des)
 {
@@ -4531,6 +4532,16 @@ void load_config(){
                     }
                 }
             }
+
+            if (sk_exists(GENERAL_CONF_PATTERN,"serial_device_id",&my_conf_handle)){
+                pchar tmp = get_value(GENERAL_CONF_PATTERN,"serial_device_id",&my_conf_handle);
+                if (tmp){
+                    i_tmp = atoi(tmp);
+                    if (i_tmp > 0){
+                        current_serial_device_id = 1;
+                    }
+                }
+            }
             load_config_by_pattern(NOTIFY_CONF_PATTERN,"matching_pattern",my_conf_handle);
             //ADD other config pattern HERE
             free_config_file(&my_conf_handle);
@@ -5041,7 +5052,12 @@ int main(int argc, char **argv)
     if (property_get(BOARD_FIELD, boardVersion, "") <=0){
         get_version_info(SYS_PROP, BOARD_FIELD, boardVersion);
     }
-    read_proc_uid(PROC_UUID, LOG_UUID, uuid, "Medfield");
+    if (current_serial_device_id == 1){
+        property_get("ro.serialno", uuid, "empty_serial");
+        write_uid(LOG_UUID, uuid);
+    }else{
+        read_proc_uid(PROC_UUID, LOG_UUID, uuid, "Medfield");
+    }
     read_sys_spid(LOG_SPID);
 
     sdcard_available(CRASH_MODE);
