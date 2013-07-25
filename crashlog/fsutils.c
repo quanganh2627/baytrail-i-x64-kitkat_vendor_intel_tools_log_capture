@@ -1024,6 +1024,12 @@ void do_log_copy(char *mode, int dir, const char* timestamp, int type) {
             extension = ".istp";
             limit = 0; /* no limit size for bplogs copy */
             break;
+        case BPLOG_TYPE_OLD:
+            logfile0 = BPLOG_FILE_1_OLD;
+            logfile1 = BPLOG_FILE_2_OLD;
+            extension = ".istp";
+            /* limit size remains for old bplogs*/
+            break;
         default:
             /* Ignore unknown type, just return */
             return;

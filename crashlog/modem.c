@@ -137,14 +137,58 @@ int crashlog_check_modem_shutdown() {
 
     destion[0] = '\0';
     snprintf(destion, sizeof(destion), "%s%d/", CRASH_DIR, dir);
-    key = raise_event(CRASHEVENT, MODEM_SHUTDOWN, NULL, destion);
-    LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, get_current_time_long(0), MODEM_SHUTDOWN, destion);
+
     usleep(TIMEOUT_VALUE);
     do_log_copy(MODEM_SHUTDOWN, dir, dateshort, APLOG_TYPE);
     do_last_kmsg_copy(dir);
+    key = raise_event(CRASHEVENT, MODEM_SHUTDOWN, NULL, destion);
+    LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, get_current_time_long(0), MODEM_SHUTDOWN, destion);
     free(key);
     remove(MODEM_SHUTDOWN_TRIGGER);
 
+    return 0;
+}
+
+int crashlog_check_mpanic_abort(){
+    char destion[PATHMAX];
+    int dir;
+    char *key;
+    const char *dateshort = get_current_time_short(1);
+
+    if (file_exists(MCD_PROCESSING)) {
+        remove(MCD_PROCESSING);
+
+        dir = find_new_crashlog_dir(CRASH_MODE);
+        if (dir == -1) {
+            LOGE("%s: find_new_crashlog_dir failed\n", __FUNCTION__);
+            key = raise_event(CRASHEVENT, MDMCRASH_EVNAME, NULL, NULL);
+            LOGE("%-8s%-22s%-20s%s\n", CRASHEVENT, key, get_current_time_long(0), MDMCRASH_EVNAME);
+            free(key);
+            return -1;
+        }
+
+        do_log_copy(MDMCRASH_EVNAME,dir,dateshort,APLOG_TYPE);
+        do_log_copy(MDMCRASH_EVNAME,dir,dateshort,BPLOG_TYPE_OLD);
+
+        snprintf(destion,sizeof(destion),"%s%d/", CRASH_DIR,dir);
+
+        FILE *fp;
+        char fullpath[PATHMAX];
+        snprintf(fullpath, sizeof(fullpath)-1, "%s/%s_crashdata", destion, MDMCRASH_EVNAME );
+
+        fp = fopen(fullpath,"w");
+        if (fp == NULL){
+            LOGE("%s: can not create file: %s\n", __FUNCTION__, fullpath);
+        }else{
+            fprintf(fp,"DATA0=%s\n", MPANIC_ABORT);
+            fprintf(fp,"_END\n");
+            fclose(fp);
+        }
+
+        key = raise_event(CRASHEVENT, MDMCRASH_EVNAME, NULL, destion);
+        LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, get_current_time_long(0), MDMCRASH_EVNAME, destion);
+        free(key);
+    }
     return 0;
 }
 
