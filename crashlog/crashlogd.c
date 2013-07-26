@@ -4182,8 +4182,11 @@ static int crashlog_check_fabric(char *reason, unsigned int files)
 
         strcpy(crashtype, FABRIC_ERROR);
         for (i = 0; i < sizeof(ft_array)/sizeof(struct fabric_type); i++)
-            if (!find_str_in_file(CURRENT_PROC_FABRIC_ERROR_NAME, ft_array[i].keyword, ft_array[i].tail))
+            if (!find_str_in_file(CURRENT_PROC_FABRIC_ERROR_NAME, ft_array[i].keyword, ft_array[i].tail)) {
                    strncpy(crashtype, ft_array[i].name, sizeof(crashtype)-1);
+                   if (strstr(crashtype, "HANG"))
+                       strncpy(event_name, INFOEVENT, sizeof(event_name)-1);
+        }
         if ((!find_str_in_file(CURRENT_PROC_FABRIC_ERROR_NAME, fake[0].keyword, fake[0].tail)) &&
           (!find_str_in_file(CURRENT_PROC_FABRIC_ERROR_NAME, fake[1].keyword, fake[1].tail))) {
                    strncpy(crashtype, fake[0].name, sizeof(crashtype)-1);
@@ -4227,6 +4230,7 @@ static int crashlog_check_fabric(char *reason, unsigned int files)
         LOGE("%-8s%-22s%-20s%s %s\n", event_name, key, date_tmp_2, crashtype, destion);
         history_file_write(event_name, crashtype, NULL, destion, NULL, key, date_tmp_2);
         del_file_more_lines(HISTORY_FILE);
+        process_aplog_and_bz_trigger(NULL, "aplog_trigger", files);
     }
     return 0;
 }
