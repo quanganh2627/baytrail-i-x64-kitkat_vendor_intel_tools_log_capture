@@ -32,7 +32,7 @@
 #include <sys/stat.h>
 #include <dirent.h>
 #include <stdlib.h>
-#include <sha1.h>
+#include <sys/sha1.h>
 
 extern pconfig g_first_modem_config;
 

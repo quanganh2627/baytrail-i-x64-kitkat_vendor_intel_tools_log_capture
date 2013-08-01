@@ -27,8 +27,7 @@
 #include "fsutils.h"
 
 #include "cutils/log.h"
-#include "sha1.h"
-
+#include <sys/sha1.h>
 #include <stdlib.h>
 
 static void backup_apcoredump(unsigned int dir, char* name, char* path) {

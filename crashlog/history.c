@@ -35,7 +35,7 @@
 #include <string.h>
 #include <fcntl.h>
 #include <stdio.h>
-#include <sha1.h>
+#include <sys/sha1.h>
 
 #define HISTORY_FIRST_LINE_FMT  "#V1.0 " UPTIME_EVNAME "   %-24s\n"
 #define HISTORY_BLANK_LINE1     "#V1.0 " UPTIME_EVNAME "   0000:00:00              \n"
@@ -239,9 +239,9 @@ int update_history_file(struct history_entry *entry) {
     }
     nextline = (nextline + 1) % MAX_RECORDS;
     /* We need to recreate a new file and write the full buffer
-     * costly!!
+     * costly!!!
      */
-    fd = open(HISTORY_FILE, O_RDWR | O_TRUNC | O_CREAT);
+    fd = open(HISTORY_FILE, O_RDWR | O_TRUNC | O_CREAT, S_IRUSR | S_IWUSR);
     if (fd < 0) {
         LOGE("%s: Cannot create %s\n", HISTORY_FILE, strerror(errno));
         return -errno;

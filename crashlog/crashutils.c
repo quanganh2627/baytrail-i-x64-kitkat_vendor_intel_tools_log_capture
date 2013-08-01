@@ -36,7 +36,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <time.h>
-#include <sha1.h>
+#include <sys/sha1.h>
 
 #include <cutils/properties.h>
 #ifndef __TEST__
@@ -482,7 +482,7 @@ void create_infoevent(char* filename, char* data0, char* data1, char* data2)
 }
 
 const char *get_build_footprint() {
-    static char footprint[SIZE_FOOTPRINT_MAX] = {0,};
+    static char footprint[SIZE_FOOTPRINT_MAX+1] = {0,};
     char prop[PROPERTY_VALUE_MAX];
 
     /* footprint contains:
