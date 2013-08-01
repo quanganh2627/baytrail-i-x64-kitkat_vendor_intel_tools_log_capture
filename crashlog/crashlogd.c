@@ -620,11 +620,11 @@ static void do_log_copy(char *mode, int dir, char* ts, int type)
     if(type == BPLOG_TYPE){
         if(stat(BPLOG_FILE_0, &info) == 0){
             snprintf(destion,sizeof(destion), "%s%d/%s_%s_%s%s", CRASH_DIR, dir,strrchr(BPLOG_FILE_0,'/')+1,mode,ts,".istp");
-            do_copy(BPLOG_FILE_0,destion, FILESIZE_MAX);
+            do_copy(BPLOG_FILE_0,destion, 0);
             if(info.st_size < 1*1024*1024){
                 if(stat(BPLOG_FILE_1, &info) == 0){
                     snprintf(destion,sizeof(destion), "%s%d/%s_%s_%s%s", CRASH_DIR, dir,strrchr(BPLOG_FILE_1,'/')+1,mode,ts,".istp");
-                    do_copy(BPLOG_FILE_1,destion, FILESIZE_MAX);
+                    do_copy(BPLOG_FILE_1,destion, 0);
                 }
             }
         }
@@ -2856,8 +2856,16 @@ void process_aplog_and_bz_trigger(char *filename, char *name,  unsigned int file
 
             //In case of bz_trigger with BPLOG=1, copy bplog file
             if((bplogFlag == 1)) {
-                snprintf(destion,sizeof(destion),"%s%d/bplog", BZ_DIR,dir);
-                do_copy(BPLOG_FILE_0, destion, FILESIZE_MAX);
+                if(stat(BPLOG_FILE_0, &info) == 0){
+                    snprintf(destion,sizeof(destion), "%s%d/%s", BZ_DIR, dir,strrchr(BPLOG_FILE_0,'/')+1);
+                    do_copy(BPLOG_FILE_0,destion, 0);
+                    if(info.st_size < 1*1024*1024){
+                        if(stat(BPLOG_FILE_1, &info) == 0){
+                            snprintf(destion,sizeof(destion), "%s%d/%s", BZ_DIR, dir,strrchr(BPLOG_FILE_1,'/')+1);
+                            do_copy(BPLOG_FILE_1,destion, 0);
+                        }
+                    }
+                }
             }
 
             snprintf(destion,sizeof(destion),"%s%d/", BZ_DIR,dir);
