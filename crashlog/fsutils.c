@@ -41,6 +41,8 @@
 #include <private/android_filesystem_config.h>
 #endif
 
+long current_sd_size_limit = LONG_MAX;
+
 /* No header in bionic... */
 ssize_t sendfile(int out_fd, int in_fd, off_t *offset, size_t count);
 
@@ -221,7 +223,7 @@ int get_sdcard_paths(int mode) {
 #else
 
     property_get(PROP_CRASH_MODE, value, "");
-    if ((!strncmp(value, "lowmemory", 9)) || (mode == MODE_CRASH_NOSD))
+    if ((!strncmp(value, "lowmemory", 9)) || (mode == CRASH_MODE_NOSD) || !sdcard_allowed())
         return 0;
 
     errno = 0;
@@ -1015,5 +1017,41 @@ int str_simple_replace(char *str, char *search, char *replace)
     }else{
         //nothing to replace => error
         return -1;
+    }
+}
+
+long get_sd_size()
+{
+    FILE *fd;
+    long l_size=0;
+    //first calculate SDSIZE folder with the result of a du command
+    int status = system(SDSIZE_SYSTEM_CMD);
+    if (status != 0){
+        LOGE("get_sd_size status: %d.\n", status);
+    }
+    //then read the result
+    fd = fopen(SDSIZE_CURRENT_LOG, "r");
+    if (fd == NULL){
+        LOGE("can not open file: %s\n", SDSIZE_CURRENT_LOG);
+        //if size could not be calculated, we consider size at zero value
+        return 0;
+    }
+    if (fscanf(fd, "%ld", &l_size)==EOF) {
+        l_size = 0;
+    }
+    if (fd != NULL){
+        fclose(fd);
+    }
+    return l_size;
+}
+
+int sdcard_allowed()
+{
+    //now check remain size on SD
+    if (get_sd_size() > current_sd_size_limit){
+        LOGE("SD not allowed - current_sd_size_limit reached: %ld.\n", current_sd_size_limit);
+        return 0;
+    }else{
+        return 1;
     }
 }

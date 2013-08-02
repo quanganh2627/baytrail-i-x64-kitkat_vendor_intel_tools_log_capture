@@ -87,6 +87,8 @@ int read_file_prop_uid(char* propsource, char *filename, char *uid, char* defaul
 int find_new_crashlog_dir(int mode);
 int get_sdcard_paths(int mode);
 void do_log_copy(char *mode, int dir, const char* ts, int type);
+long get_sd_size();
+int sdcard_allowed();
 
 int find_matching_file(char *dir_to_search, char *pattern, char *filename_found);
 int get_value_in_file(char *file, char *keyword, char *value, unsigned int sizemax);

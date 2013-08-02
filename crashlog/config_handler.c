@@ -34,6 +34,7 @@ pconfig g_first_modem_config = NULL; /* Points to first modem_config in list */
 pconfig g_current_modem_config = NULL; /* Points to current modem_config in list */
 
 extern int gcurrent_uptime_hour_frequency;
+extern long current_sd_size_limit;
 
 //to get pconfig if it exists
 pconfig get_generic_config(char* event_name, pconfig config_to_match) {
@@ -256,6 +257,8 @@ void load_config(){
     struct stat info;
     char cur_extra_section[PATHMAX];
     struct config_handle my_conf_handle;
+    int i_tmp;
+    long l_tmp;
     //Check if config file exists
     if (stat(CRASHLOG_CONF_PATH, &info) == 0) {
         LOGI("Loading specific crashlog config\n");
@@ -268,9 +271,18 @@ void load_config(){
             if (sk_exists(GENERAL_CONF_PATTERN,"uptime_frequency",&my_conf_handle)){
                 pchar tmp = get_value(GENERAL_CONF_PATTERN,"uptime_frequency",&my_conf_handle);
                 if (tmp){
-                    int i_tmp = atoi(tmp);
+                    i_tmp = atoi(tmp);
                     if (i_tmp > 0){
                         gcurrent_uptime_hour_frequency = i_tmp;
+                    }
+                }
+            }
+            if (sk_exists(GENERAL_CONF_PATTERN,"sd_size_limit",&my_conf_handle)){
+                pchar tmp = get_value(GENERAL_CONF_PATTERN,"sd_size_limit",&my_conf_handle);
+                if (tmp){
+                    l_tmp = atol(tmp);
+                    if (l_tmp > 0){
+                        current_sd_size_limit = l_tmp;
                     }
                 }
             }

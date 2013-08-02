@@ -204,6 +204,7 @@ enum {
 #define DROPBOX_DIR             DATA_DIR "/system/dropbox"
 #define TOMBSTONE_DIR           DATA_DIR "/tombstones"
 #define SYS_SPID_DIR            RESDIR "/sys/spid"
+#define SDSIZE_CURRENT_LOG      LOGS_DIR "/currentsdsize"
 
 /* FILES */
 #define SYS_PROP                SYS_DIR "/build.prop"
@@ -265,6 +266,9 @@ enum {
 /* MACROS */
 #define MIN(a,b)                ((a) < (b) ? (a) : (b))
 #define MAX(a,b)                ((a) > (b) ? (a) : (b))
+
+/* SYSTEM COMMANDS */
+#define SDSIZE_SYSTEM_CMD "du -sk /mnt/sdcard/logs/ > /logs/currentsdsize"
 
 extern char *CRASH_DIR;
 extern char *STATS_DIR;
