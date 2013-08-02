@@ -38,6 +38,13 @@ struct fabric_type fabric_types_array[] = {
     {"DW0:", "f502", "INSTERR"},
     {"DW0:", "f504", "SRAMECCERR"},
     {"DW0:", "00dd", "HWWDTLOGERR"},
+    {"DW3:", "0000e101", "MEMERR"},
+    {"DW3:", "0000e102", "INSTERR"},
+    {"DW3:", "0000e104", "SRAMECCERR"},
+    {"DW3:", "0000e107", "SCUWDT"},
+    {"DW3:", "0000e108", "PLLLOCKERR"},
+    {"DW3:", "0000e10a", "KERNELHANG"},
+    {"DW3:", "0000e10b", "CHAABIHANG"},
 };
 
 struct fabric_type fabric_fakes_array[] = {
