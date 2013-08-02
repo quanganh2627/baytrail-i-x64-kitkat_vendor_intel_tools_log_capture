@@ -3075,7 +3075,6 @@ void process_anr_and_uiwatchdog_events(char *filename, char *eventname, char *na
         LOGE("%-8s%-22s%-20s%s\n", CRASHEVENT, key, date_tmp_2, eventname);
         del_file_more_lines(HISTORY_FILE);
         history_file_write(CRASHEVENT, eventname, NULL, NULL, NULL, key, date_tmp_2);
-        notify_crashreport();
         restart_profile1_srv();
         return;
     }
@@ -3106,7 +3105,6 @@ void process_anr_and_uiwatchdog_events(char *filename, char *eventname, char *na
                 wd = inotify_add_watch(fd, destion, IN_CLOSE_WRITE);
                 if (wd < 0) {
                     LOGE("Can't add watch for %s.\n", destion);
-                    notify_crashreport();
                     return;
                 }
                 //return key of current anr for consecutive anr dumpstate management
@@ -3115,7 +3113,6 @@ void process_anr_and_uiwatchdog_events(char *filename, char *eventname, char *na
             }
         }
 #endif
-        notify_crashreport();
     }
     return;
 }
