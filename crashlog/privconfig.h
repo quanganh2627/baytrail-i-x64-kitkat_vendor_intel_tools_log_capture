@@ -236,6 +236,7 @@ enum {
 #define FABRIC_ERROR_NAME       "ipanic_fabric_err"
 #define CMDLINE_NAME            "cmdline"
 #define CRASHFILE_NAME          "crashfile"
+#define BPLOG_NAME              "bplog"
 #define LAST_KMSG               PROC_DIR "/" LAST_KMSG_FILE
 #define PANIC_CONSOLE_NAME      PROC_DIR "/" CONSOLE_NAME
 #define PROC_FABRIC_ERROR_NAME  PROC_DIR "/" FABRIC_ERROR_NAME

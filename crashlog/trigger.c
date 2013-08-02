@@ -39,8 +39,8 @@ static void compress_aplog_folder(char *folder_path)
     DIR *d;
     struct dirent* de;
 
-    /* Compress aplog files */
-    snprintf(cmd, sizeof(cmd), "gzip %s/aplog*", folder_path);
+    /* Compress aplog/bplog files */
+    snprintf(cmd, sizeof(cmd), "gzip %s/[ab]plog*", folder_path);
     system(cmd);
     /* Change owner and group of those aplog files */
     d = opendir(folder_path);
@@ -80,8 +80,9 @@ int process_log_event(char *rootdir, char *triggername, int mode) {
     char path[PATHMAX];
     char destination[PATHMAX];
     char tmp[PATHMAX] = {'\0',};
-    int nbPacket,aplogDepth;
+    int nbPacket,aplogDepth = 0;
     int aplogIsPresent, DepthValueRead = 0;
+    int bplogFlag = 0;
     char value[PROPERTY_VALUE_MAX];
     const char *logrootdir, *suppl_to_copy;
     char *event, *type;
@@ -120,6 +121,11 @@ int process_log_event(char *rootdir, char *triggername, int mode) {
                 aplogDepth = atoi(tmp);
                 nbPacket = 1;
                 DepthValueRead = 1;
+            }
+            //Read bplog flag value specified inside trigger file
+            tmp[0] = '\0';
+            if (!get_value_in_file(path,"BPLOG=", tmp, sizeof(tmp))) {
+                bplogFlag = atoi(tmp);
             }
         }
     }
@@ -198,6 +204,12 @@ int process_log_event(char *rootdir, char *triggername, int mode) {
             snprintf(destination,sizeof(destination),"%s%d/%s", logrootdir, dir, suppl_to_copy);
             snprintf(path, sizeof(path),"%s/%s", APLOG_DIR, BZTRIGGER);
             do_copy_tail(path,destination,0);
+
+            /* In case of bz_trigger with BPLOG=1, copy bplog file */
+            if( bplogFlag == 1 ) {
+                snprintf(destination,sizeof(destination),"%s%d/%s", BZ_DIR, dir, BPLOG_NAME);
+                do_copy(BPLOG_FILE_0, destination, MAXFILESIZE);
+            }
         }
         snprintf(destination,sizeof(destination),"%s%d/", logrootdir,dir);
         if (do_screenshot) {
