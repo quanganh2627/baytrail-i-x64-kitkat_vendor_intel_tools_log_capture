@@ -245,6 +245,8 @@ int process_modem_generic(struct watch_entry *entry, struct inotify_event *event
             linkedConfig = get_generic_config_by_path(curConfig->path_linked, g_first_modem_config);
             if (linkedConfig){
                 strncpy(name_linked, event->name, sizeof(name_linked));
+                //adding security NULL character
+                name_linked[sizeof(name_linked)-1] = '\0';
                 if (!str_simple_replace(name_linked,curConfig->matching_pattern,linkedConfig->matching_pattern)){
                     //only do the copy if name has been replaced
                     struct arg_copy * args_linked =  malloc(sizeof(struct arg_copy));
