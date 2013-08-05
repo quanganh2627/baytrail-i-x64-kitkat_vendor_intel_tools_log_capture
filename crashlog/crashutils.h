@@ -93,7 +93,8 @@ void check_running_power_service();
 
 int get_build_board_versions(char *filename, char *buildver, char *boardver);
 const char *get_build_footprint();
-int create_minimal_crashfile(const char* type, const char* path, char* key, const char* uptime, const char* date, int data_ready);
+int create_minimal_crashfile(char * event, const char* type, const char* path,
+               char* key, const char* uptime, const char* date, int data_ready);
 
 
 void process_info_and_error(char *filename, char *name);

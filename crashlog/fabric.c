@@ -52,10 +52,19 @@ struct fabric_type fabric_fakes_array[] = {
     {"DW3:", "ffd04100", "FABRIC_FAKE"},
 };
 
+enum {
+    F_INFORMATIVE_MSG
+};
+
+static const struct fabric_type fabric_event[] = {
+    [ F_INFORMATIVE_MSG ] = {"DW0:", "f506", "FIRMWARE"},
+};
+
 int crashlog_check_fabric(char *reason, int test) {
     const char *dateshort = get_current_time_short(1);
     char destination[PATHMAX];
     char crashtype[32] = {'\0'};
+    char event_name[10] = CRASHEVENT;
     int dir;
     unsigned int i = 0;
     char *key;
@@ -87,12 +96,19 @@ int crashlog_check_fabric(char *reason, int test) {
             strcpy(crashtype, FABRIC_ERROR);
         }
     }
+    /* Search for INFORMATIVE_MSG reported by kernel fabric module */
+    if ( find_str_in_file(CURRENT_PROC_FABRIC_ERROR_NAME, fabric_event[F_INFORMATIVE_MSG].keyword,
+                                                          fabric_event[F_INFORMATIVE_MSG].tail) > 0 ) {
+        /* Informative_Msg from fabric -> info event */
+        strncpy(event_name, INFOEVENT, sizeof(event_name)-1);
+        strncpy(crashtype, fabric_event[F_INFORMATIVE_MSG].name, sizeof(crashtype)-1);
+    }
 
     dir = find_new_crashlog_dir(CRASH_MODE);
     if (dir < 0) {
         LOGE("%s: find_new_crashlog_dir failed\n", __FUNCTION__);
-        key = raise_event(CRASHEVENT, crashtype, NULL, NULL);
-        LOGE("%-8s%-22s%-20s%s\n", CRASHEVENT, key, get_current_time_long(0), crashtype);
+        key = raise_event(event_name, crashtype, NULL, NULL);
+        LOGE("%-8s%-22s%-20s%s\n", event_name, key, get_current_time_long(0), crashtype);
         free(key);
         return -1;
     }
@@ -105,8 +121,8 @@ int crashlog_check_fabric(char *reason, int test) {
 
     destination[0] = '\0';
     snprintf(destination,sizeof(destination),"%s%d/",CRASH_DIR,dir);
-    key = raise_event(CRASHEVENT, crashtype, NULL, destination);
-    LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, get_current_time_long(0), crashtype, destination);
+    key = raise_event(event_name, crashtype, NULL, destination);
+    LOGE("%-8s%-22s%-20s%s %s\n", event_name, key, get_current_time_long(0), crashtype, destination);
     free(key);
     return 0;
 }

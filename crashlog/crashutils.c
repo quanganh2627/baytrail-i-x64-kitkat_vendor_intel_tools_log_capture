@@ -263,10 +263,17 @@ static char *priv_raise_event(char *event, char *type, char *subtype, char *log,
         errno = -res;
         return NULL;
     }
-    if (!strncmp(event, CRASHEVENT, sizeof(CRASHEVENT)) || !strncmp(event, BZEVENT, sizeof(BZEVENT))) {
-        /* Creating a minimal crashfile is required if log not null */
-        if ( log && (res = create_minimal_crashfile( (!strncmp(event, CRASHEVENT, sizeof(CRASHEVENT)) ? subtype : event),
-                log, key, puptime, datelong, data_ready)) != 0) {
+    if (log ) {
+        if (!strncmp(event, CRASHEVENT, sizeof(CRASHEVENT))) {
+            res = create_minimal_crashfile( event, subtype, log, key, puptime, datelong, data_ready);
+        }
+        else if(!strncmp(event, BZEVENT, sizeof(BZEVENT))) {
+            res = create_minimal_crashfile( event, BZMANUAL, log, key, puptime, datelong, data_ready);
+        }
+        else if(!strncmp(event, INFOEVENT, sizeof(INFOEVENT)) && !strncmp(type, "FIRMWARE", sizeof("FIRMWARE"))) {
+            res = create_minimal_crashfile( event, type, log, key, puptime, datelong, data_ready);
+        }
+        if ( res != 0 ) {
             LOGE("%s: Cannot create a minimal crashfile in %s - %s.\n", __FUNCTION__,
                 entry.log, strerror(-res));
             errno = -res;
@@ -556,7 +563,8 @@ void start_daemon(const char *daemonname) {
 
 //This function creates a minimal crashfile (without DATA0, DATA1 and DATA2 fields)
 //Note:DATA0 is filled for Modem Panic case only
-int create_minimal_crashfile(const char* type, const char* path, char* key, const char* uptime, const char* date, int data_ready)
+int create_minimal_crashfile(char * event, const char* type, const char* path, char* key,
+                             const char* uptime, const char* date, int data_ready)
 {
     FILE *fp;
     char fullpath[PATHMAX];
@@ -583,12 +591,7 @@ int create_minimal_crashfile(const char* type, const char* path, char* key, cons
     }
 
     //Fill crashfile
-    if (!strncmp(type,BZEVENT,sizeof(BZEVENT))) {
-        fprintf(fp,"EVENT=BZ\n");
-    }
-    else {
-        fprintf(fp,"EVENT=CRASH\n");
-    }
+    fprintf(fp,"EVENT=%s\n", event);
     fprintf(fp,"ID=%s\n", key);
     fprintf(fp,"SN=%s\n", guuid);
     fprintf(fp,"DATE=%s\n", date);
@@ -596,12 +599,7 @@ int create_minimal_crashfile(const char* type, const char* path, char* key, cons
     fprintf(fp,"BUILD=%s\n", get_build_footprint());
     fprintf(fp,"BOARD=%s\n", gboardversion);
     fprintf(fp,"IMEI=%s\n", get_imei());
-    if (!strncmp(type,BZEVENT,sizeof(BZEVENT))) {
-        fprintf(fp,"TYPE=MANUAL\n");
-    }
-    else {
-        fprintf(fp,"TYPE=%s\n", type);
-    }
+    fprintf(fp,"TYPE=%s\n", type);
     fprintf(fp,"DATA_READY=%d\n", data_ready);
     //MPANIC crash : fill DATA0 field
     if (!strcmp(MDMCRASH_EVNAME, type)){
