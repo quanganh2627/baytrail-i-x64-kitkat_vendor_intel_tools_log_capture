@@ -1,0 +1,545 @@
+/* Copyright (C) Intel 2013
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/**
+ * @file main.c
+ * @brief File containing the entry point of crashlogd where are performed the
+ * earlier checks, the initialization of the various events sources and the
+ * launch of the main loop monitoring those events (file system watcher, modem
+ * manager monitor, log reader...).
+ *
+ */
+
+#include "inotify_handler.h"
+#include "startupreason.h"
+#include "mmgr_source.h"
+#include "crashutils.h"
+#include "privconfig.h"
+#include "usercrash.h"
+#include "anruiwdt.h"
+#include "recovery.h"
+#include "dropbox.h"
+#include "fsutils.h"
+#include "history.h"
+#include "trigger.h"
+#include "fabric.h"
+#include "modem.h"
+#include "panic.h"
+#include "config_handler.h"
+
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <pthread.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <string.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <errno.h>
+#include <ctype.h>
+
+#include <cutils/properties.h>
+#include <cutils/log.h>
+
+extern char gbuildversion[PROPERTY_VALUE_MAX];
+extern char gboardversion[PROPERTY_VALUE_MAX];
+extern char guuid[256];
+
+extern pconfig g_first_modem_config;
+
+int gmaxfiles = MAX_DIRS;
+char *CRASH_DIR = NULL;
+char *STATS_DIR = NULL;
+char *APLOGS_DIR = NULL;
+char *BZ_DIR = NULL;
+//Variables containing paths of files triggering IPANIC & FABRICERR & WDT treatment
+char CURRENT_PANIC_CONSOLE_NAME[PATHMAX]={PANIC_CONSOLE_NAME};
+char CURRENT_PROC_FABRIC_ERROR_NAME[PATHMAX]={PROC_FABRIC_ERROR_NAME};
+char CURRENT_KERNEL_CMDLINE[PATHMAX]={KERNEL_CMDLINE};
+
+int process_command_event(struct watch_entry *entry, struct inotify_event *event) {
+    char path[PATHMAX];
+    char action[MAXLINESIZE];
+    char args[MAXLINESIZE];
+    char line[MAXLINESIZE];
+    FILE *fd;
+
+    snprintf(path, sizeof(path),"%s/%s", entry->eventpath, event->name);
+    if ( (fd = fopen(path, "r")) == NULL) {
+        LOGE("%s: Cannot open %s - %s\n", __FUNCTION__, path, strerror(errno));
+        /* Tries to remove it in case of an improbable error */
+        rmfr(path);
+        return -errno;
+    }
+
+    /* now, read the file and get the last action/args found */
+    action[0] = 0;
+    args[0] = 0;
+    while ( freadline(fd, line) > 0 ) {
+        sscanf(line, "ACTION=%s", action);
+        sscanf(line, "ARGS=%s", args);
+    }
+    fclose(fd);
+    rmfr(path);
+    if (!action[0] || !args[0]) {
+        LOGE("%s: Cannot find action/args in %s\n", __FUNCTION__, path);
+        return -1;
+    }
+
+    /* here is the delete action */
+    if (!strcmp(action, "DELETE")) {
+        LOGI("%s: Handles delete %s\n", __FUNCTION__, args);
+        update_history_on_cmd_delete(args);
+        return 0;
+    }
+    LOGE("%s: Unknown action found in %s: %s %s\n", __FUNCTION__,
+        path, action, args);
+    return -1;
+}
+
+static int swupdated(char *buildname) {
+    FILE *fd;
+    int res;
+    char currentbuild[PROPERTY_VALUE_MAX];
+
+    if ( (fd = fopen(LOG_BUILDID, "r")) != NULL) {
+        res = fscanf(fd, "%s", currentbuild);
+        fclose(fd);
+        if ( res == 1 && !strcmp(currentbuild, buildname) ) {
+            /* buildid is the same */
+            return 0;
+        }
+    }
+
+    /* build changed or file not found, overwrite it */
+    if ( (fd = fopen(LOG_BUILDID, "w")) == NULL) {
+        LOGE("%s: Cannot open or create %s - %s\n", __FUNCTION__,
+            LOG_BUILDID, strerror(errno));
+        return 0;
+    }
+    do_chown(LOG_BUILDID, "root", "log");
+    fprintf(fd, "%s", buildname);
+    fclose(fd);
+    LOGI("Reset history after build update -> %s\n", buildname);
+    return 1;
+}
+
+/**
+ * @brief Remove directory content. Only files in directory if remove_dir = 0.
+ * Otherwise, all directory content is removed recursively.
+ *
+ * @return void.
+ */
+static void reset_logdir(char *path, int remove_dir) {
+    struct stat info;
+
+    if (stat(path,&info)) {
+        LOGE("%s: Cannot reset logdir %s - %s\n", __FUNCTION__,
+            path, strerror(errno));
+        return;
+    }
+    rmfr_specific(path, remove_dir);
+    if (remove_dir) {
+        mkdir(path, info.st_mode);
+        chown(path, info.st_uid, info.st_gid);
+    }
+}
+
+static void reset_file(char *filename) {
+    FILE *fd;
+
+    fd = fopen(filename, "w");
+    if (fd == NULL) {
+        LOGE("%s: Cannot reset %s - %s\n", __FUNCTION__, filename,
+            strerror(errno));
+        return;
+    }
+    fprintf(fd, "%4d", 0);
+    fclose(fd);
+}
+
+static void reset_after_swupdate(void)
+{
+    reset_logdir(HISTORY_CORE_DIR, 1);
+    /* don't remove folder for modemcrash */
+    reset_logdir(LOGS_MODEM_DIR, 0);
+    reset_logdir(LOGS_GPS_DIR, 1);
+    remove(MODEM_UUID);
+    reset_file(CRASH_CURRENT_LOG);
+    reset_file(STATS_CURRENT_LOG);
+    reset_file(APLOGS_CURRENT_LOG);
+    reset_uptime_history();
+}
+
+static void timeup_thread_mainloop()
+{
+    int fd;
+    char logservice[PROPERTY_VALUE_MAX];
+    char logenable[PROPERTY_VALUE_MAX];
+
+    while (1) {
+        /*
+         * checks the logging services are still alive...
+         * restart it if necessary
+         */
+        property_get("init.svc.apk_logfs", logservice, "");
+        property_get("persist.service.apklogfs.enable", logenable, "");
+        if (strcmp(logservice, "running") && !strcmp(logenable, "1")) {
+            LOGE("log service stopped whereas property is set .. restarting\n");
+            start_daemon("apk_logfs");
+        }
+#ifdef __TEST__
+        sleep(5);
+#else
+        sleep(UPTIME_FREQUENCY);
+#endif
+        fd = open(HISTORY_UPTIME, O_RDWR | O_CREAT, 0666);
+        if (fd < 0)
+            LOGE("%s: can not open file: %s\n", __FUNCTION__, HISTORY_UPTIME);
+        else
+            close(fd);
+    }
+}
+
+static void early_check(char *encryptstate, int test) {
+
+    char startupreason[32] = { '\0', };
+    char flashtype[32] = { '\0', };
+    const char *datelong;
+    char *key;
+    struct stat info;
+
+    if (swupdated(gbuildversion) == 1) {
+        strcpy(startupreason,"SWUPDATE");
+        if (stat(BLANKPHONE_FILE, &info) == -1)
+            strcpy(flashtype, UNALIGNED_BLK_FS);
+        else strcpy(flashtype, "UNKNOWN");
+        reset_after_swupdate();
+    }
+    else {
+        read_startupreason(startupreason);
+        uptime_history();
+    }
+
+    crashlog_check_fabric(startupreason, test);
+    crashlog_check_panic(startupreason, test);
+    crashlog_check_modem_shutdown();
+    crashlog_check_startupreason(startupreason);
+    crashlog_check_recovery();
+
+    key = raise_event_bootuptime(SYS_REBOOT, startupreason, NULL, NULL);
+    datelong = get_current_time_long(0);
+    LOGE("%-8s%-22s%-20s%s\n", SYS_REBOOT, key, datelong, startupreason);
+    free(key);
+
+    if (!strncmp(flashtype, UNALIGNED_BLK_FS, sizeof(UNALIGNED_BLK_FS))) {
+        key = raise_event(INFOEVENT, flashtype, NULL, NULL);
+        LOGE("%-8s%-22s%-20s%s\n", INFOEVENT, key, datelong, flashtype);
+        free(key);
+    }
+
+    key = raise_event_nouptime(STATEEVENT, encryptstate, NULL, NULL);
+    LOGE("%-8s%-22s%-20s%s\n", STATEEVENT, key, datelong, encryptstate);
+    free(key);
+}
+
+void spid_read_concat(const char *path, char *complete_value)
+{
+    FILE *fd;
+    char temp_spid[5]="XXXX";
+
+    fd = fopen(path, "r");
+    if (fd != NULL && fscanf(fd, "%s", temp_spid) == 1)
+        fclose(fd);
+    else
+        LOGE("%s: Cannot read %s - %s\n", __FUNCTION__, path, strerror(errno));
+
+    strncat(complete_value,"-",1);
+    strncat(complete_value,temp_spid, sizeof(temp_spid));
+}
+/**
+ * Read SPID data from file system, build it and write it into given file
+ */
+void read_sys_spid(char *filename)
+{
+    FILE *fd;
+    char complete_spid[256];
+    char temp_spid[5]="XXXX";
+
+    if (filename == 0)
+        return;
+
+    fd = fopen(SYS_SPID_1, "r");
+    if (fd != NULL && fscanf(fd, "%s", temp_spid) == 1)
+        fclose(fd);
+    else
+        LOGE("%s: Cannot read SPID from %s - %s\n", __FUNCTION__, SYS_SPID_1, strerror(errno));
+
+    snprintf(complete_spid, sizeof(complete_spid), "%s", temp_spid);
+
+    spid_read_concat(SYS_SPID_2,complete_spid);
+    spid_read_concat(SYS_SPID_3,complete_spid);
+    spid_read_concat(SYS_SPID_4,complete_spid);
+    spid_read_concat(SYS_SPID_5,complete_spid);
+    spid_read_concat(SYS_SPID_6,complete_spid);
+
+    fd = fopen(filename, "w");
+    if (!fd) {
+        LOGE("%s: Cannot write SPID to %s - %s\n", __FUNCTION__, filename, strerror(errno));
+    } else {
+        fprintf(fd, "%s", complete_spid);
+        fclose(fd);
+    }
+    do_chown(filename, PERM_USER, PERM_GROUP);
+}
+
+static void get_crash_env(char *crypt_state, char *encrypt_progress, char *decrypt, char *token) {
+
+    char value[PROPERTY_VALUE_MAX];
+    FILE *fd;
+
+    if( property_get("crashlogd.debug.proc_path", value, NULL) > 0 )
+    {
+        snprintf(CURRENT_PROC_FABRIC_ERROR_NAME, sizeof(CURRENT_PROC_FABRIC_ERROR_NAME), "%s/%s", value, FABRIC_ERROR_NAME);
+        snprintf(CURRENT_PANIC_CONSOLE_NAME, sizeof(CURRENT_PANIC_CONSOLE_NAME), "%s/%s", value, CONSOLE_NAME);
+        snprintf(CURRENT_KERNEL_CMDLINE, sizeof(CURRENT_KERNEL_CMDLINE), "%s/%s", value, CMDLINE_NAME);
+        LOGI("Test Mode : ipanic, fabricerr and wdt trigger path is %s\n", value);
+    }
+
+    /*
+     * Open SYS_PROP and get gbuildversion and gboardversion
+     * if not got from properties
+     */
+    get_build_board_versions(SYS_PROP, gbuildversion, gboardversion);
+
+    /* read uuid from proc or uuid.txt if proc fails
+     * if both fail, set Medfield as default
+     */
+    fd = fopen(PROC_UUID, "r");
+    if (fd != NULL && fscanf(fd, "%s", guuid) == 1) {
+        fclose(fd);
+        fd = fopen(LOG_UUID, "w");
+        if (!fd) {
+            LOGE("%s: Cannot write uuid to %s - %s\n",
+                __FUNCTION__, LOG_UUID, strerror(errno));
+        } else {
+            fprintf(fd, "%s", guuid);
+            fclose(fd);
+        }
+    } else {
+        LOGE("%s: Cannot read uuid from %s - %s\n",
+            __FUNCTION__, PROC_UUID, strerror(errno));
+        fd = fopen(LOG_UUID, "w");
+        if (!fd) {
+            LOGE("%s: Cannot write uuid to %s - %s\n",
+                __FUNCTION__, LOG_UUID, strerror(errno));
+        } else {
+            fprintf(fd, "Medfield");
+            fclose(fd);
+        }
+    }
+    do_chown(LOG_UUID, PERM_USER, PERM_GROUP);
+
+    /* Read SPID */
+    read_sys_spid(LOG_SPID);
+
+    /* Set SDcard paths*/
+    get_sdcard_paths(MODE_CRASH);
+
+    property_get("ro.crypto.state", crypt_state, "unencrypted");
+    property_get("vold.encrypt_progress",encrypt_progress,"");
+    property_get("vold.decrypt", decrypt, "");
+    property_get("crashlogd.token", token, "");
+#ifdef FULL_REPORT
+    if (property_get(PROP_COREDUMP, value, "") <= 0) {
+        LOGE("Property %s not readable - core dump capture is disabled\n", PROP_COREDUMP);
+    } else if ( value[0] == '1' ) {
+        LOGI("Folders /logs and /logs/core set to 0777\n");
+        chmod(LOGS_DIR,0777);
+        chmod(HISTORY_CORE_DIR,0777);
+    }
+#endif
+}
+
+/**
+ * @brief File monitor module file descriptor getter
+ *
+ * Export FD which expose new events from File Monitor module events
+ * source.
+ *
+ * @return Initialized File Monitor module file descriptor.
+ */
+int get_inotify_fd() {
+    static int file_monitor_fd = -1;
+
+    if (file_monitor_fd < 0) {
+        file_monitor_fd = init_inotify_handler();
+    }
+    return file_monitor_fd;
+}
+
+int do_monitor() {
+    fd_set read_fds; /**< file descriptor set watching data availability from sources */
+    int max = 0; /**< select max fd value +1 {@see man select(2) nfds} */
+    int select_result; /**< select result */
+    int file_monitor_fd = get_inotify_fd();
+    dropbox_set_file_monitor_fd(file_monitor_fd);
+
+    if ( file_monitor_fd < 0 ) {
+        LOGE("%s: failed to initialize the inotify handler - %s\n",
+            __FUNCTION__, strerror(-file_monitor_fd));
+        return -1;
+    }
+
+    /* Set the inotify event callbacks */
+    set_watch_entry_callback(SYSSERVER_TYPE,    process_anruiwdt_event);
+    set_watch_entry_callback(ANR_TYPE,          process_anruiwdt_event);
+    set_watch_entry_callback(TOMBSTONE_TYPE,    process_usercrash_event);
+    set_watch_entry_callback(JAVACRASH_TYPE,    process_usercrash_event);
+#ifdef FULL_REPORT
+    set_watch_entry_callback(HPROF_TYPE,        process_hprof_event);
+    set_watch_entry_callback(STATTRIG_TYPE,     process_stat_event);
+    set_watch_entry_callback(CMDTRIG_TYPE,      process_command_event);
+    set_watch_entry_callback(APCORE_TYPE,       process_apcore_event);
+#endif
+    set_watch_entry_callback(APLOGTRIG_TYPE,    process_aplog_event);
+    set_watch_entry_callback(LOST_TYPE,         process_lost_event);
+    set_watch_entry_callback(UPTIME_TYPE,       process_uptime_event);
+    set_watch_entry_callback(MDMCRASH_TYPE,     process_modem_event);
+    set_watch_entry_callback(APIMR_TYPE,        process_modem_event);
+    set_watch_entry_callback(MRST_TYPE,         process_modem_event);
+
+    init_mmgr_cli_source();
+
+    for(;;) {
+        // Clear fd set
+        FD_ZERO(&read_fds);
+
+        // File monitor fd setup
+        if ( file_monitor_fd > 0 ) {
+            FD_SET(file_monitor_fd, &read_fds);
+            if (file_monitor_fd > max)
+                max = file_monitor_fd;
+        }
+
+        //mmgr fd setup
+        if (mmgr_get_fd() > 0) {
+            FD_SET(mmgr_get_fd(), &read_fds);
+            if (mmgr_get_fd() > max)
+                max = mmgr_get_fd();
+        }
+
+        // Wait for events
+        select_result = select(max+1, &read_fds, NULL, NULL, NULL);
+
+        if (select_result == -1 && errno == EINTR) // Interrupted, need to recycle
+            continue;
+
+        // Result processing
+        if (select_result > 0) {
+            /* clean children to avoid zombie processes */
+            while(waitpid(-1, NULL, WNOHANG) > 0){};
+            // File monitor
+            if (FD_ISSET(file_monitor_fd, &read_fds)) {
+                receive_inotify_events(file_monitor_fd);
+            }
+            // mmgr monitor
+            if (FD_ISSET(mmgr_get_fd(), &read_fds)) {
+                LOGD("mmgr fd set");
+                mmgr_handle();
+            }
+        }
+    }
+
+    close_mmgr_cli_source();
+    free_config(g_first_modem_config);
+    LOGE("Exiting main monitor loop\n");
+    return -1;
+}
+
+int main(int argc, char **argv) {
+
+    int ret = 0, alreadyran = 0, test_flag = 0;
+    pthread_t thread;
+    char crypt_state[PROPERTY_VALUE_MAX];
+    char encrypt_progress[PROPERTY_VALUE_MAX];
+    char decrypt[PROPERTY_VALUE_MAX];
+    char token[PROPERTY_VALUE_MAX];
+    char encryptstate[16] = { '\0', };
+
+    /* Check the args */
+    if (argc > 2) {
+        LOGE("USAGE: %s [-modem|-test|-nomodem|<max_nb_files>]\n", argv[0]);
+        return -1;
+    }
+
+    if (argc == 2) {
+        if(!strcmp(argv[1], "-test")){
+            test_flag = 1;
+        }
+        else {
+            errno = 0;
+            gmaxfiles = strtol(argv[1], NULL, 0);
+
+            if (errno) {
+                LOGE("%s - max_nb_files number must be a number (used %s)\n", __FUNCTION__, argv[1]);
+                return -1;
+            }
+            if (gmaxfiles > MAX_DIRS || gmaxfiles < 0) {
+                LOGI("%s - max_nb_files shall be a positive number lesser than %d, change it to this value.\n", __FUNCTION__, MAX_DIRS);
+            }
+        }
+    }
+
+    /* first thing to do : load configuration */
+    load_config();
+
+    /* Get the properties and read the local files to set properly the env variables */
+    get_crash_env(crypt_state, encrypt_progress, decrypt, token);
+
+    /* DECRYPTED by default */
+    strcpy(encryptstate,"DECRYPTED");
+    alreadyran = (token[0] != 0);
+
+    if ( encrypt_progress[0]) {
+        /* Encrypting unencrypted device... */
+        LOGI("phone enter state: encrypting.\n");
+    } else if ( !strcmp(crypt_state, "unencrypted") && !alreadyran ) {
+        /* Unencrypted device */
+        LOGI("phone enter state: normal start.\n");
+        early_check(encryptstate, test_flag);
+    } else if ((!strcmp(crypt_state, "encrypted")) &&
+            !strcmp(decrypt, "trigger_restart_framework") && !alreadyran) {
+        /* Encrypted device */
+        LOGI("phone enter state: phone encrypted.\n");
+        strcpy(encryptstate,"ENCRYPTED");
+        early_check(encryptstate, test_flag);
+    }
+
+    /* Starts the thread in charge of uptime check */
+    ret = pthread_create(&thread, NULL, (void *)timeup_thread_mainloop, NULL);
+    if (ret < 0) {
+        LOGE("pthread_create error");
+        return -1;
+    }
+#ifdef FULL_REPORT
+    system("/system/bin/monitor_crashenv");
+#endif
+    check_crashlog_died();
+
+    return do_monitor();
+}
