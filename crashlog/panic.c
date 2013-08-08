@@ -114,6 +114,17 @@ static void set_ipanic_crashtype_and_reason(char *crashtype, char *reason) {
     }
 }
 
+/**
+ * @brief Checks if a PANIC event occurred
+ *
+ * This functions is called at reboot (ie at crashlogd boot ) and checks if a
+ * PANIC event occurred by parsing panic console file.
+ * It then checks the IPANIC event type.
+ * Returned values are :
+ *  -1 if a problem occurs (can't create crash dir)
+ *   0 for nominal case
+ *   1 if the panic console file doesn't exist
+ */
 int crashlog_check_panic(char *reason, int test) {
     char destination[PATHMAX];
     char crashtype[32] = {'\0'};
@@ -123,7 +134,7 @@ int crashlog_check_panic(char *reason, int test) {
 
     if ( !test && !file_exists(CURRENT_PANIC_CONSOLE_NAME) ) {
         /* Nothing to do */
-        return 0;
+        return 1;
     }
 
     set_ipanic_crashtype_and_reason(crashtype, reason);
@@ -168,4 +179,90 @@ int crashlog_check_panic(char *reason, int test) {
     check_aplogs_tobackup(SAVED_CONSOLE_NAME);
 
     return 0;
+}
+
+/**
+ * @brief Checks in RAM console if a PANIC event occurred
+ *
+ * This functions is called at reboot (ie at crashlogd boot ) and checks if a
+ * PANIC event occurred by parsing the RAM console.
+ * It then checks the IPANIC event type.
+ * Returned values are :
+ *  -1 if a problem occurs (can't create crash dir)
+ *   0 for nominal case
+ *   1 if the RAM console doesn't exist or if it exists but no panic detected.
+ */
+int crashlog_check_ram_panic(char *reason)
+{
+    char date_tmp[32];
+    char date_tmp_2[32];
+    struct stat info;
+    time_t t;
+    char destination[PATHMAX];
+    char crashtype[32] = {'\0'};
+    int dir;
+    char *key;
+    const char *dateshort = get_current_time_short(1);
+
+    if (stat(LAST_KMSG, &info) == 0) {
+        if (!find_str_in_file(LAST_KMSG, "Kernel panic - not syncing:", NULL))
+             return 1; /* Not a PANIC : return */
+
+         do_copy(LAST_KMSG, SAVED_PANIC_RAM, MAXFILESIZE);
+
+        if (find_str_in_file(SAVED_PANIC_RAM, "Kernel panic - not syncing: Kernel Watchdog", NULL))
+            strcpy(crashtype, KERNEL_SWWDT_CRASH);
+        else if  (find_str_in_file(SAVED_PANIC_RAM, "EIP is at pmu_sc_irq", NULL))
+            // This panic is triggered by a fabric error
+            // It is marked as a kernel panic linked to a HW watdchog
+            // to create a link between these 2 critical crashes
+            strcpy(crashtype, KERNEL_HWWDT_CRASH);
+        else if (find_str_in_file(SAVED_PANIC_RAM, "EIP is at panic_dbg_set", NULL)  || find_str_in_file(SAVED_PANIC_RAM, "EIP is at kwd_trigger_open", NULL))
+            strcpy(crashtype, KERNEL_FAKE_CRASH);
+        else
+            strcpy(crashtype, KERNEL_CRASH);
+
+        if (!find_str_in_file(SAVED_PANIC_RAM, "sdhci_pci_power_up_host: host controller power up is done", NULL))
+             // An error is raised when the panic console file does not end normally
+            raise_infoerror(ERROREVENT, IPANIC_CORRUPTED);
+
+        if (!strncmp(crashtype, KERNEL_FAKE_CRASH, sizeof(KERNEL_FAKE_CRASH)))
+             strcat(reason,"_FAKE");
+        else if (!strncmp(reason, "HWWDT_RESET_FAKE", 16))
+             strcpy(crashtype, KERNEL_FAKE_CRASH);
+        else if (!strncmp(reason,"HWWDT_RESET", 11))
+             strcpy(crashtype, KERNEL_HWWDT_CRASH);
+         else if (strncmp(reason,"SWWDT_RESET", 11) != 0)
+             // In some corner cases, the startupreason is not correctly set
+             // In this case, an ERROR is sent to have correct SWWDT metrics
+             raise_infoerror(ERROREVENT, CRASHLOG_SWWDT_MISSING);
+
+        dir = find_new_crashlog_dir(CRASH_MODE);
+        if (dir < 0) {
+            LOGE("%s: Cannot get a valid new crash directory...\n", __FUNCTION__);
+            key = raise_event(CRASHEVENT, crashtype, NULL, NULL);
+            LOGE("%-8s%-22s%-20s%s\n", CRASHEVENT, key, get_current_time_long(0), crashtype);
+            free(key);
+            return -1;
+        }
+
+        destination[0] = '\0';
+        snprintf(destination, sizeof(destination), "%s%d/%s_%s.txt", CRASH_DIR, dir,
+                CONSOLE_NAME, dateshort);
+        do_copy(SAVED_PANIC_RAM, destination, MAXFILESIZE);
+
+        destination[0] = '\0';
+        snprintf(destination, sizeof(destination), "%s%d/", CRASH_DIR, dir);
+        key = raise_event(CRASHEVENT, crashtype, NULL, destination);
+        LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, get_current_time_long(0), crashtype, destination);
+        free(key);
+
+        // if a pattern is found in the console file, upload a large number of aplogs
+        // property persist.crashlogd.panic.pattern is used to fill the list of pattern
+        // Each pattern is split by a semicolon in the property
+        check_aplogs_tobackup(SAVED_PANIC_RAM);
+        return 0;
+       }
+    /* No RAM console : nothing to do */
+    return 1;
 }

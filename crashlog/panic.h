@@ -23,5 +23,6 @@
 #define __PANIC_H__
 
 int crashlog_check_panic(char *reason, int test);
+int crashlog_check_ram_panic(char *reason);
 
 #endif /* __PANIC_H__ */

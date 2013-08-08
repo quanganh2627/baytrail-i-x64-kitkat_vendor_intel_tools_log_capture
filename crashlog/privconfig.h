@@ -232,6 +232,7 @@ enum {
 #define LOG_SPID                LOGS_DIR "/spid.txt"
 #define LAST_KMSG_FILE          "last_kmsg"
 #define CONSOLE_NAME            "emmc_ipanic_console"
+#define CONSOLE_RAM             "ram_ipanic_console"
 #define THREAD_NAME             "emmc_ipanic_threads"
 #define LOGCAT_NAME             "emmc_ipanic_logcat"
 #define FABRIC_ERROR_NAME       "ipanic_fabric_err"
@@ -247,6 +248,7 @@ enum {
 #define SAVED_THREAD_NAME       PANIC_DIR "/" THREAD_NAME
 #define SAVED_LOGCAT_NAME       PANIC_DIR "/" LOGCAT_NAME
 #define SAVED_FABRIC_ERROR_NAME PANIC_DIR "/" FABRIC_ERROR_NAME
+#define SAVED_PANIC_RAM         PANIC_DIR "/" CONSOLE_RAM
 #define RECOVERY_ERROR_TRIGGER  CACHE_DIR "/recovery/recoveryfail"
 #define RECOVERY_ERROR_LOG      CACHE_DIR "/recovery/last_log"
 #define SYS_SPID_1              SYS_SPID_DIR "/vendor_id"

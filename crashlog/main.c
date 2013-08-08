@@ -220,6 +220,7 @@ static void early_check(char *encryptstate, int test) {
 
     char startupreason[32] = { '\0', };
     char flashtype[32] = { '\0', };
+    char watchdog[16] = { '\0', };
     const char *datelong;
     char *key;
     struct stat info;
@@ -236,10 +237,15 @@ static void early_check(char *encryptstate, int test) {
         uptime_history();
     }
 
+    strcpy(watchdog,"WDT");
+
     crashlog_check_fabric(startupreason, test);
-    crashlog_check_panic(startupreason, test);
+    if ( crashlog_check_panic(startupreason, test) == 1 )
+        /* No panic console file : check RAM console to determine the watchdog event type */
+        if ( crashlog_check_ram_panic(startupreason) == 1 && strstr(startupreason, "SWWDT_") )
+            strcpy(watchdog, "WDT_UNHANDLED");
     crashlog_check_modem_shutdown();
-    crashlog_check_startupreason(startupreason);
+    crashlog_check_startupreason(startupreason, watchdog);
     crashlog_check_recovery();
 
     key = raise_event_bootuptime(SYS_REBOOT, startupreason, NULL, NULL);

@@ -126,6 +126,11 @@ int find_oneofstrings_in_file(char *filename, char **keywords, int nbkeywords) {
     return 0;
 }
 
+/**
+ * Finds if file defined by filename contains given keyword and
+ * if the matching line also ends with given tails (if provided).
+ * It returns 1 if a match is found. 0 otherwise.
+ */
 int find_str_in_file(char *filename, char *keyword, char *tail) {
     char buffer[MAXLINESIZE];
     int fd, linesize;

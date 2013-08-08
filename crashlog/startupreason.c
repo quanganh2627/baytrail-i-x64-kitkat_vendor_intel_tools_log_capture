@@ -175,7 +175,7 @@ void read_startupreason(char *startupreason)
  *
  * @param reason - string containing the translated startup reason
  */
-int crashlog_check_startupreason(char *reason) {
+int crashlog_check_startupreason(char *reason, char *watchdog) {
     const char *dateshort = get_current_time_short(1);
     char destination[PATHMAX];
     int dir;
@@ -192,7 +192,7 @@ int crashlog_check_startupreason(char *reason) {
     dir = find_new_crashlog_dir(CRASH_MODE);
     if (dir < 0) {
         LOGE("%s: find_new_crashlog_dir failed\n", __FUNCTION__);
-        key = raise_event(CRASHEVENT, "WDT", NULL, NULL);
+        key = raise_event(CRASHEVENT, watchdog, NULL, NULL);
         LOGE("%-8s%-22s%-20s%s\n", CRASHEVENT, key, get_current_time_long(0), "WDT");
         free(key);
         return -1;
@@ -200,7 +200,7 @@ int crashlog_check_startupreason(char *reason) {
 
     destination[0] = '\0';
     snprintf(destination, sizeof(destination), "%s%d/", CRASH_DIR, dir);
-    key = raise_event(CRASHEVENT, "WDT", reason, destination);
+    key = raise_event(CRASHEVENT, watchdog, reason, destination);
     LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, get_current_time_long(0), "WDT", destination);
     flush_aplog_atboot("WDT", dir, dateshort);
     usleep(TIMEOUT_VALUE);
