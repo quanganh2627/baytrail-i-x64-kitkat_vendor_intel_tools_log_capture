@@ -60,6 +60,7 @@ extern char gboardversion[PROPERTY_VALUE_MAX];
 extern char guuid[256];
 
 extern pconfig g_first_modem_config;
+extern int g_current_serial_device_id;
 
 int gmaxfiles = MAX_DIRS;
 char *CRASH_DIR = NULL;
@@ -307,6 +308,24 @@ void read_sys_spid(char *filename)
     do_chown(filename, PERM_USER, PERM_GROUP);
 }
 
+/**
+ * Writes given UUID value into specified file
+ */
+void write_uuid(char* filename, char *uuid_value)
+{
+    FILE *fd;
+    fd = fopen(filename, "w");
+    if (!fd) {
+        LOGE("%s: Cannot write uuid to %s - %s\n",
+            __FUNCTION__, filename, strerror(errno));
+        return;
+    } else {
+        fprintf(fd, "%s", uuid_value);
+        fclose(fd);
+        do_chown(filename, PERM_USER, PERM_GROUP);
+    }
+}
+
 static void get_crash_env(char *crypt_state, char *encrypt_progress, char *decrypt, char *token) {
 
     char value[PROPERTY_VALUE_MAX];
@@ -326,34 +345,24 @@ static void get_crash_env(char *crypt_state, char *encrypt_progress, char *decry
      */
     get_build_board_versions(SYS_PROP, gbuildversion, gboardversion);
 
-    /* read uuid from proc or uuid.txt if proc fails
-     * if both fail, set Medfield as default
-     */
-    fd = fopen(PROC_UUID, "r");
-    if (fd != NULL && fscanf(fd, "%s", guuid) == 1) {
-        fclose(fd);
-        fd = fopen(LOG_UUID, "w");
-        if (!fd) {
-            LOGE("%s: Cannot write uuid to %s - %s\n",
-                __FUNCTION__, LOG_UUID, strerror(errno));
-        } else {
-            fprintf(fd, "%s", guuid);
-            fclose(fd);
-        }
+    /* Read UUID */
+    if (g_current_serial_device_id == 1) {
+        /* Get serial ID from properties and updates UUID file */
+        property_get("ro.serialno", guuid, "empty_serial");
+        write_uuid(LOG_UUID, guuid);
     } else {
-        LOGE("%s: Cannot read uuid from %s - %s\n",
-            __FUNCTION__, PROC_UUID, strerror(errno));
-        fd = fopen(LOG_UUID, "w");
-        if (!fd) {
-            LOGE("%s: Cannot write uuid to %s - %s\n",
-                __FUNCTION__, LOG_UUID, strerror(errno));
-        } else {
-            fprintf(fd, "Medfield");
+        /* Read UUID value from /proc (emmc) and set UUID file with retrieved value.
+         * If reading fails set "Medfield" as default value */
+        fd = fopen(PROC_UUID, "r");
+        if (fd != NULL && fscanf(fd, "%s", guuid) == 1) {
             fclose(fd);
+            write_uuid(LOG_UUID, guuid);
+        } else {
+            LOGE("%s: Cannot read uuid from %s - %s\n",
+                __FUNCTION__, PROC_UUID, strerror(errno));
+            write_uuid(LOG_UUID, "Medfield");
         }
     }
-    do_chown(LOG_UUID, PERM_USER, PERM_GROUP);
-
     /* Read SPID */
     read_sys_spid(LOG_SPID);
 

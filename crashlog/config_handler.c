@@ -33,8 +33,10 @@
 pconfig g_first_modem_config = NULL; /* Points to first modem_config in list */
 pconfig g_current_modem_config = NULL; /* Points to current modem_config in list */
 
-extern int gcurrent_uptime_hour_frequency;
+/* Global variables set from loaded config and used accross crashlogd source code */
+extern int  gcurrent_uptime_hour_frequency;
 extern long current_sd_size_limit;
+int g_current_serial_device_id = 0; /* Specifies where serial ID should be retrieved (from emmc or from properties )*/
 
 //to get pconfig if it exists
 pconfig get_generic_config(char* event_name, pconfig config_to_match) {
@@ -283,6 +285,15 @@ void load_config(){
                     l_tmp = atol(tmp);
                     if (l_tmp > 0){
                         current_sd_size_limit = l_tmp;
+                    }
+                }
+            }
+            if (sk_exists(GENERAL_CONF_PATTERN,"serial_device_id",&my_conf_handle)){
+                pchar tmp = get_value(GENERAL_CONF_PATTERN,"serial_device_id",&my_conf_handle);
+                if (tmp){
+                    i_tmp = atoi(tmp);
+                    if (i_tmp > 0){
+                        g_current_serial_device_id = 1;
                     }
                 }
             }
