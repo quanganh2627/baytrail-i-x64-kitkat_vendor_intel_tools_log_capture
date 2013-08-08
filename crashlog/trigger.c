@@ -226,9 +226,11 @@ int process_log_event(char *rootdir, char *triggername, int mode) {
     remove(APLOG_FILE_0);
 #endif
 
-    /*delete trigger file*/
-    snprintf(path, sizeof(path),"%s/%s",rootdir, triggername);
-    remove(path);
+    /*delete trigger file if necessary */
+    if (rootdir && triggername) {
+        snprintf(path, sizeof(path),"%s/%s",rootdir, triggername);
+        remove(path);
+    }
     return 0;
 }
 

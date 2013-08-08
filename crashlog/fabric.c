@@ -20,7 +20,7 @@
  *
  * This file contains the functions used to handle fabric events.
  */
-
+#include "trigger.h"
 #include "crashutils.h"
 #include "privconfig.h"
 #include "fsutils.h"
@@ -88,6 +88,8 @@ int crashlog_check_fabric(char *reason, int test) {
             if ( find_str_in_file(CURRENT_PROC_FABRIC_ERROR_NAME, fabric_types_array[i].keyword, fabric_types_array[i].tail) > 0 ) {
                /* Got it! */
                strncpy(crashtype, fabric_types_array[i].name, sizeof(crashtype)-1);
+               if (strstr(crashtype, "HANG"))
+                   strncpy(event_name, INFOEVENT, sizeof(event_name)-1);
                break;
             }
         }
@@ -124,5 +126,8 @@ int crashlog_check_fabric(char *reason, int test) {
     key = raise_event(event_name, crashtype, NULL, destination);
     LOGE("%-8s%-22s%-20s%s %s\n", event_name, key, get_current_time_long(0), crashtype, destination);
     free(key);
+    /* Raise an aplog event to get some logs */
+    if ( process_log_event(NULL, NULL, MODE_APLOGS) < 0 )
+        LOGE("%s: process_log_event for APLOGS failed\n", __FUNCTION__);
     return 0;
 }
