@@ -180,10 +180,12 @@
 #define LAST_KMSG_FILE "last_kmsg"
 #define TIMESTAMP_MAX_SIZE 10 /* Unix style timestamp on 10 characters max.*/
 
+#define SAVED_PANIC_RAM "/data/dontpanic/ram_ipanic_console"
 #define SAVED_CONSOLE_NAME "/data/dontpanic/emmc_ipanic_console"
 #define SAVED_THREAD_NAME "/data/dontpanic/emmc_ipanic_threads"
 #define SAVED_LOGCAT_NAME "/data/dontpanic/emmc_ipanic_logcat"
 #define SAVED_FABRIC_ERROR_NAME "/data/dontpanic/ipanic_fabric_err"
+#define CONSOLE_RAM "ram_ipanic_console"
 #define CONSOLE_NAME "emmc_ipanic_console"
 #define THREAD_NAME "emmc_ipanic_threads"
 #define LOGCAT_NAME "emmc_ipanic_logcat"
@@ -281,6 +283,7 @@ int abort_clean_sd = 0;
 // global variable to enable dynamic change of uptime frequency
 int current_uptime_hour_frequency = UPTIME_HOUR_FREQUENCY;
 long current_sd_size_limit = LONG_MAX;
+int current_serial_device_id = 0;
 
 static int do_mv(char *src, char *des)
 {
@@ -3075,7 +3078,6 @@ void process_anr_and_uiwatchdog_events(char *filename, char *eventname, char *na
         LOGE("%-8s%-22s%-20s%s\n", CRASHEVENT, key, date_tmp_2, eventname);
         del_file_more_lines(HISTORY_FILE);
         history_file_write(CRASHEVENT, eventname, NULL, NULL, NULL, key, date_tmp_2);
-        notify_crashreport();
         restart_profile1_srv();
         return;
     }
@@ -3106,7 +3108,6 @@ void process_anr_and_uiwatchdog_events(char *filename, char *eventname, char *na
                 wd = inotify_add_watch(fd, destion, IN_CLOSE_WRITE);
                 if (wd < 0) {
                     LOGE("Can't add watch for %s.\n", destion);
-                    notify_crashreport();
                     return;
                 }
                 //return key of current anr for consecutive anr dumpstate management
@@ -3115,7 +3116,6 @@ void process_anr_and_uiwatchdog_events(char *filename, char *eventname, char *na
             }
         }
 #endif
-        notify_crashreport();
     }
     return;
 }
@@ -4289,7 +4289,7 @@ static int crashlog_check_panic(char *reason, unsigned int files)
             history_file_write(CRASHEVENT, crashtype, NULL, NULL, NULL, key, date_tmp_2);
             del_file_more_lines(HISTORY_FILE);
             //Need to return 0 to avoid closing crashlogd
-            return 0;
+            return 1;
         }
 
         destion[0] = '\0';
@@ -4322,6 +4322,89 @@ static int crashlog_check_panic(char *reason, unsigned int files)
         // property persist.crashlogd.panic.pattern is used to fill the list of pattern
         // Each pattern is split by a semicolon in the property
         check_aplogs_tobackup(SAVED_CONSOLE_NAME, files);
+        return 1;
+       }
+    return 0;
+}
+
+static int crashlog_check_ram_panic(char *reason, unsigned int files)
+{
+    char date_tmp[32];
+    char date_tmp_2[32];
+    struct stat info;
+    time_t t;
+    char destion[PATHMAX];
+    char crashtype[32] = {'\0'};
+    int dir;
+    char key[SHA1_DIGEST_LENGTH+1];
+    struct tm *time_tmp;
+
+    if (stat(LAST_KMSG, &info) == 0) {
+        if (find_str_in_file(LAST_KMSG, "Kernel panic - not syncing:", NULL))
+             return 0;
+
+         do_copy(LAST_KMSG, SAVED_PANIC_RAM, FILESIZE_MAX);
+
+        if (!find_str_in_file(SAVED_PANIC_RAM, "Kernel panic - not syncing: Kernel Watchdog", NULL))
+            strcpy(crashtype, KERNEL_SWWDT_CRASH);
+        else if  (!find_str_in_file(SAVED_PANIC_RAM, "EIP is at pmu_sc_irq", NULL))
+            // This panic is triggered by a fabric error
+            // It is marked as a kernel panic linked to a HW watdchog
+            // to create a link between these 2 critical crashes
+            strcpy(crashtype, KERNEL_HWWDT_CRASH);
+        else if (!find_str_in_file(SAVED_PANIC_RAM, "EIP is at panic_dbg_set", NULL)  || !find_str_in_file(SAVED_PANIC_RAM, "EIP is at kwd_trigger_open", NULL))
+            strcpy(crashtype, KERNEL_FAKE_CRASH);
+        else
+            strcpy(crashtype, KERNEL_CRASH);
+
+        if (find_str_in_file(SAVED_PANIC_RAM, "sdhci_pci_power_up_host: host controller power up is done", NULL))
+             // An error is raised when the panic console file does not end normally
+             crashlog_raise_infoerror(ERROREVENT, CRASHLOG_IPANIC_CORRUPTED);
+
+        if (!strncmp(crashtype, KERNEL_FAKE_CRASH, sizeof(KERNEL_FAKE_CRASH)))
+             strcat(reason,"_FAKE");
+        else if (!strncmp(reason, "HWWDT_RESET_FAKE", 16))
+             strcpy(crashtype, KERNEL_FAKE_CRASH);
+        else if (!strncmp(reason,"HWWDT_RESET", 11))
+             strcpy(crashtype, KERNEL_HWWDT_CRASH);
+         else if (strncmp(reason,"SWWDT_RESET", 11) != 0)
+             // In some corner cases, the startupreason is not correctly set
+             // In this case, an ERROR is sent to have correct SWWDT metrics
+             crashlog_raise_infoerror(ERROREVENT, CRASHLOG_SWWDT_MISSING);
+
+        time(&t);
+        time_tmp = localtime((const time_t *)&t);
+        PRINT_TIME(date_tmp, TIME_FORMAT_1, time_tmp);
+        PRINT_TIME(date_tmp_2, TIME_FORMAT_2, time_tmp);
+        dir = find_dir(files,CRASH_MODE);
+
+        if (dir == -1) {
+            LOGE("find dir %d for check panic failed\n", files);
+            compute_key(key, CRASHEVENT, crashtype);
+            LOGE("%-8s%-22s%-20s%s\n", CRASHEVENT, key, date_tmp_2, crashtype);
+            history_file_write(CRASHEVENT, crashtype, NULL, NULL, NULL, key, date_tmp_2);
+            del_file_more_lines(HISTORY_FILE);
+            //Need to return 0 to avoid closing crashlogd
+            return  1;
+        }
+
+        destion[0] = '\0';
+        snprintf(destion, sizeof(destion), "%s%d/%s_%s.txt", CRASH_DIR, dir,
+                CONSOLE_RAM, date_tmp);
+        do_copy(SAVED_PANIC_RAM, destion, FILESIZE_MAX);
+
+        destion[0] = '\0';
+        snprintf(destion, sizeof(destion), "%s%d/", CRASH_DIR, dir);
+        compute_key(key, CRASHEVENT, crashtype);
+        LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, date_tmp_2, crashtype, destion);
+        history_file_write(CRASHEVENT, crashtype, NULL, destion, NULL, key, date_tmp_2);
+        del_file_more_lines(HISTORY_FILE);
+
+        // if a pattern is found in the console file, upload a large number of aplogs
+        // property persist.crashlogd.panic.pattern is used to fill the list of pattern
+        // Each pattern is split by a semicolon in the property
+        check_aplogs_tobackup(SAVED_PANIC_RAM, files);
+        return 1;
        }
     return 0;
 }
@@ -4531,6 +4614,16 @@ void load_config(){
                     }
                 }
             }
+
+            if (sk_exists(GENERAL_CONF_PATTERN,"serial_device_id",&my_conf_handle)){
+                pchar tmp = get_value(GENERAL_CONF_PATTERN,"serial_device_id",&my_conf_handle);
+                if (tmp){
+                    i_tmp = atoi(tmp);
+                    if (i_tmp > 0){
+                        current_serial_device_id = 1;
+                    }
+                }
+            }
             load_config_by_pattern(NOTIFY_CONF_PATTERN,"matching_pattern",my_conf_handle);
             //ADD other config pattern HERE
             free_config_file(&my_conf_handle);
@@ -4602,7 +4695,7 @@ static int crashlog_check_recovery(unsigned int files)
  *
  * @param reason - string containing the translated startup reason
  */
-static int crashlog_check_startupreason(char *reason, unsigned int files)
+static int crashlog_check_startupreason(char *reason, char* watchdog, unsigned int files)
 {
     char date_tmp[32];
     char date_tmp_2[32];
@@ -4625,7 +4718,7 @@ static int crashlog_check_startupreason(char *reason, unsigned int files)
         if (dir == -1) {
             LOGE("find dir %d for check startup reason failed\n", files);
             LOGE("%-8s%-22s%-20s%s\n", CRASHEVENT, key, date_tmp_2, "WDT");
-            history_file_write(CRASHEVENT, "WDT", reason, NULL, NULL, key, date_tmp_2);
+            history_file_write(CRASHEVENT, watchdog, reason, NULL, NULL, key, date_tmp_2);
             del_file_more_lines(HISTORY_FILE);
             //Need to return 0 to avoid closing crashlogd
             return 0;
@@ -4638,7 +4731,7 @@ static int crashlog_check_startupreason(char *reason, unsigned int files)
         usleep(TIMEOUT_VALUE);
         do_log_copy("WDT", dir, date_tmp, APLOG_TYPE);
         do_last_kmsg_copy(dir);
-        history_file_write(CRASHEVENT, "WDT", reason, destion, NULL, key, date_tmp_2);
+        history_file_write(CRASHEVENT, watchdog, reason, destion, NULL, key, date_tmp_2);
         del_file_more_lines(HISTORY_FILE);
     }
     return 0;
@@ -5041,7 +5134,12 @@ int main(int argc, char **argv)
     if (property_get(BOARD_FIELD, boardVersion, "") <=0){
         get_version_info(SYS_PROP, BOARD_FIELD, boardVersion);
     }
-    read_proc_uid(PROC_UUID, LOG_UUID, uuid, "Medfield");
+    if (current_serial_device_id == 1){
+        property_get("ro.serialno", uuid, "empty_serial");
+        write_uid(LOG_UUID, uuid);
+    }else{
+        read_proc_uid(PROC_UUID, LOG_UUID, uuid, "Medfield");
+    }
     read_sys_spid(LOG_SPID);
 
     sdcard_available(CRASH_MODE);
@@ -5050,6 +5148,7 @@ int main(int argc, char **argv)
     char startupreason[32] = { '\0', };
     char flashtype[32] = { '\0', };
     char encryptstate[16] = { '\0', };
+    char watchdog[16] = { '\0', };
     struct stat st;
     char lastuptime[32];
     char crypt_state[PROPERTY_VALUE_MAX];
@@ -5058,6 +5157,7 @@ int main(int argc, char **argv)
     char token[PROPERTY_VALUE_MAX];
 
     strcpy(encryptstate,"DECRYPTED");
+    strcpy(watchdog,"WDT");
 
     property_get("ro.crypto.state", crypt_state, "unencrypted");
     property_get("vold.encrypt_progress",encrypt_progress,"");
@@ -5107,9 +5207,13 @@ int main(int argc, char **argv)
 
 next:
     crashlog_check_fabric(startupreason, files);
-    crashlog_check_panic(startupreason, files);
+    if (crashlog_check_panic(startupreason, files) == 0)
+        if (crashlog_check_ram_panic(startupreason, files) == 0)
+            if (strstr(startupreason, "SWWDT_"))
+                 strcpy(watchdog, "WDT_UNHANDLED");
+
     crashlog_check_modem_shutdown(startupreason, files);
-    crashlog_check_startupreason(startupreason, files);
+    crashlog_check_startupreason(startupreason, watchdog, files);
     crashlog_check_recovery(files);
 
     time(&t);
