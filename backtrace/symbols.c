@@ -24,7 +24,7 @@
 #include <sys/mman.h>
 
 #include "symbols.h"
-#include <linux/elf.h>
+#include <elf.h>
 #include <assert.h>
 #include <string.h>
 #include <errno.h>
