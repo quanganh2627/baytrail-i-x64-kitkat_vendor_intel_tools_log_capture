@@ -23,7 +23,7 @@ include $(CLEAR_VARS)
 LOCAL_SRC_FILES:= \
 	com_android_server_am_DebugAnr.cpp
 
-LOCAL_MODULE_TAGS := eng debug
+LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE:= libdebug_anr
 
 LOCAL_SHARED_LIBRARIES:= libnativehelper libc libcutils libparse_stack

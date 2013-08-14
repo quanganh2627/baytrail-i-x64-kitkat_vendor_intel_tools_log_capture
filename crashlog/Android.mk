@@ -29,7 +29,7 @@ LOCAL_C_INCLUDES += \
   $(TARGET_OUT_HEADERS)/IFX-modem \
   vendor/intel/tools/log_capture/backtrace
 
-LOCAL_MODULE_TAGS := eng debug
+LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE:= crashlogd
 
 LOCAL_SHARED_LIBRARIES:= libparse_stack libc libcutils libmmgrcli
