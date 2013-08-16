@@ -49,7 +49,8 @@ enum {
     MODE_CRASH_NOSD,
     MODE_STATS,
     MODE_APLOGS,
-    MODE_BZ
+    MODE_BZ,
+    MODE_KDUMP,
 };
 
 /* Mode used to cache a file into a buffer*/
@@ -104,6 +105,7 @@ int do_chown(const char *file, char *uid, char *gid);
 int do_copy_eof(const char *src, const char *des);
 int do_copy_tail(char *src, char *dest, int limit);
 int do_copy(char *src, char *dest, int limit);
+int do_mv(char *src, char *dest);
 int rmfr(char *path);
 int rmfr_specific(char *path, int remove_dir);
 

@@ -266,3 +266,82 @@ int crashlog_check_ram_panic(char *reason)
     /* No RAM console : nothing to do */
     return 1;
 }
+
+/**
+ * @brief Checks if a KDUMP event occured.
+ *
+ * This functions is called at boot (ie at crashlogd boot ) and checks if a
+ * KDUMP event occurred by checking specific files existence.
+ * It then checks the IPANIC event type.
+ * Returned values are :
+ *  -1 if a problem occurs (can't create crash dir)
+ *   0 for nominal case
+ */
+int crashlog_check_kdump(char *reason, int test) {
+    int start_flag = 0;
+    int file_flag = 0;
+    int finish_flag = 0;
+    int curr_stat = 0;
+    char *crashtype = NULL;
+    struct stat info;
+    char destination[PATHMAX];
+    int dir;
+    char *key;
+    const char *dateshort = get_current_time_short(1);
+
+    if (stat(KDUMP_START_FLAG, &info) == 0)
+        start_flag = 1;
+    if (stat(KDUMP_FILE_NAME, &info) == 0)
+        file_flag = 1;
+    if (stat(KDUMP_FINISH_FLAG, &info) == 0)
+        finish_flag = 1;
+    if (finish_flag == 1) {
+        curr_stat = 3;
+        crashtype = KDUMP_CRASH;
+    }
+    if ((finish_flag == 0) && (file_flag == 1)) {
+        curr_stat = 2;
+        LOGE("%s: KDUMP hasn't finished, maybe disk full or write timeout!!!\n", __FUNCTION__);
+        raise_infoerror("KDUMP don't finish, maybe disk full or write timeout", "DONTF");
+        return -1;
+    }
+    if ((finish_flag == 0) && (file_flag == 0) && (start_flag == 1)) {
+        curr_stat = 1;
+        LOGE("%s: KDUMP only enter, maybe user shutdown!!!\n", __FUNCTION__);
+        raise_infoerror("KDUMP only enter, maybe user shutdown", "ENTER");
+        return -1;
+    }
+
+    if ((curr_stat == 3) || (test == 1)) {
+
+        dir = find_new_crashlog_dir(MODE_KDUMP);
+        if (dir < 0) {
+            LOGE("%s: Cannot get a valid new crash directory...\n", __FUNCTION__);
+            key = raise_event(CRASHEVENT, crashtype, NULL, NULL);
+            LOGE("%-8s%-22s%-20s%s\n", CRASHEVENT, key, get_current_time_long(0), crashtype);
+            free(key);
+            return -1;
+        }
+
+        if (curr_stat == 2 || curr_stat == 3) {
+            destination[0] = '\0';
+            snprintf(destination, sizeof(destination), "%s%d/%s_%s.core",
+                    KDUMP_CRASH_DIR, dir, "kdumpfile", dateshort);
+            do_mv(KDUMP_FILE_NAME, destination);
+        }
+
+        /* Copy aplogs to KDUMP crash directory */
+        do_log_copy(crashtype, dir, dateshort, KDUMP_TYPE);
+
+        destination[0] = '\0';
+        snprintf(destination, sizeof(destination), "%s%d/", KDUMP_CRASH_DIR, dir);
+        key = raise_event(CRASHEVENT, crashtype, NULL, destination);
+        LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, get_current_time_long(0), crashtype, destination);
+        free(key);
+
+        remove(KDUMP_START_FLAG);
+        remove(KDUMP_FILE_NAME);
+        remove(KDUMP_FINISH_FLAG);
+    }
+    return 0;
+}

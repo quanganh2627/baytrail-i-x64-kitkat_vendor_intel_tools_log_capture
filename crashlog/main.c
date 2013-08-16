@@ -67,6 +67,7 @@ char *CRASH_DIR = NULL;
 char *STATS_DIR = NULL;
 char *APLOGS_DIR = NULL;
 char *BZ_DIR = NULL;
+
 //Variables containing paths of files triggering IPANIC & FABRICERR & WDT treatment
 char CURRENT_PANIC_CONSOLE_NAME[PATHMAX]={PANIC_CONSOLE_NAME};
 char CURRENT_PROC_FABRIC_ERROR_NAME[PATHMAX]={PROC_FABRIC_ERROR_NAME};
@@ -244,6 +245,7 @@ static void early_check(char *encryptstate, int test) {
         /* No panic console file : check RAM console to determine the watchdog event type */
         if ( crashlog_check_ram_panic(startupreason) == 1 && strstr(startupreason, "SWWDT_") )
             strcpy(watchdog, "WDT_UNHANDLED");
+    crashlog_check_kdump(startupreason, test);
     crashlog_check_modem_shutdown();
     crashlog_check_startupreason(startupreason, watchdog);
     crashlog_check_recovery();

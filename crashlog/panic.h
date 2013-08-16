@@ -24,5 +24,6 @@
 
 int crashlog_check_panic(char *reason, int test);
 int crashlog_check_ram_panic(char *reason);
+int crashlog_check_kdump(char *reason, int test);
 
 #endif /* __PANIC_H__ */

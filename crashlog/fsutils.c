@@ -272,6 +272,10 @@ int find_new_crashlog_dir(int mode) {
             snprintf(path, sizeof(path), STATS_CURRENT_LOG);
             dir = STATS_DIR;
             break;
+        case MODE_KDUMP:
+            snprintf(path, sizeof(path), CRASH_CURRENT_LOG);
+            dir = KDUMP_CRASH_DIR;
+            break;
         default:
             LOGE("%s: Invalid mode %d\n", __FUNCTION__, mode);
             return -1;
@@ -647,6 +651,30 @@ int do_copy(char *src, char *dest, int limit) {
     return rc;
 }
 
+int do_mv(char *src, char *dest) {
+    struct stat info;
+
+    if (src == NULL || dest == NULL) return -EINVAL;
+
+    if (stat(src, &info) < 0) {
+        return -errno;
+    }
+    /* check if destination exists */
+    if (stat(dest, &info)) {
+        /* an error, unless the destination was missing */
+        if (errno != ENOENT) {
+            LOGE("%s: failed on '%s', err:%s", __FUNCTION__, dest, strerror(errno));
+            return -1;
+        }
+    }
+    /* attempt to move it */
+    if (rename(src, dest)) {
+        LOGE("%s: failed on '%s', err:%s\n",  __FUNCTION__, src, strerror(errno));
+        return -1;
+    }
+    return 0;
+}
+
 void qs_swap(void *array, int *indexes, int first, int second) {
     int itmp;
     char *vtmp;
@@ -926,6 +954,7 @@ void do_log_copy(char *mode, int dir, const char* timestamp, int type) {
     switch (type) {
         case APLOG_TYPE:
         case APLOG_STATS_TYPE:
+        case KDUMP_TYPE:
 #ifndef FULL_REPORT
             flush_aplog();
 #endif
@@ -934,6 +963,8 @@ void do_log_copy(char *mode, int dir, const char* timestamp, int type) {
             extension = "";
             if (type == APLOG_STATS_TYPE)
                 dir_pattern = STATS_DIR;
+            else if (type == KDUMP_TYPE)
+                dir_pattern = KDUMP_CRASH_DIR;
             break;
         case BPLOG_TYPE:
             logfile0 = BPLOG_FILE_0;

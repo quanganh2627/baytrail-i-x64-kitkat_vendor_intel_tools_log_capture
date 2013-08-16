@@ -74,6 +74,7 @@
 #define FABRIC_FAKE_CRASH       "FABRIC_FAKE"
 #define KERNEL_FAKE_CRASH       "IPANIC_FAKE"
 #define IPANIC_CORRUPTED        "IPANIC_CORRUPTED"
+#define KDUMP_CRASH             "KDUMP"
 #define MODEM_SHUTDOWN          "MSHUTDOWN"
 #define BZTRIGGER               "bz_trigger"
 #define SCREENSHOT_PATTERN      "SCREENSHOT="
@@ -133,12 +134,14 @@ enum {
     STATS_MODE,
     APLOGS_MODE,
     BZ_MODE,
+    KDUMP_MODE,
 };
 
 enum {
     APLOG_TYPE = 0,
     BPLOG_TYPE,
     APLOG_STATS_TYPE,
+    KDUMP_TYPE,
 };
 /*Define uptime mode for raise_event function */
 enum {
@@ -204,6 +207,8 @@ enum {
 #define DROPBOX_DIR             DATA_DIR "/system/dropbox"
 #define TOMBSTONE_DIR           DATA_DIR "/tombstones"
 #define SYS_SPID_DIR            RESDIR "/sys/spid"
+#define LOGS_MEDIA_DIR          DATA_DIR "/media/logs"
+#define KDUMP_DIR               LOGS_MEDIA_DIR "/kdump"
 #define SDSIZE_CURRENT_LOG      LOGS_DIR "/currentsdsize"
 
 /* FILES */
@@ -257,9 +262,13 @@ enum {
 #define SYS_SPID_4              SYS_SPID_DIR "/platform_family_id"
 #define SYS_SPID_5              SYS_SPID_DIR "/product_line_id"
 #define SYS_SPID_6              SYS_SPID_DIR "/hardware_id"
-#define ANR_DUPLICATE_INFOERROR "anr_duplicate_infoevent"
-#define ANR_DUPLICATE_DATA      "anr_duplicate_data.txt"
-#define UIWDT_DUPLICATE_DATA    "uiwdt_duplicate_data.txt"
+#define KDUMP_START_FLAG        KDUMP_DIR "/kdumphappened"
+#define KDUMP_FILE_NAME         KDUMP_DIR "/kdumpfile.core"
+#define KDUMP_FINISH_FLAG       KDUMP_DIR "/kdumpfinished"
+#define KDUMP_CRASH_DIR         LOGS_MEDIA_DIR "/crashlog"
+#define ANR_DUPLICATE_INFOERROR         "anr_duplicate_infoevent"
+#define ANR_DUPLICATE_DATA              "anr_duplicate_data.txt"
+#define UIWDT_DUPLICATE_DATA            "uiwdt_duplicate_data.txt"
 #define JAVACRASH_DUPLICATE_DATA        "javacrash_duplicate_data.txt"
 #define JAVACRASH_DUPLICATE_INFOERROR   "javacrash_duplicate_infoevent"
 #define UIWDT_DUPLICATE_INFOERROR       "uiwdt_duplicate_infoevent"
