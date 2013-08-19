@@ -87,6 +87,7 @@ int process_log_event(char *rootdir, char *triggername, int mode) {
     const char *logrootdir, *suppl_to_copy;
     char *event, *type;
     int packetidx, logidx, newdirperpacket, do_screenshot;
+    struct stat info;
 
     switch (mode) {
         case MODE_BZ:
@@ -205,10 +206,18 @@ int process_log_event(char *rootdir, char *triggername, int mode) {
             snprintf(path, sizeof(path),"%s/%s", APLOG_DIR, BZTRIGGER);
             do_copy_tail(path,destination,0);
 
-            /* In case of bz_trigger with BPLOG=1, copy bplog file */
+            /* In case of bz_trigger with BPLOG=1, copy bplog file(s) */
             if( bplogFlag == 1 ) {
-                snprintf(destination,sizeof(destination),"%s%d/%s", BZ_DIR, dir, BPLOG_NAME);
-                do_copy(BPLOG_FILE_0, destination, MAXFILESIZE);
+                if(stat(BPLOG_FILE_0, &info) == 0){
+                    snprintf(destination,sizeof(destination), "%s%d/%s", BZ_DIR, dir,strrchr(BPLOG_FILE_0,'/')+1);
+                    do_copy(BPLOG_FILE_0,destination, 0);
+                    if(info.st_size < 1*MB){
+                        if(stat(BPLOG_FILE_1, &info) == 0){
+                            snprintf(destination,sizeof(destination), "%s%d/%s", BZ_DIR, dir,strrchr(BPLOG_FILE_1,'/')+1);
+                            do_copy(BPLOG_FILE_1,destination, 0);
+                        }
+                    }
+                }
             }
         }
         snprintf(destination,sizeof(destination),"%s%d/", logrootdir,dir);

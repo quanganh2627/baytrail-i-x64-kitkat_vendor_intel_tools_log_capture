@@ -950,6 +950,7 @@ void do_log_copy(char *mode, int dir, const char* timestamp, int type) {
     char destination[PATHMAX], *logfile0, *logfile1, *extension;
     struct stat info;
     char *dir_pattern = CRASH_DIR;
+    int limit = MAXFILESIZE;
 
     switch (type) {
         case APLOG_TYPE:
@@ -970,6 +971,7 @@ void do_log_copy(char *mode, int dir, const char* timestamp, int type) {
             logfile0 = BPLOG_FILE_0;
             logfile1 = BPLOG_FILE_1;
             extension = ".istp";
+            limit = 0; /* no limit size for bplogs copy */
             break;
         default:
             /* Ignore unknown type, just return */
@@ -977,11 +979,11 @@ void do_log_copy(char *mode, int dir, const char* timestamp, int type) {
     }
     if(stat(logfile0, &info) == 0) {
         snprintf(destination,sizeof(destination), "%s%d/%s_%s_%s%s", dir_pattern, dir, strrchr(logfile0,'/')+1, mode, timestamp, extension);
-        do_copy_tail(logfile0, destination, MAXFILESIZE);
+        do_copy_tail(logfile0, destination, limit);
         if(info.st_size < 1*MB) {
             if(stat(logfile1, &info) == 0) {
                 snprintf(destination,sizeof(destination), "%s%d/%s_%s_%s%s", dir_pattern, dir, strrchr(logfile1,'/')+1, mode, timestamp, extension);
-                do_copy_tail(logfile1, destination, MAXFILESIZE);
+                do_copy_tail(logfile1, destination, limit);
             }
         }
 #ifndef FULL_REPORT
