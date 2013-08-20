@@ -18,10 +18,23 @@
 LOCAL_PATH:= $(call my-dir)
 include $(CLEAR_VARS)
 
-LOCAL_SRC_FILES:= \
-  crashlogd.c \
-  mmgr_source.c \
-  config.c
+LOCAL_SRC_FILES:= main.c \
+    config.c \
+    inotify_handler.c \
+    startupreason.c \
+    mmgr_source.c \
+    crashutils.c \
+    usercrash.c \
+    anruiwdt.c \
+    recovery.c \
+    history.c \
+    trigger.c \
+    dropbox.c \
+    fsutils.c \
+    fabric.c \
+    modem.c \
+    panic.c \
+    config_handler.c
 
 LOCAL_CFLAGS += -DFULL_REPORT=1
 
