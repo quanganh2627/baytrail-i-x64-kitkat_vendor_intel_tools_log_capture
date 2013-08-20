@@ -89,6 +89,7 @@
 #define CRASHLOG_SWWDT_MISSING "SWWDT_MISSING"
 #define CRASHLOG_IPANIC_CORRUPTED "IPANIC_CORRUPTED"
 #define USBBOGUS "USBBOGUS"
+#define FWDUMP_EVENT "FWDUMP"
 
 #define FILESIZE_MAX  (10*1024*1024)
 #define PATHMAX 512
@@ -178,6 +179,8 @@
 #define SYS_SPID_6  "/sys/spid/hardware_id"
 #define LAST_KMSG "/proc/last_kmsg"
 #define LAST_KMSG_FILE "last_kmsg"
+#define GBUFFER_FILE "/proc/emmc_ipanic_gbuffer"
+#define LM_DUMP_FILE "/d/lm_dump/lkm_buf0" /* entry point of LM_DUMP module */
 #define TIMESTAMP_MAX_SIZE 10 /* Unix style timestamp on 10 characters max.*/
 
 #define SAVED_PANIC_RAM "/data/dontpanic/ram_ipanic_console"
@@ -185,11 +188,13 @@
 #define SAVED_THREAD_NAME "/data/dontpanic/emmc_ipanic_threads"
 #define SAVED_LOGCAT_NAME "/data/dontpanic/emmc_ipanic_logcat"
 #define SAVED_FABRIC_ERROR_NAME "/data/dontpanic/ipanic_fabric_err"
+#define SAVED_LM_BUFFER_NAME "lkm_buffer_dump"
 #define CONSOLE_RAM "ram_ipanic_console"
 #define CONSOLE_NAME "emmc_ipanic_console"
 #define THREAD_NAME "emmc_ipanic_threads"
 #define LOGCAT_NAME "emmc_ipanic_logcat"
 #define FABRIC_ERROR_NAME "ipanic_fabric_err"
+#define GBUFFER_NAME "emmc_ipanic_gbuffer"
 #define CRASHFILE_NAME "crashfile"
 #define ANR_DUPLICATE_INFOERROR "anr_duplicate_infoevent"
 #define JAVACRASH_DUPLICATE_INFOERROR "javacrash_duplicate_infoevent"
@@ -270,6 +275,44 @@ char CURRENT_KERNEL_CMDLINE[PATHMAX]={KERNEL_CMDLINE};
 #define KDUMP_CRASH "KDUMP"
 #define KDUMP_CRASH_DIR "/data/media/logs/crashlog"
 
+typedef unsigned int bool;
+enum { FALSE = 0, TRUE = 1, };
+
+/* Define crashlogd running modes */
+enum crashlog_mode {
+    NOMINAL_MODE = 0, /* NOMINAL : standard behavior */
+    RAMDUMP_MODE,     /* RAMDUMP : only checks some crashes, dump Lakemore file and do a cold reset */
+};
+
+
+/* Struct defining a crashlog mode configuration
+ * New attributes to be added when needed
+ */
+struct mode_config {
+    char *name;
+    bool sdcard_storage:1;
+    bool notifs_crashreport:1;
+    bool monitor_crashenv:1;
+};
+
+/* Array defining for each crashlog mode, the associated config */
+static const struct mode_config get_mode_configs[] = {
+    [ NOMINAL_MODE ] = { .name = "NOMINAL MODE",
+                         .sdcard_storage = TRUE,
+                         .notifs_crashreport = TRUE,
+                         .monitor_crashenv = TRUE},
+
+    [ RAMDUMP_MODE ] = { .name = "RAMDUMP MODE",
+                         .sdcard_storage = FALSE,
+                         .notifs_crashreport = FALSE,
+                         .monitor_crashenv = FALSE},
+};
+
+/* MACROS */
+#define CRASHLOG_MODE_NAME(mode)              ( get_mode_configs[mode].name )
+#define CRASHLOG_MODE_SD_STORAGE(mode)        ( get_mode_configs[mode].sdcard_storage )
+#define CRASHLOG_MODE_NOTIFS_ENABLED(mode)    ( get_mode_configs[mode].notifs_crashreport )
+#define CRASHLOG_MODE_MONITOR_CRASHENV(mode)  ( get_mode_configs[mode].monitor_crashenv )
 
 char *CRASH_DIR = NULL;
 char *STATS_DIR = NULL;
@@ -291,6 +334,8 @@ int abort_clean_sd = 0;
 int current_uptime_hour_frequency = UPTIME_HOUR_FREQUENCY;
 long current_sd_size_limit = LONG_MAX;
 int current_serial_device_id = 0;
+/*global flag indicating crashlogd mode */
+enum  crashlog_mode g_crashlog_mode;
 
 static int do_mv(char *src, char *des)
 {
@@ -1233,6 +1278,11 @@ static void notify_crashreport()
 {
     char boot_state[PROPERTY_VALUE_MAX];
 
+    /* Does current crashlog mode allow notifs to crashreport ?*/
+    if ( !CRASHLOG_MODE_NOTIFS_ENABLED(g_crashlog_mode) ) {
+        LOGD("%s : Current crashlog mode is %s - crashreport notifs disabled.\n", __FUNCTION__, CRASHLOG_MODE_NAME(g_crashlog_mode) );
+        return;
+    }
     property_get(BOOT_STATUS, boot_state, "-1");
     if (strcmp(boot_state, "1"))
         return;
@@ -1758,6 +1808,12 @@ void backtrace_anr_uiwdt(char *dest, int dir)
 
 void monitor_crashenv(void)
 {
+    /* Does current crashlog mode allow monitor_crash_env ?*/
+    if ( !CRASHLOG_MODE_MONITOR_CRASHENV(g_crashlog_mode) ) {
+        LOGD("%s : Current crashlog mode is %s - monitor_crashenv disabled.\n", __FUNCTION__, CRASHLOG_MODE_NAME(g_crashlog_mode));
+        return;
+    }
+
     int status = system("/system/bin/monitor_crashenv");
     if (status != 0)
         LOGE("monitor_crashenv status: %d.\n", status);
@@ -1867,6 +1923,11 @@ long get_sd_size()
 
 int sdcard_allowed()
 {
+    /* Does current crashlog mode allow SDcard storage ?*/
+    if ( !CRASHLOG_MODE_SD_STORAGE(g_crashlog_mode) ) {
+        LOGD("%s : Current crashlog mode is %s - SDCard storage disabled.\n", __FUNCTION__, CRASHLOG_MODE_NAME(g_crashlog_mode));
+        return 0;
+    }
     //now check remain size on SD
     if (get_sd_size() > current_sd_size_limit){
         LOGE("SD not allowed - current_sd_size_limit reached: %ld.\n", current_sd_size_limit);
@@ -4405,6 +4466,12 @@ static int crashlog_check_panic(char *reason, unsigned int files)
         snprintf(destion, sizeof(destion), "%s%d/%s_%s.txt", CRASH_DIR, dir,
                 LOGCAT_NAME, date_tmp);
         do_copy(SAVED_LOGCAT_NAME, destion, FILESIZE_MAX);
+
+        destion[0] = '\0';
+        snprintf(destion, sizeof(destion), "%s%d/%s_%s.txt", CRASH_DIR, dir,
+                GBUFFER_NAME, date_tmp);
+        do_copy(GBUFFER_FILE, destion, FILESIZE_MAX);
+
         do_last_kmsg_copy(dir);
 
         write_file(CURRENT_PANIC_CONSOLE_NAME, "1");
@@ -4504,6 +4571,77 @@ static int crashlog_check_ram_panic(char *reason, unsigned int files)
         check_aplogs_tobackup(SAVED_PANIC_RAM, files);
         return 1;
        }
+    return 0;
+}
+
+/**
+* @brief checks for IPANIC events relying on files exposed by emmc-ipanic and ram
+* console modules.
+*
+* @param[in] reason   : start-up reason
+* @param[in] watchdog : watchdog timer type
+* @param[in] files    : nb max of logs destination directories (crashlog, aplogs, bz... )
+*
+* @retval returns 'void'
+*/
+static void crashlog_check_panic_events(char *reason, char *watchdog, unsigned int files) {
+
+    if (crashlog_check_panic(reason, files) == 0)
+        if (crashlog_check_ram_panic(reason, files) == 0)
+            if (strstr(reason, "SWWDT_"))
+                 strcpy(watchdog, "WDT_UNHANDLED");
+}
+
+/**
+* @brief performs a copy of the virtual file exposed by the LM_DUMP kernel
+* module and raises a 'FWDUMP' event.
+*
+* @param[in] files : nb max of logs destination directories (crashlog, aplogs, bz... )
+*
+* @retval returns -1 if a problem occurs (no LM_DUMP file..). 0 otherwise.
+*/
+static int crashlog_check_fwdump( unsigned int files )
+{
+    char date_tmp[32];
+    char date_tmp_2[32];
+    struct stat info;
+    time_t t;
+    char destion[PATHMAX] = {'\0'};
+    char *crashtype = FWDUMP_EVENT;
+    int dir;
+    char key[SHA1_DIGEST_LENGTH+1];
+    struct tm *time_tmp;
+
+    if ( stat(LM_DUMP_FILE, &info) < 0 )
+        LOGE("%s: can't find file %s - error is %s.\n",
+             __FUNCTION__, LM_DUMP_FILE, strerror(errno) );
+    time(&t);
+    time_tmp = localtime((const time_t *)&t);
+    PRINT_TIME(date_tmp, TIME_FORMAT_1, time_tmp);
+    PRINT_TIME(date_tmp_2, TIME_FORMAT_2, time_tmp);
+
+    dir = find_dir(files, CRASH_MODE);
+
+    if (dir == -1) {
+        LOGE("%s : find dir %d failed\n", __FUNCTION__, files);
+        compute_key(key, CRASHEVENT, crashtype);
+        LOGE("%-8s%-22s%-20s%s\n", CRASHEVENT, key, date_tmp_2, crashtype);
+        history_file_write(CRASHEVENT, crashtype, NULL, NULL, NULL, key, date_tmp_2);
+        del_file_more_lines(HISTORY_FILE);
+        return  -1;
+    }
+    /* Copy */
+    snprintf(destion, sizeof(destion), "%s%d/%s_%s.txt", CRASH_DIR, dir, SAVED_LM_BUFFER_NAME, date_tmp);
+    do_copy_eof(LM_DUMP_FILE, destion);
+    do_last_kmsg_copy(dir);
+
+    destion[0] = '\0';
+    snprintf(destion, sizeof(destion), "%s%d/", CRASH_DIR, dir);
+    compute_key(key, CRASHEVENT, crashtype);
+    LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, date_tmp_2, crashtype, destion);
+    history_file_write(CRASHEVENT, crashtype, NULL, destion, NULL, key, date_tmp_2);
+    del_file_more_lines(HISTORY_FILE);
+
     return 0;
 }
 
@@ -5045,6 +5183,34 @@ static void uptime_history(char *lastuptime)
     }
 }
 
+/**
+* @brief trigger a global reset of the plateform by writing in specific registers.
+*
+* @retval return 0.
+*/
+static int request_global_reset() {
+
+#define CMD_SET_RESET_TO_GLOBAL "peeknpoke w fed0304a 8 33" // ETR register, bit cf9gr
+#define CMD_REBOOT "reboot"
+
+    /**
+     * "androidboot.crashlogd=noreboot" in cmdline will prevent reboot
+     */
+    char ro_boot_crashlogd[PROPERTY_VALUE_MAX];
+    property_get("ro.boot.crashlogd", ro_boot_crashlogd, "");
+    if (!strcmp(ro_boot_crashlogd, "noreboot")) {
+        LOGI("ro.boot.crashlogd=noreboot global reset aborted\n");
+        return -1;
+    }
+
+    LOGI("Requesting a platform global reset...\n");
+
+    system(CMD_SET_RESET_TO_GLOBAL);
+    system(CMD_REBOOT);
+
+    return 0;
+}
+
 /*
 * Name          : read_startupreason
 * Description   : This function returns the decoded startup reason by reading
@@ -5170,6 +5336,49 @@ static void manage_ipanic_fabricerr_wdt_trigger_path(void)
     }
 }
 
+/**
+* @brief performs all checks required in RAMDUMP mode.
+* In this mode, numerous checks are bypassed.
+*
+* @param[in] files : nb max of logs destination directories (crashlog, aplogs, bz... )
+*
+* @retval returns -1 if a problem occurs (no LM_DUMP file..). 0 otherwise.
+*/
+static int do_ramdump_checks( unsigned int files ) {
+
+    char startupreason[32] = { '\0', };
+    char watchdog[16] = { '\0', };
+    char lastuptime[32] = { '\0', };
+    char key[SHA1_DIGEST_LENGTH+1], date_tmp[32];
+    time_t t;
+    struct tm *time_tmp;
+
+    strcpy(watchdog,"WDT");
+
+    read_startupreason(startupreason);
+    uptime_history(lastuptime);
+    update_logs_permission();
+
+    /* Checks for panic */
+    crashlog_check_panic_events(startupreason, watchdog, files);
+    crashlog_check_startupreason(startupreason, watchdog, files);
+    /* Dump Lakemore file and raises FWDUMP event */
+    crashlog_check_fwdump(files);
+
+    /* Raise REBOOT event*/
+    time(&t);
+    time_tmp = localtime((const time_t *)&t);
+    PRINT_TIME(date_tmp, TIME_FORMAT_2, time_tmp);
+    compute_key(key, SYS_REBOOT, startupreason);
+    LOGE("%-8s%-22s%-20s%s\n", SYS_REBOOT, key, date_tmp, startupreason);
+    history_file_write(SYS_REBOOT, startupreason, NULL, NULL, lastuptime, key, date_tmp);
+    del_file_more_lines(HISTORY_FILE);
+
+    request_global_reset();
+
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
 
@@ -5183,12 +5392,15 @@ int main(int argc, char **argv)
     unsigned int dir;
     char key[SHA1_DIGEST_LENGTH+1];
     struct tm *time_tmp;
+    char bootmode[PROPERTY_VALUE_MAX];
 
     pthread_t thread;
     char value[PROPERTY_VALUE_MAX];
 
+    g_crashlog_mode = NOMINAL_MODE;
+
     if (argc > 2) {
-        LOGE("USAGE: %s [number] \n", argv[0]);
+        LOGE("USAGE: %s [-modem|-test|-nomodem|-ramdump|<max_nb_files>] \n", argv[0]);
         return -1;
     }
 
@@ -5209,7 +5421,9 @@ int main(int argc, char **argv)
             WDCOUNT = (WDCOUNT - 3);
             LOGI(" crashlogd only snoop AP \n");
         }
-        else{
+        else if ( !memcmp(argv[1], "-ramdump", 8) )
+            g_crashlog_mode = RAMDUMP_MODE;
+        else {
             errno = 0;
             files = (unsigned int)strtoul(argv[1], 0, 0);
 
@@ -5219,6 +5433,17 @@ int main(int argc, char **argv)
             }
         }
     }
+
+    LOGI("Current crashlog mode is %s\n", CRASHLOG_MODE_NAME(g_crashlog_mode));
+
+    if (g_crashlog_mode == NOMINAL_MODE) {
+        property_get("ro.boot.mode", bootmode, "");
+        if (!strcmp(bootmode, "ramconsole")) {
+            LOGI("Started as NOMINAL_MODE in ramconsole OS, quitting\n");
+            return 0;
+        }
+    }
+
     //first thing to do : load configuration
     load_config();
 
@@ -5242,12 +5467,15 @@ int main(int argc, char **argv)
 
     sdcard_available(CRASH_MODE);
 
+    /* If mode is RAMDUMP, performs associated checks and exit */
+    if ( g_crashlog_mode == RAMDUMP_MODE )
+        return do_ramdump_checks(files);
+
     // check startup reason and sw update
     char startupreason[32] = { '\0', };
     char flashtype[32] = { '\0', };
     char encryptstate[16] = { '\0', };
     char watchdog[16] = { '\0', };
-    struct stat st;
     char lastuptime[32];
     char crypt_state[PROPERTY_VALUE_MAX];
     char encrypt_progress[PROPERTY_VALUE_MAX];
@@ -5305,11 +5533,7 @@ int main(int argc, char **argv)
 
 next:
     crashlog_check_fabric(startupreason, files);
-    if (crashlog_check_panic(startupreason, files) == 0)
-        if (crashlog_check_ram_panic(startupreason, files) == 0)
-            if (strstr(startupreason, "SWWDT_"))
-                 strcpy(watchdog, "WDT_UNHANDLED");
-
+    crashlog_check_panic_events(startupreason, watchdog, files);
     crashlog_check_kdump(startupreason, files);
     crashlog_check_modem_shutdown(startupreason, files);
     crashlog_check_startupreason(startupreason, watchdog, files);
