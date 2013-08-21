@@ -71,15 +71,13 @@ int crashlog_check_fabric(char *reason, int test) {
 
     if ( !test && !file_exists(CURRENT_PROC_FABRIC_ERROR_NAME) ) return 0;
 
-    /* Looks for fake fabrics */
-    for (i = 0; i < DIM(fabric_fakes_array); i++) {
-        if ( find_str_in_file(CURRENT_PROC_FABRIC_ERROR_NAME, fabric_fakes_array[i].keyword, fabric_fakes_array[i].tail) > 0 ) {
+    /* Looks first for fake fabrics */
+    if ( find_str_in_file(CURRENT_PROC_FABRIC_ERROR_NAME, fabric_fakes_array[0].keyword, fabric_fakes_array[0].tail) > 0 &&
+         find_str_in_file(CURRENT_PROC_FABRIC_ERROR_NAME, fabric_fakes_array[1].keyword, fabric_fakes_array[1].tail) > 0 ) {
             /* Got it, it's a fake!! */
             strncpy(crashtype, fabric_fakes_array[i].name, sizeof(crashtype)-1);
             if (!strncmp(reason, "HWWDT_RESET", strlen("HWWDT_RESET")))
                 strcat(reason,"_FAKE");
-            break;
-        }
     }
 
     if (crashtype[0] == 0) {
