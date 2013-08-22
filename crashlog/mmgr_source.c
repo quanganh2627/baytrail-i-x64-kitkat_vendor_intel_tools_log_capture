@@ -216,6 +216,7 @@ int mmgr_get_fd()
 }
 
 void init_mmgr_cli_source(void){
+    int ret = 0;
     LOGD("init_mmgr_cli_source");
     if (mmgr_hdl){
         close_mmgr_cli_source();
@@ -230,7 +231,24 @@ void init_mmgr_cli_source(void){
     mmgr_cli_subscribe_event(mmgr_hdl, mdm_CORE_DUMP_COMPLETE, E_MMGR_NOTIFY_CORE_DUMP_COMPLETE);
     mmgr_cli_subscribe_event(mmgr_hdl, mdm_AP_RESET, E_MMGR_NOTIFY_AP_RESET);
     mmgr_cli_subscribe_event(mmgr_hdl, mdm_TEL_ERROR, E_MMGR_NOTIFY_ERROR);
-    mmgr_cli_connect(mmgr_hdl);
+
+    uint32_t iMaxTryConnect = MAX_WAIT_MMGR_CONNECT_SECONDS * 1000 / MMGR_CONNECT_RETRY_TIME_MS;
+
+    while (iMaxTryConnect-- != 0) {
+
+        /* Try to connect */
+        ret = mmgr_cli_connect (mmgr_hdl);
+
+        if (ret == E_ERR_CLI_SUCCEED) {
+
+            break;
+        }
+
+        LOGE("Delaying mmgr_cli_connect %d", ret);
+
+        /* Wait */
+        usleep(MMGR_CONNECT_RETRY_TIME_MS * 1000);
+    }
     // pipe init
     pipe(mmgr_monitor_fd);
 }

@@ -46,6 +46,8 @@
 #define CPBUFFERSIZE            (4*KB)
 #define SIZE_FOOTPRINT_MAX      ((PROPERTY_VALUE_MAX + 1) * 11)
 #define TIMEOUT_VALUE           (20*1000)
+#define MAX_WAIT_MMGR_CONNECT_SECONDS  5
+#define MMGR_CONNECT_RETRY_TIME_MS     200
 #define CMDSIZE_MAX             ((21*20) + 1)
 #define UPTIME_FREQUENCY        (5 * 60)
 #define MMGRMAXSTRING           (20)
