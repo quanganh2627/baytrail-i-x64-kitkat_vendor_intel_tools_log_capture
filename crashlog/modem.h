@@ -15,25 +15,23 @@
  */
 
 /**
- * @file mmgr_source.h
- * @brief File containing functions to handle modem manager source and events
- * coming from this source.
+ * @file modem.h
+ * @brief File containing functions to handle the processing of modem events.
  *
- * This file contains the functions to handle the modem manager source (init,
- * closure, events reading from socket) and the functions to process the
- * different kinds of events read from this source.
+ * This file contains the functions to handle the processing of modem events and
+ * modem shutdown events.
  */
 
-#ifndef MMGR_SOURCE_H_INCLUDED
-#define MMGR_SOURCE_H_INCLUDED
+#ifndef __MODEM_H__
+#define __MODEM_H__
 
-#include <stdlib.h>
+#include "privconfig.h"
+#include "inotify_handler.h"
 
-#include "mmgr_cli.h"
+#include <sys/types.h>
 
-int mmgr_get_fd();
-void init_mmgr_cli_source(void);
-void close_mmgr_cli_source(void);
-int mmgr_handle(void);
+int process_modem_event(struct watch_entry *entry, struct inotify_event *event);
+int crashlog_check_modem_shutdown();
+int process_modem_generic(struct watch_entry *entry, struct inotify_event *event, int fd);
 
-#endif
+#endif /* __MODEM_H__ */

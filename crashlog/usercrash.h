@@ -1,4 +1,4 @@
-/* * Copyright (C) Intel 2010
+/* Copyright (C) Intel 2013
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,25 +15,18 @@
  */
 
 /**
- * @file mmgr_source.h
- * @brief File containing functions to handle modem manager source and events
- * coming from this source.
- *
- * This file contains the functions to handle the modem manager source (init,
- * closure, events reading from socket) and the functions to process the
- * different kinds of events read from this source.
+ * @file usercrash.h
+ * @brief File containing functions to process 'generic' events (javacrash,
+ * tombstone, hprof and apcore events).
  */
 
-#ifndef MMGR_SOURCE_H_INCLUDED
-#define MMGR_SOURCE_H_INCLUDED
+#ifndef __USERCRASH__H__
+#define __USERCRASH__H__
 
-#include <stdlib.h>
+#include "inotify_handler.h"
 
-#include "mmgr_cli.h"
-
-int mmgr_get_fd();
-void init_mmgr_cli_source(void);
-void close_mmgr_cli_source(void);
-int mmgr_handle(void);
+int process_usercrash_event(struct watch_entry *entry, struct inotify_event *event);
+int process_hprof_event(struct watch_entry *entry, struct inotify_event *event);
+int process_apcore_event(struct watch_entry *entry, struct inotify_event *event);
 
 #endif
