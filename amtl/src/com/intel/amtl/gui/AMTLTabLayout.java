@@ -49,6 +49,7 @@ import com.intel.amtl.modem.Gsmtty;
 import com.intel.amtl.modem.GsmttyManager;
 import com.intel.amtl.modem.ModemController;
 import com.intel.amtl.platform.Platform;
+import com.intel.internal.telephony.MmgrClientException;
 import com.intel.internal.telephony.ModemStatus;
 
 import java.io.FileInputStream;
@@ -279,8 +280,14 @@ public class AMTLTabLayout extends Activity implements GeneralSetupFrag.GSFCallB
     public void onResume() {
         super.onResume();
         if (this.mdmCtrl != null) {
-            this.mdmCtrl.acquireResource();
-            this.mdmCtrl.openTty();
+            try {
+                this.mdmCtrl.acquireResource();
+                this.mdmCtrl.openTty();
+            } catch (MmgrClientException ex) {
+                Log.e(TAG, MODULE + ": Cannot acquire modem resource " + ex);
+                UIHelper.exitDialog(this,
+                        "Cannot acquire modem resource ", "AMTL will exit: " + ex);
+            }
         }
     }
 
