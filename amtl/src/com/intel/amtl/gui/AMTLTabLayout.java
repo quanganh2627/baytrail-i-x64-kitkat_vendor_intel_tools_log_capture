@@ -96,6 +96,8 @@ public class AMTLTabLayout extends Activity implements GeneralSetupFrag.GSFCallB
 
     private Boolean buttonChanged = false;
 
+    private Boolean firstCreated = true;
+
     // Telephony stack check - in order to enable it if disabled
     private TelephonyStack telStackSetter;
 
@@ -172,12 +174,14 @@ public class AMTLTabLayout extends Activity implements GeneralSetupFrag.GSFCallB
                 pushFragments(tabId, tab1_frag);
                 tab1_frag.setExpertConf(expertModemConf);
                 tab1_frag.setButtonChanged(buttonChanged);
+                tab1_frag.setFirstCreated(firstCreated);
             } else if (tabId.equals(TAB2_FRAG_NAME)) {
                 pushFragments(tabId, tab2_frag);
                 tab2_frag.setButtonChanged(buttonChanged);
             } else if(tabId.equals(TAB3_FRAG_NAME)) {
                 pushFragments(tabId, tab3_frag);
             }
+            firstCreated = false;
         }
     };
 
@@ -226,7 +230,7 @@ public class AMTLTabLayout extends Activity implements GeneralSetupFrag.GSFCallB
                         "Error during XML configuration file parsing ", "AMTL will exit: "
                         + ex.getMessage());
             }
-
+            this.firstCreated = true;
             tab1_frag = new GeneralSetupFrag(this.configOutputs);
             tab2_frag = new MasterSetupFrag();
             tab3_frag = new ExpertSetupFrag();

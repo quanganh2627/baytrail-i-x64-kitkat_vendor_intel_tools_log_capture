@@ -99,6 +99,8 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
 
     private Boolean buttonChanged;
 
+    private Boolean firstCreated;
+
     // Target fragment for progress popup.
     private FragmentManager gsfManager;
     // Callback object pointer. Active only when associated to Main layout.
@@ -215,6 +217,10 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
         }
     }
 
+    public void setFirstCreated(boolean created) {
+        this.firstCreated = created;
+    }
+
     // retrieve the property value to know if expert mode is set
     private boolean isExpertModeEnabled() {
         boolean ret = false;
@@ -279,6 +285,28 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
     }
 
     @Override
+    public void onResume() {
+        super.onResume();
+        if (!firstCreated) {
+            // update modem status when returning from another fragment
+            if (ModemController.getModemStatus() == ModemStatus.UP) {
+                try {
+                    ModemController mdmCtrl = ModemController.get();
+                    this.currentModemConf = checkModemConfig(mdmCtrl);
+                    this.mtsMgr.printMtsProperties();
+                    this.updateUi(this.currentModemConf);
+                    this.setUIEnabled();
+                    mdmCtrl = null;
+                } catch (ModemControlException ex) {
+                    Log.e(TAG, MODULE + ": fail to send command to the modem " + ex);
+                }
+            } else if (ModemController.getModemStatus() == ModemStatus.DOWN) {
+                this.setUIDisabled();
+            }
+        }
+    }
+
+    @Override
     public void onDestroy() {
         this.context.unregisterReceiver(mMessageReceiver);
         super.onDestroy();
@@ -308,13 +336,6 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
 
         this.defineExecConfButton(view);
         this.defineSaveLogsButton(view);
-
-         // update modem status when returning from another fragment
-         if (ModemController.getModemStatus() == ModemStatus.UP) {
-             this.setUIEnabled();
-         } else if (ModemController.getModemStatus() == ModemStatus.DOWN) {
-             this.setUIDisabled();
-         }
 
         return view;
     }
