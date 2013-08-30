@@ -5,6 +5,7 @@ PRODUCT_COPY_FILES += \
         $(LOCAL_PATH)/TANGIER_XMM_6360.cfg:system/etc/amtl/catalog/TANGIER_XMM_6360.cfg \
         $(LOCAL_PATH)/TANGIER_XMM_7160_REV3.cfg:system/etc/amtl/catalog/TANGIER_XMM_7160_REV3.cfg \
         $(LOCAL_PATH)/TANGIER_XMM_7160_REV3_5.cfg:system/etc/amtl/catalog/TANGIER_XMM_7160_REV3_5.cfg \
+        $(LOCAL_PATH)/TANGIER_XMM_7160_REV4.cfg:system/etc/amtl/catalog/TANGIER_XMM_7160_REV4.cfg \
         $(LOCAL_PATH)/CLOVERVIEW_XMM_6268.cfg:system/etc/amtl/catalog/CLOVERVIEW_XMM_6268.cfg \
         $(LOCAL_PATH)/CLOVERVIEW_XMM_6360.cfg:system/etc/amtl/catalog/CLOVERVIEW_XMM_6360.cfg \
         $(LOCAL_PATH)/CLOVERVIEW_XMM_7160.cfg:system/etc/amtl/catalog/CLOVERVIEW_XMM_7160.cfg \
