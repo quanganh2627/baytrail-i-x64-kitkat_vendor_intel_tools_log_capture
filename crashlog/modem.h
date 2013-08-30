@@ -32,6 +32,7 @@
 
 int process_modem_event(struct watch_entry *entry, struct inotify_event *event);
 int crashlog_check_modem_shutdown();
+int crashlog_check_mpanic_abort();
 int process_modem_generic(struct watch_entry *entry, struct inotify_event *event, int fd);
 
 #endif /* __MODEM_H__ */

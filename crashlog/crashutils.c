@@ -629,12 +629,15 @@ int create_minimal_crashfile(char * event, const char* type, const char* path, c
                     break;
                 }
                 char value[PATHMAX] = "";
-                fscanf(fd_panic, "%s", value);
-                fclose(fd_panic);
-                if (ismpanic)
+                if (ismpanic) {
+                    fscanf(fd_panic, "%s", value);
                     fprintf(fp,"DATA0=%s\n", value);
-                else // iscrashdata
-                    fprintf(fp,"%s\n", value);
+                }
+                else { // iscrashdata
+                    while (fgets(value,sizeof(value),fd_panic) && !strstr(value,"_END"))
+                        fprintf(fp,"%s\n", value);
+                }
+                fclose(fd_panic);
                 break;
             }
         }

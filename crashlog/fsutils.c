@@ -130,8 +130,10 @@ int find_oneofstrings_in_file(char *filename, char **keywords, int nbkeywords) {
  * Finds if file defined by filename contains given keyword and
  * if the matching line also ends with given tails (if provided).
  * It returns 1 if a match is found. 0 otherwise.
+ * This function does not work on virtual files such as files located
+ * in /proc directory.
  */
-int find_str_in_file(char *filename, char *keyword, char *tail) {
+int find_str_in_standard_file(char *filename, char *keyword, char *tail) {
     char buffer[MAXLINESIZE];
     int fd, linesize;
     int taillen;
@@ -167,6 +169,55 @@ int find_str_in_file(char *filename, char *keyword, char *tail) {
 
     close(fd);
     return (linesize > 0 ? 1 : 0);
+}
+
+/**
+ * Finds if file defined by filename contains given keyword and
+ * if the matching line also ends with given tails (if provided).
+ * It returns 1 if a match is found. 0 otherwise.
+ */
+int find_str_in_file(char *filename, char *keyword, char *tail)
+{
+    char buffer[4 * KB];
+    int rc = 0;
+    FILE *fd1;
+    struct stat info;
+    int buflen;
+
+    if (keyword == NULL || filename == NULL)
+        return -EINVAL;
+
+    if (stat(filename, &info) < 0) {
+        LOGE("%s: can not open file: %s - error is %s.\n", __FUNCTION__, filename, strerror(errno) );
+        return -errno;
+    }
+    fd1 = fopen(filename, "r");
+    if(fd1 == NULL) {
+        LOGE("%s : can not open file: %s - error is %s.\n", __FUNCTION__, filename, strerror(errno) );
+        return -errno;
+    }
+    while(!feof(fd1)){
+        if (fgets(buffer, sizeof(buffer), fd1) != NULL){
+            /* Check the keyword */
+            if (keyword && strstr(buffer,keyword)){
+                /* Check the tail? */
+                if (!tail){
+                    rc = 1;
+                    break;
+                } else{
+                    /* Do the tail's check*/
+                    int buflen = strlen(buffer);
+                    int str2len = strlen(tail);
+                    if ((buflen > str2len) && (!strncmp(&(buffer[buflen-str2len-1]), tail, strlen(tail)))){
+                        rc = 1;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    fclose(fd1);
+    return rc;
 }
 
 int get_value_in_file(char *file, char *keyword, char *value, unsigned int sizemax)
@@ -972,6 +1023,12 @@ void do_log_copy(char *mode, int dir, const char* timestamp, int type) {
             logfile1 = BPLOG_FILE_1;
             extension = ".istp";
             limit = 0; /* no limit size for bplogs copy */
+            break;
+        case BPLOG_TYPE_OLD:
+            logfile0 = BPLOG_FILE_1_OLD;
+            logfile1 = BPLOG_FILE_2_OLD;
+            extension = ".istp";
+            /* limit size remains for old bplogs*/
             break;
         default:
             /* Ignore unknown type, just return */

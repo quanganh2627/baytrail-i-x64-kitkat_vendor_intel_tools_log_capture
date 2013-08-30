@@ -247,6 +247,7 @@ static void early_check(char *encryptstate, int test) {
             strcpy(watchdog, "WDT_UNHANDLED");
     crashlog_check_kdump(startupreason, test);
     crashlog_check_modem_shutdown();
+    crashlog_check_mpanic_abort();
     crashlog_check_startupreason(startupreason, watchdog);
     crashlog_check_recovery();
 

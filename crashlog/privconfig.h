@@ -46,6 +46,8 @@
 #define CPBUFFERSIZE            (4*KB)
 #define SIZE_FOOTPRINT_MAX      ((PROPERTY_VALUE_MAX + 1) * 11)
 #define TIMEOUT_VALUE           (20*1000)
+#define MAX_WAIT_MMGR_CONNECT_SECONDS  5
+#define MMGR_CONNECT_RETRY_TIME_MS     200
 #define CMDSIZE_MAX             ((21*20) + 1)
 #define UPTIME_FREQUENCY        (5 * 60)
 #define MMGRMAXSTRING           (20)
@@ -105,6 +107,8 @@
 #define EXTRA_NAME              "EXTRA"
 #define NOTIFY_CONF_PATTERN     "INOTIFY"
 #define GENERAL_CONF_PATTERN    "GENERAL"
+#define MPANIC_ABORT            "COREDUMP_ABORTED_BY_PLATFORM_SHUTDOWN"
+
 
 /*
  * Take care that this enum is ALWAYS aligned with
@@ -142,6 +146,7 @@ enum {
     BPLOG_TYPE,
     APLOG_STATS_TYPE,
     KDUMP_TYPE,
+    BPLOG_TYPE_OLD,
 };
 /*Define uptime mode for raise_event function */
 enum {
@@ -226,6 +231,8 @@ enum {
 #define APLOG_FILE_1            LOGS_DIR "/aplog.1"
 #define BPLOG_FILE_0            LOGS_DIR "/bplog"
 #define BPLOG_FILE_1            LOGS_DIR "/bplog.1"
+#define BPLOG_FILE_1_OLD        LOGS_DIR "/bplog.1.istp"
+#define BPLOG_FILE_2_OLD        LOGS_DIR "/bplog.2.istp"
 #define LOGRESERVED             LOGS_DIR "/reserved"
 #define HISTORY_UPTIME          LOGS_DIR "/uptime"
 #define HISTORY_CORE_DIR        LOGS_DIR "/core"
@@ -273,6 +280,7 @@ enum {
 #define JAVACRASH_DUPLICATE_INFOERROR   "javacrash_duplicate_infoevent"
 #define UIWDT_DUPLICATE_INFOERROR       "uiwdt_duplicate_infoevent"
 #define CRASHLOG_CONF_PATH              "/system/etc/crashlog.conf"
+#define MCD_PROCESSING          LOGS_DIR "/mcd_processing"
 
 /* MACROS */
 #define MIN(a,b)                ((a) < (b) ? (a) : (b))

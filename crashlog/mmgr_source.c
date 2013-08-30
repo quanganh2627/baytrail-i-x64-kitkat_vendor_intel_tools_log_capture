@@ -94,7 +94,7 @@ int mdm_MRESET(mmgr_cli_event_t __attribute__((unused))*ev)
     return 0;
 }
 
-int mdm_CORE_DUMP(mmgr_cli_event_t *ev)
+int mdm_CORE_DUMP_COMPLETE(mmgr_cli_event_t *ev)
 {
     LOGD("Received E_MMGR_NOTIFY_CORE_DUMP_COMPLETE");
     int extra_int = 0, extra_string_len = 0;
@@ -108,40 +108,44 @@ int mdm_CORE_DUMP(mmgr_cli_event_t *ev)
     }
 
     switch (cd->state) {
-    //ENUM WILL be UPDATED
-    case E_CD_FAILED:
-        LOGW("core dump not retrived");
-        // use -1 value to indicate a CD failed
-        extra_int = -1;
+    case E_CD_TIMEOUT:
+        LOGW("COREDUMP_TIMEOUT");
+        // use 1 value to indicate timeout error
+        extra_int = 1;
         break;
-    case E_CD_FAILED_WITH_PANIC_ID:
-        LOGW("FAILED_WITH_PANIC_ID");
-        LOGD("panic id: %d", cd->panic_id);
-        extra_int = cd->panic_id;
+    case E_CD_LINK_ERROR:
+        LOGW("COREDUMP_LINK_ERROR");
+        // use 2 value to indicate link error
+        extra_int = 2;
         break;
-    case E_CD_SUCCEED_WITHOUT_PANIC_ID:
-        LOGD("No panic id");
-        // use -2 value to indicate an empty panic ID to crashlogd
-        extra_int = -2;
-        copy_cd = 1;
+    case E_CD_PROTOCOL_ERROR:
+        LOGD("COREDUMP_PROTOCOL_ERROR");
+        // use 2 value to indicate protocole error
+        extra_int = 3;
+        break;
+    case E_CD_SELF_RESET:
+        LOGD("COREDUMP_SELF_RESET");
+        // use 2 value to indicate self reset
+        extra_int = 4;
         break;
     case E_CD_SUCCEED:
-        LOGD("panic id: %d", cd->panic_id);
-        extra_int = cd->panic_id;
+        extra_int = 0;
         copy_cd = 1;
         break;
     default:
         LOGE("Unknown core dump state");
-        // use -3 value to indicate an unknown state to crashlogd
-        extra_int = -3;
+        // use 5 value to indicate an unknown state to crashlogd
+        extra_int = 5;
         break;
     }
-    if ( (cd->len < MMGRMAXEXTRA) && (copy_cd == 1) ) {
-        extra_string_len = cd->len;
+    if ((cd->path_len < MMGRMAXEXTRA) && (copy_cd == 1) ) {
+        extra_string_len = cd->path_len;
         extra_string = cd->path;
-        LOGD("core dump path: %s", cd->path);
-    } else if (copy_cd == 1) {
-        LOGE("%s: length error : %lu", __FUNCTION__, (unsigned long)cd->len);
+        LOGD("core dump path: %s", extra_string);
+    }else if ((cd->reason_len < MMGRMAXEXTRA) && (copy_cd == 0) ){
+        extra_string_len = cd->reason_len;
+        extra_string = cd->reason;
+        LOGE("mdm_CORE_DUMP error : %s", extra_string);
     }
 
     write_mmgr_monitor_with_extras("MPANIC", extra_string, extra_string_len, extra_int);
@@ -195,6 +199,16 @@ int mdm_TEL_ERROR(mmgr_cli_event_t *ev)
     return 0;
 }
 
+int mdm_CORE_DUMP(mmgr_cli_event_t *ev)
+{
+    LOGD("Received E_MMGR_NOTIFY_CORE_DUMP");
+    struct mmgr_data cur_data;
+    strncpy(cur_data.string,"START_CD\0",sizeof(cur_data.string));
+    //TO DO update with write_mmgr_monitor_with_extras
+    write(mmgr_monitor_fd[1], &cur_data, sizeof( struct mmgr_data));
+    return 0;
+}
+
 
 int mmgr_get_fd()
 {
@@ -202,20 +216,39 @@ int mmgr_get_fd()
 }
 
 void init_mmgr_cli_source(void){
+    int ret = 0;
     LOGD("init_mmgr_cli_source");
     if (mmgr_hdl){
         close_mmgr_cli_source();
     }
     mmgr_hdl = NULL;
     mmgr_cli_create_handle(&mmgr_hdl, "crashlogd", NULL);
+    mmgr_cli_subscribe_event(mmgr_hdl, mdm_CORE_DUMP, E_MMGR_NOTIFY_CORE_DUMP);
     mmgr_cli_subscribe_event(mmgr_hdl, mdm_SHUTDOWN, E_MMGR_NOTIFY_MODEM_SHUTDOWN);
     mmgr_cli_subscribe_event(mmgr_hdl, mdm_REBOOT, E_MMGR_NOTIFY_PLATFORM_REBOOT);
     mmgr_cli_subscribe_event(mmgr_hdl, mdm_OUT_OF_SERVICE, E_MMGR_EVENT_MODEM_OUT_OF_SERVICE);
     mmgr_cli_subscribe_event(mmgr_hdl, mdm_MRESET, E_MMGR_NOTIFY_SELF_RESET);
-    mmgr_cli_subscribe_event(mmgr_hdl, mdm_CORE_DUMP, E_MMGR_NOTIFY_CORE_DUMP_COMPLETE);
+    mmgr_cli_subscribe_event(mmgr_hdl, mdm_CORE_DUMP_COMPLETE, E_MMGR_NOTIFY_CORE_DUMP_COMPLETE);
     mmgr_cli_subscribe_event(mmgr_hdl, mdm_AP_RESET, E_MMGR_NOTIFY_AP_RESET);
     mmgr_cli_subscribe_event(mmgr_hdl, mdm_TEL_ERROR, E_MMGR_NOTIFY_ERROR);
-    mmgr_cli_connect(mmgr_hdl);
+
+    uint32_t iMaxTryConnect = MAX_WAIT_MMGR_CONNECT_SECONDS * 1000 / MMGR_CONNECT_RETRY_TIME_MS;
+
+    while (iMaxTryConnect-- != 0) {
+
+        /* Try to connect */
+        ret = mmgr_cli_connect (mmgr_hdl);
+
+        if (ret == E_ERR_CLI_SUCCEED) {
+
+            break;
+        }
+
+        LOGE("Delaying mmgr_cli_connect %d", ret);
+
+        /* Wait */
+        usleep(MMGR_CONNECT_RETRY_TIME_MS * 1000);
+    }
     // pipe init
     pipe(mmgr_monitor_fd);
 }
@@ -277,7 +310,7 @@ static int compute_mmgr_param(char *type, int *mode, char *name, int *aplog, int
         sprintf(name, "%s", ERROREVENT);
         *aplog = 1;
         *log_mode = APLOG_STATS_TYPE;
-    } else{
+    } else  if (!strstr(type, "START_CD" )){
         //unknown event name
         LOGE("%s: wrong type found in mmgr_get_fd : %s.\n", __FUNCTION__, type);
         return -1;
@@ -317,6 +350,7 @@ int mmgr_handle(void) {
     data0[0] = 0;
     data1[0] = 0;
     data2[0] = 0;
+    data3[0] = 0;
     cd_path[0] = 0;
     destion[0] = 0;
     destion2[0] = 0;
@@ -342,18 +376,27 @@ int mmgr_handle(void) {
     }
     //set DATA0/1 value
     if (strstr(type, "MPANIC" )) {
-        LOGD("Extra int value : %d ", cur_data.extra_int);
-        if (cur_data.extra_int >= 0){
-            snprintf(data0,sizeof(data0),"%d", cur_data.extra_int);
-        }else if (cur_data.extra_int == -1){
-            snprintf(data0,sizeof(data0),"%s", "CD_FAILED");
-        }else if (cur_data.extra_int == -2){
-            snprintf(data0,sizeof(data0),"%s", "NO_PANIC_ID");
-        }else if (cur_data.extra_int == -3){
-            snprintf(data0,sizeof(data0),"%s", "UNKNOWN");
+        LOGD("Extra int value : %d ",cur_data.extra_int);
+        if (cur_data.extra_int == 0){
+            snprintf(data0,sizeof(data0),"%s", "CD_SUCCEED");
+            snprintf(cd_path,sizeof(cd_path),"%s", cur_data.extra_string);
+        }else if(cur_data.extra_int >= 1 && cur_data.extra_int <= 5) {
+            if (cur_data.extra_int == 1){
+                snprintf(data0,sizeof(data0),"%s", "CD_TIMEOUT");
+            }else if (cur_data.extra_int == 2){
+                snprintf(data0,sizeof(data0),"%s", "CD_LINK_ERROR");
+            }else if (cur_data.extra_int == 3){
+                snprintf(data0,sizeof(data0),"%s", "CD_PROTOCOL_ERROR");
+            }else if (cur_data.extra_int == 4){
+                snprintf(data0,sizeof(data0),"%s", "CD_SELF_RESET");
+            }else if (cur_data.extra_int == 5){
+                snprintf(data0,sizeof(data0),"%s", "OTHER");
+            }
+            snprintf(data1,sizeof(data1),"%s", cur_data.extra_string);
         }
         LOGD("Extra string value : %s ",cur_data.extra_string);
-        snprintf(cd_path,sizeof(cd_path),"%s", cur_data.extra_string);
+        if (file_exists(MCD_PROCESSING))
+            remove(MCD_PROCESSING);
     } else if (strstr(type, "APIMR" )){
         LOGD("Extra string value : %s ",cur_data.extra_string);
         //need to put it in DATA3 to avoid conflict with parser
@@ -363,6 +406,13 @@ int mmgr_handle(void) {
         snprintf(data0,sizeof(data0),"%d", cur_data.extra_int);
         LOGD("Extra string value : %s ",cur_data.extra_string);
         snprintf(data1,sizeof(data1),"%s", cur_data.extra_string);
+    }else if (strstr(type, "START_CD" )){
+        FILE *fp = fopen(MCD_PROCESSING,"w");
+        if (fp == NULL){
+            LOGE("can not create file: %s\n", MCD_PROCESSING);
+        }
+        else fclose(fp);
+        return 0;
     }
 
     dir = find_new_crashlog_dir(event_mode);
