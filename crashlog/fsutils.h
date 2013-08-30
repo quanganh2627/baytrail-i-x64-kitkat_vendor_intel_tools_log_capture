@@ -93,8 +93,7 @@ int sdcard_allowed();
 
 int find_matching_file(char *dir_to_search, char *pattern, char *filename_found);
 int get_value_in_file(char *file, char *keyword, char *value, unsigned int sizemax);
-int find_str_in_file(char *filename, char *keyword, char *tail);
-int find_str_in_standard_file(char *filename, char *keyword, char *tail);
+int find_str_in_file(char *file, char *keyword, char *tail);
 int find_oneofstrings_in_file(char *file, char **keywords, int nbkeywords);
 int readline(int fd, char buffer[MAXLINESIZE]);
 int freadline(FILE *fd, char buffer[MAXLINESIZE]);
