@@ -84,6 +84,7 @@
 #define UNALIGNED_BLK_FS "NO_BLANKPHONE"
 // Add Recovery error crash type
 #define RECOVERY_ERROR "RECOVERY_ERROR"
+#define FACTORY_ERROR "FACTORY_ERROR"
 #define CRASHLOG_ERROR_DEAD "CRASHLOG_DEAD"
 #define CRASHLOG_ERROR_PATH "CRASHLOG_PATH"
 #define CRASHLOG_SWWDT_MISSING "SWWDT_MISSING"
@@ -4924,6 +4925,59 @@ static int crashlog_check_recovery(unsigned int files)
 }
 
 /**
+ * @brief generate FACTORY crash event
+ *
+ * When /factory failed to be mounted.
+ */
+static int crashlog_check_factory(unsigned int files)
+{
+    char date_tmp[32];
+    char cmd[PATHMAX];
+    char *dst;
+    time_t t;
+    int dir;
+    struct tm *time_tmp;
+    char key[SHA1_DIGEST_LENGTH+1];
+    char product[PROPERTY_VALUE_MAX];
+
+    property_get("ro.product.model", product, "");
+    if (strstr(product, "byt_t_") == product &&
+        find_str_in_file("/proc/mounts", "/factory", NULL) != 0) {
+        // compute dates
+        time(&t);
+        time_tmp = localtime((const time_t *)&t);
+        PRINT_TIME(date_tmp, TIME_FORMAT_2, time_tmp);
+        // compute crash id
+        compute_key(key, CRASHEVENT, FACTORY_ERROR);
+
+        // get output crash dir
+        dir = find_dir(files, CRASH_MODE);
+        if (dir == -1) {
+            LOGE("find dir %d for check factory failed\n", files);
+            LOGE("%-8s%-22s%-20s%s\n", CRASHEVENT, key, date_tmp, FACTORY_ERROR);
+            history_file_write(CRASHEVENT, FACTORY_ERROR, NULL, NULL, NULL, key, date_tmp);
+            del_file_more_lines(HISTORY_FILE);
+            return 0;
+        }
+
+        // build gzip command and dump file name
+        snprintf(cmd, sizeof(cmd), "gzip %s%d/mmcdump.bin.gz", CRASH_DIR, dir);
+        dst = cmd + strlen("gzip ");
+        dst[strlen(dst) - 3] = '\0';
+
+        // dump partition
+        do_copy_eof("/dev/block/mmcblk0p4", dst);
+        system(cmd);
+        dst[strlen(dst)] = '.';
+        LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, date_tmp, FACTORY_ERROR, dst);
+        // write event in history_event
+        history_file_write(CRASHEVENT, FACTORY_ERROR, NULL, dst, NULL, key, date_tmp);
+        del_file_more_lines(HISTORY_FILE);
+    }
+    return 0;
+}
+
+/**
  * @brief generate WDT crash event
  *
  * If startup reason contains HWWDT or SWWDT, generate a WDT crash event.
@@ -5538,6 +5592,7 @@ next:
     crashlog_check_modem_shutdown(startupreason, files);
     crashlog_check_startupreason(startupreason, watchdog, files);
     crashlog_check_recovery(files);
+    crashlog_check_factory(files);
 
     time(&t);
     time_tmp = localtime((const time_t *)&t);
