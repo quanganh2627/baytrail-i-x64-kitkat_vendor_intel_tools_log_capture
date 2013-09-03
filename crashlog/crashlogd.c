@@ -264,6 +264,13 @@ char CURRENT_PANIC_CONSOLE_NAME[PATHMAX]={PANIC_CONSOLE_NAME};
 char CURRENT_PROC_FABRIC_ERROR_NAME[PATHMAX]={PROC_FABRIC_ERROR_NAME};
 char CURRENT_KERNEL_CMDLINE[PATHMAX]={KERNEL_CMDLINE};
 
+#define KDUMP_START_FLAG "/data/media/logs/kdump/kdumphappened"
+#define KDUMP_FILE_NAME "/data/media/logs/kdump/kdumpfile.core"
+#define KDUMP_FINISH_FLAG "/data/media/logs/kdump/kdumpfinished"
+#define KDUMP_CRASH "KDUMP"
+#define KDUMP_CRASH_DIR "/data/media/logs/crashlog"
+
+
 char *CRASH_DIR = NULL;
 char *STATS_DIR = NULL;
 char *APLOGS_DIR = NULL;
@@ -613,11 +620,11 @@ static void do_log_copy(char *mode, int dir, char* ts, int type)
     if(type == BPLOG_TYPE){
         if(stat(BPLOG_FILE_0, &info) == 0){
             snprintf(destion,sizeof(destion), "%s%d/%s_%s_%s%s", CRASH_DIR, dir,strrchr(BPLOG_FILE_0,'/')+1,mode,ts,".istp");
-            do_copy(BPLOG_FILE_0,destion, FILESIZE_MAX);
+            do_copy(BPLOG_FILE_0,destion, 0);
             if(info.st_size < 1*1024*1024){
                 if(stat(BPLOG_FILE_1, &info) == 0){
                     snprintf(destion,sizeof(destion), "%s%d/%s_%s_%s%s", CRASH_DIR, dir,strrchr(BPLOG_FILE_1,'/')+1,mode,ts,".istp");
-                    do_copy(BPLOG_FILE_1,destion, FILESIZE_MAX);
+                    do_copy(BPLOG_FILE_1,destion, 0);
                 }
             }
         }
@@ -1874,6 +1881,7 @@ int sdcard_allowed()
 #define STATS_MODE 2
 #define APLOGS_MODE 3
 #define BZ_MODE 4
+#define KDUMP_MODE 5
 static void sdcard_available(int mode)
 {
     struct stat info;
@@ -1940,6 +1948,9 @@ static unsigned int find_dir(unsigned int max, int mode)
     case BZ_MODE:
         snprintf(path, sizeof(path), BZ_CURRENT_LOG);
         break;
+    case KDUMP_MODE:
+        snprintf(path, sizeof(path), CRASH_CURRENT_LOG);
+        break;
     default:
         snprintf(path, sizeof(path), STATS_CURRENT_LOG);
         break;
@@ -1994,6 +2005,9 @@ static unsigned int find_dir(unsigned int max, int mode)
         break;
     case BZ_MODE:
         dir = BZ_DIR;
+        break;
+    case KDUMP_MODE:
+        dir = KDUMP_CRASH_DIR;
         break;
     default:
         dir = STATS_DIR;
@@ -2842,8 +2856,16 @@ void process_aplog_and_bz_trigger(char *filename, char *name,  unsigned int file
 
             //In case of bz_trigger with BPLOG=1, copy bplog file
             if((bplogFlag == 1)) {
-                snprintf(destion,sizeof(destion),"%s%d/bplog", BZ_DIR,dir);
-                do_copy(BPLOG_FILE_0, destion, FILESIZE_MAX);
+                if(stat(BPLOG_FILE_0, &info) == 0){
+                    snprintf(destion,sizeof(destion), "%s%d/%s", BZ_DIR, dir,strrchr(BPLOG_FILE_0,'/')+1);
+                    do_copy(BPLOG_FILE_0,destion, 0);
+                    if(info.st_size < 1*1024*1024){
+                        if(stat(BPLOG_FILE_1, &info) == 0){
+                            snprintf(destion,sizeof(destion), "%s%d/%s", BZ_DIR, dir,strrchr(BPLOG_FILE_1,'/')+1);
+                            do_copy(BPLOG_FILE_1,destion, 0);
+                        }
+                    }
+                }
             }
 
             snprintf(destion,sizeof(destion),"%s%d/", BZ_DIR,dir);
@@ -4235,6 +4257,82 @@ static int crashlog_check_fabric(char *reason, unsigned int files)
     return 0;
 }
 
+static int crashlog_check_kdump(char *reason, unsigned int files)
+{
+    int start_flag = 0;
+    int file_flag = 0;
+    int finish_flag = 0;
+    int curr_stat = 0;
+    char *cur_event = NULL;
+    char date_tmp[32];
+    char date_tmp_2[32];
+    struct stat info;
+    time_t t;
+    char destion[PATHMAX];
+    unsigned int dir;
+    char key[SHA1_DIGEST_LENGTH+1];
+    struct tm *time_tmp;
+
+    if (stat(KDUMP_START_FLAG, &info) == 0)
+        start_flag = 1;
+    if (stat(KDUMP_FILE_NAME, &info) == 0)
+        file_flag = 1;
+    if (stat(KDUMP_FINISH_FLAG, &info) == 0)
+        finish_flag = 1;
+    if (finish_flag == 1){
+        curr_stat = 3;
+        cur_event = KDUMP_CRASH;
+    }
+    if ((finish_flag == 0) && (file_flag == 1)){
+        curr_stat = 2;
+        LOGE("KDUMP don't finish, maybe disk full or write timeout!!!\n");
+        crashlog_raise_infoerror("KDUMP don't finish, maybe disk full or write timeout", "DONTF");
+        return 0;
+    }
+    if ((finish_flag == 0) && (file_flag == 0) && (start_flag == 1)){
+        curr_stat = 1;
+        LOGE("KDUMP only enter, maybe user shutdown!!!\n");
+        crashlog_raise_infoerror("KDUMP only enter, maybe user shutdown", "ENTER");
+        return 0;
+    }
+
+    if ((curr_stat == 3) || (test_flag == 1)) {
+        time(&t);
+        time_tmp = localtime((const time_t *)&t);
+        PRINT_TIME(date_tmp, TIME_FORMAT_1, time_tmp);
+        PRINT_TIME(date_tmp_2, TIME_FORMAT_2, time_tmp);
+        dir = find_dir(files,KDUMP_MODE);
+
+        if (curr_stat == 2 || curr_stat == 3){
+            destion[0] = '\0';
+            snprintf(destion, sizeof(destion), "%s%d/%s_%s.core", KDUMP_CRASH_DIR, dir,
+            "kdumpfile", date_tmp);
+            do_mv(KDUMP_FILE_NAME, destion);
+        }
+
+        compute_key(key, CRASHEVENT, cur_event);
+        LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, date_tmp_2, cur_event, destion);
+        snprintf(destion,sizeof(destion), "%s%d/%s_%s_%s", KDUMP_CRASH_DIR, dir,strrchr(APLOG_FILE_0,'/')+1,cur_event,date_tmp);
+        do_copy(APLOG_FILE_0,destion, FILESIZE_MAX);
+        if(info.st_size < 1*1024*1024){
+            if(stat(APLOG_FILE_1, &info) == 0){
+                snprintf(destion,sizeof(destion), "%s%d/%s_%s_%s", KDUMP_CRASH_DIR, dir,strrchr(APLOG_FILE_1,'/')+1,cur_event,date_tmp);
+                do_copy(APLOG_FILE_1,destion, FILESIZE_MAX);
+            }
+        }
+
+        destion[0] = '\0';
+        snprintf(destion, sizeof(destion), "%s%d/", KDUMP_CRASH_DIR, dir);
+        history_file_write(CRASHEVENT, cur_event, NULL, destion, NULL, key, date_tmp_2);
+
+        del_file_more_lines(HISTORY_FILE);
+        remove(KDUMP_START_FLAG);
+        remove(KDUMP_FILE_NAME);
+        remove(KDUMP_FINISH_FLAG);
+    }
+    return 0;
+}
+
 static int crashlog_check_panic(char *reason, unsigned int files)
 {
     char date_tmp[32];
@@ -5212,6 +5310,7 @@ next:
             if (strstr(startupreason, "SWWDT_"))
                  strcpy(watchdog, "WDT_UNHANDLED");
 
+    crashlog_check_kdump(startupreason, files);
     crashlog_check_modem_shutdown(startupreason, files);
     crashlog_check_startupreason(startupreason, watchdog, files);
     crashlog_check_recovery(files);
