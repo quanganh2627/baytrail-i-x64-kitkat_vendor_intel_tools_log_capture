@@ -53,16 +53,56 @@ char gboardversion[PROPERTY_VALUE_MAX] = {0,};
 char guuid[256] = {0,};
 int gabortcleansd = 0;
 
-static struct tm *gcurrenttime = NULL;
+/**
+ * @brief Returns the date/time under the input format.
+ *
+ * if refresh requested, returns current date/time.
+ * if refresh not requested, returns previous computed time if available.
+ *
+ * @param[in] refresh : force date/time re-computing or not.
+ * @param[in] format : specifies requested date/time format.
+ * @retval           : the current system time under with specified formatting.
+ */
+const char *  __attribute__( ( noinline ) ) get_current_system_time(int refresh, enum time_format format) {
 
-char *get_time_formated(char *format, char *dest) {
+    int format_idx = 0;
+    /* Defines different formats type used by crashlog */
+    const struct { char *format; } date_time_format [] = {
+            [ DATE_FORMAT_SHORT ] = { "%Y%m%d" },
+            [ TIME_FORMAT_SHORT ] = { "%Y%m%d%H%M%S" },
+            [ TIME_FORMAT_LONG ]  = { "%Y-%m-%d/%H:%M:%S  " },
+    };
+    /* Array containing the current date/time under different formats */
+    static struct { char value[TIME_FORMAT_LENGTH]; } crashlog_time_array[] = {
+            [ DATE_FORMAT_SHORT ] = { {0,} },
+            [ TIME_FORMAT_SHORT ] = { {0,} },
+            [ TIME_FORMAT_LONG ]  = { {0,} },
+    };
+    /* to NOT refresh and time array already initialized : returns value previously computed */
+    if (!refresh && crashlog_time_array[format].value[0] != 0 )
+        return crashlog_time_array[format].value;
 
+    /* time array not initialized yet or to refresh : get system time and refresh current date/time array */
     time_t t;
+    if (time(&t) == (time_t)-1 )
+        LOGE("%s: Can't get current system time : use value previously got - error is %s", __FUNCTION__, strerror(errno));
+    else {
+        for ( format_idx = 0 ; format_idx < (int)DIM(crashlog_time_array); format_idx++ )
+            PRINT_TIME( crashlog_time_array[format_idx].value ,
+                        date_time_format[format_idx].format ,
+                        localtime((const time_t *)&t));
+    }
+    return crashlog_time_array[format].value;
+}
 
-    time(&t);
-    gcurrenttime = localtime((const time_t *)&t);
-    PRINT_TIME(dest, format, gcurrenttime);
-    return dest;
+const char *get_current_time_short(int refresh) {
+    return get_current_system_time( refresh, TIME_FORMAT_SHORT);
+}
+const char *get_current_date_short(int refresh) {
+    return get_current_system_time( refresh, DATE_FORMAT_SHORT);
+}
+const char *get_current_time_long(int refresh) {
+    return get_current_system_time( refresh, TIME_FORMAT_LONG);
 }
 
 unsigned long long get_uptime(int refresh, int *error)

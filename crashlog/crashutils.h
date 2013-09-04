@@ -30,10 +30,16 @@
 
 #include "inotify_handler.h"
 
-#define TIME_FORMAT_LENGTH	32
-#define DATE_FORMAT_SHORT   "%Y%m%d"
-#define TIME_FORMAT_SHORT   "%Y%m%d%H%M%S"
-#define TIME_FORMAT_LONG    "%Y-%m-%d/%H:%M:%S  "
+/* Define time formats */
+enum time_format {
+    DATE_FORMAT_SHORT = 0,
+    TIME_FORMAT_SHORT,
+    TIME_FORMAT_LONG,
+};
+
+#define TIME_FORMAT_LENGTH  32
+#define DUPLICATE_TIME_FORMAT    "%Y-%m-%d/%H:%M:%S"
+
 #define PRINT_TIME(var_tmp, format_time, local_time) {              \
     strftime(var_tmp, TIME_FORMAT_LENGTH, format_time, local_time); \
     var_tmp[TIME_FORMAT_LENGTH-1]=0;                                \
@@ -41,34 +47,9 @@
 
 char *get_time_formated(char *format, char *dest);
 
-static inline const char *get_current_time_short(int refresh) {
-
-    static char shorttime[TIME_FORMAT_LENGTH] = {0,};
-
-    if (!refresh && shorttime[0] != 0) return shorttime;
-
-    /* not initialized yet or to refresh */
-    return get_time_formated(TIME_FORMAT_SHORT, shorttime);
-}
-static inline const char *get_current_date_short(int refresh) {
-
-    static char shortdate[TIME_FORMAT_LENGTH] = {0,};
-
-    if (!refresh && shortdate[0] != 0) return shortdate;
-
-    /* not initialized yet or to refresh */
-    return get_time_formated(DATE_FORMAT_SHORT, shortdate);
-}
-
-static inline const char *get_current_time_long(int refresh) {
-
-    static char longtime[TIME_FORMAT_LENGTH] = {0,};
-
-    if (!refresh && longtime[0] != 0) return longtime;
-
-    /* not initialized yet or to refresh */
-    return get_time_formated(TIME_FORMAT_LONG, longtime);
-}
+const char *get_current_time_long(int refresh);
+const char *get_current_time_short(int refresh);
+const char *get_current_date_short(int refresh);
 
 unsigned long long get_uptime(int refresh, int *error);
 
