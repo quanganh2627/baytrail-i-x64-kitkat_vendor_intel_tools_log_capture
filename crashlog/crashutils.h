@@ -28,6 +28,8 @@
 #ifndef __CRASHUTILS_H__
 #define __CRASHUTILS_H__
 
+#include "inotify_handler.h"
+
 #define TIME_FORMAT_LENGTH	32
 #define DATE_FORMAT_SHORT   "%Y%m%d"
 #define TIME_FORMAT_SHORT   "%Y%m%d%H%M%S"
@@ -96,7 +98,7 @@ const char *get_build_footprint();
 int create_minimal_crashfile(char * event, const char* type, const char* path,
                char* key, const char* uptime, const char* date, int data_ready);
 
-
-void process_info_and_error(char *filename, char *name);
+int process_info_and_error_inotify_callback(struct watch_entry *entry, struct inotify_event *event);
+int process_info_and_error(char *filename, char *name);
 
 #endif /* __CRASHUTILS_H__ */

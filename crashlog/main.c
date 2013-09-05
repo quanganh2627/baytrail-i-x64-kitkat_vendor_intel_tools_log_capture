@@ -431,6 +431,8 @@ int do_monitor() {
 #ifdef FULL_REPORT
     set_watch_entry_callback(HPROF_TYPE,        process_hprof_event);
     set_watch_entry_callback(STATTRIG_TYPE,     process_stat_event);
+    set_watch_entry_callback(INFOTRIG_TYPE,     process_info_and_error_inotify_callback);
+    set_watch_entry_callback(ERRORTRIG_TYPE,    process_info_and_error_inotify_callback);
     set_watch_entry_callback(CMDTRIG_TYPE,      process_command_event);
     set_watch_entry_callback(APCORE_TYPE,       process_apcore_event);
 #endif

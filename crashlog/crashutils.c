@@ -387,6 +387,22 @@ int get_build_board_versions(char *filename, char *buildver, char *boardver) {
     return ((buildver[0] != 0 && boardver[0] != 0) ? 0 : -1);
 }
 
+/**
+ * @brief This function is only an interface of the process_info_and_error function
+ * called as a callback by the inotify-watcher mechanism when a info-error
+ * file is triggered.
+ *
+ * @param[in] entry : watcher entry linked to the inotify event
+ * @param[in] event : the initial inotify event
+ */
+int process_info_and_error_inotify_callback(struct watch_entry *entry, struct inotify_event *event) {
+
+    if ( event->len )
+        return process_info_and_error(entry->eventpath, event->name);
+    else
+        return -1; /* Robustness */
+}
+
 /*
 * Name          : process_info_and_error
 * Description   : This function manages treatment of error and info
@@ -395,7 +411,7 @@ int get_build_board_versions(char *filename, char *buildver, char *boardver) {
 *   char *filename        -> path of watched directory/file
 *   char *name            -> name of the file inside the watched directory that has triggered the event
 */
-void process_info_and_error(char *filename, char *name) {
+int process_info_and_error(char *filename, char *name) {
     int dir;
     char path[PATHMAX];
     char destion[PATHMAX];
@@ -415,14 +431,14 @@ void process_info_and_error(char *filename, char *name) {
         snprintf(name_event,sizeof(name_event),"%s",ERROREVENT);
         snprintf(file_ext,sizeof(file_ext),"%s","_errorevent");
     }else{ /*Robustness*/
-        LOGE("Unknown stats trigger file\n");
-        return;
+        LOGE("%s: Can't handle input file\n", __FUNCTION__);
+        return -1;
     }
     snprintf(tmp,sizeof(tmp),"%s",name);
 
     dir = find_new_crashlog_dir(STATS_MODE);
     if (dir < 0) {
-        LOGE("find dir for stat trigger failed\n");
+        LOGE("%s: Cannot get a valid new crash directory...\n", __FUNCTION__);
         p = strstr(tmp,"trigger");
         if ( p ){
             strcpy(p,"data");
@@ -430,7 +446,7 @@ void process_info_and_error(char *filename, char *name) {
         key = raise_event(name_event, tmp, NULL, NULL);
         LOGE("%-8s%-22s%-20s%s\n", name_event, key, get_current_time_long(0), tmp);
         free(key);
-        return;
+        return -1;
     }
     /*copy data file*/
     p = strstr(tmp,file_ext);
@@ -463,6 +479,7 @@ void process_info_and_error(char *filename, char *name) {
     key = raise_event(name_event, type, NULL, destion);
     LOGE("%-8s%-22s%-20s%s %s\n", name_event, key, get_current_time_long(0), type, destion);
     free(key);
+    return 0;
 }
 
 /**
