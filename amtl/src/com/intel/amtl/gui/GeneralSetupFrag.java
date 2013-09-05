@@ -280,8 +280,10 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
         }
 
         context = AMTLTabLayout.ctx;
-        context.registerReceiver(mMessageReceiver, new IntentFilter("modem-event"));
-        mtsMgr = new MtsManager();
+        if (context != null) {
+            context.registerReceiver(mMessageReceiver, new IntentFilter("modem-event"));
+            mtsMgr = new MtsManager();
+        }
     }
 
     @Override
@@ -308,7 +310,9 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
 
     @Override
     public void onDestroy() {
-        this.context.unregisterReceiver(mMessageReceiver);
+        if (this.context != null) {
+            this.context.unregisterReceiver(mMessageReceiver);
+        }
         super.onDestroy();
     }
 
@@ -317,25 +321,29 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
             Bundle savedInstanceState) {
 
         View view = inflater.inflate(R.layout.generalsetupfraglayout, container, false);
-        if (view == null) {
-            UIHelper.exitDialog(this.getActivity(), "Error in UI", "AMTL will exit.");
+        if (view != null && context != null) {
+
+            this.sExpertMode = (Switch) view.findViewById(R.id.switchExpertMode);
+            this.tvModemStatus = (TextView) view.findViewById(R.id.modemStatusValueTxt);
+            this.tvMtsStatus = (TextView) view.findViewById(R.id.mtsStatusValueTxt);
+            this.ll = (LinearLayout) view.findViewById(R.id.generalsetupfraglayout);
+
+            // definition of switch listeners
+            if (this.configArray != null) {
+                for (LogOutput o: configArray) {
+                    o.setConfigSwitch(ll, configArray.lastIndexOf(o), context, view);
+                }
+            }
+
+            this.defineExecConfButton(view);
+            this.defineSaveLogsButton(view);
+        } else {
+
+            UIHelper.exitDialog(this.getActivity(), "Error in UI", "View cannot be displayed.\n"
+                    + "AMTL will exit.");
+            Log.e(TAG, MODULE + ": context or view are null, AMTL will exit");
             // This is a UI bug - AMTL will end
         }
-
-        this.sExpertMode = (Switch) view.findViewById(R.id.switchExpertMode);
-        this.tvModemStatus = (TextView) view.findViewById(R.id.modemStatusValueTxt);
-        this.tvMtsStatus = (TextView) view.findViewById(R.id.mtsStatusValueTxt);
-        this.ll = (LinearLayout) view.findViewById(R.id.generalsetupfraglayout);
-
-        // definition of switch listeners
-        if (this.configArray != null) {
-            for (LogOutput o: configArray) {
-                o.setConfigSwitch(ll, configArray.lastIndexOf(o), context, view);
-            }
-        }
-
-        this.defineExecConfButton(view);
-        this.defineSaveLogsButton(view);
 
         return view;
     }
@@ -344,23 +352,26 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
     public void onViewCreated(View view, Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        if (this.configArray != null) {
-            for (LogOutput o: configArray) {
-                if (view != null) {
-                    view.findViewById(o.getSwitchId()).setOnClickListener(this);
-                    view.findViewById(o.getSwitchId()).setOnTouchListener(this);
+        if (view != null && context != null) {
+
+            if (this.configArray != null) {
+                for (LogOutput o: configArray) {
+                    if (view != null) {
+                        view.findViewById(o.getSwitchId()).setOnClickListener(this);
+                        view.findViewById(o.getSwitchId()).setOnTouchListener(this);
+                    }
                 }
             }
-        }
-        if (this.sExpertMode != null) {
-            this.sExpertMode.setOnTouchListener(this);
-            this.sExpertMode.setOnClickListener(this);
-        }
-        if (this.bAppConf != null) {
-            this.bAppConf.setOnClickListener(this);
-        }
-        if (this.bSavLog != null) {
-            this.bSavLog.setOnClickListener(this);
+            if (this.sExpertMode != null) {
+                this.sExpertMode.setOnTouchListener(this);
+                this.sExpertMode.setOnClickListener(this);
+            }
+            if (this.bAppConf != null) {
+                this.bAppConf.setOnClickListener(this);
+            }
+            if (this.bSavLog != null) {
+                this.bSavLog.setOnClickListener(this);
+            }
         }
     }
 

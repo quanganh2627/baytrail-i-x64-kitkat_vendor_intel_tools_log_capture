@@ -214,11 +214,6 @@ public class ModemController implements ModemEventListener, Closeable {
     }
 
     @Override
-    public void onModemWarmReset(ModemNotificationArgs args) {
-        Log.d(TAG, MODULE + ": Modem is performing a WARM RESET");
-    }
-
-    @Override
     public void onModemColdReset(ModemNotificationArgs args) {
         Log.d(TAG, MODULE + ": Modem is performing a COLD RESET");
     }

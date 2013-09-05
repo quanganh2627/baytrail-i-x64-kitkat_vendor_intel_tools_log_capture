@@ -944,40 +944,38 @@ int overwrite_file(char *filename, char *value) {
     return 0;
 }
 
-int read_file_prop_uid(char* propsource, char *filename, char *uid, char* defaultvalue) {
+int read_file_prop_uid(char* source, char *filename, char *uid, char* defaultvalue) {
     FILE *fd;
-    int res;
+    char buffer[MAXLINESIZE];
+    char temp_uid[PROPERTY_VALUE_MAX];
 
-    if ( !propsource || !filename || !uid || !defaultvalue )
-        return -EINVAL;
-
-    /*
-     * Get the property first as it seems to be the priority
-     * in the original algorithm
-     */
-    res = property_get(propsource, uid, NULL);
-    if (res > 0) return 0;
-
-    fd = fopen(filename, "w+");
-    if (fd == NULL) {
-        if (res < 0) {
-            strncpy(uid, defaultvalue, PROPERTY_VALUE_MAX);
-        }
-        return 0;
-    }
-
-    if (fscanf(fd, "%s", uid) == 1) {
-        /* Got the value in the file */
-        fclose(fd);
-        return 0;
-    }
-
-    /* Didn't get the property, nor the file but the file exists
-     * so, write the default value there... */
+    if ((source && filename && uid && defaultvalue) == 0)
+        return -1;
     strncpy(uid, defaultvalue, PROPERTY_VALUE_MAX);
-    fprintf(fd, "%s", defaultvalue);
-    do_chown(filename, PERM_USER, PERM_GROUP);
-    fclose(fd);
+    fd = fopen(filename, "r");
+    if (fd!=NULL){
+        freadline(fd, buffer);
+        strncpy(uid, buffer, PROPERTY_VALUE_MAX);
+        fclose(fd);
+    }
+
+    if (property_get(source, temp_uid, "") <= 0) {
+        LOGE("Property %s not readable\n", source);
+        return -1;
+    }
+    strncpy(uid, temp_uid, PROPERTY_VALUE_MAX);
+    if (strncmp(uid, buffer,PROPERTY_VALUE_MAX) != 0){
+        /*need to reopen file in w mode and write the property in the file*/
+        fd = fopen(filename, "w");
+        if (fd!=NULL){
+            fprintf(fd, "%s", uid);
+            do_chown(filename, PERM_USER, PERM_GROUP);
+            fclose(fd);
+        }else{
+            LOGE("Can't open file %s \n", filename);
+            return -1;
+        }
+    }
     return 0;
 }
 
