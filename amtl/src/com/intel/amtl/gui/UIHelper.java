@@ -26,6 +26,7 @@ import android.content.DialogInterface;
 import android.content.Context;
 import android.graphics.Color;
 import android.text.InputType;
+import android.util.Log;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.TextView;
@@ -94,6 +95,40 @@ public class UIHelper {
                         // if im is null, no specific issue, virtual keyboard will not be cleared
                         snaplog.setTag(snapshotTag);
                         logProgressFrag.launch(snaplog);
+                    }
+                })
+                .setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int whichButton) {
+                        /* Nothing to do */
+                    }
+                })
+                .show();
+    }
+
+    /* Print pop-up message with ok and cancel buttons to save */
+    public static void logTagDialog(final Activity A, String title, String message,
+            final Context context) {
+        final EditText saveInput = new EditText(context);
+        saveInput.setText("TAG_TO_SET_IN_LOGS", TextView.BufferType.EDITABLE);
+        saveInput.setTextColor(Color.parseColor("#66ccff"));
+        saveInput.setInputType(InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        new AlertDialog.Builder(A)
+                .setView(saveInput)
+                .setTitle(title)
+                .setMessage(message)
+                .setCancelable(false)
+                .setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int whichButton) {
+                        String logTag = saveInput.getText().toString();
+                        InputMethodManager imm = (InputMethodManager)
+                            A.getSystemService(context.INPUT_METHOD_SERVICE);
+                        if (imm != null) {
+                            imm.hideSoftInputFromWindow(saveInput.getWindowToken(), 0);
+                        }
+                        // if im is null, no specific issue, virtual keyboard will not be cleared
+                        Log.d("AMTL", "UIHelper: " + logTag);
                     }
                 })
                 .setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
