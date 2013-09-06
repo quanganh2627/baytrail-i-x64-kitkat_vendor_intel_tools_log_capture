@@ -150,6 +150,14 @@ static int compute_key(char* key, char *event, char *type)
     return 0;
 }
 
+static void check_prop_modemid(){
+    static int propFound = -1;
+    char prop[PROPERTY_VALUE_MAX];
+    if (propFound !=0){
+        propFound = read_file_prop_uid(MODEM_FIELD, MODEM_UUID, prop, "unknown");
+    }
+}
+
 char **commachain_to_fixedarray(char *chain,
         unsigned int recordsize, unsigned int maxrecords, int *res) {
     char *curptr, *copy, *psave, **array;
@@ -220,6 +228,9 @@ static char *priv_raise_event(char *event, char *type, char *subtype, char *log,
     char lastbootuptime[24];
     int res, hours;
     const char *datelong = get_current_time_long(1);
+
+    //check property of modemid at each event
+    check_prop_modemid();
 
     /* UPTIME      : event uptime value is get from system
      * UPTIME_BOOT : event uptime value get from history file first line
