@@ -421,6 +421,9 @@ int do_monitor() {
         LOGE("%s: failed to initialize the inotify handler - %s\n",
             __FUNCTION__, strerror(-file_monitor_fd));
         return -1;
+    } else if( get_missing_watched_dir_nb() ) {
+        /* One or several directories couldn't have been added to inotify watcher */
+        handle_missing_watched_dir(file_monitor_fd);
     }
 
     /* Set the inotify event callbacks */

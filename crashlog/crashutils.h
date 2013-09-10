@@ -79,6 +79,9 @@ const char *get_build_footprint();
 int create_minimal_crashfile(char * event, const char* type, const char* path,
                char* key, const char* uptime, const char* date, int data_ready);
 
+void build_crashenv_parameters( char * crashenv_param );
+void monitor_crashenv();
+
 int process_info_and_error_inotify_callback(struct watch_entry *entry, struct inotify_event *event);
 int process_info_and_error(char *filename, char *name);
 

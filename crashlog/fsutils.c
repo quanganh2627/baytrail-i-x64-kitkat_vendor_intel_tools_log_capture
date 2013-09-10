@@ -1113,6 +1113,41 @@ int str_simple_replace(char *str, char *search, char *replace)
     }
 }
 
+/**
+ * @brief extracts the parent directory of the input dir.
+ *
+ * @param dir        : input directory
+ * @param parent_dir : parent path of input directory
+ * @return : 0 if succeeds. -1 if fails.
+ */
+int get_parent_dir( char * dir, char *parent_dir )
+{
+    char path[PATHMAX];
+    char * ptr;
+
+    if ( !dir || !parent_dir )
+        return -EINVAL;
+
+    strncpy(path, dir, PATHMAX-1);
+    ptr = strrchr(path, '/');
+
+    if ( !ptr || strlen(path) <= 1 )
+        return -1;
+
+    /* Manage case path terminates by '/' character */
+    if ( *(ptr + 1) == '\0' ) {
+        *(ptr) = '\0';
+        ptr = strrchr(path, '/');
+    }
+    *(ptr + 1) = '\0';
+
+    if ( strlen(path) == 0 )
+        return -1;
+
+    strncpy( parent_dir, path, PATHMAX-1);
+    return 0;
+}
+
 long get_sd_size()
 {
     FILE *fd;
