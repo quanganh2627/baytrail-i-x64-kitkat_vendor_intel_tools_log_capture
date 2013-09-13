@@ -152,6 +152,9 @@ void do_last_kmsg_copy(int dir) {
     if ( file_exists(LAST_KMSG) ) {
         snprintf(destion, sizeof(destion), "%s%d/%s", CRASH_DIR, dir, LAST_KMSG_FILE);
         do_copy_tail(LAST_KMSG, destion, MAXFILESIZE);
+    } else if ( file_exists(CONSOLE_RAMOOPS) ) {
+        snprintf(destion, sizeof(destion), "%s%d/%s", CRASH_DIR, dir, CONSOLE_RAMOOPS_FILE);
+        do_copy_tail(CONSOLE_RAMOOPS, destion, MAXFILESIZE);
     }
 }
 

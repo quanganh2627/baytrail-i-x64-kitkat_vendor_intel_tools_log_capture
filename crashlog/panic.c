@@ -204,16 +204,31 @@ int crashlog_check_ram_panic(char *reason)
     time_t t;
     char destination[PATHMAX];
     char crashtype[32] = {'\0'};
-    int dir;
+    int dir,panic_found;
     char *key;
+    char ram_console[PATHMAX];
     const char *dateshort = get_current_time_short(1);
 
+    panic_found = 0;
     if (stat(LAST_KMSG, &info) == 0) {
-        if (!find_str_in_file(LAST_KMSG, "Kernel panic - not syncing:", NULL))
-             return 1; /* Not a PANIC : return */
+        strcpy(ram_console,LAST_KMSG);
+    } else if (stat(CONSOLE_RAMOOPS, &info) == 0) {
+        strcpy(ram_console,CONSOLE_RAMOOPS);
+    } else {
+        // no file found, should return
+        return 1;
+    }
 
-         do_copy(LAST_KMSG, SAVED_PANIC_RAM, MAXFILESIZE);
+    if (!find_str_in_file(ram_console, "Kernel panic - not syncing:", NULL)) {
+        return 1; /* Not a PANIC : return */
+    }
+    else {
+        // to be homogeneous with do_last_kmsg_copy, we use do_copy_tail
+        do_copy_tail(ram_console, SAVED_PANIC_RAM, MAXFILESIZE);
+        panic_found = 1;
+    }
 
+    if (panic_found) {
         if (find_str_in_file(SAVED_PANIC_RAM, "Kernel panic - not syncing: Kernel Watchdog", NULL))
             strcpy(crashtype, KERNEL_SWWDT_CRASH);
         else if  (find_str_in_file(SAVED_PANIC_RAM, "EIP is at pmu_sc_irq", NULL))

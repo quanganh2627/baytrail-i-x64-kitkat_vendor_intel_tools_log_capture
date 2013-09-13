@@ -196,6 +196,7 @@ enum {
 #define DATA_DIR                RESDIR "/data"
 #define SYS_DIR                 RESDIR "/system"
 #define CACHE_DIR               RESDIR "/cache"
+#define PSTORE_DIR              RESDIR "/pstore"
 #define PANIC_DIR               DATA_DIR "/dontpanic"
 #define SDCARD_LOGS_DIR         SDCARD_DIR "/logs"
 #define SDCARD_CRASH_DIR        SDCARD_LOGS_DIR "/crashlog"
@@ -245,6 +246,7 @@ enum {
 #define MODEM_SHUTDOWN_TRIGGER  LOGS_DIR "/modemcrash/mshutdown.txt"
 #define LOG_SPID                LOGS_DIR "/spid.txt"
 #define LAST_KMSG_FILE          "last_kmsg"
+#define CONSOLE_RAMOOPS_FILE    "console-ramoops"
 #define CONSOLE_NAME            "emmc_ipanic_console"
 #define CONSOLE_RAM             "ram_ipanic_console"
 #define THREAD_NAME             "emmc_ipanic_threads"
@@ -254,6 +256,7 @@ enum {
 #define CRASHFILE_NAME          "crashfile"
 #define BPLOG_NAME              "bplog"
 #define LAST_KMSG               PROC_DIR "/" LAST_KMSG_FILE
+#define CONSOLE_RAMOOPS         PSTORE_DIR "/" CONSOLE_RAMOOPS_FILE
 #define PANIC_CONSOLE_NAME      PROC_DIR "/" CONSOLE_NAME
 #define PANIC_THREAD_NAME       PROC_DIR "/" THREAD_NAME
 #define PROC_FABRIC_ERROR_NAME  PROC_DIR "/" FABRIC_ERROR_NAME
