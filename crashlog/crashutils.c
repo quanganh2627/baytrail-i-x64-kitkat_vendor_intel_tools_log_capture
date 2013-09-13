@@ -53,16 +53,56 @@ char gboardversion[PROPERTY_VALUE_MAX] = {0,};
 char guuid[256] = {0,};
 int gabortcleansd = 0;
 
-static struct tm *gcurrenttime = NULL;
+/**
+ * @brief Returns the date/time under the input format.
+ *
+ * if refresh requested, returns current date/time.
+ * if refresh not requested, returns previous computed time if available.
+ *
+ * @param[in] refresh : force date/time re-computing or not.
+ * @param[in] format : specifies requested date/time format.
+ * @retval           : the current system time under with specified formatting.
+ */
+const char *  __attribute__( ( noinline ) ) get_current_system_time(int refresh, enum time_format format) {
 
-char *get_time_formated(char *format, char *dest) {
+    int format_idx = 0;
+    /* Defines different formats type used by crashlog */
+    const struct { char *format; } date_time_format [] = {
+            [ DATE_FORMAT_SHORT ] = { "%Y%m%d" },
+            [ TIME_FORMAT_SHORT ] = { "%Y%m%d%H%M%S" },
+            [ TIME_FORMAT_LONG ]  = { "%Y-%m-%d/%H:%M:%S  " },
+    };
+    /* Array containing the current date/time under different formats */
+    static struct { char value[TIME_FORMAT_LENGTH]; } crashlog_time_array[] = {
+            [ DATE_FORMAT_SHORT ] = { {0,} },
+            [ TIME_FORMAT_SHORT ] = { {0,} },
+            [ TIME_FORMAT_LONG ]  = { {0,} },
+    };
+    /* to NOT refresh and time array already initialized : returns value previously computed */
+    if (!refresh && crashlog_time_array[format].value[0] != 0 )
+        return crashlog_time_array[format].value;
 
+    /* time array not initialized yet or to refresh : get system time and refresh current date/time array */
     time_t t;
+    if (time(&t) == (time_t)-1 )
+        LOGE("%s: Can't get current system time : use value previously got - error is %s", __FUNCTION__, strerror(errno));
+    else {
+        for ( format_idx = 0 ; format_idx < (int)DIM(crashlog_time_array); format_idx++ )
+            PRINT_TIME( crashlog_time_array[format_idx].value ,
+                        date_time_format[format_idx].format ,
+                        localtime((const time_t *)&t));
+    }
+    return crashlog_time_array[format].value;
+}
 
-    time(&t);
-    gcurrenttime = localtime((const time_t *)&t);
-    PRINT_TIME(dest, format, gcurrenttime);
-    return dest;
+const char *get_current_time_short(int refresh) {
+    return get_current_system_time( refresh, TIME_FORMAT_SHORT);
+}
+const char *get_current_date_short(int refresh) {
+    return get_current_system_time( refresh, DATE_FORMAT_SHORT);
+}
+const char *get_current_time_long(int refresh) {
+    return get_current_system_time( refresh, TIME_FORMAT_LONG);
 }
 
 unsigned long long get_uptime(int refresh, int *error)
@@ -387,6 +427,22 @@ int get_build_board_versions(char *filename, char *buildver, char *boardver) {
     return ((buildver[0] != 0 && boardver[0] != 0) ? 0 : -1);
 }
 
+/**
+ * @brief This function is only an interface of the process_info_and_error function
+ * called as a callback by the inotify-watcher mechanism when a info-error
+ * file is triggered.
+ *
+ * @param[in] entry : watcher entry linked to the inotify event
+ * @param[in] event : the initial inotify event
+ */
+int process_info_and_error_inotify_callback(struct watch_entry *entry, struct inotify_event *event) {
+
+    if ( event->len )
+        return process_info_and_error(entry->eventpath, event->name);
+    else
+        return -1; /* Robustness */
+}
+
 /*
 * Name          : process_info_and_error
 * Description   : This function manages treatment of error and info
@@ -395,7 +451,7 @@ int get_build_board_versions(char *filename, char *buildver, char *boardver) {
 *   char *filename        -> path of watched directory/file
 *   char *name            -> name of the file inside the watched directory that has triggered the event
 */
-void process_info_and_error(char *filename, char *name) {
+int process_info_and_error(char *filename, char *name) {
     int dir;
     char path[PATHMAX];
     char destion[PATHMAX];
@@ -415,14 +471,14 @@ void process_info_and_error(char *filename, char *name) {
         snprintf(name_event,sizeof(name_event),"%s",ERROREVENT);
         snprintf(file_ext,sizeof(file_ext),"%s","_errorevent");
     }else{ /*Robustness*/
-        LOGE("Unknown stats trigger file\n");
-        return;
+        LOGE("%s: Can't handle input file\n", __FUNCTION__);
+        return -1;
     }
     snprintf(tmp,sizeof(tmp),"%s",name);
 
     dir = find_new_crashlog_dir(STATS_MODE);
     if (dir < 0) {
-        LOGE("find dir for stat trigger failed\n");
+        LOGE("%s: Cannot get a valid new crash directory...\n", __FUNCTION__);
         p = strstr(tmp,"trigger");
         if ( p ){
             strcpy(p,"data");
@@ -430,7 +486,7 @@ void process_info_and_error(char *filename, char *name) {
         key = raise_event(name_event, tmp, NULL, NULL);
         LOGE("%-8s%-22s%-20s%s\n", name_event, key, get_current_time_long(0), tmp);
         free(key);
-        return;
+        return -1;
     }
     /*copy data file*/
     p = strstr(tmp,file_ext);
@@ -463,6 +519,7 @@ void process_info_and_error(char *filename, char *name) {
     key = raise_event(name_event, type, NULL, destion);
     LOGE("%-8s%-22s%-20s%s %s\n", name_event, key, get_current_time_long(0), type, destion);
     free(key);
+    return 0;
 }
 
 /**

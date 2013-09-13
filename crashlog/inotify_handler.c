@@ -65,6 +65,8 @@ struct watch_entry wd_array[] = {
     {0, CORE_DIR_MASK,      APCORE_TYPE,    APCORE_EVNAME,      HISTORY_CORE_DIR,   ".core",                    NULL},
     {0, CORE_DIR_MASK,      HPROF_TYPE,     HPROF_EVNAME,       HISTORY_CORE_DIR,   ".hprof",                   NULL},
     {0, STAT_DIR_MASK,      STATTRIG_TYPE,  STATSTRIG_EVNAME,   STAT_DIR,           "_trigger",                 NULL},
+    {0, STAT_DIR_MASK,      INFOTRIG_TYPE,  STATSTRIG_EVNAME,   STAT_DIR,           "_infoevent",               NULL},
+    {0, STAT_DIR_MASK,      ERRORTRIG_TYPE, STATSTRIG_EVNAME,   STAT_DIR,           "_errorevent",              NULL},
 #endif
     {0, APLOG_DIR_MASK,     APLOGTRIG_TYPE, APLOGTRIG_EVNAME,   APLOG_DIR,          "_trigger",                 NULL},
 #ifdef FULL_REPORT
