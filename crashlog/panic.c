@@ -136,9 +136,11 @@ int crashlog_check_panic(char *reason, int test) {
         /* Nothing to do */
         return 1;
     }
-
+    //legacy : copy console to data/dontpanic
+    do_copy_eof(PANIC_THREAD_NAME, SAVED_THREAD_NAME);
+    do_copy_eof(PANIC_CONSOLE_NAME, SAVED_CONSOLE_NAME);
+    //crashtype calculation should be done after SAVED_CONSOLE_NAME calculation
     set_ipanic_crashtype_and_reason(crashtype, reason);
-
     dir = find_new_crashlog_dir(CRASH_MODE);
     if (dir < 0) {
         LOGE("%s: Cannot get a valid new crash directory...\n", __FUNCTION__);
@@ -152,11 +154,12 @@ int crashlog_check_panic(char *reason, int test) {
     snprintf(destination, sizeof(destination), "%s%d/%s_%s.txt", CRASH_DIR, dir,
             THREAD_NAME, dateshort);
     do_copy(SAVED_THREAD_NAME, destination, MAXFILESIZE);
-    snprintf(destination,sizeof(destination),"%s%d/",CRASH_DIR,dir);
 
+    snprintf(destination,sizeof(destination),"%s%d/",CRASH_DIR,dir);
     destination[0] = '\0';
     snprintf(destination, sizeof(destination), "%s%d/%s_%s.txt", CRASH_DIR, dir,
             CONSOLE_NAME, dateshort);
+
     do_copy(SAVED_CONSOLE_NAME, destination, MAXFILESIZE);
 
     destination[0] = '\0';
@@ -169,6 +172,7 @@ int crashlog_check_panic(char *reason, int test) {
 
     destination[0] = '\0';
     snprintf(destination, sizeof(destination), "%s%d/", CRASH_DIR, dir);
+
     key = raise_event(CRASHEVENT, crashtype, NULL, destination);
     LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, get_current_time_long(0), crashtype, destination);
     free(key);

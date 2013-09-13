@@ -253,6 +253,7 @@ enum {
 #define BPLOG_NAME              "bplog"
 #define LAST_KMSG               PROC_DIR "/" LAST_KMSG_FILE
 #define PANIC_CONSOLE_NAME      PROC_DIR "/" CONSOLE_NAME
+#define PANIC_THREAD_NAME       PROC_DIR "/" THREAD_NAME
 #define PROC_FABRIC_ERROR_NAME  PROC_DIR "/" FABRIC_ERROR_NAME
 #define KERNEL_CMDLINE          PROC_DIR "/" CMDLINE_NAME
 #define PROC_UUID               PROC_DIR "/emmc0_id_entry"
