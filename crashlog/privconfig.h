@@ -215,6 +215,8 @@ enum {
 #define LOGS_MEDIA_DIR          DATA_DIR "/media/logs"
 #define KDUMP_DIR               LOGS_MEDIA_DIR "/kdump"
 #define SDSIZE_CURRENT_LOG      LOGS_DIR "/currentsdsize"
+#define REBOOT_DIR              RESDIR "/sys/kernel/debug/intel_scu_osnib"
+#define EVENTS_DIR              LOGS_DIR "/events"
 
 /* FILES */
 #define SYS_PROP                SYS_DIR "/build.prop"
@@ -283,6 +285,11 @@ enum {
 #define CRASHLOG_WATCHER_INFOEVENT      "crashlog_watcher_infoevent"
 #define CRASHLOG_CONF_PATH              "/system/etc/crashlog.conf"
 #define MCD_PROCESSING          LOGS_DIR "/mcd_processing"
+#define RESET_SOURCE_0          REBOOT_DIR "/RESETSRC0"
+#define RESET_SOURCE_1          REBOOT_DIR "/RESETSRC1"
+#define RESET_IRQ_1             REBOOT_DIR "/RESETIRQ1"
+#define RESET_IRQ_2             REBOOT_DIR "/RESETIRQ2"
+#define EVENTFILE_NAME          "eventfile"
 
 /* MACROS */
 #define MIN(a,b)                ((a) < (b) ? (a) : (b))
