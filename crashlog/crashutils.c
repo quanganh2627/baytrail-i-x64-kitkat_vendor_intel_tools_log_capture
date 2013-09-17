@@ -376,6 +376,15 @@ void restart_profile_srv(int serveridx) {
         start_daemon(profile_srv);
 }
 
+int check_running_modem_trace() {
+    char modemtrace[PROPERTY_VALUE_MAX];
+
+    property_get("init.svc.mtsp", modemtrace, "");
+    if (!strncmp(modemtrace, "running", 7))
+        return 1;
+    return 0;
+}
+
 void check_running_power_service() {
 #ifdef FULL_REPORT
     char powerservice[PROPERTY_VALUE_MAX];

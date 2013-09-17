@@ -73,6 +73,8 @@ char *create_crashdir_move_crashfile(char *origpath, char *crashfile, int copylo
 void start_daemon(const char *daemonname);
 void restart_profile_srv(int serveridx);
 void check_running_power_service();
+int check_running_modem_trace();
+
 
 int get_build_board_versions(char *filename, char *buildver, char *boardver);
 const char *get_build_footprint();
