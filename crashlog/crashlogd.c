@@ -184,7 +184,7 @@
 #define LAST_KMSG "/proc/last_kmsg"
 #define LAST_KMSG_FILE "last_kmsg"
 #define GBUFFER_FILE "/proc/emmc_ipanic_gbuffer"
-#define LM_DUMP_FILE "/d/lm_dump/lkm_buf0" /* entry point of LM_DUMP module */
+#define LM_DUMP_FILE "/d/lm_dump/lkm_buf1" /* buffer content exposed by LM_DUMP module */
 #define TIMESTAMP_MAX_SIZE 10 /* Unix style timestamp on 10 characters max.*/
 
 #define SAVED_PANIC_RAM "/data/dontpanic/ram_ipanic_console"
