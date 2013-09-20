@@ -39,25 +39,28 @@ public class ModemConf {
 
     public ModemConf(LogOutput config) {
         this.config = config;
+        this.atXsystrace = "AT+XSYSTRACE=1," + this.config.concatMasterPort();
+
         if (this.config.getXsio() != null) {
+
+            this.atXsystrace += "," + this.config.concatMasterOption();
             this.atXsio = "AT+XSIO=" + this.config.getXsio() + "\r\n";
-        }
-        this.atXsystrace = "AT+XSYSTRACE=1," + this.config.concatMasterPort() + ","
-                + this.config.concatMasterOption();
-        if (this.config.getOct() != null) {
-            this.atXsystrace += ",\"oct=";
-            this.atXsystrace += this.config.getOct();
-            this.atXsystrace += "\"";
-        }
-        if (this.config.getPti1() != null) {
-            this.atXsystrace += ",\"pti1=";
-            this.atXsystrace += this.config.getPti1();
-            this.atXsystrace += "\"";
-        }
-        if (this.config.getPti2() != null) {
-            this.atXsystrace += ",\"pti2=";
-            this.atXsystrace += this.config.getPti2();
-            this.atXsystrace += "\"";
+
+            if (this.config.getOct() != null) {
+                this.atXsystrace += ",\"oct=";
+                this.atXsystrace += this.config.getOct();
+                this.atXsystrace += "\"";
+            }
+            if (this.config.getPti1() != null) {
+                this.atXsystrace += ",\"pti1=";
+                this.atXsystrace += this.config.getPti1();
+                this.atXsystrace += "\"";
+            }
+            if (this.config.getPti2() != null) {
+                this.atXsystrace += ",\"pti2=";
+                this.atXsystrace += this.config.getPti2();
+                this.atXsystrace += "\"";
+            }
         }
         this.atXsystrace += "\r\n";
         if (!this.atXsio.equals("")) {

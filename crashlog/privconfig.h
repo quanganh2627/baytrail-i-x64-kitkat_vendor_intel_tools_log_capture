@@ -58,10 +58,6 @@
 #define PERM_GROUP              "log"
 #define STARTUP_STR             "androidboot.wakesrc="
 #define PER_UPTIME              "UPTIME"
-#define RECOVERY_ERROR          "RECOVERY_ERROR"
-#define CRASHLOG_ERROR_DEAD     "CRASHLOG_DEAD"
-#define CRASHLOG_ERROR_PATH     "CRASHLOG_PATH"
-#define CRASHLOG_SWWDT_MISSING  "SWWDT_MISSING"
 #define USBBOGUS                "USBBOGUS"
 #define ERROREVENT              "ERROR"
 #define CRASHEVENT              "CRASH"
@@ -99,6 +95,8 @@
 #define HPROF_EVNAME            "HPROF"
 #define STATSTRIG_EVNAME        "STTRIG"
 #define APLOGTRIG_EVNAME        "APLOGTRIG"
+#define INFOTRIG_EVNAME         "INFOTRIG"
+#define ERRORTRIG_EVNAME        "ERRORTRIG"
 #define CMDTRIG_EVNAME          "CMDTRIG"
 #define UPTIME_EVNAME           "CURRENTUPTIME"
 #define MDMCRASH_EVNAME         "MPANIC"
@@ -108,7 +106,7 @@
 #define NOTIFY_CONF_PATTERN     "INOTIFY"
 #define GENERAL_CONF_PATTERN    "GENERAL"
 #define MPANIC_ABORT            "COREDUMP_ABORTED_BY_PLATFORM_SHUTDOWN"
-
+#define CRASHLOG_WATCHER_ERROR  "CRASHLOG_WATCHER"
 
 /*
  * Take care that this enum is ALWAYS aligned with
@@ -124,6 +122,8 @@ enum {
     APCORE_TYPE,
     HPROF_TYPE,
     STATTRIG_TYPE,
+    INFOTRIG_TYPE,
+    ERRORTRIG_TYPE,
     APLOGTRIG_TYPE,
     CMDTRIG_TYPE,
     UPTIME_TYPE,
@@ -253,6 +253,7 @@ enum {
 #define BPLOG_NAME              "bplog"
 #define LAST_KMSG               PROC_DIR "/" LAST_KMSG_FILE
 #define PANIC_CONSOLE_NAME      PROC_DIR "/" CONSOLE_NAME
+#define PANIC_THREAD_NAME       PROC_DIR "/" THREAD_NAME
 #define PROC_FABRIC_ERROR_NAME  PROC_DIR "/" FABRIC_ERROR_NAME
 #define KERNEL_CMDLINE          PROC_DIR "/" CMDLINE_NAME
 #define PROC_UUID               PROC_DIR "/emmc0_id_entry"
@@ -279,6 +280,7 @@ enum {
 #define JAVACRASH_DUPLICATE_DATA        "javacrash_duplicate_data.txt"
 #define JAVACRASH_DUPLICATE_INFOERROR   "javacrash_duplicate_infoevent"
 #define UIWDT_DUPLICATE_INFOERROR       "uiwdt_duplicate_infoevent"
+#define CRASHLOG_WATCHER_INFOEVENT      "crashlog_watcher_infoevent"
 #define CRASHLOG_CONF_PATH              "/system/etc/crashlog.conf"
 #define MCD_PROCESSING          LOGS_DIR "/mcd_processing"
 

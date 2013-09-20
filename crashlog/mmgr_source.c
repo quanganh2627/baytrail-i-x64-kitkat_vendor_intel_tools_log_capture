@@ -291,13 +291,14 @@ static int compute_mmgr_param(char *type, int *mode, char *name, int *aplog, int
         sprintf(name, "%s",CRASHEVENT);
         *aplog = 1;
         *log_mode = APLOG_TYPE;
-        *bplog = 1;
+        *bplog = check_running_modem_trace();
     } else if (strstr(type, "APIMR" )) {
         //CASE APIMR
         *mode = CRASH_MODE;
         sprintf(name, "%s", CRASHEVENT);
         *aplog = 1;
         *log_mode = APLOG_TYPE;
+        *bplog = check_running_modem_trace();
     } else if (strstr(type, "MRESET" )) {
         //CASE MRESET
         *mode = CRASH_MODE;

@@ -252,7 +252,7 @@ int manage_duplicate_dropbox_events(struct inotify_event *event)
             struct tm *time;
             memset(&time, 0, sizeof(time));
             time = localtime(&timestamp_value);
-            PRINT_TIME(human_readable_date, TIME_FORMAT_LONG, time);
+            PRINT_TIME(human_readable_date, DUPLICATE_TIME_FORMAT , time);
         }
         /*
          * Generates the INFO event with the previous and the new
