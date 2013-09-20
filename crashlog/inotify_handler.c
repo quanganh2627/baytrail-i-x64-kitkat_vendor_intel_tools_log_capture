@@ -56,28 +56,28 @@ extern pconfig g_first_modem_config;
 */
 struct watch_entry wd_array[] = {
     /* -------------Warning: if table is updated, don't forget to update also WDCOUNT and gwdcountstart in main function--- */
-    {0, DROPBOX_DIR_MASK,   LOST_TYPE,      LOST_EVNAME,        DROPBOX_DIR,        ".lost",                    NULL}, /* for full dropbox */
-    {0, DROPBOX_DIR_MASK,   SYSSERVER_TYPE, SYSSERVER_EVNAME,   DROPBOX_DIR,        "system_server_watchdog",   NULL},
-    {0, DROPBOX_DIR_MASK,   ANR_TYPE,       ANR_EVNAME,         DROPBOX_DIR,        "anr",                      NULL},
-    {0, TOMBSTONE_DIR_MASK, TOMBSTONE_TYPE, TOMBSTONE_EVNAME,   TOMBSTONE_DIR,      "tombstone",                NULL},
-    {0, DROPBOX_DIR_MASK,   JAVACRASH_TYPE, JAVACRASH_EVNAME,   DROPBOX_DIR,        "crash",                    NULL},
+    {0, DROPBOX_DIR_MASK,   LOST_TYPE,      0,      LOST_EVNAME,        DROPBOX_DIR,        ".lost",                    NULL}, /* for full dropbox */
+    {0, DROPBOX_DIR_MASK,   SYSSERVER_TYPE, 0,      SYSSERVER_EVNAME,   DROPBOX_DIR,        "system_server_watchdog",   NULL},
+    {0, DROPBOX_DIR_MASK,   ANR_TYPE,       0,      ANR_EVNAME,         DROPBOX_DIR,        "anr",                      NULL},
+    {0, TOMBSTONE_DIR_MASK, TOMBSTONE_TYPE, 0,      TOMBSTONE_EVNAME,   TOMBSTONE_DIR,      "tombstone",                NULL},
+    {0, DROPBOX_DIR_MASK,   JAVACRASH_TYPE, 0,      JAVACRASH_EVNAME,   DROPBOX_DIR,        "crash",                    NULL},
 #ifdef FULL_REPORT
-    {0, CORE_DIR_MASK,      APCORE_TYPE,    APCORE_EVNAME,      HISTORY_CORE_DIR,   ".core",                    NULL},
-    {0, CORE_DIR_MASK,      HPROF_TYPE,     HPROF_EVNAME,       HISTORY_CORE_DIR,   ".hprof",                   NULL},
-    {0, STAT_DIR_MASK,      STATTRIG_TYPE,  STATSTRIG_EVNAME,   STAT_DIR,           "_trigger",                 NULL},
-    {0, STAT_DIR_MASK,      INFOTRIG_TYPE,  STATSTRIG_EVNAME,   STAT_DIR,           "_infoevent",               NULL},
-    {0, STAT_DIR_MASK,      ERRORTRIG_TYPE, STATSTRIG_EVNAME,   STAT_DIR,           "_errorevent",              NULL},
+    {0, CORE_DIR_MASK,      APCORE_TYPE,    0,      APCORE_EVNAME,      HISTORY_CORE_DIR,   ".core",                    NULL},
+    {0, CORE_DIR_MASK,      HPROF_TYPE,     0,      HPROF_EVNAME,       HISTORY_CORE_DIR,   ".hprof",                   NULL},
+    {0, STAT_DIR_MASK,      STATTRIG_TYPE,  0,      STATSTRIG_EVNAME,   STAT_DIR,           "_trigger",                 NULL},
+    {0, STAT_DIR_MASK,      INFOTRIG_TYPE,  0,      STATSTRIG_EVNAME,   STAT_DIR,           "_infoevent",               NULL},
+    {0, STAT_DIR_MASK,      ERRORTRIG_TYPE, 0,      STATSTRIG_EVNAME,   STAT_DIR,           "_errorevent",              NULL},
 #endif
-    {0, APLOG_DIR_MASK,     APLOGTRIG_TYPE, APLOGTRIG_EVNAME,   APLOG_DIR,          "_trigger",                 NULL},
+    {0, APLOG_DIR_MASK,     APLOGTRIG_TYPE, 0,      APLOGTRIG_EVNAME,   APLOG_DIR,          "_trigger",                 NULL},
 #ifdef FULL_REPORT
-    {0, APLOG_DIR_MASK,     CMDTRIG_TYPE,   CMDTRIG_EVNAME,     APLOG_DIR,          "_cmd",                     NULL},
+    {0, APLOG_DIR_MASK,     CMDTRIG_TYPE,   0,      CMDTRIG_EVNAME,     APLOG_DIR,          "_cmd",                     NULL},
 #endif
     /* -----------------------------above is dir, below is file------------------------------------------------------------ */
-    {0, UPTIME_MASK,        UPTIME_TYPE,    UPTIME_EVNAME,      UPTIME_FILE,        NULL,                      NULL},
+    {0, UPTIME_MASK,        UPTIME_TYPE,    0,      UPTIME_EVNAME,      UPTIME_FILE,        NULL,                      NULL},
     /* -------------------------above is AP, below is modem---------------------------------------------------------------- */
-    {0, MDMCRASH_DIR_MASK,  MDMCRASH_TYPE,  MDMCRASH_EVNAME,    LOGS_MODEM_DIR,     "mpanic.txt",               NULL},/*for modem crash */
-    {0, MDMCRASH_DIR_MASK,  APIMR_TYPE,     APIMR_EVNAME,       LOGS_MODEM_DIR,     "apimr.txt",                NULL},
-    {0, MDMCRASH_DIR_MASK,  MRST_TYPE,      MRST_EVNAME,        LOGS_MODEM_DIR,     "mreset.txt",               NULL},
+    {0, MDMCRASH_DIR_MASK,  MDMCRASH_TYPE,  0,      MDMCRASH_EVNAME,    LOGS_MODEM_DIR,     "mpanic.txt",               NULL},/*for modem crash */
+    {0, MDMCRASH_DIR_MASK,  APIMR_TYPE,     0,      APIMR_EVNAME,       LOGS_MODEM_DIR,     "apimr.txt",                NULL},
+    {0, MDMCRASH_DIR_MASK,  MRST_TYPE,      0,      MRST_EVNAME,        LOGS_MODEM_DIR,     "mreset.txt",               NULL},
 };
 
 int set_watch_entry_callback(unsigned int watch_type, inotify_callback pcallback) {
@@ -90,6 +90,7 @@ int set_watch_entry_callback(unsigned int watch_type, inotify_callback pcallback
     wd_array[watch_type].pcallback = pcallback;
     return 0;
 }
+
 
 /**
  * @brief File Monitor module init function
@@ -122,7 +123,7 @@ int init_inotify_handler() {
             if ( !strcmp(wd_array[j].eventpath, wd_array[i].eventpath) ) {
                 alreadywatched = 1;
                 wd_array[i].wd = wd_array[j].wd;
-                LOGI("Dont duplicate the watch for %s\n", wd_array[j].eventpath);
+                LOGI("Don't duplicate watch operation for %s\n", wd_array[j].eventpath);
                 break;
             }
         }
@@ -130,20 +131,112 @@ int init_inotify_handler() {
         wd_array[i].wd = inotify_add_watch(fd, wd_array[i].eventpath,
                 wd_array[i].eventmask);
         if (wd_array[i].wd < 0) {
+            wd_array[i].inotify_error = errno;
             LOGE("Can't add watch for %s - %s.\n",
-                wd_array[i].eventpath, strerror(errno));
-            res = -errno;
-            for (--i ; i >= 0 ; i--) {
-                inotify_rm_watch(fd, wd_array[i].wd);
-            }
-            return res;
-        }
-        LOGI("%s, wd=%d has been snooped\n", wd_array[i].eventpath, wd_array[i].wd);
+                wd_array[i].eventpath, strerror(wd_array[i].inotify_error) );
+        } else
+            LOGI("%s, wd=%d has been snooped\n", wd_array[i].eventpath, wd_array[i].wd);
     }
     //add generic watch here
     generic_add_watch(g_first_modem_config, fd);
 
     return fd;
+}
+
+/**
+ * @brief Handles treatments to do when one or severals
+ * directories that should be watched by crashlogd couldn't
+ * have been added to inotify watcher.
+ */
+void handle_missing_watched_dir() {
+
+    int idx;
+    const char * date = get_current_time_long(1);
+    /* Raise first an error */
+    raise_infoerror(ERROREVENT, CRASHLOG_WATCHER_ERROR);
+
+    /* Then raise an infoevent for each failed watched directory */
+    for (idx = 0 ; idx < (int)DIM(wd_array) ; idx++) {
+        if (wd_array[idx].wd >= 0 && wd_array[idx].inotify_error == 0) continue; /* Skip if well watched */
+        int alreadydone = 0, j;
+        /* Skip already treated directories */
+        for (j = 0 ; j < idx ; j++) {
+            if ( !strcmp(wd_array[j].eventpath, wd_array[idx].eventpath) ) {
+                alreadydone = 1;
+                break;
+            }
+        }
+        if (alreadydone) continue;
+        create_infoevent(CRASHLOG_WATCHER_INFOEVENT, wd_array[idx].eventpath, strerror(wd_array[idx].inotify_error), (char *)date );
+    }
+}
+
+/**
+ * @brief Returns the number of directories that couldn't
+ * have been added to inotify watcher.
+ *
+ * @return : the number of directories not watched.
+ */
+int get_missing_watched_dir_nb() {
+    int idx, res = 0;
+    /* Loop on watched directories to */
+    for (idx = 0 ; idx < (int)DIM(wd_array) ; idx++) {
+        if (wd_array[idx].wd >= 0 && wd_array[idx].inotify_error == 0) continue; /* Skip if well watched */
+        int alreadydone = 0, j;
+        for (j = 0 ; j < idx ; j++) {
+            if ( !strcmp(wd_array[j].eventpath, wd_array[idx].eventpath) ) {
+                alreadydone = 1;
+                break;
+            }
+        }
+        if (alreadydone) continue; /* Skip if already treated */
+        res++;
+    }
+    return res;
+}
+
+/**
+ * @brief lists the directories to be listed by crashenv script
+ * when one or several directories couldn't have been added to
+ * inotify watcher.
+ *
+ * @param crashenv_param: buffer containing the inotify events
+ */
+void build_crashenv_dir_list_option( char crashenv_param[PATHMAX] ) {
+
+    int idx = 0, idx_parent = 0;
+    char path[PATHMAX] = { 0, };
+    char tmp[PATHMAX] = { 0, };
+    char parent_array[(int)DIM(wd_array)][PATHMAX];
+
+    crashenv_param[0] = '\0';
+
+    for (idx = 0 ; idx < (int)DIM(wd_array) ; idx++) {
+        if (wd_array[idx].wd >= 0 && wd_array[idx].inotify_error == 0) continue; /* Skip if well watched */
+        if ( get_parent_dir( wd_array[idx].eventpath, path ) != 0 ) {
+            LOGD("%s : error - can't get parent path of %s\n", __FUNCTION__, wd_array[idx].eventpath);
+            continue;
+        }
+        /* Skip path if same parent path already got */
+        int alreadydone = 0, j;
+        for (j = 0 ; j < idx_parent ; j++) {
+            if ( !strcmp(path, parent_array[j]) ) {
+                alreadydone = 1;
+                break;
+            }
+        }
+        if (alreadydone) continue;
+        /* Add path to parent_array to manage duplicates and add path to output param string */
+        strncpy(parent_array[idx_parent], path, PATHMAX-1);
+        idx_parent++;
+        snprintf( tmp, sizeof(tmp), "-l %s ", path);
+        if( PATHMAX-1 - strlen(crashenv_param) >= strlen(tmp) )
+            strncat( crashenv_param, tmp, PATHMAX-1);
+        else
+            LOGW("%s : error - can't add path %s in monitor_crashenv -l option : no available space\n",
+                    __FUNCTION__, wd_array[idx].eventpath);
+    }
+    return;
 }
 
 static struct watch_entry *get_event_entry(int wd, char *eventname) {
@@ -315,7 +408,6 @@ int receive_inotify_events(int inotify_fd) {
                     continue;
                 }
     #endif
-
                 /* Stray event... */
                 LOGD("%s: Can't handle the event \"%s\", no valid entry found, drop it...\n",
                     __FUNCTION__, (event->len ? event->name : "empty event"));

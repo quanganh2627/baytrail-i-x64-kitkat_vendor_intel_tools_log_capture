@@ -34,6 +34,7 @@
 #define __INOTIFY_HANDLER_H__
 
 #include <sys/inotify.h>
+#include "fsutils.h"
 
 /* Define inotify mask values for watched directories */
 #define BASE_DIR_MASK       (IN_CLOSE_WRITE|IN_DELETE_SELF|IN_MOVE_SELF)
@@ -60,6 +61,7 @@ struct watch_entry {
     int wd;
     int eventmask;
     int eventtype;
+    int inotify_error;
     char *eventname;
     char *eventpath;
     char *eventpattern;
@@ -67,6 +69,9 @@ struct watch_entry {
 };
 
 int init_inotify_handler();
+void handle_missing_watched_dir();
+int get_missing_watched_dir_nb();
+void build_crashenv_dir_list_option( char crashenv_param[PATHMAX] );
 int set_watch_entry_callback(unsigned int watch_type, inotify_callback pcallback);
 int receive_inotify_events(int inotify_fd);
 

@@ -728,6 +728,42 @@ void notify_crashreport() {
         LOGI("notify crashreport status: %d.\n", status);
 }
 
+/**
+ * @brief Builds the string containing arguments to pass
+ * to monitor_crashenv script.
+ *
+ * @param crashenv_param : string containing args to pass to crashenv
+ */
+void build_crashenv_parameters( char * crashenv_param ) {
+
+    int idx = 0;
+    char param[PATHMAX] = { 0, };
+
+    /* Checks if some directories need to be listed */
+    if ( get_missing_watched_dir_nb() ) {
+        build_crashenv_dir_list_option( param );
+        strncpy( crashenv_param, param , PATHMAX );
+    }
+    /* Others arguments to be added...*/
+
+}
+
+/**
+ * @brief Performs a call to monitor_crashenv shell script.
+ */
+void monitor_crashenv()
+{
+    char cmd[PATHMAX] = { 0, }, parameters[PATHMAX] = { 0, };
+
+    build_crashenv_parameters(parameters);
+    snprintf(cmd, sizeof(cmd), "/system/bin/monitor_crashenv %s", parameters);
+    LOGD("%s: execute %s ", __FUNCTION__, cmd);
+    int status = system(cmd);
+    if (status != 0)
+        LOGE("monitor_crashenv status: %d.\n", status);
+    return ;
+}
+
 int raise_infoerror(char *type, char *subtype) {
     char *key;
     int status;
@@ -738,9 +774,7 @@ int raise_infoerror(char *type, char *subtype) {
     free(key);
     unlink(LOGRESERVED);
 #ifdef FULL_REPORT
-    status = system("/system/bin/monitor_crashenv");
-    if (status != 0)
-        LOGE("monitor_crashenv status: %d.\n", status);
+    monitor_crashenv();
 #endif
     return 0;
 }
