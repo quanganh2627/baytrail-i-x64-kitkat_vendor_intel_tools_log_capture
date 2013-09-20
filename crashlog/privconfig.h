@@ -73,6 +73,7 @@
 #define KERNEL_FAKE_CRASH       "IPANIC_FAKE"
 #define IPANIC_CORRUPTED        "IPANIC_CORRUPTED"
 #define KDUMP_CRASH             "KDUMP"
+#define FWDUMP_EVENT            "FWDUMP"
 #define MODEM_SHUTDOWN          "MSHUTDOWN"
 #define BZTRIGGER               "bz_trigger"
 #define SCREENSHOT_PATTERN      "SCREENSHOT="
@@ -130,6 +131,30 @@ enum {
     MDMCRASH_TYPE,
     APIMR_TYPE,
     MRST_TYPE,
+    EVENT_TYPE_NUMBER, /* !!! Take care this enum item is always the last one */
+};
+
+/*
+ * Array to print string value of enum defined here above for logging
+ * purpose only Take care this array is aligned with the enum type
+ */
+static const char* print_eventtype[EVENT_TYPE_NUMBER] = {
+    "LOST_TYPE",
+    "SYSSERVER_TYPE",
+    "ANR_TYPE",
+    "TOMBSTONE_TYPE",
+    "JAVACRASH_TYPE",
+    "APCORE_TYPE",
+    "HPROF_TYPE",
+    "STATTRIG_TYPE",
+    "INFOTRIG_TYPE",
+    "ERRORTRIG_TYPE",
+    "APLOGTRIG_TYPE",
+    "CMDTRIG_TYPE",
+    "UPTIME_TYPE",
+    "MDMCRASH_TYPE",
+    "APIMR_TYPE",
+    "MRST_TYPE"
 };
 
 enum {
@@ -154,6 +179,77 @@ enum {
     UPTIME,
     UPTIME_BOOT,
 };
+
+typedef unsigned int bool;
+enum { FALSE = 0, TRUE = 1, };
+
+/* Define crashlogd running modes */
+enum crashlog_mode {
+    NOMINAL_MODE = 0, /*< boot mode is MAIN : standard behavior */
+    RAMDUMP_MODE,     /*< boot mode is RAMCONSOLE : only checks some crashes, dump fw files and do a cold reset */
+    MINIMAL_MODE,     /*< boot mode different from MAIN OS (COS, ROS, POS...) : minimal checks, no watcher */
+};
+
+/* Struct defining a crashlog mode configuration
+ * New attributes to be added when needed
+ */
+struct mode_config {
+    char *name;
+    bool sdcard_storage:1;
+    bool notifs_crashreport:1;
+    bool monitor_crashenv:1;
+    bool watched_event_types[EVENT_TYPE_NUMBER];
+    bool mmgr_enabled:1;
+};
+
+/* Array defining for each crashlog mode, the associated config */
+static const struct mode_config get_mode_configs[] = {
+    [ NOMINAL_MODE ] = {
+        .name = "NOMINAL MODE",
+        .sdcard_storage = TRUE,
+        .notifs_crashreport = TRUE,
+        .monitor_crashenv = TRUE,
+        .watched_event_types = {[ LOST_TYPE ... MRST_TYPE ] = TRUE, }, /* All directories are watched */
+        .mmgr_enabled = TRUE,
+    },
+    [ RAMDUMP_MODE ] = {
+        .name = "RAMDUMP MODE",
+        .sdcard_storage = FALSE,
+        .notifs_crashreport = FALSE,
+        .monitor_crashenv = FALSE,
+        .watched_event_types = { [ LOST_TYPE ... MRST_TYPE ] = FALSE, }, /* No directories are watched */
+        .mmgr_enabled = FALSE,
+    },
+    [ MINIMAL_MODE ] = {
+        .name = "MINIMAL MODE",
+        .sdcard_storage = TRUE,
+        .notifs_crashreport = FALSE,
+        .monitor_crashenv = FALSE,
+        .watched_event_types = {
+            [ LOST_TYPE ... HPROF_TYPE ] = FALSE, /* Watch only stat directory */
+            [ STATTRIG_TYPE  ] = TRUE,
+            [ INFOTRIG_TYPE ... MRST_TYPE ] = FALSE },
+        .mmgr_enabled = FALSE,
+    },
+};
+
+/* MACROS */
+#define CRASHLOG_MODE_NAME(mode) \
+    ((mode > MINIMAL_MODE) ? "" : get_mode_configs[mode].name)
+#define CRASHLOG_MODE_SD_STORAGE(mode) \
+    ((mode > MINIMAL_MODE) ? 0 : get_mode_configs[mode].sdcard_storage)
+#define CRASHLOG_MODE_NOTIFS_ENABLED(mode) \
+    ((mode > MINIMAL_MODE) ? 0 :get_mode_configs[mode].notifs_crashreport)
+#define CRASHLOG_MODE_MONITOR_CRASHENV(mode) \
+    ((mode > MINIMAL_MODE) ? 0 : get_mode_configs[mode].monitor_crashenv)
+#define CRASHLOG_MODE_EVENT_TYPE_ENABLED(mode, type) \
+    ((mode > MINIMAL_MODE || type > MRST_TYPE) ? \
+     0 : get_mode_configs[mode].watched_event_types[type])
+#define CRASHLOG_MODE_MMGR_ENABLED(mode) \
+    ((mode > MINIMAL_MODE) ? 0 : get_mode_configs[mode].mmgr_enabled)
+
+/* global flag indicating crashlogd mode (main.c) */
+extern enum crashlog_mode g_crashlog_mode;
 
 /* DIM returns the dimention of an array */
 #define DIM(array)              ( sizeof(array) / sizeof(array[0]) )
@@ -197,6 +293,7 @@ enum {
 #define SYS_DIR                 RESDIR "/system"
 #define CACHE_DIR               RESDIR "/cache"
 #define PSTORE_DIR              RESDIR "/pstore"
+#define DEBUGFS_DIR             RESDIR "/d"
 #define PANIC_DIR               DATA_DIR "/dontpanic"
 #define SDCARD_LOGS_DIR         SDCARD_DIR "/logs"
 #define SDCARD_CRASH_DIR        SDCARD_LOGS_DIR "/crashlog"
@@ -216,7 +313,7 @@ enum {
 #define LOGS_MEDIA_DIR          DATA_DIR "/media/logs"
 #define KDUMP_DIR               LOGS_MEDIA_DIR "/kdump"
 #define SDSIZE_CURRENT_LOG      LOGS_DIR "/currentsdsize"
-#define REBOOT_DIR              RESDIR "/sys/kernel/debug/intel_scu_osnib"
+#define REBOOT_DIR              DEBUGFS_DIR "/intel_scu_osnib"
 #define EVENTS_DIR              LOGS_DIR "/events"
 
 /* FILES */
@@ -252,6 +349,7 @@ enum {
 #define THREAD_NAME             "emmc_ipanic_threads"
 #define LOGCAT_NAME             "emmc_ipanic_logcat"
 #define FABRIC_ERROR_NAME       "ipanic_fabric_err"
+#define GBUFFER_NAME            "emmc_ipanic_gbuffer"
 #define CMDLINE_NAME            "cmdline"
 #define CRASHFILE_NAME          "crashfile"
 #define BPLOG_NAME              "bplog"
@@ -279,6 +377,7 @@ enum {
 #define KDUMP_FILE_NAME         KDUMP_DIR "/kdumpfile.core"
 #define KDUMP_FINISH_FLAG       KDUMP_DIR "/kdumpfinished"
 #define KDUMP_CRASH_DIR         LOGS_MEDIA_DIR "/crashlog"
+#define GBUFFER_FILE            PROC_DIR "/emmc_ipanic_gbuffer"
 #define ANR_DUPLICATE_INFOERROR         "anr_duplicate_infoevent"
 #define ANR_DUPLICATE_DATA              "anr_duplicate_data.txt"
 #define UIWDT_DUPLICATE_DATA            "uiwdt_duplicate_data.txt"
@@ -286,7 +385,7 @@ enum {
 #define JAVACRASH_DUPLICATE_INFOERROR   "javacrash_duplicate_infoevent"
 #define UIWDT_DUPLICATE_INFOERROR       "uiwdt_duplicate_infoevent"
 #define CRASHLOG_WATCHER_INFOEVENT      "crashlog_watcher_infoevent"
-#define CRASHLOG_CONF_PATH              "/system/etc/crashlog.conf"
+#define CRASHLOG_CONF_PATH              SYS_DIR "/etc/crashlog.conf"
 #define MCD_PROCESSING          LOGS_DIR "/mcd_processing"
 #define RESET_SOURCE_0          REBOOT_DIR "/RESETSRC0"
 #define RESET_SOURCE_1          REBOOT_DIR "/RESETSRC1"

@@ -15,16 +15,15 @@
  */
 
 /**
- * @file panic.h
- * @brief File containing functions to detect and process ipanic events.
+ * @file ramdump.h
+ * @brief File containing functions for ram dump mode processing.
  */
 
-#ifndef __PANIC_H__
-#define __PANIC_H__
+#ifndef RAMDUMP_H_
+#define RAMDUMP_H_
 
-int crashlog_check_panic(char *reason, int test);
-int crashlog_check_ram_panic(char *reason);
-int crashlog_check_kdump(char *reason, int test);
-void crashlog_check_panic_events(char *reason, char *watchdog, int test);
+int do_ramdump_checks(int test);
+int crashlog_check_fwdump();
+int request_global_reset();
 
-#endif /* __PANIC_H__ */
+#endif /* RAMDUMP_H_ */
