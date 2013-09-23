@@ -5302,11 +5302,15 @@ static int request_global_reset() {
 * Parameters    :
 *   char *startupreason   -> string containing the translated startup reason */
 
-static void read_startupreason(char *startupreason)
+void read_startupreason(char *startupreason)
 {
     char cmdline[512] = { '\0', };
+    char prop_reason[PROPERTY_VALUE_MAX];
+
     char *p, *endptr;
     unsigned long reason;
+    FILE *fd;
+    int res;
     static const char *bootmode_reason[] = {
         "BATT_INSERT",
         "PWR_BUTTON_PRESS",
@@ -5330,37 +5334,65 @@ static void read_startupreason(char *startupreason)
         "HWWDT_RESET_PLATFORM",
         "HWWDT_RESET_SC"};
 
-    struct stat info;
-    FILE *fd;
-
-    strcpy(startupreason, bootmode_reason[7]);
-
-    if (stat(CURRENT_KERNEL_CMDLINE, &info) == 0) {
-        fd = fopen(CURRENT_KERNEL_CMDLINE, "r");
-        if (fd == NULL){
-            LOGE("can not open file: %s\n", CURRENT_KERNEL_CMDLINE);
+    strcpy(startupreason, "UNKNOWN");
+    fd = fopen(CURRENT_KERNEL_CMDLINE, "r");
+    if ( fd == NULL ) {
+        LOGE("%s: Cannot open file %s - %s\n", __FUNCTION__,
+            CURRENT_KERNEL_CMDLINE, strerror(errno));
+        return;
+    }
+    res = fread(cmdline, 1, sizeof(cmdline)-1, fd);
+    fclose(fd);
+    if (res <= 0) {
+        LOGE("%s: Cannot read file %s - %s\n", __FUNCTION__,
+            CURRENT_KERNEL_CMDLINE, strerror(errno));
+        return;
+    }
+    p = strstr(cmdline, STARTUP_STR);
+    if(!p) {
+        /* No reason in the command line, use property */
+        LOGE("%s: no reason in cmdline : %s \n",  __FUNCTION__, cmdline);
+        if (property_get("ro.boot.wakesrc", prop_reason, "") > 0) {
+            reason = strtoul(prop_reason, NULL, 16);
+        } else {
+            LOGE("%s: no property found... \n",  __FUNCTION__);
             return;
         }
-        fread(cmdline, 1, sizeof(cmdline)-1, fd);
-        fclose(fd);
-        p = strstr(cmdline, STARTUP_STR);
-        if(p) {
-            p += strlen(STARTUP_STR);
-            if (!isspace(*p)) {
-                errno = 0;
-                reason=strtoul(p, &endptr, 16);
-                if ((errno != ERANGE) &&
-                    (endptr != p) &&
-                    (reason >= 0) &&
-                    (reason < (sizeof(bootmode_reason)/sizeof(char*)))) {
-                    strcpy(startupreason, bootmode_reason[reason]);
-                }else {
-                    strcpy(startupreason, "UNKNOWN");
-                }
-            }
+    } else {
+
+        if (strlen(p) <= strlen(STARTUP_STR)) {
+            /* the pattern is found but is incomplete... */
+            LOGE("%s: Incomplete startup reason found in cmdline \"%s\"\n",
+                __FUNCTION__, cmdline);
+            return;
+        }
+        p += strlen(STARTUP_STR);
+        if (isspace(*p)) {
+            /* the pattern is found but starting with a space... */
+            LOGE("%s: Incorrect startup reason found in cmdline \"%s\"\n",
+                __FUNCTION__, cmdline);
+            return;
+        }
+
+        /* All is fine, decode the reason */
+        errno = 0;
+        reason = strtoul(p, &endptr, 16);
+        if (endptr == p) {
+            LOGE("%s: Invalid startup reason found in cmdline \"%s\"\n",
+            __FUNCTION__, cmdline);
+            return;
         }
     }
+    if ((errno != ERANGE) &&
+        (reason < (sizeof(bootmode_reason)/sizeof(char*)))) {
+        strcpy(startupreason, bootmode_reason[reason]);
+    } else {
+        /* Hmm! bad value... */
+        LOGE("%s: Invalid startup reason found \"%s\"\n",
+            __FUNCTION__, startupreason);
+    }
 }
+
 #ifdef FULL_REPORT
 static void update_logs_permission(void)
 {
