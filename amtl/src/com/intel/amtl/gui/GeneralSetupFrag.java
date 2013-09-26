@@ -194,6 +194,9 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
     }
 
     private void updateUi(ModemConf curModConf) {
+        if (curModConf.getTrace().equals("0") && mtsMgr.getMtsState().equals("running")) {
+            mtsMgr.stopServices();
+        }
         this.updateText(this.mtsMgr.getMtsState(), tvMtsStatus);
         if (this.isExpertModeEnabled() && !curModConf.getTrace().equals("0")) {
             if (curModConf.isMtsRequired() && mtsMgr.getMtsState().equals("running")) {
