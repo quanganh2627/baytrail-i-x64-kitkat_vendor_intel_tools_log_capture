@@ -190,6 +190,7 @@
 #define SAVED_LOGCAT_NAME "/data/dontpanic/emmc_ipanic_logcat"
 #define SAVED_FABRIC_ERROR_NAME "/data/dontpanic/ipanic_fabric_err"
 #define SAVED_LM_BUFFER_NAME "lkm_buffer_dump"
+#define RAMDUMP_SAVED_LAST_KMSG "/logs/ram_ipanic_console"
 #define CONSOLE_RAM "ram_ipanic_console"
 #define CONSOLE_NAME "emmc_ipanic_console"
 #define THREAD_NAME "emmc_ipanic_threads"
@@ -294,6 +295,7 @@ struct mode_config {
     bool sdcard_storage:1;
     bool notifs_crashreport:1;
     bool monitor_crashenv:1;
+    char saved_panic_ram_path[PATHMAX];
 };
 
 /* Array defining for each crashlog mode, the associated config */
@@ -301,12 +303,14 @@ static const struct mode_config get_mode_configs[] = {
     [ NOMINAL_MODE ] = { .name = "NOMINAL MODE",
                          .sdcard_storage = TRUE,
                          .notifs_crashreport = TRUE,
-                         .monitor_crashenv = TRUE},
+                         .monitor_crashenv = TRUE,
+                         .saved_panic_ram_path = SAVED_PANIC_RAM},
 
     [ RAMDUMP_MODE ] = { .name = "RAMDUMP MODE",
                          .sdcard_storage = FALSE,
                          .notifs_crashreport = FALSE,
-                         .monitor_crashenv = FALSE},
+                         .monitor_crashenv = FALSE,
+                         .saved_panic_ram_path = RAMDUMP_SAVED_LAST_KMSG},
 };
 
 /* MACROS */
@@ -314,6 +318,7 @@ static const struct mode_config get_mode_configs[] = {
 #define CRASHLOG_MODE_SD_STORAGE(mode)        ( get_mode_configs[mode].sdcard_storage )
 #define CRASHLOG_MODE_NOTIFS_ENABLED(mode)    ( get_mode_configs[mode].notifs_crashreport )
 #define CRASHLOG_MODE_MONITOR_CRASHENV(mode)  ( get_mode_configs[mode].monitor_crashenv )
+#define CRASHLOG_MODE_SAVED_PANIC_RAM(mode)   ( get_mode_configs[mode].saved_panic_ram_path )
 
 char *CRASH_DIR = NULL;
 char *STATS_DIR = NULL;
@@ -4500,6 +4505,7 @@ static int crashlog_check_ram_panic(char *reason, unsigned int files)
     struct stat info;
     time_t t;
     char destion[PATHMAX];
+    char saved_panic_ram_console[PATHMAX];
     char crashtype[32] = {'\0'};
     int dir;
     char key[SHA1_DIGEST_LENGTH+1];
@@ -4509,23 +4515,21 @@ static int crashlog_check_ram_panic(char *reason, unsigned int files)
         if (find_str_in_file(LAST_KMSG, "Kernel panic - not syncing:", NULL))
              return 0;
 
-         do_copy(LAST_KMSG, SAVED_PANIC_RAM, FILESIZE_MAX);
+        /* Get path where panic ram console shall be copied */
+        strncpy( saved_panic_ram_console, CRASHLOG_MODE_SAVED_PANIC_RAM(g_crashlog_mode), sizeof(saved_panic_ram_console)-1 );
+        do_copy(LAST_KMSG, saved_panic_ram_console, FILESIZE_MAX);
 
-        if (!find_str_in_file(SAVED_PANIC_RAM, "Kernel panic - not syncing: Kernel Watchdog", NULL))
+        if (!find_str_in_file(saved_panic_ram_console, "Kernel panic - not syncing: Kernel Watchdog", NULL))
             strcpy(crashtype, KERNEL_SWWDT_CRASH);
-        else if  (!find_str_in_file(SAVED_PANIC_RAM, "EIP is at pmu_sc_irq", NULL))
+        else if  (!find_str_in_file(saved_panic_ram_console, "EIP is at pmu_sc_irq", NULL))
             // This panic is triggered by a fabric error
             // It is marked as a kernel panic linked to a HW watdchog
             // to create a link between these 2 critical crashes
             strcpy(crashtype, KERNEL_HWWDT_CRASH);
-        else if (!find_str_in_file(SAVED_PANIC_RAM, "EIP is at panic_dbg_set", NULL)  || !find_str_in_file(SAVED_PANIC_RAM, "EIP is at kwd_trigger_open", NULL))
+        else if (!find_str_in_file(saved_panic_ram_console, "EIP is at panic_dbg_set", NULL)  || !find_str_in_file(saved_panic_ram_console, "EIP is at kwd_trigger_open", NULL))
             strcpy(crashtype, KERNEL_FAKE_CRASH);
         else
             strcpy(crashtype, KERNEL_CRASH);
-
-        if (find_str_in_file(SAVED_PANIC_RAM, "sdhci_pci_power_up_host: host controller power up is done", NULL))
-             // An error is raised when the panic console file does not end normally
-             crashlog_raise_infoerror(ERROREVENT, CRASHLOG_IPANIC_CORRUPTED);
 
         if (!strncmp(crashtype, KERNEL_FAKE_CRASH, sizeof(KERNEL_FAKE_CRASH)))
              strcat(reason,"_FAKE");
@@ -4557,7 +4561,7 @@ static int crashlog_check_ram_panic(char *reason, unsigned int files)
         destion[0] = '\0';
         snprintf(destion, sizeof(destion), "%s%d/%s_%s.txt", CRASH_DIR, dir,
                 CONSOLE_RAM, date_tmp);
-        do_copy(SAVED_PANIC_RAM, destion, FILESIZE_MAX);
+        do_copy(saved_panic_ram_console, destion, FILESIZE_MAX);
 
         destion[0] = '\0';
         snprintf(destion, sizeof(destion), "%s%d/", CRASH_DIR, dir);
@@ -4569,7 +4573,8 @@ static int crashlog_check_ram_panic(char *reason, unsigned int files)
         // if a pattern is found in the console file, upload a large number of aplogs
         // property persist.crashlogd.panic.pattern is used to fill the list of pattern
         // Each pattern is split by a semicolon in the property
-        check_aplogs_tobackup(SAVED_PANIC_RAM, files);
+        check_aplogs_tobackup(saved_panic_ram_console, files);
+
         return 1;
        }
     return 0;
@@ -5391,6 +5396,28 @@ static void manage_ipanic_fabricerr_wdt_trigger_path(void)
 }
 
 /**
+* @brief performs all necessary actions before crashlogd exits.
+*
+* @param[in] current_crashlog_mode : current crashlogd mode
+*
+* @retval returns -1 if a problem occurs. 0 otherwise.
+*/
+static int clean_up_on_exit ( enum crashlog_mode current_crashlog_mode ) {
+
+    struct stat info;
+
+    switch(current_crashlog_mode) {
+        case RAMDUMP_MODE:
+            /* No need to keep saved last_kmsg in ramconsole mode */
+            if ( stat(CRASHLOG_MODE_SAVED_PANIC_RAM(g_crashlog_mode), &info) == 0 )
+                remove(CRASHLOG_MODE_SAVED_PANIC_RAM(g_crashlog_mode));
+            return 0;
+        default:
+            return 0;
+    }
+}
+
+/**
 * @brief performs all checks required in RAMDUMP mode.
 * In this mode, numerous checks are bypassed.
 *
@@ -5427,6 +5454,8 @@ static int do_ramdump_checks( unsigned int files ) {
     LOGE("%-8s%-22s%-20s%s\n", SYS_REBOOT, key, date_tmp, startupreason);
     history_file_write(SYS_REBOOT, startupreason, NULL, NULL, lastuptime, key, date_tmp);
     del_file_more_lines(HISTORY_FILE);
+
+    clean_up_on_exit(RAMDUMP_MODE);
 
     request_global_reset();
 
