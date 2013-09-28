@@ -47,6 +47,7 @@
 #include <privconfig.h>
 #include <history.h>
 #include <fsutils.h>
+#include <dropbox.h>
 
 char gbuildversion[PROPERTY_VALUE_MAX] = {0,};
 char gboardversion[PROPERTY_VALUE_MAX] = {0,};
@@ -151,6 +152,9 @@ void do_last_kmsg_copy(int dir) {
     if ( file_exists(LAST_KMSG) ) {
         snprintf(destion, sizeof(destion), "%s%d/%s", CRASH_DIR, dir, LAST_KMSG_FILE);
         do_copy_tail(LAST_KMSG, destion, MAXFILESIZE);
+    } else if ( file_exists(CONSOLE_RAMOOPS) ) {
+        snprintf(destion, sizeof(destion), "%s%d/%s", CRASH_DIR, dir, CONSOLE_RAMOOPS_FILE);
+        do_copy_tail(CONSOLE_RAMOOPS, destion, MAXFILESIZE);
     }
 }
 
@@ -331,6 +335,12 @@ static char *priv_raise_event(char *event, char *type, char *subtype, char *log,
             return NULL;
         }
     }
+
+    if (!strncmp(event, SYS_REBOOT, sizeof(SYS_REBOOT))) {
+        res = reboot_reason_files_present();
+        create_rebootfile(key, res);
+    }
+
     /* Notify CrashReport except for UIWDT events */
     if (strncmp(type, SYSSERVER_EVNAME, sizeof(SYSSERVER_EVNAME))) {
             notify_crashreport();
@@ -374,6 +384,15 @@ void restart_profile_srv(int serveridx) {
     if (property_get(PROP_PROFILE, value, NULL) <= 0) return;
     if ( value[0] == expected )
         start_daemon(profile_srv);
+}
+
+int check_running_modem_trace() {
+    char modemtrace[PROPERTY_VALUE_MAX];
+
+    property_get("init.svc.mtsp", modemtrace, "");
+    if (!strncmp(modemtrace, "running", 7))
+        return 1;
+    return 0;
 }
 
 void check_running_power_service() {
@@ -881,4 +900,92 @@ void clean_crashlog_in_sd(char *dir_to_search, int max) {
     }
     // abort clean of legacy log folder when there is no more folders expect the ones in history_event
     gabortcleansd = (i < max);
+}
+
+//This function creates a reboot file(DATA0/1 set to RESETSRC0/1).
+int create_rebootfile(char* key, int data_ready)
+{
+    FILE *fp;
+    char fullpath[PATHMAX];
+
+    if(!file_exists(EVENTS_DIR)) {
+        /* Create a fresh directory */
+        errno = 0;
+        if (mkdir(EVENTS_DIR, 0777) == -1) {
+            LOGE("%s: Cannot create dir %s %s\n", __FUNCTION__, EVENTS_DIR, strerror(errno));
+            raise_infoerror(ERROREVENT, EVENTS_DIR);
+            return -errno;
+        }
+        do_chown(EVENTS_DIR, PERM_USER, PERM_GROUP);
+    }
+    snprintf(fullpath, sizeof(fullpath)-1, "%s/%s_%s", EVENTS_DIR, EVENTFILE_NAME, key);
+
+    //Create crashfile
+    errno = 0;
+    fp = fopen(fullpath,"w");
+    if (fp == NULL)
+    {
+        LOGE("%s: Cannot create %s - %s\n", __FUNCTION__, fullpath, strerror(errno));
+        return -errno;
+    }
+    fclose(fp);
+    do_chown(fullpath, PERM_USER, PERM_GROUP);
+
+    errno = 0;
+    fp = fopen(fullpath,"w");
+    if (fp == NULL)
+    {
+        LOGE("%s: can not open file: %s %s\n", __FUNCTION__, fullpath, strerror(errno));
+        return -errno;
+    }
+
+    fprintf(fp,"DATA_READY=%d\n", data_ready);
+    if (data_ready){
+        LOGI("reset source detected : generating DATA0\n");
+        char tmp[PATHMAX] = "";
+        if(file_exists(RESET_SOURCE_0))
+            snprintf(tmp, sizeof(tmp), RESET_SOURCE_0);
+        else if(file_exists(RESET_IRQ_1))
+            snprintf(tmp, sizeof(tmp), RESET_IRQ_1);
+        get_data_from_boot_file(tmp, "DATA3", fp);
+
+        tmp[0] = '\0';
+        if(file_exists(RESET_SOURCE_1))
+            snprintf(tmp, sizeof(tmp), RESET_SOURCE_1);
+        else if(file_exists(RESET_IRQ_2))
+            snprintf(tmp, sizeof(tmp), RESET_IRQ_2);
+        get_data_from_boot_file(tmp,"DATA4", fp);
+
+    }
+    fprintf(fp,"_END\n");
+    fclose(fp);
+    return 0;
+}
+
+/**
+ * Return 0 if reboot reason files (RESETSRC0/1 or RESETIRQ1/2) are present
+ */
+int reboot_reason_files_present() {
+    if((file_exists(RESET_SOURCE_0) && file_exists(RESET_SOURCE_1)) || (file_exists(RESET_IRQ_1) && file_exists(RESET_IRQ_2)))
+        return 1;
+    else return 0;
+
+}
+
+void get_data_from_boot_file(char *file, char* data, FILE* fp) {
+    char value[PATHMAX] = "";
+    FILE *fd_source = fopen(file, "r");
+    errno = 0;
+    if (fd_source == NULL){
+        LOGE("%s: can not open file: %s %s\n", __FUNCTION__, file, strerror(errno));
+    }
+    else {
+        if(fgets(value,sizeof(value),fd_source)) {
+            int size = strlen(value);
+            if(value[size-1] == '\n')
+                value[size-1] = '\0';
+            fprintf(fp,"%s=%s\n", data, value);
+        }
+        fclose(fd_source);
+    }
 }

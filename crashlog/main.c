@@ -217,6 +217,25 @@ static void timeup_thread_mainloop()
     }
 }
 
+static void early_check_nomain(char *boot_mode, int test) {
+
+    char startupreason[32] = { '\0', };
+    const char *datelong;
+    char *key;
+
+    read_startupreason(startupreason);
+
+    key = raise_event_nouptime(SYS_REBOOT, startupreason, NULL, NULL);
+    datelong = get_current_time_long(0);
+    LOGE("%-8s%-22s%-20s%s\n", SYS_REBOOT, key, datelong, startupreason);
+    free(key);
+
+    key = raise_event_nouptime(STATEEVENT, boot_mode, NULL, NULL);
+    LOGE("%-8s%-22s%-20s%s\n", STATEEVENT, key, datelong, boot_mode);
+    free(key);
+}
+
+
 static void early_check(char *encryptstate, int test) {
 
     char startupreason[32] = { '\0', };
@@ -335,7 +354,7 @@ void write_uuid(char* filename, char *uuid_value)
     }
 }
 
-static void get_crash_env(char *crypt_state, char *encrypt_progress, char *decrypt, char *token) {
+static void get_crash_env(char * boot_mode, char *crypt_state, char *encrypt_progress, char *decrypt, char *token) {
 
     char value[PROPERTY_VALUE_MAX];
     FILE *fd;
@@ -354,7 +373,16 @@ static void get_crash_env(char *crypt_state, char *encrypt_progress, char *decry
      */
     get_build_board_versions(SYS_PROP, gbuildversion, gboardversion);
 
-    /* Read UUID */
+     /* Set SDcard paths*/
+    get_sdcard_paths(MODE_CRASH);
+
+    property_get("ro.boot.mode", boot_mode, "");
+    property_get("ro.crypto.state", crypt_state, "unencrypted");
+    property_get("vold.encrypt_progress",encrypt_progress,"");
+    property_get("vold.decrypt", decrypt, "");
+    property_get("crashlogd.token", token, "");
+
+   /* Read UUID */
     if (g_current_serial_device_id == 1) {
         /* Get serial ID from properties and updates UUID file */
         property_get("ro.serialno", guuid, "empty_serial");
@@ -374,14 +402,6 @@ static void get_crash_env(char *crypt_state, char *encrypt_progress, char *decry
     }
     /* Read SPID */
     read_sys_spid(LOG_SPID);
-
-    /* Set SDcard paths*/
-    get_sdcard_paths(MODE_CRASH);
-
-    property_get("ro.crypto.state", crypt_state, "unencrypted");
-    property_get("vold.encrypt_progress",encrypt_progress,"");
-    property_get("vold.decrypt", decrypt, "");
-    property_get("crashlogd.token", token, "");
 #ifdef FULL_REPORT
     if (property_get(PROP_COREDUMP, value, "") <= 0) {
         LOGE("Property %s not readable - core dump capture is disabled\n", PROP_COREDUMP);
@@ -494,10 +514,64 @@ int do_monitor() {
     return -1;
 }
 
+int do_monitor_nomain() {
+    fd_set read_fds; /**< file descriptor set watching data availability from sources */
+    int max = 0; /**< select max fd value +1 {@see man select(2) nfds} */
+    int select_result; /**< select result */
+    int file_monitor_fd = get_inotify_fd();
+
+    if ( file_monitor_fd < 0 ) {
+        LOGE("%s: failed to initialize the inotify handler - %s\n",
+            __FUNCTION__, strerror(-file_monitor_fd));
+        return -1;
+    }
+
+    /* Set the inotify event callbacks */
+#ifdef FULL_REPORT
+    set_watch_entry_callback(STATTRIG_TYPE,     process_stat_event);
+#endif
+
+    for(;;) {
+        // Clear fd set
+        FD_ZERO(&read_fds);
+
+        // File monitor fd setup
+        if ( file_monitor_fd > 0 ) {
+            FD_SET(file_monitor_fd, &read_fds);
+            if (file_monitor_fd > max)
+                max = file_monitor_fd;
+        }
+
+        // Wait for events
+        select_result = select(max+1, &read_fds, NULL, NULL, NULL);
+
+        if (select_result == -1 && errno == EINTR) // Interrupted, need to recycle
+            continue;
+
+        // Result processing
+        if (select_result > 0) {
+            /* clean children to avoid zombie processes */
+            while(waitpid(-1, NULL, WNOHANG) > 0){};
+            // File monitor
+            if (FD_ISSET(file_monitor_fd, &read_fds)) {
+                receive_inotify_events(file_monitor_fd);
+            }
+        }
+    }
+
+    free_config(g_first_modem_config);
+    LOGE("Exiting monitor loop\n");
+    return -1;
+}
+
+
+
 int main(int argc, char **argv) {
 
     int ret = 0, alreadyran = 0, test_flag = 0;
+    int i;
     pthread_t thread;
+    char boot_mode[PROPERTY_VALUE_MAX];
     char crypt_state[PROPERTY_VALUE_MAX];
     char encrypt_progress[PROPERTY_VALUE_MAX];
     char decrypt[PROPERTY_VALUE_MAX];
@@ -532,11 +606,22 @@ int main(int argc, char **argv) {
     load_config();
 
     /* Get the properties and read the local files to set properly the env variables */
-    get_crash_env(crypt_state, encrypt_progress, decrypt, token);
+    get_crash_env(boot_mode, crypt_state, encrypt_progress, decrypt, token);
+
+    /* check boot mode */
+    alreadyran = (token[0] != 0);
+    if ( strcmp(boot_mode, "main") ) {
+        if (!alreadyran) {
+            for (i=0; i<strlen(boot_mode); i++)
+                    boot_mode[i] = toupper(boot_mode[i]);
+            early_check_nomain(boot_mode, test_flag);
+        }
+        check_crashlog_died();
+        return do_monitor_nomain();
+    }
 
     /* DECRYPTED by default */
     strcpy(encryptstate,"DECRYPTED");
-    alreadyran = (token[0] != 0);
 
     if ( encrypt_progress[0]) {
         /* Encrypting unencrypted device... */

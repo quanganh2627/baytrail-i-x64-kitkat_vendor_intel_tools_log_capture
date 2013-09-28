@@ -61,6 +61,9 @@ void do_last_kmsg_copy(int dir);
 void clean_crashlog_in_sd(char *dir_to_search, int max);
 void check_crashlog_died();
 int raise_infoerror(char *type, char *subtype);
+int create_rebootfile(char* key, int data_ready);
+int reboot_reason_files_present();
+void get_data_from_boot_file(char *file, char* data, FILE* fp);
 char *raise_event(char *event, char *type, char *subtype, char *log);
 char *raise_event_nouptime(char *event, char *type, char *subtype, char *log);
 char *raise_event_bootuptime(char *event, char *type, char *subtype, char *log);
@@ -73,6 +76,8 @@ char *create_crashdir_move_crashfile(char *origpath, char *crashfile, int copylo
 void start_daemon(const char *daemonname);
 void restart_profile_srv(int serveridx);
 void check_running_power_service();
+int check_running_modem_trace();
+
 
 int get_build_board_versions(char *filename, char *buildver, char *boardver);
 const char *get_build_footprint();

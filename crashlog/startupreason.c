@@ -90,6 +90,8 @@ static void flush_aplog_atboot(char *mode, int dir, const char* ts)
 void read_startupreason(char *startupreason)
 {
     char cmdline[512] = { '\0', };
+    char prop_reason[PROPERTY_VALUE_MAX];
+
     char *p, *endptr;
     unsigned long reason;
     FILE *fd;
@@ -118,7 +120,6 @@ void read_startupreason(char *startupreason)
         "HWWDT_RESET_SC"};
 
     strcpy(startupreason, "UNKNOWN");
-
     fd = fopen(CURRENT_KERNEL_CMDLINE, "r");
     if ( fd == NULL ) {
         LOGE("%s: Cannot open file %s - %s\n", __FUNCTION__,
@@ -134,35 +135,46 @@ void read_startupreason(char *startupreason)
     }
     p = strstr(cmdline, STARTUP_STR);
     if(!p) {
-        /* No reason in the command line */
-        return;
-    }
+        /* No reason in the command line, use property */
+        LOGE("%s: no reason in cmdline : %s \n",  __FUNCTION__, cmdline);
+        if (property_get("ro.boot.wakesrc", prop_reason, "") > 0) {
+            reason = strtoul(prop_reason, NULL, 16);
+        } else {
+            LOGE("%s: no property found... \n",  __FUNCTION__);
+            return;
+        }
+    } else {
 
-    if (strlen(p) <= strlen(STARTUP_STR)) {
-        /* the pattern is found but is incomplete... */
-        LOGE("%s: Incomplete startup reason found in cmdline \"%s\"\n",
-            __FUNCTION__, cmdline);
-        return;
-    }
-    p += strlen(STARTUP_STR);
-    if (isspace(*p)) {
-        /* the pattern is found but starting with a space... */
-        LOGE("%s: Incorrect startup reason found in cmdline \"%s\"\n",
-            __FUNCTION__, cmdline);
-        return;
-    }
+        if (strlen(p) <= strlen(STARTUP_STR)) {
+            /* the pattern is found but is incomplete... */
+            LOGE("%s: Incomplete startup reason found in cmdline \"%s\"\n",
+                __FUNCTION__, cmdline);
+            return;
+        }
+        p += strlen(STARTUP_STR);
+        if (isspace(*p)) {
+            /* the pattern is found but starting with a space... */
+            LOGE("%s: Incorrect startup reason found in cmdline \"%s\"\n",
+                __FUNCTION__, cmdline);
+            return;
+        }
 
-    /* All is fine, decode the reason */
-    errno = 0;
-    reason = strtoul(p, &endptr, 16);
+        /* All is fine, decode the reason */
+        errno = 0;
+        reason = strtoul(p, &endptr, 16);
+        if (endptr == p) {
+            LOGE("%s: Invalid startup reason found in cmdline \"%s\"\n",
+            __FUNCTION__, cmdline);
+            return;
+        }
+    }
     if ((errno != ERANGE) &&
-        (endptr != p) &&
         (reason < (sizeof(bootmode_reason)/sizeof(char*)))) {
         strcpy(startupreason, bootmode_reason[reason]);
     } else {
         /* Hmm! bad value... */
-        LOGE("%s: Invalid startup reason found in cmdline \"%s\"\n",
-            __FUNCTION__, cmdline);
+        LOGE("%s: Invalid startup reason found \"%s\"\n",
+            __FUNCTION__, startupreason);
     }
 }
 

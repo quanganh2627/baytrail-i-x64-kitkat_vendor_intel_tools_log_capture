@@ -196,6 +196,7 @@ enum {
 #define DATA_DIR                RESDIR "/data"
 #define SYS_DIR                 RESDIR "/system"
 #define CACHE_DIR               RESDIR "/cache"
+#define PSTORE_DIR              RESDIR "/pstore"
 #define PANIC_DIR               DATA_DIR "/dontpanic"
 #define SDCARD_LOGS_DIR         SDCARD_DIR "/logs"
 #define SDCARD_CRASH_DIR        SDCARD_LOGS_DIR "/crashlog"
@@ -215,6 +216,8 @@ enum {
 #define LOGS_MEDIA_DIR          DATA_DIR "/media/logs"
 #define KDUMP_DIR               LOGS_MEDIA_DIR "/kdump"
 #define SDSIZE_CURRENT_LOG      LOGS_DIR "/currentsdsize"
+#define REBOOT_DIR              RESDIR "/sys/kernel/debug/intel_scu_osnib"
+#define EVENTS_DIR              LOGS_DIR "/events"
 
 /* FILES */
 #define SYS_PROP                SYS_DIR "/build.prop"
@@ -243,6 +246,7 @@ enum {
 #define MODEM_SHUTDOWN_TRIGGER  LOGS_DIR "/modemcrash/mshutdown.txt"
 #define LOG_SPID                LOGS_DIR "/spid.txt"
 #define LAST_KMSG_FILE          "last_kmsg"
+#define CONSOLE_RAMOOPS_FILE    "console-ramoops"
 #define CONSOLE_NAME            "emmc_ipanic_console"
 #define CONSOLE_RAM             "ram_ipanic_console"
 #define THREAD_NAME             "emmc_ipanic_threads"
@@ -252,6 +256,7 @@ enum {
 #define CRASHFILE_NAME          "crashfile"
 #define BPLOG_NAME              "bplog"
 #define LAST_KMSG               PROC_DIR "/" LAST_KMSG_FILE
+#define CONSOLE_RAMOOPS         PSTORE_DIR "/" CONSOLE_RAMOOPS_FILE
 #define PANIC_CONSOLE_NAME      PROC_DIR "/" CONSOLE_NAME
 #define PANIC_THREAD_NAME       PROC_DIR "/" THREAD_NAME
 #define PROC_FABRIC_ERROR_NAME  PROC_DIR "/" FABRIC_ERROR_NAME
@@ -283,6 +288,11 @@ enum {
 #define CRASHLOG_WATCHER_INFOEVENT      "crashlog_watcher_infoevent"
 #define CRASHLOG_CONF_PATH              "/system/etc/crashlog.conf"
 #define MCD_PROCESSING          LOGS_DIR "/mcd_processing"
+#define RESET_SOURCE_0          REBOOT_DIR "/RESETSRC0"
+#define RESET_SOURCE_1          REBOOT_DIR "/RESETSRC1"
+#define RESET_IRQ_1             REBOOT_DIR "/RESETIRQ1"
+#define RESET_IRQ_2             REBOOT_DIR "/RESETIRQ2"
+#define EVENTFILE_NAME          "eventfile"
 
 /* MACROS */
 #define MIN(a,b)                ((a) < (b) ? (a) : (b))

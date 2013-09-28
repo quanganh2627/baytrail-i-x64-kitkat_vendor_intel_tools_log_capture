@@ -49,6 +49,8 @@ struct mmgr_data {
     char string[MMGRMAXSTRING];     /* main string representing mmgr data content */
     int  extra_int;                 /* optional integer data (mailly used for error code) */
     char extra_string[MMGRMAXEXTRA];/* optional string that could be used for any purpose */
+    int  extra_nb_causes;                 /* optional integer data that could be used to store number of optionnal data */
+    char extra_tab_string[5][MMGRMAXEXTRA];/* optional string that could be used to store data1 to data5 */
 };
 
 mmgr_cli_handle_t *mmgr_hdl = NULL;
@@ -63,6 +65,26 @@ static void write_mmgr_monitor_with_extras(char *chain, char *extra_string, int 
         cur_data.extra_string[size-1] = 0;
     }
     cur_data.extra_int = extra_int;
+    write(mmgr_monitor_fd[1], &cur_data, sizeof( struct mmgr_data));
+}
+
+static void write_mmgr_monitor_with_extras_apimr(char *chain, char *extra_string[6], int nb_values,  int extra_string_len[6]) {
+    struct mmgr_data cur_data;
+    int i,size;
+    strncpy(cur_data.string, chain, sizeof(cur_data.string));
+
+    if (nb_values > 0) {
+        size = MIN(extra_string_len[0]+1, (int)sizeof(cur_data.extra_string));
+        strncpy(cur_data.extra_string, extra_string[0], size);
+        cur_data.extra_string[size-1] = 0;
+        for(i=1; i < nb_values; i++){
+            size = MIN(extra_string_len[i]+1, (int)sizeof(cur_data.extra_tab_string[i-1]));
+            strncpy(cur_data.extra_tab_string[i-1], extra_string[i], size);
+            cur_data.extra_tab_string[i-1][size-1] = 0;
+        }
+
+    }
+    cur_data.extra_nb_causes = nb_values - 1;
     write(mmgr_monitor_fd[1], &cur_data, sizeof( struct mmgr_data));
 }
 
@@ -155,8 +177,9 @@ int mdm_CORE_DUMP_COMPLETE(mmgr_cli_event_t *ev)
 int mdm_AP_RESET(mmgr_cli_event_t *ev)
 {
     LOGD("Received E_MMGR_NOTIFY_AP_RESET");
-    char *extra_string = NULL;
-    int extra_string_len = 0;
+    char *extra_string[6];
+    int extra_string_len[6] = {0,};
+    int i;
     mmgr_cli_ap_reset_t *ap = (mmgr_cli_ap_reset_t *)ev->data;
 
     if (ap == NULL) {
@@ -164,14 +187,24 @@ int mdm_AP_RESET(mmgr_cli_event_t *ev)
     } else {
         LOGD("%s: AP reset asked by: %s (len: %lu)", __FUNCTION__, ap->name, (unsigned long)ap->len);
         if (ap->len < MMGRMAXEXTRA) {
-            extra_string = ap->name;
-            extra_string_len = ap->len;
+            extra_string[0] = ap->name;
+            extra_string_len[0] = ap->len;
+            if(ap->num_causes > 0) {
+                for(i=0; i < (int)ap->num_causes; i++) {
+                    if(ap->recovery_causes[i].len < MMGRMAXEXTRA) {
+                        extra_string_len[i+1] = ap->recovery_causes[i].len;
+                        extra_string[i+1] = ap->recovery_causes[i].cause;
+                    }
+                    else {
+                        LOGE("%s: cause length error : %lu", __FUNCTION__, (unsigned long)ap->recovery_causes[i].len);
+                    }
+                }
+            }
         } else {
             LOGE("%s: length error : %lu", __FUNCTION__, (unsigned long)ap->len);
         }
     }
-
-    write_mmgr_monitor_with_extras("APIMR", extra_string, extra_string_len, 0);
+    write_mmgr_monitor_with_extras_apimr("APIMR", extra_string, ap->num_causes + 1,extra_string_len);
     return 0;
 }
 
@@ -291,13 +324,14 @@ static int compute_mmgr_param(char *type, int *mode, char *name, int *aplog, int
         sprintf(name, "%s",CRASHEVENT);
         *aplog = 1;
         *log_mode = APLOG_TYPE;
-        *bplog = 1;
+        *bplog = check_running_modem_trace();
     } else if (strstr(type, "APIMR" )) {
         //CASE APIMR
         *mode = CRASH_MODE;
         sprintf(name, "%s", CRASHEVENT);
         *aplog = 1;
         *log_mode = APLOG_TYPE;
+        *bplog = check_running_modem_trace();
     } else if (strstr(type, "MRESET" )) {
         //CASE MRESET
         *mode = CRASH_MODE;
@@ -337,6 +371,8 @@ int mmgr_handle(void) {
     char data1[MMGRMAXEXTRA];
     char data2[MMGRMAXEXTRA];
     char data3[MMGRMAXEXTRA];
+    char data4[MMGRMAXEXTRA];
+    char data5[MMGRMAXEXTRA];
     char cd_path[MMGRMAXEXTRA];
     char destion[PATHMAX];
     char destion2[PATHMAX];
@@ -351,6 +387,8 @@ int mmgr_handle(void) {
     data1[0] = 0;
     data2[0] = 0;
     data3[0] = 0;
+    data4[0] = 0;
+    data5[0] = 0;
     cd_path[0] = 0;
     destion[0] = 0;
     destion2[0] = 0;
@@ -398,9 +436,33 @@ int mmgr_handle(void) {
         if (file_exists(MCD_PROCESSING))
             remove(MCD_PROCESSING);
     } else if (strstr(type, "APIMR" )){
-        LOGD("Extra string value : %s ",cur_data.extra_string);
-        //need to put it in DATA3 to avoid conflict with parser
-        snprintf(data3,sizeof(data3),"%s", cur_data.extra_string);
+        if(!cur_data.extra_nb_causes) {
+            LOGD("Extra string value : %s ",cur_data.extra_string);
+            //need to put it in DATA3 to avoid conflict with parser
+            snprintf(data3,sizeof(data3),"%s", cur_data.extra_string);
+        }
+        else if(cur_data.extra_nb_causes > 0) {
+            LOGD("Extra string value : %s ",cur_data.extra_string);
+            snprintf(data0,sizeof(data0),"%s", cur_data.extra_string);
+            LOGD("Extra tab string value 0: %s ",cur_data.extra_tab_string[0]);
+            snprintf(data1,sizeof(data1),"%s", cur_data.extra_tab_string[0]);
+            if(cur_data.extra_nb_causes > 1) {
+                LOGD("Extra tab string value 1: %s ",cur_data.extra_tab_string[1]);
+                snprintf(data2,sizeof(data2),"%s", cur_data.extra_tab_string[1]);
+            }
+            if(cur_data.extra_nb_causes > 2) {
+                LOGD("Extra tab string value 2: %s ",cur_data.extra_tab_string[2]);
+                snprintf(data3,sizeof(data3),"%s", cur_data.extra_tab_string[2]);
+            }
+            if(cur_data.extra_nb_causes > 3) {
+                LOGD("Extra tab string value 3: %s ",cur_data.extra_tab_string[3]);
+                snprintf(data4,sizeof(data4),"%s", cur_data.extra_tab_string[3]);
+            }
+            if(cur_data.extra_nb_causes > 4) {
+                LOGD("Extra tab string value 4 %s ",cur_data.extra_tab_string[4]);
+                snprintf(data5,sizeof(data5),"%s", cur_data.extra_tab_string[4]);
+            }
+        }
     } else if (strstr(type, "TELEPHONY" )){
         LOGD("Extra int value : %d ",cur_data.extra_int);
         snprintf(data0,sizeof(data0),"%d", cur_data.extra_int);
@@ -469,6 +531,10 @@ int mmgr_handle(void) {
                 fprintf(fp,"DATA2=%s\n", data2);
             if (strlen(data3) > 0)
                 fprintf(fp,"DATA3=%s\n", data3);
+            if (strlen(data4) > 0)
+                fprintf(fp,"DATA4=%s\n", data4);
+            if (strlen(data5) > 0)
+                fprintf(fp,"DATA5=%s\n", data5);
             fprintf(fp,"_END\n");
             fclose(fp);
         }
