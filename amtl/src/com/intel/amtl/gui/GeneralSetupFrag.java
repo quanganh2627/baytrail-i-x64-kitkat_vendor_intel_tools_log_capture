@@ -78,6 +78,7 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
     private Switch sExpertMode;
     private Button bAppConf;
     private Button bSavLog;
+    private Button bLogTag;
     private TextView tvModemStatus;
     private TextView tvMtsStatus;
 
@@ -85,6 +86,7 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
 
     private final int appConfId = 100;
     private final int savLogId = 200;
+    private final int logTagId = 300;
 
     // Context used for intents and to display buttons
     private Context context;
@@ -337,6 +339,7 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
 
             this.defineExecConfButton(view);
             this.defineSaveLogsButton(view);
+            this.defineLogTagButton(view);
         } else {
 
             UIHelper.exitDialog(this.getActivity(), "Error in UI", "View cannot be displayed.\n"
@@ -371,6 +374,9 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
             }
             if (this.bSavLog != null) {
                 this.bSavLog.setOnClickListener(this);
+            }
+            if (this.bLogTag != null) {
+                this.bLogTag.setOnClickListener(this);
             }
         }
     }
@@ -440,6 +446,20 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
         this.bSavLog.setText("Save Logs");
         ll.addView(this.bSavLog, appSaveLogs);
         this.bSavLog = ((Button)view.findViewById(this.savLogId));
+    }
+
+    public void defineLogTagButton(View view) {
+        LinearLayout.LayoutParams appLogTag = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.MATCH_PARENT);
+        appLogTag.setMargins(0, 50, 0, 0);
+        this.bLogTag = new Button(context);
+        this.bLogTag.setId(this.logTagId);
+        this.bLogTag.setGravity(Gravity.CENTER);
+        this.bLogTag.setTextColor(Color.BLACK);
+        this.bLogTag.setText("Inject TAG in logs");
+        ll.addView(this.bLogTag, appLogTag);
+        this.bLogTag = ((Button)view.findViewById(this.logTagId));
     }
 
     public void saveLogs() {
@@ -584,6 +604,10 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
                 this.buttonChanged = false;
                 modeChangedCallBack.onModeChanged(this.buttonChanged);
                 this.changeButtonColor(this.buttonChanged);
+                break;
+            case logTagId:
+                UIHelper.logTagDialog(this.getActivity(), "Log TAG", "Please select the TAG"
+                        + " you want to set in logs:\n", context);
                 break;
         }
     }
