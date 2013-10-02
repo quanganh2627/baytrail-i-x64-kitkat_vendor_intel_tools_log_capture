@@ -24,6 +24,8 @@ import android.app.Activity;
 import android.app.DialogFragment;
 import android.app.Fragment;
 import android.app.FragmentManager;
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.SystemClock;
@@ -45,6 +47,7 @@ public class ConfigApplyFrag extends DialogFragment {
 
     private final String TAG = "AMTL";
     private final String MODULE = "ConfigApplyFrag";
+    private Context context;
 
     int targetFrag;
     String tag;
@@ -53,9 +56,10 @@ public class ConfigApplyFrag extends DialogFragment {
     // thread executed while Dialog Box is displayed.
     ApplyConfTask exeSetup;
 
-    public ConfigApplyFrag(String tag, int targetFrag) {
+    public ConfigApplyFrag(String tag, int targetFrag, Context context) {
         this.tag = tag;
         this.targetFrag = targetFrag;
+        this.context = context;
     }
 
     public void handlerConf(ApplyConfTask confTask) {
@@ -73,7 +77,8 @@ public class ConfigApplyFrag extends DialogFragment {
 
         this.exeSetup = null;
         if (!exceptReason.equals("")) {
-            Log.e(TAG, MODULE + ": modem conf application failed: " + exceptReason);
+            Log.e(TAG, MODULE + ": modem conf application failed: " +
+                    exceptReason);
             UIHelper.okDialog(getActivity(),
                     "Error ", "Configuration not applied:\n" + exceptReason);
         }
@@ -84,8 +89,9 @@ public class ConfigApplyFrag extends DialogFragment {
         }
     }
 
-    public void launch(ModemConf modemConfToApply, Fragment frag, FragmentManager gsfManager) {
-        handlerConf(new ApplyConfTask(modemConfToApply));
+    public void launch(ModemConf modemConfToApply, Fragment frag,
+             FragmentManager gsfManager) {
+        handlerConf(new ApplyConfTask(modemConfToApply, this.context));
         setTargetFragment(this, targetFrag);
         show(gsfManager, tag);
     }
@@ -115,8 +121,8 @@ public class ConfigApplyFrag extends DialogFragment {
 
     @Override
     public void onDestroyView() {
-        /* This will allow dialog box to stay even if parent layout configuration
-        is changed (rotation).*/
+        // This will allow dialog box to stay even if parent layout
+        // configuration is changed (rotation)
         if (getDialog() != null && getRetainInstance()) {
             getDialog().setDismissMessage(null);
         }
@@ -125,8 +131,8 @@ public class ConfigApplyFrag extends DialogFragment {
 
     @Override
     public void onResume() {
-        /* This allows to close dialog box if the thread ends while we are not focused
-        on the activity. */
+        // This allows to close dialog box if the thread ends while
+        // we are not focused on the activity.
         super.onResume();
         if (this.exeSetup == null) {
             dismiss();
@@ -142,9 +148,11 @@ public class ConfigApplyFrag extends DialogFragment {
         private MtsManager mtsManager;
         private ModemConf modConfToApply;
         private String exceptReason = "";
+        private Context context;
 
-        public ApplyConfTask (ModemConf confToApply) {
+        public ApplyConfTask (ModemConf confToApply, Context context) {
             this.modConfToApply = confToApply;
+            this.context = context;
         }
 
         void setFragment(ConfigApplyFrag confAppFrag) {
@@ -154,6 +162,11 @@ public class ConfigApplyFrag extends DialogFragment {
         // Function overrides for Apply configuration thread.
         @Override
         protected Void doInBackground(Void... params) {
+            SharedPreferences prefs = context.getSharedPreferences("AMTLPrefsData",
+                    Context.MODE_PRIVATE);
+            SharedPreferences.Editor editor =
+                    context.getSharedPreferences("AMTLPrefsData",
+                    Context.MODE_PRIVATE).edit();
             try {
                 modemCtrl = ModemController.get();
                 if (modemCtrl != null) {
@@ -161,6 +174,36 @@ public class ConfigApplyFrag extends DialogFragment {
                     modemCtrl.sendAtCommand(modConfToApply.getXsio());
                     modemCtrl.sendAtCommand(modConfToApply.getTrace());
                     modemCtrl.sendAtCommand(modConfToApply.getXsystrace());
+                    // if flush command available for this configuration, let s use it.
+                    if (!modConfToApply.getFlCmd().equalsIgnoreCase("")) {
+                        Log.d(TAG, MODULE + ": Config has flush_cmd defined.");
+                        modemCtrl.sendAtCommand(modConfToApply.getFlCmd());
+                        // give time to the modem to sync - 1 second
+                        SystemClock.sleep(1000);
+                    } else {
+                        // fall back - check if a default flush cmf is set
+                        Log.d(TAG, MODULE + ": Fall back - check default_flush_cmd");
+                        String flCmd = prefs.getString("default_flush_cmd", "");
+                        if (!flCmd.equalsIgnoreCase("")) {
+                            modemCtrl.sendAtCommand(flCmd + "\r\n");
+                            // give time to the modem to sync - 1 second
+                            SystemClock.sleep(1000);
+                        }
+                    }
+
+                    // Success to apply conf, it s time to record it.
+                    Log.d(TAG, MODULE + ": Configuration index to save: "
+                            + modConfToApply.getIndex());
+
+                    editor.putInt("index", modConfToApply.getIndex());
+                    if (modConfToApply.getIndex() != -1)  {
+                        editor.putBoolean("expert_mode", false);
+                        Log.d(TAG, MODULE + ": Selected configuration index: " +
+                                modConfToApply.getIndex());
+                    } else {
+                        editor.putBoolean("expert_mode", true);
+                    }
+
                     // check if the configuration requires mts
                     mtsManager = new MtsManager();
                     if (modConfToApply != null) {
@@ -187,21 +230,37 @@ public class ConfigApplyFrag extends DialogFragment {
                         exceptReason = "no configuration to apply";
                     }
                 } else {
-                    exceptReason = "cannot apply configuration: modemCtrl is null";
+                    exceptReason =
+                            "cannot apply configuration: modemCtrl is null";
                 }
+                // Everything went right, so let s commit trace configuration.
+                editor.commit();
             } catch (ModemControlException ex) {
                 exceptReason = ex.getMessage();
                 Log.e(TAG, MODULE + ": cannot change modem configuration " + ex);
                 // if config change failed, logging is stopped
+                editor.remove("expert_mode");
+                editor.remove("index");
+                editor.commit();
                 try {
                     mtsManager = new MtsManager();
                     mtsManager.stopServices();
                     modemCtrl.sendAtCommand("AT+TRACE=0\r\n");
                     modemCtrl.sendAtCommand("AT+XSYSTRACE=0\r\n");
+                    String flCmd = prefs.getString("default_flush_cmd", "");
+                    if (!flCmd.equalsIgnoreCase("")) {
+                        modemCtrl.sendAtCommand(flCmd + "\r\n");
+                        // give time to the modem to sync - 1 second
+                        SystemClock.sleep(1000);
+                    }
                     modemCtrl.restartModem();
                     Log.e(TAG, MODULE + ": logging has been stopped");
+                    editor.putBoolean("log_active", false);
+                    editor.commit();
                 } catch (ModemControlException mcex) {
                     Log.e(TAG, MODULE + ": failed to stop logging " + mcex);
+                    editor.putBoolean("log_active", true);
+                    editor.commit();
                 }
             }
             return null;

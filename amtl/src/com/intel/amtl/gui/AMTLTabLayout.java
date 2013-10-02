@@ -26,6 +26,7 @@ import android.app.Fragment;
 import android.app.FragmentManager;
 import android.app.FragmentTransaction;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.util.Log;
@@ -58,6 +59,16 @@ import java.io.IOException;
 import java.util.ArrayList;
 
 import org.xmlpull.v1.XmlPullParserException;
+
+// AMTL is using a sharedPreferences file to store volatile data.
+// As this is spread through the classes, here the summary of the
+// stored data:
+// @index (int) the current executed configuration
+// @log_active (boolean) indicates if logging is active
+// @cpuName (string) the platform CPU name
+// @modemName (string) the platform modem name
+// @expert_mode (boolean) indicates if expert mode is engaged
+// @default_flush_cmd (string) if populated, the command to execute to flush to NVM
 
 public class AMTLTabLayout extends Activity implements GeneralSetupFrag.GSFCallBack,
         ExpertSetupFrag.OnExpertModeApplied, ExpertSetupFrag.OnModeChanged,
@@ -107,12 +118,19 @@ public class AMTLTabLayout extends Activity implements GeneralSetupFrag.GSFCallB
 
     private void loadConfiguration() throws ParsingException {
         FileInputStream fin = null;
+        SharedPreferences.Editor editor = ctx.getSharedPreferences("AMTLPrefsData",
+                Context.MODE_PRIVATE).edit();
+        Log.d(TAG, MODULE + ": Will remove default_flush_cmd entry.");
+        editor.remove("default_flush_cmd");
+        editor.commit();
+
         try {
             // Use of getXmlPlatform
-            this.platform = new Platform();
+            this.platform = new Platform(ctx);
             this.currentCatalogPath = this.platform.getPlatformConf();
 
-            Log.d(TAG, MODULE + ": Will load " + this.currentCatalogPath + " configuration file");
+            Log.d(TAG, MODULE + ": Will load " + this.currentCatalogPath +
+                    " configuration file");
             fin = new FileInputStream(this.currentCatalogPath);
             if (fin != null) {
                 this.configOutputs = this.configParser.parseConfig(fin);
@@ -223,7 +241,7 @@ public class AMTLTabLayout extends Activity implements GeneralSetupFrag.GSFCallB
                     telStackSetter);
         } else {
             try {
-                this.configParser = new ConfigParser();
+                this.configParser = new ConfigParser(this.ctx);
                 this.loadConfiguration();
 
             } catch (ParsingException ex) {

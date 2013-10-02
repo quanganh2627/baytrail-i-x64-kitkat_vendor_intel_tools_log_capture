@@ -274,7 +274,7 @@ public class MasterSetupFrag extends Fragment
                 setMasterStringToInt();
                 ModemConf sysConf = setModemConf();
                 ConfigApplyFrag progressFrag = new ConfigApplyFrag(CONFSETUP_MASTER_TAG,
-                        CONFSETUP_MASTER_TARGETFRAG);
+                        CONFSETUP_MASTER_TARGETFRAG, this.context);
                 progressFrag.launch(sysConf, this, gsfManager);
                 break;
         }

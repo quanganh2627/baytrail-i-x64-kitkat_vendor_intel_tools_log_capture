@@ -39,6 +39,7 @@ public class LogOutput {
     private  final String TAG = "AMTL";
     private  final String MODULE = "LogOutput";
 
+    private int index = -1;
     private String name = null;
     private String xsioValue = null;
     private String buttonColor = null;
@@ -53,14 +54,16 @@ public class LogOutput {
     private String pti2 = null;
     private Hashtable<String, Master> masterList = null;
     private Switch confSwitch = null;
+    private String flcmd = null;
 
     public LogOutput() {
         this.masterList = new Hashtable<String, Master>();
     }
 
-    public LogOutput(String name, String xsioValue, String buttonColor, String mtsInput,
+    public LogOutput(int index, String name, String xsioValue, String buttonColor, String mtsInput,
             String mtsOutput, String mtsOutputType, String mtsRotateNum, String mtsRotateSize,
-            String mtsMode, String oct, String pti1, String pti2) {
+            String mtsMode, String oct, String pti1, String pti2, String flcmd) {
+        this.setIndex(index);
         this.setName(name);
         this.setXsio(xsioValue);
         this.setButtonColor(buttonColor);
@@ -74,6 +77,11 @@ public class LogOutput {
         this.setOct(oct);
         this.setPti1(pti1);
         this.setPti2(pti2);
+        this.setFlCmd(flcmd);
+    }
+
+    public void setIndex(int index) {
+        this.index = index;
     }
 
     public void setName(String name) {
@@ -124,6 +132,14 @@ public class LogOutput {
         this.pti2 = pti2;
     }
 
+    public void setFlCmd(String flcmd) {
+        this.flcmd = flcmd;
+    }
+
+    public int getIndex() {
+        return this.index;
+    }
+
     public String getName() {
         return this.name;
     }
@@ -170,6 +186,10 @@ public class LogOutput {
 
     public String getPti2() {
         return this.pti2;
+    }
+
+    public String getFlCmd() {
+        return this.flcmd;
     }
 
     public Hashtable<String, Master> getMasterList() {
@@ -281,14 +301,18 @@ public class LogOutput {
     public void printToLog() {
         Collection<Master> c = this.masterList.values();
         Iterator<Master> it = c.iterator();
-        Log.d(TAG, MODULE + ": name = " + this.name + ", value = " + this.xsioValue
-                + ", color = " + this.buttonColor + ", mts_input = " + this.mtsInput
+        Log.d(TAG, MODULE + ": index = " + this.index + ", name = " + this.name
+                + ", value = " + this.xsioValue
+                + ", color = " + this.buttonColor
+                + ", mts_input = " + this.mtsInput
                 + ", mts_output = " + this.mtsOutput
                 + ", mts_output_type = " + this.mtsOutputType
                 + ", mts_rotate_num = " + this.mtsRotateNum
                 + ", mts_rotate_size = " + this.mtsRotateSize
                 + ", mts_mode = " + this.mtsMode
-                + ", oct = " + this.oct + ", pti1 = " + this.pti1 + ", pti2 = " + this.pti2 + ".");
+                + ", oct = " + this.oct + ", pti1 = " + this.pti1
+                + ", pti2 = " + this.pti2
+                + ", flush_command = " + this.flcmd + ".");
         while(it.hasNext()) {
             Master master = it.next();
             master.printToLog();

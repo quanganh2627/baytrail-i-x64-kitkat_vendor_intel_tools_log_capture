@@ -32,15 +32,21 @@ public class ModemConf {
     private String atTrace = "";
     private String atXsystrace = "";
     private String mtsMode = "";
+    private String flCmd = "";
     private boolean mtsRequired = false;
+    private int confIndex = -1;
 
     private LogOutput config = null;
     private MtsConf mtsConf = null;
 
     public ModemConf(LogOutput config) {
         this.config = config;
+        this.confIndex = this.config.getIndex();
         this.atXsystrace = "AT+XSYSTRACE=1," + this.config.concatMasterPort();
 
+        if (this.config.getFlCmd() != null) {
+            this.flCmd = this.config.getFlCmd() + "\r\n";
+        }
         if (this.config.getXsio() != null) {
 
             this.atXsystrace += "," + this.config.concatMasterOption();
@@ -73,10 +79,12 @@ public class ModemConf {
         }
     }
 
-    public ModemConf(String xsio, String trace, String xsystrace) {
+    public ModemConf(String xsio, String trace, String xsystrace, String flcmd) {
         this.atTrace = trace;
         this.atXsio = xsio;
         this.atXsystrace = xsystrace;
+        this.flCmd = flcmd;
+        this.confIndex = -1;
         if (!this.atTrace.equals("AT+TRACE=1\r\n")) {
             this.mtsConf = new MtsConf();
         }
@@ -98,6 +106,14 @@ public class ModemConf {
 
     public String getXsystrace() {
         return this.atXsystrace;
+    }
+
+    public String getFlCmd() {
+        return this.flCmd;
+    }
+
+    public int getIndex() {
+        return this.confIndex;
     }
 
     public void activateConf(boolean activate) {
