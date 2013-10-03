@@ -180,15 +180,11 @@ public class ModemController implements ModemEventListener, Closeable {
         }
     }
 
-    public void acquireResource() {
+    public void acquireResource() throws MmgrClientException {
         if (this.modemStatusManager != null) {
-            try {
-                if (!this.modemAcquired) {
-                    this.modemStatusManager.acquireModem();
-                    this.modemAcquired = true;
-                }
-            } catch (MmgrClientException ex) {
-                Log.e(TAG, MODULE + ": Cannot acquire modem resource");
+            if (!this.modemAcquired) {
+                this.modemStatusManager.acquireModem();
+                this.modemAcquired = true;
             }
         }
     }
