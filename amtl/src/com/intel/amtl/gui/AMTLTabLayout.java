@@ -282,7 +282,9 @@ public class AMTLTabLayout extends Activity implements GeneralSetupFrag.GSFCallB
         if (this.mdmCtrl != null) {
             try {
                 this.mdmCtrl.acquireResource();
-                this.mdmCtrl.openTty();
+                if (this.mdmCtrl.isModemAcquired()) {
+                    this.mdmCtrl.openTty();
+                }
             } catch (MmgrClientException ex) {
                 Log.e(TAG, MODULE + ": Cannot acquire modem resource " + ex);
                 UIHelper.exitDialog(this,
