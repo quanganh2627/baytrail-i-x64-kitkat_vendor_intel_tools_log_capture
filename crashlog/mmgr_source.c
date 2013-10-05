@@ -64,6 +64,7 @@ static void write_mmgr_monitor_with_extras(char *chain, char *extra_string, int 
         strncpy(cur_data.extra_string, extra_string, size);
         cur_data.extra_string[size-1] = 0;
     }
+    else cur_data.extra_string[0] = 0;
     cur_data.extra_int = extra_int;
     write(mmgr_monitor_fd[1], &cur_data, sizeof( struct mmgr_data));
 }
@@ -166,8 +167,10 @@ int mdm_CORE_DUMP_COMPLETE(mmgr_cli_event_t *ev)
         LOGD("core dump path: %s", extra_string);
     }else if ((cd->reason_len < MMGRMAXEXTRA) && (copy_cd == 0) ){
         extra_string_len = cd->reason_len;
-        extra_string = cd->reason;
-        LOGE("mdm_CORE_DUMP error : %s", extra_string);
+        if(cd->reason_len > 0) {
+            extra_string = cd->reason;
+            LOGE("mdm_CORE_DUMP error : %s", extra_string);
+        }
     }
 
     write_mmgr_monitor_with_extras("MPANIC", extra_string, extra_string_len, extra_int);
