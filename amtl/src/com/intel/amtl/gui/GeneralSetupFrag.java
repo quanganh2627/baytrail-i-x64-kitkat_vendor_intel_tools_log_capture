@@ -194,6 +194,9 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
     }
 
     private void updateUi(ModemConf curModConf) {
+        if (curModConf.getTrace().equals("0") && mtsMgr.getMtsState().equals("running")) {
+            mtsMgr.stopServices();
+        }
         this.updateText(this.mtsMgr.getMtsState(), tvMtsStatus);
         if (this.isExpertModeEnabled() && !curModConf.getTrace().equals("0")) {
             if (curModConf.isMtsRequired() && mtsMgr.getMtsState().equals("running")) {
@@ -416,7 +419,7 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
         atTraceResponse = mdmCtrl.sendAtCommand("at+trace?\r\n");
         atXsystraceResponse = mdmCtrl.sendAtCommand("at+xsystrace=10\r\n");
         retModemConf = new ModemConf(cmdParser.parseXsioResponse(atXsioResponse),
-                cmdParser.parseTraceResponse(atTraceResponse), atXsystraceResponse);
+                cmdParser.parseTraceResponse(atTraceResponse), atXsystraceResponse, "");
         return retModemConf;
     }
 
@@ -501,7 +504,8 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
                     }
                 }
                 if (!buttonChecked) {
-                    modemConfToApply = new ModemConf("", "AT+TRACE=0\r\n", "AT+XSYSTRACE=0\r\n");
+                    modemConfToApply = new ModemConf("", "AT+TRACE=0\r\n",
+                            "AT+XSYSTRACE=0\r\n", "");
                 }
             }
         } else {
@@ -518,7 +522,7 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
             }
         }
         ConfigApplyFrag progressFrag = new ConfigApplyFrag(CONFSETUP_TAG,
-                CONFSETUP_TARGETFRAG);
+                CONFSETUP_TARGETFRAG, context);
         progressFrag.launch(modemConfToApply, this, gsfManager);
     }
 
