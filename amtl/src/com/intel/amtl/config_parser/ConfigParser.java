@@ -214,6 +214,7 @@ public class ConfigParser {
                     parser.getAttributeValue(null, "mts_rotate_size"),
                     parser.getAttributeValue(null, "mts_mode"),
                     parser.getAttributeValue(null, "oct"),
+                    parser.getAttributeValue(null, "oct_fcs"),
                     parser.getAttributeValue(null, "pti1"),
                     parser.getAttributeValue(null, "pti2"),
                     flcmd);
@@ -229,6 +230,7 @@ public class ConfigParser {
                     + ", mts_rotate_size = " + parser.getAttributeValue(null, "mts_rotate_size")
                     + ", mts_mode = " + parser.getAttributeValue(null, "mts_mode")
                     + ", oct = " + parser.getAttributeValue(null, "oct")
+                    + ", oct_fcs = " + parser.getAttributeValue(null, "oct_fcs")
                     + ", pti1 = "+ parser.getAttributeValue(null, "pti1")
                     + ", pti2 = "+ parser.getAttributeValue(null, "pti2")
                     + ", default_flush_cmd = "+ parser.getAttributeValue(null, "default_flush_cmd")
