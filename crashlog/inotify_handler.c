@@ -84,10 +84,16 @@ int set_watch_entry_callback(unsigned int watch_type, inotify_callback pcallback
 
     if ( watch_type >= DIM(wd_array) ) {
         LOGE("%s: Cannot set the callback for type %u (max is %lu)\n",
-            __FUNCTION__, watch_type, (long unsigned int)DIM(wd_array));
+             __FUNCTION__, watch_type, (long unsigned int)DIM(wd_array));
         return -1;
     }
-    wd_array[watch_type].pcallback = pcallback;
+
+    if ( CRASHLOG_MODE_EVENT_TYPE_ENABLED(g_crashlog_mode, wd_array[watch_type].eventtype) )
+        wd_array[watch_type].pcallback = pcallback;
+    else
+        LOGD("event type '%s' is disabled : Don't set callback function\n",
+             print_eventtype[watch_type] );
+
     return 0;
 }
 
@@ -104,7 +110,7 @@ int set_watch_entry_callback(unsigned int watch_type, inotify_callback pcallback
  */
 int init_inotify_handler() {
 
-    int fd, res, i;
+    int fd, i;
 
 #ifndef __TEST__
     fd = inotify_init();
@@ -118,22 +124,31 @@ int init_inotify_handler() {
 
     for (i = 0; i < (int)DIM(wd_array); i++) {
         int alreadywatched = 0, j;
-        /* install watches only for new unwatched paths */
+
+        if (!CRASHLOG_MODE_EVENT_TYPE_ENABLED(g_crashlog_mode, wd_array[i].eventtype)) {
+            LOGI("event type '%s' disabled : Don't add watch on %s\n",
+                 print_eventtype[ wd_array[i].eventtype ], wd_array[i].eventpath);
+            continue;
+        }
+
+        /* Install watches only for new unwatched paths */
         for (j = 0 ; j < i ; j++) {
-            if ( !strcmp(wd_array[j].eventpath, wd_array[i].eventpath) ) {
+            if (!strcmp(wd_array[j].eventpath, wd_array[i].eventpath) ) {
                 alreadywatched = 1;
                 wd_array[i].wd = wd_array[j].wd;
-                LOGI("Don't duplicate watch operation for %s\n", wd_array[j].eventpath);
+                LOGI("Don't duplicate watch operation for %s\n", wd_array[i].eventpath);
                 break;
             }
         }
-        if (alreadywatched) continue;
+        if (alreadywatched)
+            continue;
+
         wd_array[i].wd = inotify_add_watch(fd, wd_array[i].eventpath,
-                wd_array[i].eventmask);
+                                           wd_array[i].eventmask);
         if (wd_array[i].wd < 0) {
             wd_array[i].inotify_error = errno;
             LOGE("Can't add watch for %s - %s.\n",
-                wd_array[i].eventpath, strerror(wd_array[i].inotify_error) );
+                 wd_array[i].eventpath, strerror(wd_array[i].inotify_error));
         } else
             LOGI("%s, wd=%d has been snooped\n", wd_array[i].eventpath, wd_array[i].wd);
     }
@@ -149,7 +164,6 @@ int init_inotify_handler() {
  * have been added to inotify watcher.
  */
 void handle_missing_watched_dir() {
-
     int idx;
     const char * date = get_current_time_long(1);
     /* Raise first an error */
@@ -475,4 +489,3 @@ int receive_inotify_events(int inotify_fd) {
 
     return 0;
 }
-

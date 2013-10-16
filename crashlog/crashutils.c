@@ -738,6 +738,11 @@ int create_minimal_crashfile(char * event, const char* type, const char* path, c
 void notify_crashreport() {
     char boot_state[PROPERTY_VALUE_MAX];
 
+    /* Does current crashlog mode allow notifs to crashreport ?*/
+    if ( !CRASHLOG_MODE_NOTIFS_ENABLED(g_crashlog_mode) ) {
+        LOGD("%s : Current crashlog mode is %s - crashreport notifs disabled.\n", __FUNCTION__, CRASHLOG_MODE_NAME(g_crashlog_mode) );
+        return;
+    }
     property_get(PROP_BOOT_STATUS, boot_state, "-1");
     if (strcmp(boot_state, "1"))
         return;
@@ -773,6 +778,12 @@ void build_crashenv_parameters( char * crashenv_param ) {
 void monitor_crashenv()
 {
     char cmd[PATHMAX] = { 0, }, parameters[PATHMAX] = { 0, };
+
+    /* Does current crashlog mode allow monitor_crash_env ?*/
+    if ( !CRASHLOG_MODE_MONITOR_CRASHENV(g_crashlog_mode) ) {
+        LOGD("%s : Current crashlog mode is %s - monitor_crashenv disabled.\n", __FUNCTION__, CRASHLOG_MODE_NAME(g_crashlog_mode));
+        return;
+    }
 
     build_crashenv_parameters(parameters);
     snprintf(cmd, sizeof(cmd), "/system/bin/monitor_crashenv %s", parameters);

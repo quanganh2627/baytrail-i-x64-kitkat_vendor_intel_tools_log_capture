@@ -1175,6 +1175,11 @@ long get_sd_size()
 
 int sdcard_allowed()
 {
+    /* Does current crashlog mode allow SDcard storage ?*/
+    if ( !CRASHLOG_MODE_SD_STORAGE(g_crashlog_mode) ) {
+        LOGD("%s : Current crashlog mode is %s - SDCard storage disabled.\n", __FUNCTION__, CRASHLOG_MODE_NAME(g_crashlog_mode));
+        return 0;
+    }
     //now check remain size on SD
     if (get_sd_size() > current_sd_size_limit){
         LOGE("SD not allowed - current_sd_size_limit reached: %ld.\n", current_sd_size_limit);
@@ -1182,4 +1187,24 @@ int sdcard_allowed()
     }else{
         return 1;
     }
+}
+
+/**
+ * Updates rights of folders containing logs
+ */
+void update_logs_permission(void)
+{
+#ifdef FULL_REPORT
+    char value[PROPERTY_VALUE_MAX] = "0";
+
+    if (property_get(PROP_COREDUMP, value, "") <= 0) {
+        LOGE("Property %s not readable - core dump capture is disabled\n", PROP_COREDUMP);
+    } else if ( value[0] == '1' ) {
+        LOGI("Folders /logs and /logs/core set to 0777\n");
+        chmod(LOGS_DIR,0777);
+        chmod(HISTORY_CORE_DIR,0777);
+    }
+#else
+    return;
+#endif
 }

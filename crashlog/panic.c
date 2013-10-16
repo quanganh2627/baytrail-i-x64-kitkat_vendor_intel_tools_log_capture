@@ -24,6 +24,7 @@
 #include "privconfig.h"
 #include "inotify_handler.h"
 #include "trigger.h"
+#include "ramdump.h"
 
 #include <stdlib.h>
 
@@ -166,6 +167,12 @@ int crashlog_check_panic(char *reason, int test) {
     snprintf(destination, sizeof(destination), "%s%d/%s_%s.txt", CRASH_DIR, dir,
             LOGCAT_NAME, dateshort);
     do_copy(SAVED_LOGCAT_NAME, destination, MAXFILESIZE);
+
+    destination[0] = '\0';
+    snprintf(destination, sizeof(destination), "%s%d/%s_%s.txt", CRASH_DIR, dir,
+            GBUFFER_NAME, dateshort);
+    do_copy(GBUFFER_FILE, destination, MAXFILESIZE);
+
     do_last_kmsg_copy(dir);
 
     overwrite_file(CURRENT_PANIC_CONSOLE_NAME, "1");
@@ -240,10 +247,6 @@ int crashlog_check_ram_panic(char *reason)
             strcpy(crashtype, KERNEL_FAKE_CRASH);
         else
             strcpy(crashtype, KERNEL_CRASH);
-
-        if (!find_str_in_file(SAVED_PANIC_RAM, "sdhci_pci_power_up_host: host controller power up is done", NULL))
-             // An error is raised when the panic console file does not end normally
-            raise_infoerror(ERROREVENT, IPANIC_CORRUPTED);
 
         if (!strncmp(crashtype, KERNEL_FAKE_CRASH, sizeof(KERNEL_FAKE_CRASH)))
              strcat(reason,"_FAKE");
@@ -363,4 +366,21 @@ int crashlog_check_kdump(char *reason, int test) {
         remove(KDUMP_FINISH_FLAG);
     }
     return 0;
+}
+
+/**
+* @brief checks for IPANIC events relying on files exposed by emmc-ipanic and ram
+* console modules.
+*
+* @param[in] reason   : start-up reason
+* @param[in] watchdog : watchdog timer type
+*
+* @retval returns 'void'
+*/
+void crashlog_check_panic_events(char *reason, char *watchdog, int test) {
+
+    if (crashlog_check_panic(reason, test) == 1)
+        /* No panic console file : check RAM console to determine the watchdog event type */
+        if ( crashlog_check_ram_panic(reason) == 1 && strstr(reason, "SWWDT_") )
+            strcpy(watchdog, "WDT_UNHANDLED");
 }

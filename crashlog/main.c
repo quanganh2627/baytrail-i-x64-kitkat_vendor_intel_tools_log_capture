@@ -39,6 +39,7 @@
 #include "modem.h"
 #include "panic.h"
 #include "config_handler.h"
+#include "ramdump.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -61,6 +62,9 @@ extern char guuid[256];
 
 extern pconfig g_first_modem_config;
 extern int g_current_serial_device_id;
+
+/* global flag indicating crashlogd mode */
+enum  crashlog_mode g_crashlog_mode;
 
 int gmaxfiles = MAX_DIRS;
 char *CRASH_DIR = NULL;
@@ -260,10 +264,7 @@ static void early_check(char *encryptstate, int test) {
     strcpy(watchdog,"WDT");
 
     crashlog_check_fabric(startupreason, test);
-    if ( crashlog_check_panic(startupreason, test) == 1 )
-        /* No panic console file : check RAM console to determine the watchdog event type */
-        if ( crashlog_check_ram_panic(startupreason) == 1 && strstr(startupreason, "SWWDT_") )
-            strcpy(watchdog, "WDT_UNHANDLED");
+    crashlog_check_panic_events(startupreason, watchdog, test);
     crashlog_check_kdump(startupreason, test);
     crashlog_check_modem_shutdown();
     crashlog_check_mpanic_abort();
@@ -402,15 +403,9 @@ static void get_crash_env(char * boot_mode, char *crypt_state, char *encrypt_pro
     }
     /* Read SPID */
     read_sys_spid(LOG_SPID);
-#ifdef FULL_REPORT
-    if (property_get(PROP_COREDUMP, value, "") <= 0) {
-        LOGE("Property %s not readable - core dump capture is disabled\n", PROP_COREDUMP);
-    } else if ( value[0] == '1' ) {
-        LOGI("Folders /logs and /logs/core set to 0777\n");
-        chmod(LOGS_DIR,0777);
-        chmod(HISTORY_CORE_DIR,0777);
-    }
-#endif
+
+    /* Update rights of folder containing logs */
+    update_logs_permission();
 }
 
 /**
@@ -514,62 +509,60 @@ int do_monitor() {
     return -1;
 }
 
-int do_monitor_nomain() {
-    fd_set read_fds; /**< file descriptor set watching data availability from sources */
-    int max = 0; /**< select max fd value +1 {@see man select(2) nfds} */
-    int select_result; /**< select result */
-    int file_monitor_fd = get_inotify_fd();
+/**
+ * @brief Computes the crashlogd mode depending on boot mode and
+ * on ramdump input arguments
+ *
+ * @return 0 on success. -1 otherwise.
+ */
+int compute_crashlogd_mode(char *boot_mode, int ramdump_flag ) {
 
-    if ( file_monitor_fd < 0 ) {
-        LOGE("%s: failed to initialize the inotify handler - %s\n",
-            __FUNCTION__, strerror(-file_monitor_fd));
-        return -1;
+    if (!strcmp(boot_mode, "main")) {
+        g_crashlog_mode = NOMINAL_MODE;
+    } else if (!strcmp(boot_mode, "ramconsole")) {
+        if (ramdump_flag)
+            g_crashlog_mode = RAMDUMP_MODE;
+        else {
+            LOGI("Started as NOMINAL_MODE in ramconsole OS, quitting\n");
+            return -1;
+        }
+    } else {
+        g_crashlog_mode = MINIMAL_MODE;
     }
 
-    /* Set the inotify event callbacks */
-#ifdef FULL_REPORT
-    set_watch_entry_callback(STATTRIG_TYPE,     process_stat_event);
-#endif
-
-    for(;;) {
-        // Clear fd set
-        FD_ZERO(&read_fds);
-
-        // File monitor fd setup
-        if ( file_monitor_fd > 0 ) {
-            FD_SET(file_monitor_fd, &read_fds);
-            if (file_monitor_fd > max)
-                max = file_monitor_fd;
-        }
-
-        // Wait for events
-        select_result = select(max+1, &read_fds, NULL, NULL, NULL);
-
-        if (select_result == -1 && errno == EINTR) // Interrupted, need to recycle
-            continue;
-
-        // Result processing
-        if (select_result > 0) {
-            /* clean children to avoid zombie processes */
-            while(waitpid(-1, NULL, WNOHANG) > 0){};
-            // File monitor
-            if (FD_ISSET(file_monitor_fd, &read_fds)) {
-                receive_inotify_events(file_monitor_fd);
-            }
-        }
-    }
-
-    free_config(g_first_modem_config);
-    LOGE("Exiting monitor loop\n");
-    return -1;
+    LOGI("Current crashlogd mode is %s\n", CRASHLOG_MODE_NAME(g_crashlog_mode));
+    return 0;
 }
 
+/**
+ * "androidboot.crashlogd=wait" in cmdline will make crashlogd waiting
+ * Set [crashlogd.debug.wait] property to [0] to continue
+ */
+void crashlogd_wait_for_user() {
 
+#define PROP_RO_BOOT_CRASHLOGD "ro.boot.crashlogd"
+#define PROP_CRASHLOGD_DEBUG_WAIT "crashlogd.debug.wait"
+
+    char property_value[PROPERTY_VALUE_MAX];
+    property_get(PROP_RO_BOOT_CRASHLOGD, property_value, "");
+    if (strcmp(property_value, "wait"))
+        return;
+
+    LOGI("[%s]: [%s] waiting ...\n", PROP_RO_BOOT_CRASHLOGD, property_value);
+    property_set(PROP_CRASHLOGD_DEBUG_WAIT, "1");
+    do {
+        LOGI("Set [%s] property to [0] to continue. Meanwhile sleeping 2s ...\n",
+             PROP_CRASHLOGD_DEBUG_WAIT);
+        sleep(2);
+        property_get(PROP_CRASHLOGD_DEBUG_WAIT, property_value, "");
+    } while (strcmp(property_value, "0"));
+
+}
 
 int main(int argc, char **argv) {
 
-    int ret = 0, alreadyran = 0, test_flag = 0;
-    int i;
+    int ret = 0, alreadyran = 0, test_flag = 0, ramdump_flag = 0;
+    unsigned int i;
     pthread_t thread;
     char boot_mode[PROPERTY_VALUE_MAX];
     char crypt_state[PROPERTY_VALUE_MAX];
@@ -578,26 +571,31 @@ int main(int argc, char **argv) {
     char token[PROPERTY_VALUE_MAX];
     char encryptstate[16] = { '\0', };
 
+    crashlogd_wait_for_user();
+
     /* Check the args */
     if (argc > 2) {
-        LOGE("USAGE: %s [-modem|-test|-nomodem|<max_nb_files>]\n", argv[0]);
+        LOGE("USAGE: %s [-test|-ramdump|<max_nb_files>] \n", argv[0]);
         return -1;
     }
 
     if (argc == 2) {
-        if(!strcmp(argv[1], "-test")){
+        if(!strcmp(argv[1], "-test"))
             test_flag = 1;
-        }
+        else if ( !strcmp(argv[1], "-ramdump") )
+            ramdump_flag = 1;
         else {
             errno = 0;
             gmaxfiles = strtol(argv[1], NULL, 0);
 
             if (errno) {
-                LOGE("%s - max_nb_files number must be a number (used %s)\n", __FUNCTION__, argv[1]);
+                LOGE("%s - max_nb_files number must be a number (used %s)\n",
+                     __FUNCTION__, argv[1]);
                 return -1;
             }
             if (gmaxfiles > MAX_DIRS || gmaxfiles < 0) {
-                LOGI("%s - max_nb_files shall be a positive number lesser than %d, change it to this value.\n", __FUNCTION__, MAX_DIRS);
+                LOGI("%s - max_nb_files shall be a positive number lesser than %d,"
+                     " change it to this value.\n", __FUNCTION__, MAX_DIRS);
             }
         }
     }
@@ -608,46 +606,59 @@ int main(int argc, char **argv) {
     /* Get the properties and read the local files to set properly the env variables */
     get_crash_env(boot_mode, crypt_state, encrypt_progress, decrypt, token);
 
-    /* check boot mode */
     alreadyran = (token[0] != 0);
-    if ( strcmp(boot_mode, "main") ) {
+
+    if (compute_crashlogd_mode(boot_mode, ramdump_flag) < 0)
+        return -1;
+
+    switch (g_crashlog_mode) {
+
+    case RAMDUMP_MODE :
+        return do_ramdump_checks(test_flag);
+
+    case MINIMAL_MODE :
         if (!alreadyran) {
             for (i=0; i<strlen(boot_mode); i++)
-                    boot_mode[i] = toupper(boot_mode[i]);
+                boot_mode[i] = toupper(boot_mode[i]);
             early_check_nomain(boot_mode, test_flag);
         }
         check_crashlog_died();
-        return do_monitor_nomain();
-    }
+        return do_monitor();
 
-    /* DECRYPTED by default */
-    strcpy(encryptstate,"DECRYPTED");
+    case NOMINAL_MODE :
+        /* DECRYPTED by default */
+        strcpy(encryptstate,"DECRYPTED");
 
-    if ( encrypt_progress[0]) {
-        /* Encrypting unencrypted device... */
-        LOGI("phone enter state: encrypting.\n");
-    } else if ( !strcmp(crypt_state, "unencrypted") && !alreadyran ) {
-        /* Unencrypted device */
-        LOGI("phone enter state: normal start.\n");
-        early_check(encryptstate, test_flag);
-    } else if ((!strcmp(crypt_state, "encrypted")) &&
-            !strcmp(decrypt, "trigger_restart_framework") && !alreadyran) {
-        /* Encrypted device */
-        LOGI("phone enter state: phone encrypted.\n");
-        strcpy(encryptstate,"ENCRYPTED");
-        early_check(encryptstate, test_flag);
-    }
+        if ( encrypt_progress[0]) {
+            /* Encrypting unencrypted device... */
+            LOGI("phone enter state: encrypting.\n");
+        } else if (!strcmp(crypt_state, "unencrypted") && !alreadyran) {
+            /* Unencrypted device */
+            LOGI("phone enter state: normal start.\n");
+            early_check(encryptstate, test_flag);
+        } else if (!strcmp(crypt_state, "encrypted") &&
+                   !strcmp(decrypt, "trigger_restart_framework") && !alreadyran) {
+            /* Encrypted device */
+            LOGI("phone enter state: phone encrypted.\n");
+            strcpy(encryptstate,"ENCRYPTED");
+            early_check(encryptstate, test_flag);
+        }
 
-    /* Starts the thread in charge of uptime check */
-    ret = pthread_create(&thread, NULL, (void *)timeup_thread_mainloop, NULL);
-    if (ret < 0) {
-        LOGE("pthread_create error");
+        /* Starts the thread in charge of uptime check */
+        ret = pthread_create(&thread, NULL, (void *)timeup_thread_mainloop, NULL);
+        if (ret < 0) {
+            LOGE("pthread_create error");
+            return -1;
+        }
+
+#ifdef FULL_REPORT
+        monitor_crashenv();
+#endif
+        check_crashlog_died();
+        return do_monitor();
+
+    default :
+        /* Robustness : this case can't happen */
         return -1;
     }
-#ifdef FULL_REPORT
-    system("/system/bin/monitor_crashenv");
-#endif
-    check_crashlog_died();
-
-    return do_monitor();
 }

@@ -34,7 +34,8 @@ LOCAL_SRC_FILES:= main.c \
     fabric.c \
     modem.c \
     panic.c \
-    config_handler.c
+    config_handler.c \
+    ramdump.c
 
 LOCAL_CFLAGS += -DFULL_REPORT=1
 

@@ -111,6 +111,7 @@ int rmfr(char *path);
 int rmfr_specific(char *path, int remove_dir);
 
 void copy_dir(void *arguments);
+void update_logs_permission(void);
 
 int str_simple_replace(char *str, char *search, char *replace);
 int get_parent_dir( char * dir, char *parent_dir );
