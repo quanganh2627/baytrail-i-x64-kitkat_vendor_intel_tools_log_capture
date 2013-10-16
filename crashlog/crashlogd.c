@@ -832,7 +832,8 @@ static void compute_key(char* key, char *event, char *type)
     *tmp_key=0;
 }
 
-static void find_file_in_dir(char *name_file_found, char *dir_to_search, char *name_file_to_match)
+static void find_file_in_dir(char *name_file_found, const char *dir_to_search,
+                             const char *name_file_to_match)
 {
     DIR *d;
     struct dirent* de;
@@ -849,6 +850,77 @@ static void find_file_in_dir(char *name_file_found, char *dir_to_search, char *n
         }
     }
     closedir(d);
+}
+
+static int file_read_value(const char *path, char *value, const char *default_value)
+{
+    struct stat info;
+    FILE *fd;
+    int ret = -1;
+
+    if ( stat(path, &info) == 0 ) {
+        fd = fopen(path, "r");
+        if (fd == NULL){
+            LOGE("can not open file: %s\n", path);
+            return -1;
+        }
+        ret = fscanf(fd, "%s", value);
+        fclose(fd);
+        if (ret == 1)
+            return 0;
+    }
+    if (default_value) {
+        strcpy(value, default_value);
+        return ret;
+    } else {
+        return ret;
+    }
+}
+
+static int get_str_in_file(const char *file, const char *keyword,
+                           char *result, unsigned int sizemax)
+{
+    char buffer[PATHMAX];
+    int rc = -1;
+    FILE *fd1;
+    struct stat info;
+
+    if (stat(file, &info) < 0)
+        return -1;
+
+    if (keyword == NULL)
+        return -1;
+
+    fd1 = fopen(file,"r");
+    if(fd1 == NULL){
+        LOGE("can not open file: %s\n", file);
+        return -1;
+    }
+
+    while(!feof(fd1)){
+        if (fgets(buffer, sizeof(buffer), fd1) != NULL){
+            if (keyword && strstr(buffer,keyword)){
+                unsigned int buflen = strlen(buffer);
+                if((buflen > 0) && (buffer[buflen-1]) == '\n')
+                    buffer[--buflen]= '\0';
+                if (buflen > sizemax + strlen(keyword))
+                    return -1;
+                unsigned int size = buflen - strlen(keyword);
+                if (size < sizemax) {
+                    strncpy(result,buffer+strlen(keyword),size);
+                    rc = 0;
+                    break;
+                }
+                else
+                  return -1;
+            }
+        }
+    }
+
+    if (fd1 != NULL)
+        fclose(fd1);
+
+    return rc;
 }
 
 //ARGS for thread creation and copy_dir
@@ -910,31 +982,6 @@ static void backup_apcoredump(unsigned int dir, char* name, char* path)
         LOGE("backup ap core dump status: %d.\n",status);
     else
         remove(path);
-}
-
-static int file_read_value(const char *path, char *value, const char *default_value)
-{
-    struct stat info;
-    FILE *fd;
-    int ret = -1;
-
-    if ( stat(path, &info) == 0 ) {
-        fd = fopen(path, "r");
-        if (fd == NULL){
-            LOGE("can not open file: %s\n", path);
-            return -1;
-        }
-        ret = fscanf(fd, "%s", value);
-        fclose(fd);
-        if (ret == 1)
-            return 0;
-    }
-    if (default_value) {
-        strcpy(value, default_value);
-        return ret;
-    } else {
-        return ret;
-    }
 }
 
 static void write_uid(char* filename, char *uuid_value)
@@ -1171,17 +1218,45 @@ static void build_footprint(char *id)
     strncat(id, prop, SIZE_FOOTPRINT_MAX);
 }
 
-//This function creates a minimal crashfile (without DATA0, DATA1 and DATA2 fields)
-//Note:DATA0 is filled for Modem Panic case only
-static void create_minimal_crashfile(char* event, char* type, char* path,
-                                     char* key, char* uptime, char* date,
-                                     int data_ready)
+static int modem_crash_get_data0(const char* type, const char* path, char* data0)
+{
+    char filename[PATHMAX];
+    char mpanicpath[PATHMAX];
+
+    if (strcmp(MODEM_CRASH, type))
+        return -1;
+
+    LOGI("Modem panic detected : generating DATA0\n");
+
+    find_file_in_dir(filename, path, "mpanic");
+    if (strlen(filename) > 0) {
+        snprintf(mpanicpath, sizeof(mpanicpath)-1, "%s/%s", path, filename);
+        if (!file_read_value(mpanicpath, data0, ""))
+            return 0;
+    }
+
+    filename[0] = '\0';
+    find_file_in_dir(filename, path, "_crashdata");
+    if (strlen(filename) > 0) {
+        snprintf(mpanicpath, sizeof(mpanicpath)-1, "%s/%s", path, filename);
+        if (!get_str_in_file(mpanicpath, "DATA0=", data0, sizeof(data0)))
+            return 0;
+    }
+
+    return -1;
+}
+
+static int create_crashfile_data012(char* event, char* type, char* path,
+                                    char* data0, char* data1, char* data2,
+                                    char* key, char* uptime, char* date,
+                                    int data_ready)
 {
     FILE *fp;
     char fullpath[PATHMAX];
-    char mpanicpath[PATHMAX];
     char footprint[SIZE_FOOTPRINT_MAX] = { '\0', };
     char imei[PROPERTY_VALUE_MAX];
+    char m_data0[PATHMAX] = "";
+    char* p_data0 = data0;
 
     property_get(IMEI_FIELD, imei, "");
 
@@ -1191,20 +1266,22 @@ static void create_minimal_crashfile(char* event, char* type, char* path,
 
     //Create crashfile
     fp = fopen(fullpath,"w");
-    if (fp == NULL)
-    {
+    if (fp == NULL) {
         LOGE("can not create file: %s\n", fullpath);
-        return;
+        return -1;
     }
     fclose(fp);
     do_chown(fullpath, PERM_USER, PERM_GROUP);
 
     fp = fopen(fullpath,"w");
-    if (fp == NULL)
-    {
+    if (fp == NULL) {
         LOGE("can not open file: %s\n", fullpath);
-        return;
+        return -1;
     }
+
+    modem_crash_get_data0(type, path, m_data0);
+    if (strlen(m_data0) > 0)
+        p_data0 = m_data0;
 
     //Fill crashfile
     fprintf(fp,"EVENT=%s\n", event);
@@ -1216,50 +1293,17 @@ static void create_minimal_crashfile(char* event, char* type, char* path,
     fprintf(fp,"BOARD=%s\n", boardVersion);
     fprintf(fp,"IMEI=%s\n", imei);
     fprintf(fp,"TYPE=%s\n", type);
+    if (p_data0)
+        fprintf(fp,"DATA0=%s\n", p_data0);
+    if (data1)
+        fprintf(fp,"DATA1=%s\n", data1);
+    if (data2)
+        fprintf(fp,"DATA2=%s\n", data2);
     fprintf(fp,"DATA_READY=%d\n", data_ready);
-    //MPANIC crash : fill DATA0 field
-    if (!strcmp(MODEM_CRASH,type)){
-        LOGI("Modem panic detected : generating DATA0\n");
-        FILE *fd_panic;
-        DIR *d;
-        struct dirent* de;
-        char value[PATHMAX] = "";
-        d = opendir(path);
-        if(!d) {
-            LOGE("%s: Can't open dir %s\n",__FUNCTION__, path);
-            fclose(fp);
-            return;
-        }
-        while ((de = readdir(d))) {
-            const char *name = de->d_name;
-            if (strstr(name, "mpanic")){
-                snprintf(mpanicpath, sizeof(mpanicpath)-1, "%s/%s", path, name);
-                fd_panic = fopen(mpanicpath, "r");
-                if (fd_panic == NULL){
-                    LOGE("can not open file: %s\n", mpanicpath);
-                    break;
-                }
-                fscanf(fd_panic, "%s", value);
-                fclose(fd_panic);
-                fprintf(fp,"DATA0=%s\n", value);
-                break;
-            } else if (strstr(name, "_crashdata")){ //MMGR case
-                snprintf(mpanicpath, sizeof(mpanicpath)-1, "%s/%s", path, name);
-                fd_panic = fopen(mpanicpath, "r");
-                if (fd_panic == NULL){
-                    LOGE("can not open file: %s\n", mpanicpath);
-                    break;
-                }
-                fscanf(fd_panic, "%s", value);
-                fclose(fd_panic);
-                fprintf(fp,"%s\n", value);
-                break;
-            }
-        }
-        closedir(d);
-    }
     fprintf(fp,"_END\n");
     fclose(fp);
+
+    return 0;
 }
 
 #ifdef FULL_REPORT
@@ -1353,7 +1397,10 @@ static int history_file_updated(char *data, char* filters)
     return updated;
 }
 
-static void history_file_write_ex(char *event, char *type, char *subtype, char *log, char* lastuptime, char* key, char* date_tmp_2, int data_ready)
+static void history_file_write_data012(char *event, char *type, char *subtype,
+                                       char* data0, char* data1, char* data2,
+                                       char *log, char* lastuptime, char* key,
+                                       char* date_tmp_2, int data_ready)
 {
     char uptime[32];
     struct stat info;
@@ -1402,12 +1449,15 @@ static void history_file_write_ex(char *event, char *type, char *subtype, char *
         fprintf(to, "%-8s%-22s%-20s%s %s\n", event, key, date_tmp_2, type, tmp);
         fclose(to);
         if (!strncmp(event, CRASHEVENT, sizeof(CRASHEVENT)))
-            create_minimal_crashfile(event, subtype, tmp, key, uptime, date_tmp_2, data_ready);
+            create_crashfile_data012(event, subtype, tmp, data0, data1, data2,
+                                     key, uptime, date_tmp_2, data_ready);
         else if(!strncmp(event, BZEVENT, sizeof(BZEVENT)))
-            create_minimal_crashfile(event, BZMANUAL, tmp, key, uptime, date_tmp_2, data_ready);
+            create_crashfile_data012(event, BZMANUAL, tmp, data0, data1, data2,
+                                     key, uptime, date_tmp_2, data_ready);
         else if(!strncmp(event, INFOEVENT, sizeof(INFOEVENT)) &&
                 !strncmp(type, "FIRMWARE", sizeof("FIRMWARE")))
-            create_minimal_crashfile(event, type, tmp, key, uptime, date_tmp_2, data_ready);
+            create_crashfile_data012(event, type, tmp, data0, data1, data2,
+                                     key, uptime, date_tmp_2, data_ready);
     } else if (type != NULL) {
 
         to = fopen(HISTORY_FILE, "a");
@@ -1431,6 +1481,14 @@ static void history_file_write_ex(char *event, char *type, char *subtype, char *
         fclose(to);
     }
     return;
+}
+
+static void history_file_write_ex(char *event, char *type, char *subtype,
+                                  char *log, char* lastuptime, char* key,
+                                  char* date_tmp_2, int data_ready)
+{
+    history_file_write_data012(event, type, subtype, NULL, NULL, NULL, log,
+                               lastuptime, key, date_tmp_2, data_ready);
 }
 
 //proxy function for history_file_write_ex with data ready parameter
@@ -1756,51 +1814,6 @@ void compress_aplog_folder(char *folder_path)
         closedir(d);
     }
 
-}
-
-static int get_str_in_file(char *file, char *keyword, char *result, unsigned int sizemax)
-{
-    char buffer[PATHMAX];
-    int rc = -1;
-    FILE *fd1;
-    struct stat info;
-
-    if (stat(file, &info) < 0)
-        return -1;
-
-    if (keyword == NULL)
-        return -1;
-
-    fd1 = fopen(file,"r");
-    if(fd1 == NULL){
-        LOGE("can not open file: %s\n", file);
-        return -1;
-    }
-
-    while(!feof(fd1)){
-        if (fgets(buffer, sizeof(buffer), fd1) != NULL){
-            if (keyword && strstr(buffer,keyword)){
-                unsigned int buflen = strlen(buffer);
-                if((buflen > 0) && (buffer[buflen-1]) == '\n')
-                    buffer[--buflen]= '\0';
-                if (buflen > sizemax + strlen(keyword))
-                    return -1;
-                unsigned int size = buflen - strlen(keyword);
-                if (size < sizemax) {
-                    strncpy(result,buffer+strlen(keyword),size);
-                    rc = 0;
-                    break;
-                }
-                else
-                  return -1;
-            }
-        }
-    }
-
-    if (fd1 != NULL)
-        fclose(fd1);
-
-    return rc;
 }
 
 void backtrace_anr_uiwdt(char *dest, int dir)
