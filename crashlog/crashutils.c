@@ -574,6 +574,7 @@ void create_infoevent(char* filename, char* data0, char* data1, char* data2)
         fprintf(fp,"DATA2=%s\n", data2);
     fprintf(fp,"_END\n");
     fclose(fp);
+    do_chown(fullpath, PERM_USER, PERM_GROUP);
 
     process_info_and_error(LOGS_DIR, filename);
 }

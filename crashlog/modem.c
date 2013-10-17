@@ -183,6 +183,7 @@ int crashlog_check_mpanic_abort(){
             fprintf(fp,"DATA0=%s\n", MPANIC_ABORT);
             fprintf(fp,"_END\n");
             fclose(fp);
+            do_chown(fullpath, PERM_USER, PERM_GROUP);
         }
 
         key = raise_event(CRASHEVENT, MDMCRASH_EVNAME, NULL, destion);
@@ -333,6 +334,7 @@ int process_modem_generic(struct watch_entry *entry, struct inotify_event *event
                 fprintf(fp,"DATAREADY=%d\n", data_ready);
                 fprintf(fp,"_END\n");
                 fclose(fp);
+                do_chown(fullpath, PERM_USER, PERM_GROUP);
             }
         }
     }
