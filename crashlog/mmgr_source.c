@@ -24,6 +24,7 @@
  * different kinds of events read from this source.
  */
 
+#include "mmgr_source.h"
 #include "crashutils.h"
 #include "privconfig.h"
 #include "fsutils.h"
@@ -36,12 +37,6 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <errno.h>
-
-#include "mmgr_source.h"
-#if defined(LOG_TAG)
-#undef LOG_TAG
-#endif
-#define LOG_TAG "MMGRSOURCE"
 #include <cutils/log.h>
 
 /* private structure */
@@ -253,7 +248,14 @@ int mmgr_get_fd()
 
 void init_mmgr_cli_source(void){
     int ret = 0;
-    LOGD("init_mmgr_cli_source");
+    if (!CRASHLOG_MODE_MMGR_ENABLED(g_crashlog_mode)) {
+        LOGI("%s: MMGR source state is disabled", __FUNCTION__);
+        mmgr_monitor_fd[0] = 0;
+        mmgr_monitor_fd[1] = 0;
+        return;
+    }
+
+    LOGD("%s : initializing MMGR source...", __FUNCTION__);
     if (mmgr_hdl){
         close_mmgr_cli_source();
     }
@@ -280,16 +282,24 @@ void init_mmgr_cli_source(void){
             break;
         }
 
-        LOGE("Delaying mmgr_cli_connect %d", ret);
+        LOGE("%s: Delaying mmgr_cli_connect %d", __FUNCTION__, ret);
 
         /* Wait */
         usleep(MMGR_CONNECT_RETRY_TIME_MS * 1000);
     }
     // pipe init
-    pipe(mmgr_monitor_fd);
+    if (pipe(mmgr_monitor_fd) == -1) {
+        LOGE("%s: MMGR source init failed : Can't create the pipe - error is %s\n",
+             __FUNCTION__, strerror(errno));
+        mmgr_monitor_fd[0] = 0;
+        mmgr_monitor_fd[1] = 0;
+    }
 }
 
 void close_mmgr_cli_source(void){
+    if (!CRASHLOG_MODE_MMGR_ENABLED(g_crashlog_mode))
+        return;
+
     mmgr_cli_disconnect(mmgr_hdl);
     mmgr_cli_delete_handle(mmgr_hdl);
 }
@@ -367,7 +377,7 @@ static int compute_mmgr_param(char *type, int *mode, char *name, int *aplog, int
  * @return 0 on success, -1 on error.
  */
 int mmgr_handle(void) {
-    int event_mode, aplog_mode, dir;
+    int event_mode = 0, aplog_mode, dir;
     char *event_dir, *key;
     char event_name[MMGRMAXSTRING];
     char data0[MMGRMAXEXTRA];

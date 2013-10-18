@@ -54,6 +54,7 @@ public class ModemController implements ModemEventListener, Closeable {
     private Context context;
     private CommandParser cmdParser;
     private ArrayList<Master> masterArray;
+    private boolean firstAcquire = true;
 
     public ModemController() throws ModemControlException {
 
@@ -93,6 +94,7 @@ public class ModemController implements ModemEventListener, Closeable {
                 Log.d(TAG, MODULE + ": Acquiring modem resource");
                 this.modemStatusManager.acquireModem();
                 this.modemAcquired = true;
+                this.firstAcquire = false;
             } catch (MmgrClientException ex) {
                 throw new ModemControlException("Cannot acquire modem resource " + ex);
             }
@@ -180,9 +182,13 @@ public class ModemController implements ModemEventListener, Closeable {
         }
     }
 
+    public boolean isModemAcquired() {
+        return this.modemAcquired;
+    }
+
     public void acquireResource() throws MmgrClientException {
         if (this.modemStatusManager != null) {
-            if (!this.modemAcquired) {
+            if (!this.modemAcquired && !this.firstAcquire) {
                 this.modemStatusManager.acquireModem();
                 this.modemAcquired = true;
             }

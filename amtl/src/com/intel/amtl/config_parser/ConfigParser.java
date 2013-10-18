@@ -21,6 +21,8 @@
 
 package com.intel.amtl.config_parser;
 
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.util.Log;
 import android.util.Xml;
 
@@ -44,9 +46,18 @@ public class ConfigParser {
 
     private final String TAG = "AMTL";
     private final String MODULE = "ConfigParser";
+    private Context context = null;
+
+    public ConfigParser() {
+    }
+
+    public ConfigParser(Context context) {
+        this.context = context;
+    }
 
     public ArrayList<LogOutput> parseConfig(InputStream inputStream)
             throws XmlPullParserException, IOException {
+        int index = -1;
 
         ArrayList<LogOutput> configOutputs = new ArrayList<LogOutput>();
 
@@ -63,7 +74,8 @@ public class ConfigParser {
 
             switch (eventType) {
                 case XmlPullParser.START_TAG:
-                    configOutputs.add(this.handleOutputElement(parser));
+                    index++;
+                    configOutputs.add(this.handleOutputElement(index, parser));
                     break;
             }
             eventType = parser.next();
@@ -79,6 +91,7 @@ public class ConfigParser {
          String atXSIO = "";
          String atTRACE = "";
          String atXSYSTRACE = "";
+         String flCmd = "";
          String mtsMode = null;
          MtsConf mtsConf = null;
          XmlPullParser parser = Xml.newPullParser();
@@ -112,6 +125,12 @@ public class ConfigParser {
                         }
                         Log.d(TAG, MODULE + ": Get element type AT+XSIO : " + atXSIO);
                     }
+                    if (isStartOf(parser, "flush_cmd")) {
+                        if (parser.next() == XmlPullParser.TEXT) {
+                            flCmd = parser.getText() + "\r\n";
+                        }
+                        Log.d(TAG, MODULE + ": Get element type FLUSH COMMAND : " + flCmd);
+                    }
                     if (isStartOf(parser, "mts")) {
 
                         mtsConf = new MtsConf (parser.getAttributeValue(null, "input"),
@@ -137,7 +156,7 @@ public class ConfigParser {
              eventType = parser.next();
          }
          Log.d(TAG, MODULE + ": Completed XML file parsing.");
-         ModemConf modConf = new ModemConf(atXSIO, atTRACE, atXSYSTRACE);
+         ModemConf modConf = new ModemConf(atXSIO, atTRACE, atXSYSTRACE, flCmd);
          if (mtsConf != null) {
              modConf.setMtsConf(mtsConf);
          }
@@ -147,16 +166,45 @@ public class ConfigParser {
          return (modConf);
     }
 
-    private LogOutput handleOutputElement(XmlPullParser parser)
+    private LogOutput handleOutputElement(int index, XmlPullParser parser)
             throws XmlPullParserException, IOException {
-
         LogOutput ret = null;
+        String flcmd = null;
 
         if (isStartOf(parser, "output")) {
+            Log.d(TAG, MODULE + ": Get element type OUTPUT, index: " + index
+                    + ", -> WILL PARSE IT.");
 
-            Log.d(TAG, MODULE + ": Get element type OUTPUT -> WILL PARSE IT.");
+            // default_flush_cmd is the flush ops that will be performed
+            // by default (if specified in xml) on all use case:
+            // log start, log stop and at command error.
 
-            ret = new LogOutput(parser.getAttributeValue(null, "name"),
+            // default_flush_cmd have to be specified only once in whatever
+            // of the output type in the xml.
+
+            // default_flush_cmd can be overwritten by flush_cmd parameter
+            // flush_cmd will only by used on log start use case, and only
+            // for the output type where it is specified in xml.
+            // This implies that flush_cmd parameter does not have effect
+            // on log stop and at command error use cases.
+
+            if (parser.getAttributeValue(null, "default_flush_cmd") != null &&
+                    this.context != null) {
+                SharedPreferences.Editor editor =
+                        context.getSharedPreferences("AMTLPrefsData",
+                                Context.MODE_PRIVATE).edit();
+                editor.putString("default_flush_cmd",
+                        parser.getAttributeValue(null, "default_flush_cmd"));
+                editor.commit();
+                flcmd = parser.getAttributeValue(null, "default_flush_cmd");
+            }
+
+            if (parser.getAttributeValue(null, "flush_cmd") != null) {
+                flcmd = parser.getAttributeValue(null, "flush_cmd");
+            }
+
+            ret = new LogOutput(index,
+                    parser.getAttributeValue(null, "name"),
                     parser.getAttributeValue(null, "value"),
                     parser.getAttributeValue(null, "color"),
                     parser.getAttributeValue(null, "mts_input"),
@@ -167,9 +215,11 @@ public class ConfigParser {
                     parser.getAttributeValue(null, "mts_mode"),
                     parser.getAttributeValue(null, "oct"),
                     parser.getAttributeValue(null, "pti1"),
-                    parser.getAttributeValue(null, "pti2"));
+                    parser.getAttributeValue(null, "pti2"),
+                    flcmd);
 
-            Log.d(TAG, MODULE + ": name = " + parser.getAttributeValue(null, "name")
+            Log.d(TAG, MODULE + ": index = " + index
+                    + ", name = " + parser.getAttributeValue(null, "name")
                     + ", value = " + parser.getAttributeValue(null, "value")
                     + ", color = " + parser.getAttributeValue(null, "color")
                     + ", mts_input = " + parser.getAttributeValue(null, "mts_input")
@@ -180,7 +230,9 @@ public class ConfigParser {
                     + ", mts_mode = " + parser.getAttributeValue(null, "mts_mode")
                     + ", oct = " + parser.getAttributeValue(null, "oct")
                     + ", pti1 = "+ parser.getAttributeValue(null, "pti1")
-                    + ", pti2 = "+ parser.getAttributeValue(null, "pti2") + ".");
+                    + ", pti2 = "+ parser.getAttributeValue(null, "pti2")
+                    + ", default_flush_cmd = "+ parser.getAttributeValue(null, "default_flush_cmd")
+                    + ", flush_cmd = "+ parser.getAttributeValue(null, "flush_cmd") + ".");
 
             while (!isEndOf(parser, "output")) {
                 this.handleMasterElements(parser, ret);

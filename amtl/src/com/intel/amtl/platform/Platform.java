@@ -20,6 +20,7 @@
 package com.intel.amtl.platform;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.util.Log;
 
 import java.io.BufferedReader;
@@ -39,9 +40,16 @@ public class Platform {
     private String modemName = "";
     private String catalogPath = "/system/etc/amtl/catalog/";
 
-    public Platform() {
+    public Platform(Context context) {
         getCpuName();
         getModemName();
+        // Store modem and cpu names
+        SharedPreferences.Editor editor =
+                 context.getSharedPreferences("AMTLPrefsData",
+                 Context.MODE_PRIVATE).edit();
+        editor.putString("cpuName", this.cpuName);
+        editor.putString("modemName", this.modemName);
+        editor.commit();
     }
 
     public String getPlatformConf() {

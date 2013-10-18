@@ -89,7 +89,7 @@ static void flush_aplog_atboot(char *mode, int dir, const char* ts)
 *   */
 void read_startupreason(char *startupreason)
 {
-    char cmdline[512] = { '\0', };
+    char cmdline[1024] = { '\0', };
     char prop_reason[PROPERTY_VALUE_MAX];
 
     char *p, *endptr;
