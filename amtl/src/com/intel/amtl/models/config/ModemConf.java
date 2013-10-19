@@ -52,9 +52,19 @@ public class ModemConf {
             this.atXsystrace += "," + this.config.concatMasterOption();
             this.atXsio = "AT+XSIO=" + this.config.getXsio() + "\r\n";
 
-            if (this.config.getOct() != null) {
-                this.atXsystrace += ",\"oct=";
-                this.atXsystrace += this.config.getOct();
+            if (this.config.getOct() != null || this.config.getOctFcs() != null) {
+                this.atXsystrace += ",\"";
+                if (this.config.getOct() != null) {
+                    this.atXsystrace += "oct=";
+                    this.atXsystrace += this.config.getOct();
+                }
+                if (this.config.getOctFcs() != null) {
+                    if (this.config.getOct() != null) {
+                        this.atXsystrace += ";";
+                    }
+                    this.atXsystrace += "oct_fcs=";
+                    this.atXsystrace += this.config.getOctFcs();
+                }
                 this.atXsystrace += "\"";
             }
             if (this.config.getPti1() != null) {
