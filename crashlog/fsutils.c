@@ -995,6 +995,24 @@ static void flush_aplog()
 }
 #endif
 
+// return of compute_bp_log needs to be freed after use
+char *compute_bp_log(const char* ext_file) {
+    char destination[PATHMAX];
+    char dir_pattern_base[PATHMAX];
+    char temp_path_log[PROPERTY_VALUE_MAX];
+
+    if (property_get("persist.service.mts.output", temp_path_log, BPLOG_FILE_0) > 0) {
+        strncpy(dir_pattern_base, temp_path_log, PATHMAX);
+    }else{
+        //default value
+        LOGI("Property persist.service.mts.output not readable\n");
+        strncpy(dir_pattern_base, BPLOG_FILE_0, PATHMAX);
+    }
+    snprintf(destination,sizeof(destination), "%s%s", dir_pattern_base, ext_file);
+
+    return strdup(destination);
+}
+
 void do_log_copy(char *mode, int dir, const char* timestamp, int type) {
     char destination[PATHMAX], *logfile0, *logfile1, *extension;
     struct stat info;
@@ -1017,14 +1035,14 @@ void do_log_copy(char *mode, int dir, const char* timestamp, int type) {
                 dir_pattern = KDUMP_CRASH_DIR;
             break;
         case BPLOG_TYPE:
-            logfile0 = BPLOG_FILE_0;
-            logfile1 = BPLOG_FILE_1;
+            logfile0 = compute_bp_log(""); //BPLOG_FILE_0
+            logfile1 = compute_bp_log(BPLOG_FILE_1_EXT ); //BPLOG_FILE_1;
             extension = ".istp";
             limit = 0; /* no limit size for bplogs copy */
             break;
         case BPLOG_TYPE_OLD:
-            logfile0 = BPLOG_FILE_1_OLD;
-            logfile1 = BPLOG_FILE_2_OLD;
+            logfile0 = compute_bp_log(BPLOG_FILE_1_OLD_EXT); // BPLOG_FILE_1_OLD;
+            logfile1 = compute_bp_log(BPLOG_FILE_2_OLD_EXT); // BPLOG_FILE_2_OLD;
             extension = ".istp";
             /* limit size remains for old bplogs*/
             break;
@@ -1036,14 +1054,28 @@ void do_log_copy(char *mode, int dir, const char* timestamp, int type) {
         snprintf(destination,sizeof(destination), "%s%d/%s_%s_%s%s", dir_pattern, dir, strrchr(logfile0,'/')+1, mode, timestamp, extension);
         do_copy_tail(logfile0, destination, limit);
         if(info.st_size < 1*MB) {
-            if(stat(logfile1, &info) == 0) {
-                snprintf(destination,sizeof(destination), "%s%d/%s_%s_%s%s", dir_pattern, dir, strrchr(logfile1,'/')+1, mode, timestamp, extension);
-                do_copy_tail(logfile1, destination, limit);
-            }
+            snprintf(destination,sizeof(destination), "%s%d/%s_%s_%s%s", dir_pattern, dir, strrchr(logfile1,'/')+1, mode, timestamp, extension);
+            do_copy_tail(logfile1, destination, limit);
         }
 #ifndef FULL_REPORT
         remove(APLOG_FILE_0);
 #endif
+    }
+
+    switch (type) {
+        case APLOG_TYPE:
+        case APLOG_STATS_TYPE:
+        case KDUMP_TYPE:
+            //nothing to do
+            break;
+        case BPLOG_TYPE:
+        case BPLOG_TYPE_OLD:
+            free(logfile0);
+            free(logfile1);
+            break;
+        default:
+            /* Ignore unknown type, just return */
+            return;
     }
 }
 

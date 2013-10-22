@@ -116,4 +116,6 @@ void update_logs_permission(void);
 int str_simple_replace(char *str, char *search, char *replace);
 int get_parent_dir( char * dir, char *parent_dir );
 
+char *compute_bp_log(const char* ext_file);
+
 #endif /* __FSUTILS_H__ */
