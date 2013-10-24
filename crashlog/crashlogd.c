@@ -92,7 +92,8 @@
 #define CRASHLOG_SWWDT_MISSING "SWWDT_MISSING"
 #define CRASHLOG_IPANIC_CORRUPTED "IPANIC_CORRUPTED"
 #define USBBOGUS "USBBOGUS"
-#define FWDUMP_EVENT "FWDUMP"
+#define RAMDUMP_EVENT "RAMDUMP"
+#define RAMCONSOLE "RAMCONSOLE"
 
 #define FILESIZE_MAX  (10*1024*1024)
 #define PATHMAX 512
@@ -342,6 +343,7 @@ int abort_clean_sd = 0;
 int current_uptime_hour_frequency = UPTIME_HOUR_FREQUENCY;
 long current_sd_size_limit = LONG_MAX;
 int current_serial_device_id = 0;
+int cfg_check_ram_panic = 1;
 /*global flag indicating crashlogd mode */
 enum  crashlog_mode g_crashlog_mode;
 
@@ -4609,26 +4611,28 @@ static void crashlog_check_panic_events(char *reason, char *watchdog, unsigned i
 
     if (crashlog_check_panic(reason, files) == 0)
         if (crashlog_check_ram_panic(reason, files) == 0)
-            if (strstr(reason, "SWWDT_"))
-                 strcpy(watchdog, "WDT_UNHANDLED");
+            if (cfg_check_ram_panic)
+                if (strstr(reason, "SWWDT_"))
+                    strcpy(watchdog, "WDT_UNHANDLED");
 }
 
 /**
 * @brief performs a copy of the virtual file exposed by the LM_DUMP kernel
-* module and raises a 'FWDUMP' event.
+* module and raises a 'RAMDUMP' event.
 *
+* @param reason - string containing the translated startup reason
 * @param[in] files : nb max of logs destination directories (crashlog, aplogs, bz... )
 *
 * @retval returns -1 if a problem occurs (no LM_DUMP file..). 0 otherwise.
 */
-static int crashlog_check_fwdump( unsigned int files )
+static int crashlog_check_ramdump(char* reason, unsigned int files)
 {
     char date_tmp[32];
     char date_tmp_2[32];
     struct stat info;
     time_t t;
     char destion[PATHMAX] = {'\0'};
-    char *crashtype = FWDUMP_EVENT;
+    char *crashtype = RAMDUMP_EVENT;
     int dir;
     char key[SHA1_DIGEST_LENGTH+1];
     struct tm *time_tmp;
@@ -4651,8 +4655,18 @@ static int crashlog_check_fwdump( unsigned int files )
         del_file_more_lines(HISTORY_FILE);
         return  -1;
     }
+
+    /* If startup reason contains HWWDT or SWWDT, retrieve WDT crash event context */
+    if ((strstr(reason, "HWWDT_") || strstr(reason, "SWWDT_") || strstr(reason, "WDT_")) &&
+        !strstr(reason, "FAKE")) {
+        snprintf(destion, sizeof(destion), "%s%d/", CRASH_DIR, dir);
+        flush_aplog_atboot("WDT", dir, date_tmp);
+        usleep(TIMEOUT_VALUE);
+        do_log_copy("WDT", dir, date_tmp, APLOG_TYPE);
+    }
+
     /* Copy */
-    snprintf(destion, sizeof(destion), "%s%d/%s_%s.txt", CRASH_DIR, dir, SAVED_LM_BUFFER_NAME, date_tmp);
+    snprintf(destion, sizeof(destion), "%s%d/%s_%s.bin", CRASH_DIR, dir, SAVED_LM_BUFFER_NAME, date_tmp);
     do_copy_eof(LM_DUMP_FILE, destion);
     do_last_kmsg_copy(dir);
 
@@ -4879,6 +4893,20 @@ void load_config(){
                     }
                 }
             }
+
+            if (sk_exists(GENERAL_CONF_PATTERN,"check_ram_panic",&my_conf_handle)){
+                pchar tmp = get_value(GENERAL_CONF_PATTERN,"check_ram_panic",&my_conf_handle);
+                if (tmp){
+                    i_tmp = atoi(tmp);
+                    if (i_tmp > 0){
+                        cfg_check_ram_panic = 1;
+                    } else {
+                        cfg_check_ram_panic = 0;
+                    }
+                    LOGI("Check RAM panic: %d", cfg_check_ram_panic);
+                }
+            }
+
             load_config_by_pattern(NOTIFY_CONF_PATTERN,"matching_pattern",my_conf_handle);
             //ADD other config pattern HERE
             free_config_file(&my_conf_handle);
@@ -5110,6 +5138,7 @@ static int crashlog_check_fw_update_status(unsigned int files)
  * Copy aplogs and /proc/last_kmsg files in the event.
  *
  * @param reason - string containing the translated startup reason
+ * @param watchdog - string containing watchdog
  */
 static int crashlog_check_startupreason(char *reason, char* watchdog, unsigned int files)
 {
@@ -5150,6 +5179,7 @@ static int crashlog_check_startupreason(char *reason, char* watchdog, unsigned i
         history_file_write(CRASHEVENT, watchdog, reason, destion, NULL, key, date_tmp_2);
         del_file_more_lines(HISTORY_FILE);
     }
+
     return 0;
 }
 
@@ -5343,21 +5373,26 @@ static void uptime_history(char *lastuptime)
         LOGE("can not open file: %s\n", HISTORY_FILE);
         return;
     }
+    /* Read last current uptime in history file header */
     fscanf(to, "#V1.0 %16s%24s\n", name, lastuptime);
     fclose(to);
     if (!memcmp(name, CURRENT_UPTIME, sizeof(CURRENT_UPTIME))) {
 
+        /* Open file in RW mode */
         to = fopen(HISTORY_FILE, "r+");
         if (to == NULL){
             LOGE("can not open file: %s\n", HISTORY_FILE);
             return;
         }
+        /* Reset current uptime in history file event */
         fprintf(to, "#V1.0 %-16s%-24s\n", CURRENT_UPTIME, "0000:00:00");
         strcpy(name, PER_UPTIME);
+        /* Go to EOF */
         fseek(to, 0, SEEK_END);
         time(&t);
         time_tmp = localtime((const time_t *)&t);
         PRINT_TIME(date_tmp, TIME_FORMAT_2, time_tmp);
+        /* Write in file UPTIME with the current time (type is set with last uptime value) */
         fprintf(to, "%-8s00000000000000000000  %-20s%s\n", name, date_tmp, lastuptime);
         fclose(to);
     }
@@ -5589,23 +5624,25 @@ static int do_ramdump_checks( unsigned int files ) {
 
     strcpy(watchdog,"WDT");
 
+    /* Read the wake-up source */
     read_startupreason(startupreason);
+    /* Get the last UPTIME value and write current UPTIME one in history events file */
     uptime_history(lastuptime);
+    /* Change log directories permission rights */
     update_logs_permission();
 
     /* Checks for panic */
     crashlog_check_panic_events(startupreason, watchdog, files);
-    crashlog_check_startupreason(startupreason, watchdog, files);
-    /* Dump Lakemore file and raises FWDUMP event */
-    crashlog_check_fwdump(files);
+    /* Dump Lakemore file and raises CRASH RAMDUMP event */
+    crashlog_check_ramdump(startupreason, files);
 
-    /* Raise REBOOT event*/
+    /* Raise REBOOT RAMCONSOLE event*/
     time(&t);
     time_tmp = localtime((const time_t *)&t);
     PRINT_TIME(date_tmp, TIME_FORMAT_2, time_tmp);
-    compute_key(key, SYS_REBOOT, startupreason);
-    LOGE("%-8s%-22s%-20s%s\n", SYS_REBOOT, key, date_tmp, startupreason);
-    history_file_write(SYS_REBOOT, startupreason, NULL, NULL, lastuptime, key, date_tmp);
+    compute_key(key, SYS_REBOOT, RAMCONSOLE);
+    LOGE("%-8s%-22s%-20s%s\n", SYS_REBOOT, key, date_tmp, RAMCONSOLE);
+    history_file_write(SYS_REBOOT, RAMCONSOLE, NULL, NULL, lastuptime, key, date_tmp);
     del_file_more_lines(HISTORY_FILE);
 
     clean_up_on_exit(RAMDUMP_MODE);
