@@ -85,6 +85,8 @@
 // Add Recovery error crash type
 #define RECOVERY_ERROR "RECOVERY_ERROR"
 #define FACTORY_ERROR "FACTORY_ERROR"
+#define FW_UPDATE_ERROR "FW_UPDATE_ERROR"
+#define FW_UPDATE_NO_STATUS "FW_UPDATE_NO_STATUS"
 #define CRASHLOG_ERROR_DEAD "CRASHLOG_DEAD"
 #define CRASHLOG_ERROR_PATH "CRASHLOG_PATH"
 #define CRASHLOG_SWWDT_MISSING "SWWDT_MISSING"
@@ -4708,8 +4710,6 @@ static int crashlog_check_modem_shutdown(char *reason, unsigned int files)
     return 0;
 }
 
-
-
 //this function requires a init_config_file before to work properly
 void store_config(char *section, struct config_handle a_conf_handle){
     //for the moment, only modem is supported
@@ -4993,6 +4993,114 @@ static int crashlog_check_factory(unsigned int files)
         del_file_more_lines(HISTORY_FILE);
     }
     return 0;
+}
+
+/**
+ * @brief generate fw update crash event
+ *
+ * By reading the OSNIB fw update status set by the IA FW, the OS can check
+ * if problems have occured during the update, and then report the reasons
+ * in a crashfile.
+ * It also reports if the fw status was succeffully cleared in case of a
+ * non zero status.
+ *
+ * @param files
+ */
+#define NBR_REASON 5
+#define PREFIX "Failures detected during firmware update:"
+#define FW_UPDATE_STATUS_PATH "/sys/firmware/osnib/fw_update_status"
+
+static int crashlog_check_fw_update_status(unsigned int files)
+{
+    const char *BIT_TO_REASON[NBR_REASON] = {
+                        "Failed",
+                        "Capsule format problem",
+                        "Problem with IAFW",
+                        "Problem with PDR",
+                        "Problem with SecFW" };
+    // msg_status reports the failure trying to clear fw update status
+    char msg_status[40] = "Successfully cleared fw status";
+    // msg_reason reports the reasons for the detected errors
+    char msg_reason[256];
+    time_t t;
+    struct tm *time_tmp;
+    char key[SHA1_DIGEST_LENGTH+1];
+    char date_tmp[32];
+    int fw_update_status;
+    char *end;
+    unsigned int i;
+    char destion[PATHMAX];
+    int dir, ret;
+
+    // if the sys_fs entry does not exist or fails to read, then exit
+    if(file_read_value(FW_UPDATE_STATUS_PATH, msg_reason, NULL) == -1)
+        return -1;
+
+    // compute dates
+    time(&t);
+    time_tmp = localtime((const time_t *)&t);
+    PRINT_TIME(date_tmp, TIME_FORMAT_2, time_tmp);
+    // compute crash id
+    compute_key(key, CRASHEVENT, FW_UPDATE_ERROR);
+
+    /*
+     * Log a CRASH event into /logs/history_event file along with the
+     * path to the crashfile that is filled later on with the details.
+     */
+    errno = 0;
+    fw_update_status = strtoul(msg_reason, &end, 10);
+    if (*end != '\0' || errno == ERANGE) {
+        LOGE("failed to parse error value find dir %d for check factory failed\n", files);
+        LOGE("%-8s%-22s%-20s%s\n", CRASHEVENT, key, date_tmp, FW_UPDATE_NO_STATUS);
+        history_file_write(CRASHEVENT, FW_UPDATE_NO_STATUS, NULL, NULL, NULL, key, date_tmp);
+        del_file_more_lines(HISTORY_FILE);
+        return -1;
+    }
+
+    // if fw_update_status = 0 => no error so nothing to process
+    if (!fw_update_status)
+        return 0;
+
+    // else let's log the encountered errors
+    strcpy(msg_reason, "\0");
+    for (i = 0 ; i < NBR_REASON ; i++)
+        if (fw_update_status & (1 << i)) {
+            strcat(msg_reason, BIT_TO_REASON[i]);
+            strcat(msg_reason, ", ");
+        }
+    LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, date_tmp,
+         FW_UPDATE_ERROR, msg_reason);
+
+    // As the fw update status was not zero => clear it
+    int fd = open(FW_UPDATE_STATUS_PATH, O_WRONLY);
+    if (fd == -1) {
+        LOGE("failed to open file %s to clear the FW update status flag\n",
+              FW_UPDATE_STATUS_PATH);
+        strcpy(msg_status, "Cannot open sys_fs to clear fw status");
+    } else if (write(fd, msg_reason, 1) == -1) {
+        LOGE("failed to write file %s to clear the FW update status flag\n",
+              FW_UPDATE_STATUS_PATH);
+        strcpy(msg_status, "Cannot write sys_fs to clear fw status");
+        ret = -1;
+    }
+    close(fd);
+
+    /*
+     * Log the reason(s) for the error(s) into a crashfile located typically at
+     * /mnt/sdcard/logs/crashlogXX/crashfile (XX: crash number)
+     */
+    dir = find_dir(files, CRASH_MODE);
+    if (dir == -1) {
+        LOGE("Cannot find dir %d to log fw update error\n", files);
+        return -1;
+    }
+    snprintf(destion, sizeof(destion), "%s%d/", CRASH_DIR, dir);
+    // DATAT0=PREFIX, DATA1=msg_reason, DATA2=msg_status
+    history_file_write_data012(CRASHEVENT, FW_UPDATE_ERROR, NULL, PREFIX,
+                               msg_reason, msg_status, destion, NULL, key,
+                               date_tmp, 1);
+
+    return ret;
 }
 
 /**
@@ -5667,6 +5775,7 @@ next:
     crashlog_check_startupreason(startupreason, watchdog, files);
     crashlog_check_recovery(files);
     crashlog_check_factory(files);
+    crashlog_check_fw_update_status(files);
 
     time(&t);
     time_tmp = localtime((const time_t *)&t);
