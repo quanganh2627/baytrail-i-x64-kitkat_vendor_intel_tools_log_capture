@@ -42,6 +42,7 @@
 #include "ramdump.h"
 #include "tcs_wrapper.h"
 #include "kct_netlink.h"
+#include "iptrak.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -352,6 +353,8 @@ static void early_check(char *encryptstate, int test) {
             LOGI("%s: File %s updated successfully.", __FUNCTION__, LOG_MODEM_VERSION);
         }
     }
+    /* Update the iptrak file */
+    check_iptrak_file(RETRY_ONCE);
 }
 
 void spid_read_concat(const char *path, char *complete_value)

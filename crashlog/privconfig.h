@@ -54,6 +54,7 @@
 #define MMGRMAXEXTRA            (512)
 #define KCT_MAX_CONNECT_TRY      10
 #define KCT_CONNECT_RETRY_TIME_S 2
+#define UPTIME_MAX_LENGTH       11
 
 /* FIELDS DEFINITIONS */
 #define PERM_USER               "system"
@@ -279,6 +280,9 @@ extern enum crashlog_mode g_crashlog_mode;
 #define PROP_APLOG_DEPTH        "persist.crashreport.aplogdepth"
 #define PROP_APLOG_NB_PACKET    "persist.crashreport.packet"
 #define PROP_LOGSYSTEMSTATE     "init.svc.logsystemstate"
+#define PROP_RELEASE_VERSION    "ro.build.version.release"
+#define PROP_SYS_BKC_VERSION    "ro.build.version.incremental"
+#define PROP_SOC_VERSION        "ro.board.platform"
 
 /* DIRECTORIES */
 #ifndef __LINUX__
@@ -400,6 +404,7 @@ extern enum crashlog_mode g_crashlog_mode;
 #define RESET_IRQ_1             REBOOT_DIR "/RESETIRQ1"
 #define RESET_IRQ_2             REBOOT_DIR "/RESETIRQ2"
 #define EVENTFILE_NAME          "eventfile"
+#define IPTRAK_FILE             LOGS_DIR "/iptrak"
 
 /* MACROS */
 #define MIN(a,b)                ((a) < (b) ? (a) : (b))
