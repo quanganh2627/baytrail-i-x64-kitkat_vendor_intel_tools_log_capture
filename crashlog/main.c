@@ -176,6 +176,7 @@ static void reset_file(char *filename) {
     }
     fprintf(fd, "%4d", 0);
     fclose(fd);
+    do_chown(filename, PERM_USER, PERM_GROUP);
 }
 
 static void reset_after_swupdate(void)

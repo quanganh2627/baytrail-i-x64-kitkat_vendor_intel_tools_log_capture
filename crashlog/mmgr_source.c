@@ -550,6 +550,7 @@ int mmgr_handle(void) {
                 fprintf(fp,"DATA5=%s\n", data5);
             fprintf(fp,"_END\n");
             fclose(fp);
+            do_chown(fullpath, PERM_USER, PERM_GROUP);
         }
     }
     key = raise_event(event_name, type, NULL, destion);

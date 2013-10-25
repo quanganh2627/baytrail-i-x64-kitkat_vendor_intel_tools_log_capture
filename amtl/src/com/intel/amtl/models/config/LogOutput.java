@@ -50,6 +50,7 @@ public class LogOutput {
     private String mtsRotateNum = null;
     private String mtsMode = null;
     private String oct = null;
+    private String octFcs = null;
     private String pti1 = null;
     private String pti2 = null;
     private Hashtable<String, Master> masterList = null;
@@ -62,7 +63,7 @@ public class LogOutput {
 
     public LogOutput(int index, String name, String xsioValue, String buttonColor, String mtsInput,
             String mtsOutput, String mtsOutputType, String mtsRotateNum, String mtsRotateSize,
-            String mtsMode, String oct, String pti1, String pti2, String flcmd) {
+            String mtsMode, String oct, String octFcs, String pti1, String pti2, String flcmd) {
         this.setIndex(index);
         this.setName(name);
         this.setXsio(xsioValue);
@@ -75,6 +76,7 @@ public class LogOutput {
         this.setMtsMode(mtsMode);
         this.masterList = new Hashtable<String, Master>();
         this.setOct(oct);
+        this.setOctFcs(octFcs);
         this.setPti1(pti1);
         this.setPti2(pti2);
         this.setFlCmd(flcmd);
@@ -122,6 +124,10 @@ public class LogOutput {
 
     public void setOct(String oct) {
         this.oct = oct;
+    }
+
+    public void setOctFcs(String octFcs) {
+        this.octFcs = octFcs;
     }
 
     public void setPti1(String pti1) {
@@ -178,6 +184,10 @@ public class LogOutput {
 
     public String getOct() {
         return this.oct;
+    }
+
+    public String getOctFcs() {
+        return this.octFcs;
     }
 
     public String getPti1() {
@@ -310,8 +320,8 @@ public class LogOutput {
                 + ", mts_rotate_num = " + this.mtsRotateNum
                 + ", mts_rotate_size = " + this.mtsRotateSize
                 + ", mts_mode = " + this.mtsMode
-                + ", oct = " + this.oct + ", pti1 = " + this.pti1
-                + ", pti2 = " + this.pti2
+                + ", oct = " + this.oct + ", oct_fcs = " + this.octFcs
+                + ", pti1 = " + this.pti1 + ", pti2 = " + this.pti2
                 + ", flush_command = " + this.flcmd + ".");
         while(it.hasNext()) {
             Master master = it.next();
