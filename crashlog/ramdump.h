@@ -23,7 +23,7 @@
 #define RAMDUMP_H_
 
 int do_ramdump_checks(int test);
-int crashlog_check_fwdump();
+int crashlog_check_ramdump(const char * reason);
 int request_global_reset();
 
 #endif /* RAMDUMP_H_ */

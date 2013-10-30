@@ -979,21 +979,53 @@ int read_file_prop_uid(char* source, char *filename, char *uid, char* defaultval
     return 0;
 }
 
-#ifndef FULL_REPORT
-static void flush_aplog()
-{
-    struct stat info;
+void flush_aplog(e_aplog_file_t file, const char *mode, int *dir, const char *ts) {
+    char log_boot_name[512] = { '\0', };
     int status;
 
-    if(stat(APLOG_FILE_0, &info) == 0){
-        remove(APLOG_FILE_0);
-    }
-    status = system("/system/bin/logcat -b system -b main -b radio -b events -v threadtime -d -f /logs/aplog");
-    if (status != 0)
-        LOGE("dump logcat returns status: %d.\n", status);
-    do_chown(APLOG_FILE_0, PERM_USER, PERM_GROUP);
-}
+    switch (file) {
+    case APLOG:
+#ifndef FULL_REPORT
+        if (file_exists(APLOG_FILE_0)) {
+            remove(APLOG_FILE_0);
+        }
+        status = system("/system/bin/logcat -b system -b main -b radio -b events -v threadtime -d -f /logs/aplog");
+        if (status != 0)
+            LOGE("dump logcat returns status: %d.\n", status);
+        do_chown(APLOG_FILE_0, PERM_USER, PERM_GROUP);
 #endif
+        break;
+
+    case APLOG_BOOT:
+        if ((mode == NULL) || (dir == NULL) || (ts == NULL)) {
+            LOGE("invalid parameters\n");
+            return;
+        }
+
+        snprintf(log_boot_name, sizeof(log_boot_name)-1, "%s%d/%s_%s_%s",
+                CRASH_DIR, *dir, strrchr(APLOG_FILE_BOOT,'/')+1, mode, ts);
+
+#ifdef FULL_REPORT
+        status = system("/system/bin/logcat -b system -b main -b radio -b events -b kernel -v threadtime -d -f /logs/aplog_boot");
+#else
+        status = system("/system/bin/logcat -b system -b main -b radio -b events -v threadtime -d -f /logs/aplog_boot");
+#endif
+        if (status != 0) {
+            LOGE("flush ap log from boot returns status: %d.\n", status);
+            return;
+        }
+
+        if(file_exists(APLOG_FILE_BOOT)) {
+            do_copy(APLOG_FILE_BOOT,log_boot_name,0);
+            remove(APLOG_FILE_BOOT);
+        }
+        break;
+
+    default:
+        LOGE("invalid logfile parameter\n");
+        break;
+    }
+}
 
 // return of compute_bp_log needs to be freed after use
 char *compute_bp_log(const char* ext_file) {
@@ -1024,7 +1056,7 @@ void do_log_copy(char *mode, int dir, const char* timestamp, int type) {
         case APLOG_STATS_TYPE:
         case KDUMP_TYPE:
 #ifndef FULL_REPORT
-            flush_aplog();
+            flush_aplog(APLOG, NULL, NULL, NULL);
 #endif
             logfile0 = APLOG_FILE_0;
             logfile1 = APLOG_FILE_1;

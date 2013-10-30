@@ -73,7 +73,7 @@
 #define KERNEL_FAKE_CRASH       "IPANIC_FAKE"
 #define IPANIC_CORRUPTED        "IPANIC_CORRUPTED"
 #define KDUMP_CRASH             "KDUMP"
-#define FWDUMP_EVENT            "FWDUMP"
+#define RAMDUMP_EVENT           "RAMDUMP"
 #define MODEM_SHUTDOWN          "MSHUTDOWN"
 #define BZTRIGGER               "bz_trigger"
 #define SCREENSHOT_PATTERN      "SCREENSHOT="
@@ -108,6 +108,7 @@
 #define GENERAL_CONF_PATTERN    "GENERAL"
 #define MPANIC_ABORT            "COREDUMP_ABORTED_BY_PLATFORM_SHUTDOWN"
 #define CRASHLOG_WATCHER_ERROR  "CRASHLOG_WATCHER"
+#define RAMCONSOLE              "RAMCONSOLE"
 
 /*
  * Take care that this enum is ALWAYS aligned with

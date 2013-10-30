@@ -32,29 +32,6 @@
 #include <fcntl.h>
 #include <stdio.h>
 
-static void flush_aplog_atboot(char *mode, int dir, const char* ts)
-{
-    char cmd[512] = { '\0', };
-    char log_boot_name[512] = { '\0', };
-    struct stat info;
-
-    snprintf(log_boot_name, sizeof(log_boot_name)-1, "%s%d/%s_%s_%s", CRASH_DIR, dir, strrchr(APLOG_FILE_BOOT,'/')+1,mode,ts);
-    int status;
-#ifdef FULL_REPORT
-    status = system("/system/bin/logcat -b system -b main -b radio -b events -b kernel -v threadtime -d -f /logs/aplog_boot");
-#else
-    status = system("/system/bin/logcat -b system -b main -b radio -b events -v threadtime -d -f /logs/aplog_boot");
-#endif
-    if (status != 0) {
-        LOGE("flush ap log from boot returns status: %d.\n", status);
-        return;
-    }
-    if(!stat(APLOG_FILE_BOOT,&info)) {
-        do_copy(APLOG_FILE_BOOT,log_boot_name,0);
-        remove(APLOG_FILE_BOOT);
-    }
-}
-
 /*
 * Name          : read_startupreason
 * Description   : This function returns the decoded startup reason by reading
@@ -195,8 +172,8 @@ int crashlog_check_startupreason(char *reason, char *watchdog) {
 
     /* Nothing to do if the reason :
      *  - doesn't contains "HWWDT" or "SWWDT" or "WDT" */
-    /*  - contains "HWWDT" or "SWWDT" or "WDT" but with 'FAKE' suffix */
-    if ( !( strstr(reason, "HWWDT_") || strstr(reason, "SWWDT_") || strstr(reason, "WDT_") ) || strstr(reason, "FAKE") ) {
+    /*  - contains "WDT" but with "FAKE" suffix */
+    if ( !( strstr(reason, "WDT_") ) || strstr(reason, "FAKE") ) {
         /* Nothing to do */
         return 0;
     }
@@ -214,10 +191,11 @@ int crashlog_check_startupreason(char *reason, char *watchdog) {
     snprintf(destination, sizeof(destination), "%s%d/", CRASH_DIR, dir);
     key = raise_event(CRASHEVENT, watchdog, reason, destination);
     LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, get_current_time_long(0), "WDT", destination);
-    flush_aplog_atboot("WDT", dir, dateshort);
+    flush_aplog(APLOG_BOOT, "WDT", &dir, dateshort);
     usleep(TIMEOUT_VALUE);
     do_log_copy("WDT", dir, dateshort, APLOG_TYPE);
     do_last_kmsg_copy(dir);
     free(key);
+
     return 0;
 }

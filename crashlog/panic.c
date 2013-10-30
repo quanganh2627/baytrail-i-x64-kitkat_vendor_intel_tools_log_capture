@@ -28,6 +28,8 @@
 
 #include <stdlib.h>
 
+int cfg_check_ram_panic = 1;
+
 /*
 * Name          : check_aplogs_tobackup
 * Description   : backup a number of aplogs if a patten is found in a file
@@ -381,6 +383,8 @@ void crashlog_check_panic_events(char *reason, char *watchdog, int test) {
 
     if (crashlog_check_panic(reason, test) == 1)
         /* No panic console file : check RAM console to determine the watchdog event type */
-        if ( crashlog_check_ram_panic(reason) == 1 && strstr(reason, "SWWDT_") )
+        if ( (crashlog_check_ram_panic(reason) == 1) &&
+                strstr(reason, "SWWDT_") &&
+                (cfg_check_ram_panic == 1) )
             strcpy(watchdog, "WDT_UNHANDLED");
 }

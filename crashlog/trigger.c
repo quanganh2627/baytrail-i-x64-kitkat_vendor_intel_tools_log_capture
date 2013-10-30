@@ -148,7 +148,7 @@ int process_log_event(char *rootdir, char *triggername, int mode) {
 #ifndef FULL_REPORT
     /* Manage APLOG=0 which means bz type="enhancement"*/
     if ( aplogDepth != 0 )
-        flush_aplog();
+        flush_aplog(APLOG, NULL, NULL, NULL);
 #endif
     /* copy data file */
     for( packetidx = 0; packetidx < nbPacket ; packetidx++) {

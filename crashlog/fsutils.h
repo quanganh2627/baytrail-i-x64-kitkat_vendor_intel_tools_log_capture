@@ -53,6 +53,11 @@ enum {
     MODE_KDUMP,
 };
 
+typedef enum e_aplog_file {
+    APLOG,
+    APLOG_BOOT,
+} e_aplog_file_t;
+
 /* Mode used to cache a file into a buffer*/
 #define CACHE_TAIL      0
 #define CACHE_START     1
@@ -96,6 +101,7 @@ int get_value_in_file(char *file, char *keyword, char *value, unsigned int sizem
 int find_str_in_file(char *filename, char *keyword, char *tail);
 int find_str_in_standard_file(char *filename, char *keyword, char *tail);
 int find_oneofstrings_in_file(char *file, char **keywords, int nbkeywords);
+void flush_aplog(e_aplog_file_t file, const char *mode, int *dir, const char *ts);
 int readline(int fd, char buffer[MAXLINESIZE]);
 int freadline(FILE *fd, char buffer[MAXLINESIZE]);
 int append_file(char *filename, char *text);

@@ -22,6 +22,8 @@
 #ifndef __PANIC_H__
 #define __PANIC_H__
 
+extern int cfg_check_ram_panic;
+
 int crashlog_check_panic(char *reason, int test);
 int crashlog_check_ram_panic(char *reason);
 int crashlog_check_kdump(char *reason, int test);
