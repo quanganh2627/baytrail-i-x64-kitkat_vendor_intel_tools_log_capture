@@ -152,7 +152,7 @@ int crashlog_check_panic(char *reason, int test) {
 
     destination_thread_name[0] = '\0';
     destination_console_name[0] = '\0';
-    dir = find_new_crashlog_dir(CRASH_MODE);
+    dir = find_new_crashlog_dir(MODE_CRASH);
     if (dir < 0) {
         LOGE("%s: Cannot get a valid new crash directory...\n", __FUNCTION__);
         /* Set directory error flag and initialize destination filename to compute crashtype */
@@ -265,7 +265,7 @@ int crashlog_check_ram_panic(char *reason)
     }
 
     destination[0] = '\0';
-    dir = find_new_crashlog_dir(CRASH_MODE);
+    dir = find_new_crashlog_dir(MODE_CRASH);
     if (dir < 0) {
         LOGE("%s: Cannot get a valid new crash directory...\n", __FUNCTION__);
         /* Set directory error flag and initialize destination filename to compute crashtype */

@@ -268,7 +268,7 @@ int process_stat_event(struct watch_entry *entry, struct inotify_event *event) {
         strcpy(p, "data");
     }
 
-    dir = find_new_crashlog_dir(STATS_MODE);
+    dir = find_new_crashlog_dir(MODE_STATS);
     if (dir < 0) {
         LOGE("%s: Cannot get a valid new crash directory...\n", __FUNCTION__);
         key = raise_event(STATSEVENT, tmp, NULL, NULL);

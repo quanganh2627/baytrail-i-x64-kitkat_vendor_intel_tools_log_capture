@@ -45,14 +45,14 @@ struct arg_copy {
 };
 
 /* Modes used for get_sdcard_paths */
-enum {
+typedef enum e_dir_mode {
     MODE_CRASH = 0,
     MODE_CRASH_NOSD,
     MODE_STATS,
     MODE_APLOGS,
     MODE_BZ,
     MODE_KDUMP,
-};
+} e_dir_mode_t;
 
 typedef enum e_aplog_file {
     APLOG,
@@ -101,8 +101,8 @@ static inline int get_file_size(char *filename) {
 }
 
 int read_file_prop_uid(char* propsource, char *filename, char *uid, char* defaultvalue);
-int find_new_crashlog_dir(int mode);
-int get_sdcard_paths(int mode);
+int find_new_crashlog_dir(e_dir_mode_t mode);
+int get_sdcard_paths(e_dir_mode_t mode);
 void do_log_copy(char *mode, int dir, const char* ts, int type);
 long get_sd_size();
 int sdcard_allowed();
@@ -113,6 +113,7 @@ int find_str_in_file(char *filename, char *keyword, char *tail);
 int find_str_in_standard_file(char *filename, char *keyword, char *tail);
 int find_oneofstrings_in_file(char *file, char **keywords, int nbkeywords);
 void flush_aplog(e_aplog_file_t file, const char *mode, int *dir, const char *ts);
+void reset_file(const char *filename);
 int readline(int fd, char buffer[MAXLINESIZE]);
 int freadline(FILE *fd, char buffer[MAXLINESIZE]);
 int append_file(char *filename, char *text);

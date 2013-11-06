@@ -74,7 +74,7 @@ int crashlog_check_fabric(char *reason, int test) {
     if ( !test && !file_exists(CURRENT_PROC_FABRIC_ERROR_NAME) ) return 0;
 
     destination[0] = '\0';
-    dir = find_new_crashlog_dir(CRASH_MODE);
+    dir = find_new_crashlog_dir(MODE_CRASH);
     if (dir < 0) {
         LOGE("%s: find_new_crashlog_dir failed\n", __FUNCTION__);
         dir_err = 1;

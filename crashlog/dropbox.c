@@ -297,7 +297,7 @@ int process_lost_event(struct watch_entry __attribute__((unused)) *entry, struct
 
     snprintf(lostevent_subtype, sizeof(lostevent_subtype), "%s_%s", LOST_EVNAME, lostevent);
 
-    dir = find_new_crashlog_dir(CRASH_MODE_NOSD);
+    dir = find_new_crashlog_dir(MODE_CRASH_NOSD);
     if (dir < 0) {
         LOGE("%s: Find dir for lost dropbox failed\n", __FUNCTION__);
         key = raise_event(CRASHEVENT, lostevent, lostevent_subtype, NULL);

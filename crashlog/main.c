@@ -165,20 +165,6 @@ static void reset_logdir(char *path, int remove_dir) {
     }
 }
 
-static void reset_file(char *filename) {
-    FILE *fd;
-
-    fd = fopen(filename, "w");
-    if (fd == NULL) {
-        LOGE("%s: Cannot reset %s - %s\n", __FUNCTION__, filename,
-            strerror(errno));
-        return;
-    }
-    fprintf(fd, "%4d", 0);
-    fclose(fd);
-    do_chown(filename, PERM_USER, PERM_GROUP);
-}
-
 static void reset_after_swupdate(void)
 {
     reset_logdir(HISTORY_CORE_DIR, 1);
