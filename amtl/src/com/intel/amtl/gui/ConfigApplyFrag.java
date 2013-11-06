@@ -77,8 +77,7 @@ public class ConfigApplyFrag extends DialogFragment {
 
         this.exeSetup = null;
         if (!exceptReason.equals("")) {
-            Log.e(TAG, MODULE + ": modem conf application failed: " +
-                    exceptReason);
+            Log.e(TAG, MODULE + ": modem conf application failed: " + exceptReason);
             UIHelper.okDialog(getActivity(),
                     "Error ", "Configuration not applied:\n" + exceptReason);
         }
@@ -89,8 +88,7 @@ public class ConfigApplyFrag extends DialogFragment {
         }
     }
 
-    public void launch(ModemConf modemConfToApply, Fragment frag,
-             FragmentManager gsfManager) {
+    public void launch(ModemConf modemConfToApply, Fragment frag, FragmentManager gsfManager) {
         handlerConf(new ApplyConfTask(modemConfToApply, this.context));
         setTargetFragment(this, targetFrag);
         show(gsfManager, tag);
@@ -162,11 +160,10 @@ public class ConfigApplyFrag extends DialogFragment {
         // Function overrides for Apply configuration thread.
         @Override
         protected Void doInBackground(Void... params) {
-            SharedPreferences prefs = context.getSharedPreferences("AMTLPrefsData",
-                    Context.MODE_PRIVATE);
+            SharedPreferences prefs =
+                    context.getSharedPreferences("AMTLPrefsData", Context.MODE_PRIVATE);
             SharedPreferences.Editor editor =
-                    context.getSharedPreferences("AMTLPrefsData",
-                    Context.MODE_PRIVATE).edit();
+                    context.getSharedPreferences("AMTLPrefsData", Context.MODE_PRIVATE).edit();
             try {
                 modemCtrl = ModemController.get();
                 if (modemCtrl != null) {
@@ -181,7 +178,7 @@ public class ConfigApplyFrag extends DialogFragment {
                         // give time to the modem to sync - 1 second
                         SystemClock.sleep(1000);
                     } else {
-                        // fall back - check if a default flush cmf is set
+                        // fall back - check if a default flush cmd is set
                         Log.d(TAG, MODULE + ": Fall back - check default_flush_cmd");
                         String flCmd = prefs.getString("default_flush_cmd", "");
                         if (!flCmd.equalsIgnoreCase("")) {
@@ -196,13 +193,6 @@ public class ConfigApplyFrag extends DialogFragment {
                             + modConfToApply.getIndex());
 
                     editor.putInt("index", modConfToApply.getIndex());
-                    if (modConfToApply.getIndex() != -1)  {
-                        editor.putBoolean("expert_mode", false);
-                        Log.d(TAG, MODULE + ": Selected configuration index: " +
-                                modConfToApply.getIndex());
-                    } else {
-                        editor.putBoolean("expert_mode", true);
-                    }
 
                     // check if the configuration requires mts
                     mtsManager = new MtsManager();
@@ -230,8 +220,7 @@ public class ConfigApplyFrag extends DialogFragment {
                         exceptReason = "no configuration to apply";
                     }
                 } else {
-                    exceptReason =
-                            "cannot apply configuration: modemCtrl is null";
+                    exceptReason = "cannot apply configuration: modemCtrl is null";
                 }
                 // Everything went right, so let s commit trace configuration.
                 editor.commit();
@@ -239,7 +228,6 @@ public class ConfigApplyFrag extends DialogFragment {
                 exceptReason = ex.getMessage();
                 Log.e(TAG, MODULE + ": cannot change modem configuration " + ex);
                 // if config change failed, logging is stopped
-                editor.remove("expert_mode");
                 editor.remove("index");
                 editor.commit();
                 try {

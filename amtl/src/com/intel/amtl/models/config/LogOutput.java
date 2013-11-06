@@ -48,6 +48,7 @@ public class LogOutput {
     private String mtsOutputType = null;
     private String mtsRotateSize = null;
     private String mtsRotateNum = null;
+    private String mtsInterface = null;
     private String mtsMode = null;
     private String oct = null;
     private String octFcs = null;
@@ -63,7 +64,8 @@ public class LogOutput {
 
     public LogOutput(int index, String name, String xsioValue, String buttonColor, String mtsInput,
             String mtsOutput, String mtsOutputType, String mtsRotateNum, String mtsRotateSize,
-            String mtsMode, String oct, String octFcs, String pti1, String pti2, String flcmd) {
+            String mtsInterface, String mtsMode, String oct, String octFcs, String pti1,
+            String pti2, String flcmd) {
         this.setIndex(index);
         this.setName(name);
         this.setXsio(xsioValue);
@@ -73,6 +75,7 @@ public class LogOutput {
         this.setMtsRotateNum(mtsRotateNum);
         this.setMtsOutputType(mtsOutputType);
         this.setMtsRotateSize(mtsRotateSize);
+        this.setMtsInterface(mtsInterface);
         this.setMtsMode(mtsMode);
         this.masterList = new Hashtable<String, Master>();
         this.setOct(oct);
@@ -116,6 +119,10 @@ public class LogOutput {
 
     public void setMtsRotateNum(String mtsRotateNum) {
         this.mtsRotateNum = mtsRotateNum;
+    }
+
+    public void setMtsInterface(String mtsInterface) {
+        this.mtsInterface = mtsInterface;
     }
 
     public void setMtsMode(String mtsMode) {
@@ -176,6 +183,10 @@ public class LogOutput {
 
     public String getMtsRotateNum() {
         return this.mtsRotateNum;
+    }
+
+    public String getMtsInterface() {
+        return this.mtsInterface;
     }
 
     public String getMtsMode() {
@@ -319,6 +330,7 @@ public class LogOutput {
                 + ", mts_output_type = " + this.mtsOutputType
                 + ", mts_rotate_num = " + this.mtsRotateNum
                 + ", mts_rotate_size = " + this.mtsRotateSize
+                + ", mts_interface = " + this.mtsInterface
                 + ", mts_mode = " + this.mtsMode
                 + ", oct = " + this.oct + ", oct_fcs = " + this.octFcs
                 + ", pti1 = " + this.pti1 + ", pti2 = " + this.pti2

@@ -27,6 +27,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.util.Log;
@@ -293,7 +294,10 @@ public class MasterSetupFrag extends Fragment
     }
 
     private ModemConf setModemConf() {
+        SharedPreferences prefs = context.getSharedPreferences("AMTLPrefsData",
+                Context.MODE_PRIVATE);
         LogOutput output = new LogOutput();
+        output.setIndex(prefs.getInt("index", -2));
         if (masterArray != null) {
             for (Master m: masterArray) {
                 output.addMasterToList(m.getName(), m);
