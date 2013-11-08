@@ -346,6 +346,8 @@ extern enum crashlog_mode g_crashlog_mode;
 #define BLANKPHONE_FILE         LOGS_DIR "/flashing/blankphone_file"
 #define MODEM_SHUTDOWN_TRIGGER  LOGS_DIR "/modemcrash/mshutdown.txt"
 #define LOG_SPID                LOGS_DIR "/spid.txt"
+#define LOG_PANICTEMP           LOGS_DIR "/panic_temp"
+#define LOG_FABRICTEMP           LOGS_DIR "/fabric_temp"
 #define LAST_KMSG_FILE          "last_kmsg"
 #define CONSOLE_RAMOOPS_FILE    "console-ramoops"
 #define CONSOLE_NAME            "emmc_ipanic_console"

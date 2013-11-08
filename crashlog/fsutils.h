@@ -31,6 +31,7 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <dirent.h>
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
@@ -75,6 +76,16 @@ static inline int file_exists(char *filename) {
     struct stat info;
 
     return (stat(filename, &info) == 0);
+}
+
+static inline int dir_exists(const char *dirpath) {
+    DIR * dir;
+
+    dir = opendir(dirpath);
+    if (dir != NULL)
+        return 1;
+    else
+        return 0;
 }
 
 static inline int get_file_size(char *filename) {
