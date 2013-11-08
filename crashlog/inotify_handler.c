@@ -410,7 +410,6 @@ int receive_inotify_events(int inotify_fd) {
             /* event concerns a file into a watched directory */
             entry = get_event_entry(event->wd, (event->len ? event->name : NULL));
             if ( !entry ) {
-    #ifdef FULL_REPORT
                 /* Didn't find any entry for this event, check for
                  * a dropbox final event... */
                 if (event->len > 8 && !strncmp(event->name, "dropbox-", 8)) {
@@ -421,7 +420,6 @@ int receive_inotify_events(int inotify_fd) {
                     finalize_dropbox_pending_event(event);
                     continue;
                 }
-    #endif
                 /* Stray event... */
                 LOGD("%s: Can't handle the event \"%s\", no valid entry found, drop it...\n",
                     __FUNCTION__, (event->len ? event->name : "empty event"));

@@ -41,11 +41,11 @@ public class GsmttyManager implements Closeable {
             this.gsmtty.openTty();
             this.file = new RandomAccessFile(this.getTtyFileName(), "rw");
         } catch (ExceptionInInitializerError ex) {
-            throw new ModemControlException("libamtl_jni library was not found.");
+            throw new ModemControlException("libamtl_jni library was not found " + ex);
         } catch (IOException ex) {
-            throw new ModemControlException(String.format("Error while opening gsmtty"));
+            throw new ModemControlException("Error while opening gsmtty " + ex);
         } catch (IllegalArgumentException ex) {
-            throw new ModemControlException(String.format("Error while opening gsmtty"));
+            throw new ModemControlException("Error while opening gsmtty" + ex);
         }
     }
 

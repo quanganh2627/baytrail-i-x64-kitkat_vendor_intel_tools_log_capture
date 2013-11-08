@@ -85,7 +85,7 @@ int process_log_event(char *rootdir, char *triggername, int mode) {
     int bplogFlag = 0;
     char value[PROPERTY_VALUE_MAX];
     const char *logrootdir, *suppl_to_copy;
-    char *event, *type;
+    char *event, *type, *logfile0, *logfile1;
     int packetidx, logidx, newdirperpacket, do_screenshot;
     struct stat info;
 
@@ -208,16 +208,18 @@ int process_log_event(char *rootdir, char *triggername, int mode) {
 
             /* In case of bz_trigger with BPLOG=1, copy bplog file(s) */
             if( bplogFlag == 1 ) {
-                if(stat(BPLOG_FILE_0, &info) == 0){
-                    snprintf(destination,sizeof(destination), "%s%d/%s", BZ_DIR, dir,strrchr(BPLOG_FILE_0,'/')+1);
-                    do_copy(BPLOG_FILE_0,destination, 0);
+                logfile0 = compute_bp_log(""); //BPLOG_FILE_0
+                logfile1 = compute_bp_log(BPLOG_FILE_1_EXT ); //BPLOG_FILE_1;
+                if(stat(logfile0, &info) == 0){
+                    snprintf(destination,sizeof(destination), "%s%d/%s", BZ_DIR, dir,strrchr(logfile0,'/')+1);
+                    do_copy_tail(logfile0,destination, 0);
                     if(info.st_size < 1*MB){
-                        if(stat(BPLOG_FILE_1, &info) == 0){
-                            snprintf(destination,sizeof(destination), "%s%d/%s", BZ_DIR, dir,strrchr(BPLOG_FILE_1,'/')+1);
-                            do_copy(BPLOG_FILE_1,destination, 0);
-                        }
+                        snprintf(destination,sizeof(destination), "%s%d/%s", BZ_DIR, dir,strrchr(logfile1,'/')+1);
+                        do_copy_tail(logfile1,destination, 0);
                     }
                 }
+                free(logfile0);
+                free(logfile1);
             }
         }
         snprintf(destination,sizeof(destination),"%s%d/", logrootdir,dir);

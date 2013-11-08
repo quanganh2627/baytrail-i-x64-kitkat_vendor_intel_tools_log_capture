@@ -159,13 +159,9 @@ public class ModemController implements ModemEventListener, Closeable {
         }
     }
 
-    public void openTty() {
-        try {
-            if (this.ttyManager == null) {
-                this.ttyManager = new GsmttyManager();
-            }
-        } catch (ModemControlException ex) {
-            Log.e(TAG, MODULE + ": there is an issue with tty opening");
+    public void openTty() throws ModemControlException {
+        if (this.ttyManager == null) {
+            this.ttyManager = new GsmttyManager();
         }
     }
 
@@ -239,8 +235,12 @@ public class ModemController implements ModemEventListener, Closeable {
     public void onModemUp() {
         this.currentModemStatus = ModemStatus.UP;
         Log.d(TAG, MODULE + ": Modem is UP");
-        this.openTty();
-        sendMessage("UP");
+        try {
+            this.openTty();
+            sendMessage("UP");
+        } catch (ModemControlException ex) {
+            Log.e(TAG, MODULE + ex);
+        }
     }
 
     @Override
