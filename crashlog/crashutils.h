@@ -68,6 +68,8 @@ char *raise_event(char *event, char *type, char *subtype, char *log);
 char *raise_event_nouptime(char *event, char *type, char *subtype, char *log);
 char *raise_event_bootuptime(char *event, char *type, char *subtype, char *log);
 char *raise_event_dataready(char *event, char *type, char *subtype, char *log, int data_ready);
+char *raise_event_dataready012(char *event, char *type, char *subtype, char *log,
+                            int data_ready,char* data0, char* data1, char* data2);
 void create_infoevent(char* filename, char* data0, char* data1,
     char* data2);
 void notify_crashreport();
@@ -81,8 +83,6 @@ int check_running_modem_trace();
 
 int get_build_board_versions(char *filename, char *buildver, char *boardver);
 const char *get_build_footprint();
-int create_minimal_crashfile(char * event, const char* type, const char* path,
-               char* key, const char* uptime, const char* date, int data_ready);
 
 void build_crashenv_parameters( char * crashenv_param );
 void monitor_crashenv();
