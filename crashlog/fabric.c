@@ -48,8 +48,10 @@ struct fabric_type fabric_types_array[] = {
 };
 
 struct fabric_type fabric_fakes_array[] = {
-    {"DW2:", "02608002", "FABRIC_FAKE"},
-    {"DW3:", "ff222232", "FABRIC_FAKE"},
+    {"DW2:", "02608001", "FABRIC_FAKE"},
+    {"DW3:", "ff222230", "FABRIC_FAKE"},
+    {"DW3:", "0000e103", "FABRIC_FAKE"},
+    {"DW11:", "ff222230", "FABRIC_FAKE"},
 };
 
 enum {
@@ -86,8 +88,10 @@ int crashlog_check_fabric(char *reason, int test) {
     do_copy_eof(CURRENT_PROC_FABRIC_ERROR_NAME, destination);
 
     /* Looks first for fake fabrics */
-    if ( find_str_in_file(destination, fabric_fakes_array[0].keyword, fabric_fakes_array[0].tail) > 0 &&
-         find_str_in_file(destination, fabric_fakes_array[1].keyword, fabric_fakes_array[1].tail) > 0 ) {
+    if (( find_str_in_file(destination, fabric_fakes_array[0].keyword, fabric_fakes_array[0].tail) > 0 &&
+          find_str_in_file(destination, fabric_fakes_array[1].keyword, fabric_fakes_array[1].tail) > 0 ) ||
+        ( find_str_in_file(destination, fabric_fakes_array[2].keyword, fabric_fakes_array[2].tail) > 0 &&
+          find_str_in_file(destination, fabric_fakes_array[3].keyword, fabric_fakes_array[3].tail) > 0 )) {
             /* Got it, it's a fake!! */
             strncpy(crashtype, fabric_fakes_array[i].name, sizeof(crashtype)-1);
             if (!strncmp(reason, "HWWDT_RESET", strlen("HWWDT_RESET")))
