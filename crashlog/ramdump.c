@@ -37,14 +37,16 @@
 
 /**
 * @brief performs a copy of the virtual file exposed by the LM_DUMP kernel
-* module and raises a 'FWDUMP' event.
+* module and raises a 'RAMDUMP' event.
+*
+* @param reason - string containing the translated startup reason
 *
 * @retval returns -1 if a problem occurs (no LM_DUMP file..). 0 otherwise.
 */
-int crashlog_check_fwdump()
+int crashlog_check_ramdump(const char * reason)
 {
     char destination[PATHMAX] = {'\0'};
-    char *crashtype = FWDUMP_EVENT;
+    char *crashtype = RAMDUMP_EVENT;
     int dir;
     const char *dateshort = get_current_time_short(1);
     char *key;
@@ -62,7 +64,7 @@ int crashlog_check_fwdump()
         LOGE("%s: can't find file %s - error is %s.\n",
              __FUNCTION__, LM_DUMP_FILE, strerror(errno) );
     else {
-        snprintf(destination, sizeof(destination), "%s%d/%s_%s.txt",
+        snprintf(destination, sizeof(destination), "%s%d/%s_%s.bin",
                  CRASH_DIR, dir, SAVED_LM_BUFFER_NAME, dateshort);
         do_copy_eof(LM_DUMP_FILE, destination);
     }
@@ -79,10 +81,19 @@ int crashlog_check_fwdump()
 
     do_last_kmsg_copy(dir);
 
+    /* If startup reason contains "WDT_" without "FAKE", retrieve WDT crash event context */
+    if (strstr(reason, "WDT_") && !strstr(reason, "FAKE")) {
+        snprintf(destination, sizeof(destination), "%s%d/", CRASH_DIR, dir);
+        flush_aplog(APLOG_BOOT, "WDT", &dir, get_current_time_short(0));
+        usleep(TIMEOUT_VALUE);
+        do_log_copy("WDT", dir, get_current_time_short(0), APLOG_TYPE);
+    }
+
     destination[0] = '\0';
     snprintf(destination, sizeof(destination), "%s%d/", CRASH_DIR, dir);
     key = raise_event(CRASHEVENT, crashtype, NULL, destination);
-    LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, get_current_time_long(0), crashtype, destination);
+    LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, get_current_time_long(0),
+            crashtype, destination);
     free(key);
 
     return 0;
@@ -133,19 +144,21 @@ int do_ramdump_checks(int test) {
 
     strcpy(watchdog,"WDT");
 
+    /* Read the wake-up source */
     read_startupreason(startupreason);
+    /* Get the last UPTIME value and write current UPTIME one in history events file */
     uptime_history(lastuptime);
+    /* Change log directories permission rights */
     update_logs_permission();
 
     /* Checks for panic */
     crashlog_check_panic_events(startupreason, watchdog, test);
-    crashlog_check_startupreason(startupreason, watchdog);
-    /* Dump Lakemore file and raises FWDUMP event */
-    crashlog_check_fwdump();
+    /* Dump Lakemore file and raises CRASH RAMDUMP event */
+    crashlog_check_ramdump(startupreason);
 
     /* Raise REBOOT event*/
-    key = raise_event(SYS_REBOOT, startupreason, NULL, NULL);
-    LOGE("%-8s%-22s%-20s%s\n", SYS_REBOOT, key, get_current_time_long(0), startupreason);
+    key = raise_event(SYS_REBOOT, RAMCONSOLE, NULL, NULL);
+    LOGE("%-8s%-22s%-20s%s\n", SYS_REBOOT, key, get_current_time_long(0), RAMCONSOLE);
     free(key);
 
     request_global_reset();

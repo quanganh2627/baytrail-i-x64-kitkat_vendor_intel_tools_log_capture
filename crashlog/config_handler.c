@@ -26,6 +26,7 @@
 #include "crashutils.h"
 #include "fsutils.h"
 #include "privconfig.h"
+#include "panic.h"
 #include "config_handler.h"
 
 #include <stdlib.h>
@@ -295,6 +296,18 @@ void load_config(){
                     if (i_tmp > 0){
                         g_current_serial_device_id = 1;
                     }
+                }
+            }
+            if (sk_exists(GENERAL_CONF_PATTERN,"check_ram_panic",&my_conf_handle)){
+                pchar tmp = get_value(GENERAL_CONF_PATTERN,"check_ram_panic",&my_conf_handle);
+                if (tmp){
+                    i_tmp = atoi(tmp);
+                    if (i_tmp > 0){
+                        cfg_check_ram_panic = 1;
+                    } else {
+                        cfg_check_ram_panic = 0;
+                    }
+                    LOGI("Check RAM panic: %d", cfg_check_ram_panic);
                 }
             }
             load_config_by_pattern(NOTIFY_CONF_PATTERN,"matching_pattern",my_conf_handle);
