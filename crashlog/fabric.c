@@ -48,7 +48,7 @@ struct fabric_type fabric_types_array[] = {
 };
 
 struct fabric_type fabric_fakes_array[] = {
-    {"DW2:", "02608001", "FABRIC_FAKE"},
+    {"DW2:", "02608002", "FABRIC_FAKE"},
     {"DW3:", "ff222230", "FABRIC_FAKE"},
     {"DW3:", "0000e103", "FABRIC_FAKE"},
     {"DW11:", "ff222230", "FABRIC_FAKE"},
