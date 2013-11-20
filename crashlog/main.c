@@ -75,6 +75,7 @@ char *BZ_DIR = NULL;
 //Variables containing paths of files triggering IPANIC & FABRICERR & WDT treatment
 char CURRENT_PANIC_CONSOLE_NAME[PATHMAX]={PANIC_CONSOLE_NAME};
 char CURRENT_PROC_FABRIC_ERROR_NAME[PATHMAX]={PROC_FABRIC_ERROR_NAME};
+char CURRENT_PROC_OFFLINE_SCU_LOG_NAME[PATHMAX]={PROC_OFFLINE_SCU_LOG_NAME};
 char CURRENT_KERNEL_CMDLINE[PATHMAX]={KERNEL_CMDLINE};
 
 int process_command_event(struct watch_entry *entry, struct inotify_event *event) {
@@ -350,6 +351,7 @@ static void get_crash_env(char * boot_mode, char *crypt_state, char *encrypt_pro
     if( property_get("crashlogd.debug.proc_path", value, NULL) > 0 )
     {
         snprintf(CURRENT_PROC_FABRIC_ERROR_NAME, sizeof(CURRENT_PROC_FABRIC_ERROR_NAME), "%s/%s", value, FABRIC_ERROR_NAME);
+        snprintf(CURRENT_PROC_OFFLINE_SCU_LOG_NAME, sizeof(CURRENT_PROC_OFFLINE_SCU_LOG_NAME), "%s/%s", value, OFFLINE_SCU_LOG_NAME);
         snprintf(CURRENT_PANIC_CONSOLE_NAME, sizeof(CURRENT_PANIC_CONSOLE_NAME), "%s/%s", value, CONSOLE_NAME);
         snprintf(CURRENT_KERNEL_CMDLINE, sizeof(CURRENT_KERNEL_CMDLINE), "%s/%s", value, CMDLINE_NAME);
         LOGI("Test Mode : ipanic, fabricerr and wdt trigger path is %s\n", value);

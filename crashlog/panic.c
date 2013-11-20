@@ -199,7 +199,7 @@ int crashlog_check_panic(char *reason, int test) {
         do_copy(SAVED_LOGCAT_NAME, destination, MAXFILESIZE);
 
         destination[0] = '\0';
-        snprintf(destination, sizeof(destination), "%s%d/%s_%s.txt", CRASH_DIR, dir,
+        snprintf(destination, sizeof(destination), "%s%d/%s_%s.bin", CRASH_DIR, dir,
                 GBUFFER_NAME, dateshort);
         do_copy(GBUFFER_FILE, destination, MAXFILESIZE);
 
