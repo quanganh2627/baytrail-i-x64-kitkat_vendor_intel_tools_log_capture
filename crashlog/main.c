@@ -41,6 +41,7 @@
 #include "config_handler.h"
 #include "ramdump.h"
 #include "tcs_wrapper.h"
+#include "kct_netlink.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -532,6 +533,8 @@ int do_monitor() {
 
     init_mmgr_cli_source();
 
+    kct_netlink_init_comm();
+
     for(;;) {
         // Clear fd set
         FD_ZERO(&read_fds);
@@ -548,6 +551,13 @@ int do_monitor() {
             FD_SET(mmgr_get_fd(), &read_fds);
             if (mmgr_get_fd() > max)
                 max = mmgr_get_fd();
+        }
+
+        //kct fd setup
+        if (kct_netlink_get_fd() > 0) {
+            FD_SET(kct_netlink_get_fd(), &read_fds);
+            if (kct_netlink_get_fd() > max)
+                max = kct_netlink_get_fd();
         }
 
         // Wait for events
@@ -568,6 +578,11 @@ int do_monitor() {
             if (FD_ISSET(mmgr_get_fd(), &read_fds)) {
                 LOGD("mmgr fd set");
                 mmgr_handle();
+            }
+            // kct monitor
+            if (FD_ISSET(kct_netlink_get_fd(), &read_fds)) {
+                LOGD("kct fd set");
+                kct_netlink_handle_msg();
             }
         }
     }

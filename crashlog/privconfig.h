@@ -52,6 +52,8 @@
 #define UPTIME_FREQUENCY        (5 * 60)
 #define MMGRMAXSTRING           (20)
 #define MMGRMAXEXTRA            (512)
+#define KCT_MAX_CONNECT_TRY      10
+#define KCT_CONNECT_RETRY_TIME_S 2
 
 /* FIELDS DEFINITIONS */
 #define PERM_USER               "system"
