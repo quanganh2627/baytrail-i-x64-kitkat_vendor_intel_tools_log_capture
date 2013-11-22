@@ -52,6 +52,10 @@ public class MtsManager {
         return SystemProperties.get(MtsProperties.MTS_ROTATE_SIZE_PROP);
     }
 
+    public String getMtsInterface() {
+        return SystemProperties.get(MtsProperties.MTS_INTERFACE_PROP);
+    }
+
     public void printMtsProperties() {
         Log.d(TAG, MODULE + ": ========= MTS CONFIGURATION =========");
         Log.d(TAG, MODULE + ": INPUT = " + this.getMtsInput());
@@ -59,6 +63,7 @@ public class MtsManager {
         Log.d(TAG, MODULE + ": OUTPUT TYPE = " + this.getMtsOutputType());
         Log.d(TAG, MODULE + ": ROTATE NUM = " + this.getMtsRotateNum());
         Log.d(TAG, MODULE + ": ROTATE SIZE = " + this.getMtsRotateSize());
+        Log.d(TAG, MODULE + ": INTERFACE = " + this.getMtsInterface());
         Log.d(TAG, MODULE + ": STATUS = " + this.getMtsState());
         Log.d(TAG, MODULE + ": =======================================");
     }

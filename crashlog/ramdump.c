@@ -51,7 +51,7 @@ int crashlog_check_ramdump(const char * reason)
     const char *dateshort = get_current_time_short(1);
     char *key;
 
-    dir = find_new_crashlog_dir(CRASH_MODE);
+    dir = find_new_crashlog_dir(MODE_CRASH);
     if (dir < 0) {
         LOGE("%s: Cannot get a valid new crash directory...\n", __FUNCTION__);
         key = raise_event(CRASHEVENT, crashtype, NULL, NULL);

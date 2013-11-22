@@ -495,7 +495,7 @@ int process_info_and_error(char *filename, char *name) {
     }
     snprintf(tmp,sizeof(tmp),"%s",name);
 
-    dir = find_new_crashlog_dir(STATS_MODE);
+    dir = find_new_crashlog_dir(MODE_STATS);
     if (dir < 0) {
         LOGE("%s: Cannot get a valid new crash directory...\n", __FUNCTION__);
         p = strstr(tmp,"trigger");

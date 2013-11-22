@@ -28,6 +28,7 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.os.SystemProperties;
@@ -194,28 +195,39 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
     }
 
     private void updateUi(ModemConf curModConf) {
-        if (curModConf.getTrace().equals("0") && mtsMgr.getMtsState().equals("running")) {
-            mtsMgr.stopServices();
-        }
-        this.updateText(this.mtsMgr.getMtsState(), tvMtsStatus);
-        if (this.isExpertModeEnabled() && !curModConf.getTrace().equals("0")) {
-            if (curModConf.isMtsRequired() && mtsMgr.getMtsState().equals("running")) {
-                this.sExpertMode.setChecked(true);
-            } else if (!curModConf.isMtsRequired()) {
-                this.sExpertMode.setChecked(true);
+        SharedPreferences prefs = context.getSharedPreferences("AMTLPrefsData",
+                Context.MODE_PRIVATE);
+        int id = prefs.getInt("index", -2);
+        Log.d(TAG, MODULE + ": Current index = " + id);
+        if (id >= 0) {
+            for (LogOutput o: configArray) {
+                o.getConfSwitch().setChecked(configArray.indexOf(o) == id);
             }
         } else {
-            SystemProperties.set(EXPERT_PROPERTY, "0");
-            this.sExpertMode.setChecked(false);
-            // if traces are not enabled or mts not started ,uncheck all the conf switches
-            if (curModConf.getTrace().equals("0") || (!mtsMgr.getMtsState().equals("running")
-                    && curModConf.isMtsRequired())) {
-                this.setSwitchesChecked(false);
-            // if traces are enabled, check the corresponding conf switch
+            if (curModConf.getTrace().equals("0") && mtsMgr.getMtsState().equals("running")) {
+                mtsMgr.stopServices();
+            }
+            this.updateText(this.mtsMgr.getMtsState(), tvMtsStatus);
+            if (this.isExpertModeEnabled() && !curModConf.getTrace().equals("0")) {
+                if (curModConf.isMtsRequired() && mtsMgr.getMtsState().equals("running")) {
+                    this.sExpertMode.setChecked(true);
+                } else if (!curModConf.isMtsRequired()) {
+                    this.sExpertMode.setChecked(true);
+                }
             } else {
-                if (this.configArray != null) {
-                    for (LogOutput o: configArray) {
-                        o.getConfSwitch().setChecked(o.getXsio().equals(curModConf.getXsio()));
+                SystemProperties.set(EXPERT_PROPERTY, "0");
+                this.sExpertMode.setChecked(false);
+                // if traces are not enabled or mts not started ,uncheck all the conf switches
+                if (curModConf.getTrace().equals("0") || (!mtsMgr.getMtsState().equals("running")
+                        && curModConf.isMtsRequired())) {
+                    this.setSwitchesChecked(false);
+                // if traces are enabled, check the corresponding conf switch
+                } else {
+                    if (this.configArray != null) {
+                        for (LogOutput o: configArray) {
+                            o.getConfSwitch().setChecked(o.getXsio().equals(curModConf.getXsio())
+                                    && o.getMtsOutput().equals(curModConf.getMtsConf().getOutput()));
+                        }
                     }
                 }
             }

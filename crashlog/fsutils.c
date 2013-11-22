@@ -46,6 +46,103 @@ long current_sd_size_limit = LONG_MAX;
 /* No header in bionic... */
 ssize_t sendfile(int out_fd, int in_fd, off_t *offset, size_t count);
 
+static int close_file(const char *filename, FILE * fd) {
+    int res;
+    static int partfull = 0;
+
+    errno = 0;
+    res = fclose(fd);
+    if (res < 0) {
+        /* File closure could fail in some cases (full partition) */
+        LOGE("%s: fclose on %s failed - error is %s\n", __FUNCTION__,
+                filename, strerror(errno));
+
+        if (errno == ENOSPC) {
+            /* Full partition (no space left on device */
+            if (!partfull) {
+                raise_infoerror(ERROREVENT, CRASHLOG_ERROR_FULL);
+                partfull = 1;
+            }
+        }
+    }
+
+    return res;
+}
+
+static int read_file(const char *filename, unsigned int *pcurrent) {
+    FILE *fd;
+    int res;
+
+    /* Open file in reading */
+    fd = fopen(filename, "r");
+    if (fd != NULL) {
+        /* Read current value from file */
+        res = fscanf(fd, "%4u", pcurrent);
+        if (res != 1) {
+            /* Set it to 0 by default */
+            *pcurrent = 0;
+            LOGI("read KO res=%d, current=%d - error is %s\n", res,
+                    *pcurrent, strerror(errno));
+            res = 0;
+        }
+        /* Close file */
+        res = close_file(filename, fd);
+    } else if (errno == ENOENT) {
+        LOGE("%s: File %s does not exist, fall back to folder 0.\n", __FUNCTION__, filename);
+        /* Initialize file */
+        reset_file(filename);
+        *pcurrent = 0;
+        res = 0;
+    } else {
+        LOGE("%s: Cannot open file %s - error is %s.\n", __FUNCTION__,
+                filename, strerror(errno));
+        raise_infoerror(ERROREVENT, CRASHLOG_ERROR_PATH);
+        res = -1;
+    }
+
+    return res;
+}
+
+static int update_file(const char *filename, unsigned int current) {
+    FILE *fd;
+    int res;
+
+    /* Open file in reading and writing */
+    fd = fopen(filename, "r+");
+    if (fd == NULL) {
+        LOGE("%s: Cannot open the file %s in update mode\n", __FUNCTION__, filename);
+        raise_infoerror(ERROREVENT, CRASHLOG_ERROR_PATH);
+        return -1;
+    }
+
+    /* Write new current value in file */
+    res = fprintf(fd, "%4u", ((current+1) % gmaxfiles));
+    if (res <= 0) {
+        LOGE("%s: Cannot update file %s - error is %s.\n", __FUNCTION__,
+                filename, strerror(errno));
+        /* Close file */
+        close_file(filename, fd);
+        return -1;
+    }
+
+    /* Close file */
+    return (close_file(filename, fd));
+}
+
+void reset_file(const char *filename) {
+    FILE *fd;
+
+    fd = fopen(filename, "w");
+    if (fd == NULL) {
+        LOGE("%s: Cannot reset %s - %s\n", __FUNCTION__, filename,
+            strerror(errno));
+        return;
+    }
+    fprintf(fd, "%4u", 0);
+    close_file(filename, fd);
+    do_chown(filename, PERM_USER, PERM_GROUP);
+}
+
 int readline(int fd, char buffer[MAXLINESIZE]) {
     int size = 0, res;
     char *pbuffer = &buffer[0];
@@ -265,7 +362,7 @@ int get_value_in_file(char *file, char *keyword, char *value, unsigned int sizem
     return -1;
 }
 
-int get_sdcard_paths(int mode) {
+int get_sdcard_paths(e_dir_mode_t mode) {
     char value[PROPERTY_VALUE_MAX];
     DIR *d;
 
@@ -279,7 +376,7 @@ int get_sdcard_paths(int mode) {
 #else
 
     property_get(PROP_CRASH_MODE, value, "");
-    if ((!strncmp(value, "lowmemory", 9)) || (mode == CRASH_MODE_NOSD) || !sdcard_allowed())
+    if ((!strncmp(value, "lowmemory", 9)) || (mode == MODE_CRASH_NOSD) || !sdcard_allowed())
         return 0;
 
     errno = 0;
@@ -297,10 +394,10 @@ int get_sdcard_paths(int mode) {
 #endif
 }
 
-int find_new_crashlog_dir(int mode) {
+int find_new_crashlog_dir(e_dir_mode_t mode) {
     char path[PATHMAX];
-    unsigned int res, current;
-    FILE *fd;
+    int res;
+    unsigned int current;
     char *dir;
 
     get_sdcard_paths(mode);
@@ -332,34 +429,15 @@ int find_new_crashlog_dir(int mode) {
             return -1;
     }
 
-    if ( (fd = fopen(path, "r")) != NULL ) {
-        res = fscanf(fd, "%4d", &current);
-        if (res != 1) {
-            /* Set it to 0 by default */
-            current = 0;
-        }
-        fclose(fd);
-    } else if (errno == ENOENT) {
-        LOGE("%s: File %s does not exist, fall back to folder 0.\n", __FUNCTION__, path);
-        current = 0;
-    } else {
-        LOGE("%s: Cannot open file %s - error is %s.\n", __FUNCTION__, path, strerror(errno));
-        raise_infoerror(ERROREVENT, CRASHLOG_ERROR_PATH);
-        return -1;
-    }
-    /* Open it in write mode now to create and write the new current */
-    if ( (fd = fopen(path, "w")) == NULL ){
-        LOGE("%s: Cannot open the file %s in write mode\n", __FUNCTION__, path);
-        raise_infoerror(ERROREVENT, CRASHLOG_ERROR_PATH);
-        return -1;
-    }
-    fprintf(fd, "%4d", ((current+1) % gmaxfiles));
+    /* Read current value in file */
+    res = read_file(path, &current);
+    if (res < 0)
+        goto out;
 
-    errno = 0;
-    if (fclose(fd)!=0) {
-        /* File closure could failed in some cases (full partition)*/
-        LOGE("%s: fclose on %s failed - error is %s", __FUNCTION__, path, strerror(errno));
-    }
+    /* Open file in read/write mode to update the new current */
+    res = update_file(path, current);
+    if (res < 0)
+        goto out;
 
     snprintf(path, sizeof(path), "%s%d", dir, current);
     /* Call rmfr which will fail if the path does not exist
@@ -378,6 +456,9 @@ int find_new_crashlog_dir(int mode) {
         do_chown(path, PERM_USER, PERM_GROUP);
 
     return current;
+
+    out:
+    return -1;
 }
 
 int find_matching_file(char *dir_to_search, char *pattern, char *filename_found)

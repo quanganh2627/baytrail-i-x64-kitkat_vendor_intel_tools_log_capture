@@ -57,7 +57,7 @@ static int priv_process_usercrash_event(struct watch_entry *entry, struct inotif
     if (entry->eventtype == JAVACRASH_TYPE && manage_duplicate_dropbox_events(event) )
         return 1;
 
-    dir = find_new_crashlog_dir(CRASH_MODE);
+    dir = find_new_crashlog_dir(MODE_CRASH);
     snprintf(path, sizeof(path),"%s/%s", entry->eventpath, event->name);
     if (dir < 0 || !file_exists(path)) {
         if (dir < 0)

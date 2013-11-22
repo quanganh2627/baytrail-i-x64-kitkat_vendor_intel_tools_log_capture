@@ -313,47 +313,47 @@ void close_mmgr_cli_source(void){
  *
  * @return 0 on success, -1 on error.
  */
-static int compute_mmgr_param(char *type, int *mode, char *name, int *aplog, int *bplog, int *log_mode) {
+static int compute_mmgr_param(char *type, e_dir_mode_t *mode, char *name, int *aplog, int *bplog, int *log_mode) {
 
     if (strstr(type, "MODEMOFF" )) {
         //CASE MODEMOFF
-        *mode = STATS_MODE;
+        *mode = MODE_STATS;
         sprintf(name, "%s", INFOEVENT);
     } else if (strstr(type, "MSHUTDOWN" )) {
         //CASE MSHUTDOWN
-        *mode = CRASH_MODE;
+        *mode = MODE_CRASH;
         sprintf(name, "%s", CRASHEVENT);
         *aplog = 1;
         *log_mode = APLOG_TYPE;
     } else if (strstr(type, "MOUTOFSERVICE" )) {
         //CASE MOUTOFSERVICE
-        *mode = CRASH_MODE;
+        *mode = MODE_CRASH;
         sprintf(name, "%s", CRASHEVENT);
         *aplog = 1;
         *log_mode = APLOG_TYPE;
     } else if (strstr(type, "MPANIC" )) {
         //CASE MPANIC
-        *mode = CRASH_MODE;
+        *mode = MODE_CRASH;
         sprintf(name, "%s",CRASHEVENT);
         *aplog = 1;
         *log_mode = APLOG_TYPE;
         *bplog = check_running_modem_trace();
     } else if (strstr(type, "APIMR" )) {
         //CASE APIMR
-        *mode = CRASH_MODE;
+        *mode = MODE_CRASH;
         sprintf(name, "%s", CRASHEVENT);
         *aplog = 1;
         *log_mode = APLOG_TYPE;
         *bplog = check_running_modem_trace();
     } else if (strstr(type, "MRESET" )) {
         //CASE MRESET
-        *mode = CRASH_MODE;
+        *mode = MODE_CRASH;
         sprintf(name, "%s",CRASHEVENT);
         *log_mode = APLOG_TYPE;
         *aplog = 1;
     } else if (strstr(type, "TELEPHONY" )) {
         //CASE TEL_ERROR
-        *mode = STATS_MODE;
+        *mode = MODE_STATS;
         sprintf(name, "%s", ERROREVENT);
         *aplog = 1;
         *log_mode = APLOG_STATS_TYPE;
@@ -377,7 +377,8 @@ static int compute_mmgr_param(char *type, int *mode, char *name, int *aplog, int
  * @return 0 on success, -1 on error.
  */
 int mmgr_handle(void) {
-    int event_mode = 0, aplog_mode, dir;
+    e_dir_mode_t event_mode = MODE_CRASH;
+    int aplog_mode, dir;
     char *event_dir, *key;
     char event_name[MMGRMAXSTRING];
     char data0[MMGRMAXEXTRA];
@@ -500,7 +501,7 @@ int mmgr_handle(void) {
     }
 
     // update event_dir should be done after find_dir call
-    event_dir = (event_mode == STATS_MODE ? STATS_DIR : CRASH_DIR);
+    event_dir = (event_mode == MODE_STATS ? STATS_DIR : CRASH_DIR);
 
     if (copy_aplog > 0) {
         do_log_copy(type, dir, dateshort, aplog_mode);

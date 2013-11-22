@@ -67,7 +67,6 @@ import org.xmlpull.v1.XmlPullParserException;
 // @log_active (boolean) indicates if logging is active
 // @cpuName (string) the platform CPU name
 // @modemName (string) the platform modem name
-// @expert_mode (boolean) indicates if expert mode is engaged
 // @default_flush_cmd (string) if populated, the command to execute to flush to NVM
 
 public class AMTLTabLayout extends Activity implements GeneralSetupFrag.GSFCallBack,

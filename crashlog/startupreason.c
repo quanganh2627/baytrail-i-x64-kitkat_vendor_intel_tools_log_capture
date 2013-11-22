@@ -178,7 +178,7 @@ int crashlog_check_startupreason(char *reason, char *watchdog) {
         return 0;
     }
 
-    dir = find_new_crashlog_dir(CRASH_MODE);
+    dir = find_new_crashlog_dir(MODE_CRASH);
     if (dir < 0) {
         LOGE("%s: find_new_crashlog_dir failed\n", __FUNCTION__);
         key = raise_event(CRASHEVENT, watchdog, NULL, NULL);

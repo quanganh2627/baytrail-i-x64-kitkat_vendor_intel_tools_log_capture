@@ -84,7 +84,7 @@ int process_modem_event(struct watch_entry *entry, struct inotify_event *event) 
     char *key;
 
     snprintf(path, sizeof(path),"%s/%s", entry->eventpath, event->name);
-    dir = find_new_crashlog_dir(CRASH_MODE);
+    dir = find_new_crashlog_dir(MODE_CRASH);
     if (dir < 0) {
         LOGE("%s: find_new_crashlog_dir failed\n", __FUNCTION__);
         key = raise_event(CRASHEVENT, entry->eventname, NULL, NULL);
@@ -125,7 +125,7 @@ int crashlog_check_modem_shutdown() {
         return 0;
     }
 
-    dir = find_new_crashlog_dir(CRASH_MODE);
+    dir = find_new_crashlog_dir(MODE_CRASH);
     if (dir < 0) {
         LOGE("%s: find_new_crashlog_dir failed\n", __FUNCTION__);
         key = raise_event(CRASHEVENT, MODEM_SHUTDOWN, NULL, NULL);
@@ -158,8 +158,8 @@ int crashlog_check_mpanic_abort(){
     if (file_exists(MCD_PROCESSING)) {
         remove(MCD_PROCESSING);
 
-        dir = find_new_crashlog_dir(CRASH_MODE);
-        if (dir == -1) {
+        dir = find_new_crashlog_dir(MODE_CRASH);
+        if (dir < 0) {
             LOGE("%s: find_new_crashlog_dir failed\n", __FUNCTION__);
             key = raise_event(CRASHEVENT, MDMCRASH_EVNAME, NULL, NULL);
             LOGE("%-8s%-22s%-20s%s\n", CRASHEVENT, key, get_current_time_long(0), MDMCRASH_EVNAME);
@@ -229,17 +229,17 @@ int process_modem_generic(struct watch_entry *entry, struct inotify_event *event
     //select event type
     if (curConfig->event_class == 0){
         strncpy(event_class,CRASHEVENT, sizeof(event_class));
-        event_mode = CRASH_MODE;
+        event_mode = MODE_CRASH;
     }else if (curConfig->event_class == 1){
         strncpy(event_class,ERROREVENT, sizeof(event_class));
-        event_mode = STATS_MODE;
+        event_mode = MODE_STATS;
     }else if (curConfig->event_class == 2){
         strncpy(event_class,INFOEVENT, sizeof(event_class));
-        event_mode = STATS_MODE;
+        event_mode = MODE_STATS;
     }else{
         //default mode = crash mode
         strncpy(event_class,CRASHEVENT, sizeof(event_class));
-        event_mode = CRASH_MODE;
+        event_mode = MODE_CRASH;
     }
     //adding security NULL character
     event_class[sizeof(event_class)-1] = '\0';
@@ -257,9 +257,9 @@ int process_modem_generic(struct watch_entry *entry, struct inotify_event *event
     }
 
     //update event_dir should be done after find_dir call
-    if (event_mode == STATS_MODE){
+    if (event_mode == MODE_STATS){
         snprintf(destion,sizeof(destion),"%s%d/", STATS_DIR,dir);
-    }else if (event_mode == CRASH_MODE) {
+    }else if (event_mode == MODE_CRASH) {
         snprintf(destion,sizeof(destion),"%s%d/", CRASH_DIR,dir);
     }
     usleep(TIMEOUT_VALUE);

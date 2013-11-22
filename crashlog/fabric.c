@@ -49,7 +49,9 @@ struct fabric_type fabric_types_array[] = {
 
 struct fabric_type fabric_fakes_array[] = {
     {"DW2:", "02608002", "FABRIC_FAKE"},
-    {"DW3:", "ff222232", "FABRIC_FAKE"},
+    {"DW3:", "ff222230", "FABRIC_FAKE"},
+    {"DW3:", "0000e103", "FABRIC_FAKE"},
+    {"DW11:", "ff222230", "FABRIC_FAKE"},
 };
 
 enum {
@@ -65,15 +67,31 @@ int crashlog_check_fabric(char *reason, int test) {
     char destination[PATHMAX];
     char crashtype[32] = {'\0'};
     char event_name[10] = CRASHEVENT;
-    int dir;
+    int dir, dir_err = 0;
     unsigned int i = 0;
     char *key;
 
     if ( !test && !file_exists(CURRENT_PROC_FABRIC_ERROR_NAME) ) return 0;
 
+    destination[0] = '\0';
+    dir = find_new_crashlog_dir(MODE_CRASH);
+    if (dir < 0) {
+        LOGE("%s: find_new_crashlog_dir failed\n", __FUNCTION__);
+        dir_err = 1;
+        snprintf(destination, sizeof(destination), "%s", LOG_FABRICTEMP);
+    } else {
+        destination[0] = '\0';
+        snprintf(destination, sizeof(destination), "%s%d/%s_%s.txt", CRASH_DIR, dir,
+                FABRIC_ERROR_NAME, dateshort);
+    }
+
+    do_copy_eof(CURRENT_PROC_FABRIC_ERROR_NAME, destination);
+
     /* Looks first for fake fabrics */
-    if ( find_str_in_file(CURRENT_PROC_FABRIC_ERROR_NAME, fabric_fakes_array[0].keyword, fabric_fakes_array[0].tail) > 0 &&
-         find_str_in_file(CURRENT_PROC_FABRIC_ERROR_NAME, fabric_fakes_array[1].keyword, fabric_fakes_array[1].tail) > 0 ) {
+    if (( find_str_in_file(destination, fabric_fakes_array[0].keyword, fabric_fakes_array[0].tail) > 0 &&
+          find_str_in_file(destination, fabric_fakes_array[1].keyword, fabric_fakes_array[1].tail) > 0 ) ||
+        ( find_str_in_file(destination, fabric_fakes_array[2].keyword, fabric_fakes_array[2].tail) > 0 &&
+          find_str_in_file(destination, fabric_fakes_array[3].keyword, fabric_fakes_array[3].tail) > 0 )) {
             /* Got it, it's a fake!! */
             strncpy(crashtype, fabric_fakes_array[i].name, sizeof(crashtype)-1);
             if (!strncmp(reason, "HWWDT_RESET", strlen("HWWDT_RESET")))
@@ -83,7 +101,7 @@ int crashlog_check_fabric(char *reason, int test) {
     if (crashtype[0] == 0) {
         /* Not a fake, checks for the type in the know fabrics list */
         for (i = 0; i < DIM(fabric_types_array); i++) {
-            if ( find_str_in_file(CURRENT_PROC_FABRIC_ERROR_NAME, fabric_types_array[i].keyword, fabric_types_array[i].tail) > 0 ) {
+            if ( find_str_in_file(destination, fabric_types_array[i].keyword, fabric_types_array[i].tail) > 0 ) {
                /* Got it! */
                strncpy(crashtype, fabric_types_array[i].name, sizeof(crashtype)-1);
                if (strstr(crashtype, "HANG"))
@@ -97,35 +115,30 @@ int crashlog_check_fabric(char *reason, int test) {
         }
     }
     /* Search for INFORMATIVE_MSG reported by kernel fabric module */
-    if ( find_str_in_file(CURRENT_PROC_FABRIC_ERROR_NAME, fabric_event[F_INFORMATIVE_MSG].keyword,
-                                                          fabric_event[F_INFORMATIVE_MSG].tail) > 0 ) {
+    if ( find_str_in_file(destination, fabric_event[F_INFORMATIVE_MSG].keyword,
+            fabric_event[F_INFORMATIVE_MSG].tail) > 0 ) {
         /* Informative_Msg from fabric -> info event */
         strncpy(event_name, INFOEVENT, sizeof(event_name)-1);
         strncpy(crashtype, fabric_event[F_INFORMATIVE_MSG].name, sizeof(crashtype)-1);
     }
 
-    dir = find_new_crashlog_dir(CRASH_MODE);
-    if (dir < 0) {
-        LOGE("%s: find_new_crashlog_dir failed\n", __FUNCTION__);
+    if (dir_err == 0) {
+        do_last_kmsg_copy(dir);
+        destination[0] = '\0';
+        snprintf(destination, sizeof(destination),"%s%d/", CRASH_DIR, dir);
+        key = raise_event(event_name, crashtype, NULL, destination);
+        LOGE("%-8s%-22s%-20s%s %s\n", event_name, key, get_current_time_long(0), crashtype, destination);
+        free(key);
+        /* Raise an aplog event to get some logs */
+        if ( process_log_event(NULL, NULL, MODE_APLOGS) < 0 )
+            LOGE("%s: process_log_event for APLOGS failed\n", __FUNCTION__);
+        return 0;
+    } else {
         key = raise_event(event_name, crashtype, NULL, NULL);
         LOGE("%-8s%-22s%-20s%s\n", event_name, key, get_current_time_long(0), crashtype);
         free(key);
+        /* Remove temporary file */
+        remove(LOG_FABRICTEMP);
         return -1;
     }
-
-    destination[0] = '\0';
-    snprintf(destination, sizeof(destination), "%s%d/%s_%s.txt", CRASH_DIR, dir,
-            FABRIC_ERROR_NAME, dateshort);
-    do_copy_eof(CURRENT_PROC_FABRIC_ERROR_NAME, destination);
-    do_last_kmsg_copy(dir);
-
-    destination[0] = '\0';
-    snprintf(destination,sizeof(destination),"%s%d/",CRASH_DIR,dir);
-    key = raise_event(event_name, crashtype, NULL, destination);
-    LOGE("%-8s%-22s%-20s%s %s\n", event_name, key, get_current_time_long(0), crashtype, destination);
-    free(key);
-    /* Raise an aplog event to get some logs */
-    if ( process_log_event(NULL, NULL, MODE_APLOGS) < 0 )
-        LOGE("%s: process_log_event for APLOGS failed\n", __FUNCTION__);
-    return 0;
 }

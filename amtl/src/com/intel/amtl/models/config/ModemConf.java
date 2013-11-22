@@ -83,7 +83,7 @@ public class ModemConf {
             this.mtsMode = this.config.getMtsMode();
             this.mtsConf = new MtsConf(this.config.getMtsInput(), this.config.getMtsOutput(),
                     this.config.getMtsOutputType(), this.config.getMtsRotateNum(),
-                    this.config.getMtsRotateSize());
+                    this.config.getMtsRotateSize(), this.config.getMtsInterface());
         } else {
             this.mtsConf = new MtsConf();
         }
@@ -104,6 +104,10 @@ public class ModemConf {
         if (conf != null) {
             this.mtsConf = conf;
         }
+    }
+
+    public MtsConf getMtsConf () {
+        return this.mtsConf;
     }
 
     public String getXsio() {
@@ -165,6 +169,7 @@ public class ModemConf {
             Log.d(TAG, MODULE + ": OUTPUT TYPE = " + this.mtsConf.getOutputType());
             Log.d(TAG, MODULE + ": ROTATE NUM = " + this.mtsConf.getRotateNum());
             Log.d(TAG, MODULE + ": ROTATE SIZE = " + this.mtsConf.getRotateSize());
+            Log.d(TAG, MODULE + ": INTERFACE = " + this.mtsConf.getInterface());
             Log.d(TAG, MODULE + ": MODE = " + this.mtsMode);
             Log.d(TAG, MODULE + ": =======================================");
         }
