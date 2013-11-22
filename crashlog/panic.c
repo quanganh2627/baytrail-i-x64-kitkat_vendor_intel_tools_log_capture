@@ -94,8 +94,11 @@ static void set_ipanic_crashtype_and_reason(char *console_name, char *crashtype,
     char *key;
 
     /* Set crash type according to pattern found in Ipanic console file or according to startup reason value*/
-    if (find_str_in_file(console_name, "Kernel panic - not syncing: Kernel Watchdog", NULL) > 0)
+    if (find_str_in_file(console_name, "Kernel panic - not syncing: Kernel Watchdog", NULL) > 0) {
         strcpy(crashtype, KERNEL_SWWDT_CRASH);
+        if (find_str_in_file(console_name, "[SHTDWN] WATCHDOG TIMEOUT for test!", NULL) > 0)
+            strcpy(crashtype, KERNEL_SWWDT_FAKE_CRASH);
+    }
     else if (find_str_in_file(console_name, "EIP is at pmu_sc_irq", NULL) > 0)
         // This panic is triggered by a fabric error
         // It is marked as a kernel panic linked to a HW watdchog
@@ -112,7 +115,8 @@ static void set_ipanic_crashtype_and_reason(char *console_name, char *crashtype,
         // An error is raised when the panic console file does not end normally
        raise_infoerror(ERROREVENT, IPANIC_CORRUPTED);
     }
-    if (!strncmp(crashtype, KERNEL_FAKE_CRASH, sizeof(KERNEL_FAKE_CRASH)))
+    if ((!strncmp(crashtype, KERNEL_FAKE_CRASH, sizeof(KERNEL_FAKE_CRASH))) ||
+       (!strncmp(crashtype, KERNEL_SWWDT_FAKE_CRASH, sizeof(KERNEL_SWWDT_FAKE_CRASH))))
          strcat(reason,"_FAKE");
     else if (!strncmp(reason, "HWWDT_RESET_FAKE", 16))
          strcpy(crashtype, KERNEL_FAKE_CRASH);
