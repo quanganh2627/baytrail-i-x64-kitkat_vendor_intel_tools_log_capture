@@ -320,6 +320,7 @@ extern enum crashlog_mode g_crashlog_mode;
 #define APLOGS_CURRENT_LOG      LOGS_DIR "/currentaplogslog"
 #define LOG_UUID                LOGS_DIR "/uuid.txt"
 #define LOG_BUILDID             LOGS_DIR "/buildid.txt"
+#define LOG_MODEM_VERSION       LOGS_DIR "/modem_version.txt"
 #define MODEM_UUID              LOGS_DIR "/modemid.txt"
 #define APLOG_FILE_0            LOGS_DIR "/aplog"
 #define APLOG_FILE_1            LOGS_DIR "/aplog.1"

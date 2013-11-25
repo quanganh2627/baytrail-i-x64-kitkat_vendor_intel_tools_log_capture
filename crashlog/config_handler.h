@@ -54,4 +54,6 @@ void store_config(char *section, struct config_handle a_conf_handle);
 void load_config_by_pattern(char *section_pattern, char *key_pattern, struct config_handle a_conf_handle);
 void load_config();
 
+int cfg_check_modem_version();
+
 #endif /* CONFIG_HANDLER_H_ */

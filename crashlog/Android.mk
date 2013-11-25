@@ -35,7 +35,8 @@ LOCAL_SRC_FILES:= main.c \
     modem.c \
     panic.c \
     config_handler.c \
-    ramdump.c
+    ramdump.c \
+    tcs_wrapper.c
 
 LOCAL_CFLAGS += -DFULL_REPORT=1
 
@@ -46,5 +47,5 @@ LOCAL_C_INCLUDES += \
 LOCAL_MODULE_TAGS := eng debug
 LOCAL_MODULE:= crashlogd
 
-LOCAL_SHARED_LIBRARIES:= libparse_stack libc libcutils libmmgrcli
+LOCAL_SHARED_LIBRARIES:= libparse_stack libc libcutils libmmgrcli libtcs
 include $(BUILD_EXECUTABLE)
