@@ -124,7 +124,7 @@ int process_log_event(char *rootdir, char *triggername, int mode) {
                 DepthValueRead = 1;
             }
             //Read bplog flag value specified inside trigger file
-            tmp[0] = '\0';
+            memset(tmp, '\0', sizeof(tmp));
             if (!get_value_in_file(path,"BPLOG=", tmp, sizeof(tmp))) {
                 bplogFlag = atoi(tmp);
             }
