@@ -75,6 +75,15 @@ int crashlog_check_fabric(char *reason, int test) {
 
     destination[0] = '\0';
     dir = find_new_crashlog_dir(MODE_CRASH);
+
+    /* If available, copy the SCU log from /proc/offline_scu_log */
+    if ((dir > 0) && file_exists(CURRENT_PROC_OFFLINE_SCU_LOG_NAME)) {
+        snprintf(destination, sizeof(destination), "%s%d/%s_%s.bin", CRASH_DIR, dir,
+                 OFFLINE_SCU_LOG_NAME, dateshort);
+
+        do_copy_eof(CURRENT_PROC_OFFLINE_SCU_LOG_NAME, destination);
+    }
+
     if (dir < 0) {
         LOGE("%s: find_new_crashlog_dir failed\n", __FUNCTION__);
         dir_err = 1;

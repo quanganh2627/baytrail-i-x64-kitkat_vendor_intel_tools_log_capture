@@ -347,6 +347,7 @@ extern enum crashlog_mode g_crashlog_mode;
 #define THREAD_NAME             "emmc_ipanic_threads"
 #define LOGCAT_NAME             "emmc_ipanic_logcat"
 #define FABRIC_ERROR_NAME       "ipanic_fabric_err"
+#define OFFLINE_SCU_LOG_NAME    "offline_scu_log"
 #define GBUFFER_NAME            "emmc_ipanic_gbuffer"
 #define CMDLINE_NAME            "cmdline"
 #define CRASHFILE_NAME          "crashfile"
@@ -356,6 +357,7 @@ extern enum crashlog_mode g_crashlog_mode;
 #define PANIC_CONSOLE_NAME      PROC_DIR "/" CONSOLE_NAME
 #define PANIC_THREAD_NAME       PROC_DIR "/" THREAD_NAME
 #define PROC_FABRIC_ERROR_NAME  PROC_DIR "/" FABRIC_ERROR_NAME
+#define PROC_OFFLINE_SCU_LOG_NAME PROC_DIR "/" OFFLINE_SCU_LOG_NAME
 #define KERNEL_CMDLINE          PROC_DIR "/" CMDLINE_NAME
 #define PROC_UUID               PROC_DIR "/emmc0_id_entry"
 #define SAVED_CONSOLE_NAME      PANIC_DIR "/" CONSOLE_NAME
@@ -404,6 +406,7 @@ extern char *APLOGS_DIR;
 extern char *BZ_DIR;
 extern char CURRENT_PANIC_CONSOLE_NAME[PATHMAX];
 extern char CURRENT_PROC_FABRIC_ERROR_NAME[PATHMAX];
+extern char CURRENT_PROC_OFFLINE_SCU_LOG_NAME[PATHMAX];
 extern char CURRENT_KERNEL_CMDLINE[PATHMAX];
 extern int gmaxfiles;
 
