@@ -512,7 +512,9 @@ int do_monitor() {
     set_watch_entry_callback(SYSSERVER_TYPE,    process_anruiwdt_event);
     set_watch_entry_callback(ANR_TYPE,          process_anruiwdt_event);
     set_watch_entry_callback(TOMBSTONE_TYPE,    process_usercrash_event);
+    set_watch_entry_callback(JAVATOMBSTONE_TYPE,    process_usercrash_event);
     set_watch_entry_callback(JAVACRASH_TYPE,    process_usercrash_event);
+    set_watch_entry_callback(JAVACRASH_TYPE2,   process_usercrash_event);
 #ifdef FULL_REPORT
     set_watch_entry_callback(HPROF_TYPE,        process_hprof_event);
     set_watch_entry_callback(STATTRIG_TYPE,     process_stat_event);

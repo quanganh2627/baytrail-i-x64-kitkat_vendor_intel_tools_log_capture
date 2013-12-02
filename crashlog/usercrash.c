@@ -54,7 +54,8 @@ static int priv_process_usercrash_event(struct watch_entry *entry, struct inotif
     char *key;
     int dir;
     /* Check for duplicate dropbox event first */
-    if (entry->eventtype == JAVACRASH_TYPE && manage_duplicate_dropbox_events(event) )
+    if ((entry->eventtype == JAVACRASH_TYPE || entry->eventtype == JAVACRASH_TYPE2 || entry->eventtype == JAVATOMBSTONE_TYPE )
+            && manage_duplicate_dropbox_events(event) )
         return 1;
 
     dir = find_new_crashlog_dir(MODE_CRASH);
@@ -78,6 +79,8 @@ static int priv_process_usercrash_event(struct watch_entry *entry, struct inotif
             do_log_copy(entry->eventname, dir, get_current_time_short(1), APLOG_TYPE);
             break;
         case TOMBSTONE_TYPE:
+        case JAVATOMBSTONE_TYPE:
+        case JAVACRASH_TYPE2:
         case JAVACRASH_TYPE:
             usleep(TIMEOUT_VALUE);
             do_log_copy(entry->eventname, dir, get_current_time_short(1), APLOG_TYPE);
@@ -94,6 +97,7 @@ static int priv_process_usercrash_event(struct watch_entry *entry, struct inotif
     LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, get_current_time_long(0), entry->eventname, destion);
     switch (entry->eventtype) {
     case TOMBSTONE_TYPE:
+    case JAVACRASH_TYPE2:
     case JAVACRASH_TYPE:
 #ifdef FULL_REPORT
         if ( start_dumpstate_srv(CRASH_DIR, dir, key) <= 0 )
