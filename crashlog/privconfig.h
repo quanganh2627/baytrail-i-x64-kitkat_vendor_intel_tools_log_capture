@@ -264,6 +264,7 @@ extern enum crashlog_mode g_crashlog_mode;
 #define FINGERPRINT_FIELD       "ro.build.fingerprint"
 #define MODEM_FIELD             "gsm.version.baseband"
 #define IMEI_FIELD              "persist.radio.device.imei"
+#define OPERATOR_FIELD          "gsm.operator.alpha"
 #define PROP_CRASH              "persist.service.crashlog.enable"
 #define PROP_COREDUMP           "persist.core.enabled"
 #define PROP_CRASH_MODE         "persist.sys.crashlogd.mode"

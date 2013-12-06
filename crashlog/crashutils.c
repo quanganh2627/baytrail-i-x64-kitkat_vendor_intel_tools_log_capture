@@ -648,6 +648,12 @@ static const char *get_imei() {
     return imei;
 }
 
+static const char *get_operator() {
+    static char operator[PROPERTY_VALUE_MAX] = { 0, };
+    property_get(OPERATOR_FIELD, operator, "UNKNOWN");
+    return operator;
+}
+
 void start_daemon(const char *daemonname) {
     property_set("ctl.start", (char *)daemonname);
 }
@@ -692,6 +698,7 @@ int create_minimal_crashfile(char * event, const char* type, const char* path, c
     fprintf(fp,"IMEI=%s\n", get_imei());
     fprintf(fp,"TYPE=%s\n", type);
     fprintf(fp,"DATA_READY=%d\n", data_ready);
+    fprintf(fp,"OPERATOR=%s\n", get_operator());
     //MPANIC crash : fill DATA0 field
     if (!strcmp(MDMCRASH_EVNAME, type)){
         LOGI("Modem panic detected : generating DATA0\n");
