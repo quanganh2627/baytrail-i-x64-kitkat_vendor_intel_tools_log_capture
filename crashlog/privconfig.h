@@ -413,6 +413,7 @@ extern enum crashlog_mode g_crashlog_mode;
 #define RESET_IRQ_2             REBOOT_DIR "/RESETIRQ2"
 #define EVENTFILE_NAME          "eventfile"
 #define IPTRAK_FILE             LOGS_DIR "/iptrak"
+#define FW_UPDATE_STATUS_PATH   "/sys/firmware/osnib/fw_update_status"
 
 /* MACROS */
 #define MIN(a,b)                ((a) < (b) ? (a) : (b))
