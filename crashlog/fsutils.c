@@ -1134,7 +1134,7 @@ void flush_aplog(e_aplog_file_t file, const char *mode, int *dir, const char *ts
         }
 
         if(file_exists(APLOG_FILE_BOOT)) {
-            do_copy(APLOG_FILE_BOOT,log_boot_name,0);
+            do_copy(APLOG_FILE_BOOT, log_boot_name, MAXFILESIZE);
             remove(APLOG_FILE_BOOT);
         }
         break;
