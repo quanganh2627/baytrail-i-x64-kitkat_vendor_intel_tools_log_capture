@@ -40,6 +40,7 @@
 #include "panic.h"
 #include "config_handler.h"
 #include "ramdump.h"
+#include "fw_update.h"
 #include "tcs_wrapper.h"
 #include "kct_netlink.h"
 #include "iptrak.h"
@@ -339,6 +340,8 @@ static void early_check(char *encryptstate, int test) {
         LOGE("%-8s%-22s%-20s%s\n", INFOEVENT, key, datelong, flashtype);
         free(key);
     }
+
+    crashlog_check_fw_update_status();
 
     key = raise_event_nouptime(STATEEVENT, encryptstate, NULL, NULL);
     LOGE("%-8s%-22s%-20s%s\n", STATEEVENT, key, datelong, encryptstate);

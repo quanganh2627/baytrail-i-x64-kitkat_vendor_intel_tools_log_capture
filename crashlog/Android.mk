@@ -36,6 +36,7 @@ LOCAL_SRC_FILES:= main.c \
     panic.c \
     config_handler.c \
     ramdump.c \
+    fw_update.c \
     tcs_wrapper.c \
     kct_netlink.c \
     iptrak.c \
