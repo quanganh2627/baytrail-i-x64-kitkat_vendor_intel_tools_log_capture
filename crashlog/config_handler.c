@@ -28,6 +28,8 @@
 #include "privconfig.h"
 #include "panic.h"
 #include "config_handler.h"
+#include "modem.h"
+#include "tcs_wrapper.h"
 
 #include <stdlib.h>
 
@@ -38,6 +40,7 @@ pconfig g_current_modem_config = NULL; /* Points to current modem_config in list
 extern int  gcurrent_uptime_hour_frequency;
 extern long current_sd_size_limit;
 int g_current_serial_device_id = 0; /* Specifies where serial ID should be retrieved (from emmc or from properties )*/
+static int check_modem_version = 0;
 
 //to get pconfig if it exists
 pconfig get_generic_config(char* event_name, pconfig config_to_match) {
@@ -310,6 +313,18 @@ void load_config(){
                     LOGI("Check RAM panic: %d", cfg_check_ram_panic);
                 }
             }
+            if (sk_exists(GENERAL_CONF_PATTERN,"check_modem_version",&my_conf_handle)){
+                pchar tmp = get_value(GENERAL_CONF_PATTERN,"check_modem_version",&my_conf_handle);
+                if (tmp){
+                    i_tmp = atoi(tmp);
+                    if (i_tmp > 0){
+                        check_modem_version = 1;
+                    } else {
+                        check_modem_version = 0;
+                    }
+                    LOGI("Check modem version: %d", check_modem_version);
+                }
+            }
             load_config_by_pattern(NOTIFY_CONF_PATTERN,"matching_pattern",my_conf_handle);
             //ADD other config pattern HERE
             free_config_file(&my_conf_handle);
@@ -317,4 +332,13 @@ void load_config(){
             LOGI("specific crashlog config not found\n");
         }
     }
+}
+
+/*
+ * Return the value of the property
+ *  check_modem_version
+ * This function avoids the use of global variables.
+ */
+int cfg_check_modem_version() {
+    return check_modem_version;
 }

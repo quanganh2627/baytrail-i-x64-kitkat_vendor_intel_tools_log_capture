@@ -46,24 +46,30 @@ long current_sd_size_limit = LONG_MAX;
 /* No header in bionic... */
 ssize_t sendfile(int out_fd, int in_fd, off_t *offset, size_t count);
 
+static int check_partlogfull(const char* path) {
+
+    static int partlogfull_errorset = 0;
+
+    /* path could either indicate LOGS_DIR or SDCARD_DIR
+     * CRASHLOG_ERROR_FULL shall only be raised if path indicates LOGS_DIR
+     */
+    if (!partlogfull_errorset && !strncmp(path, LOGS_DIR, strlen(LOGS_DIR))) {
+        partlogfull_errorset = 1;
+        return 1;
+    }
+
+    return 0;
+}
+
 static int close_file(const char *filename, FILE * fd) {
     int res;
-    static int partfull = 0;
 
     errno = 0;
     res = fclose(fd);
-    if (res < 0) {
+    if (res != 0) {
         /* File closure could fail in some cases (full partition) */
         LOGE("%s: fclose on %s failed - error is %s\n", __FUNCTION__,
                 filename, strerror(errno));
-
-        if (errno == ENOSPC) {
-            /* Full partition (no space left on device */
-            if (!partfull) {
-                raise_infoerror(ERROREVENT, CRASHLOG_ERROR_FULL);
-                partfull = 1;
-            }
-        }
     }
 
     return res;
@@ -432,12 +438,12 @@ int find_new_crashlog_dir(e_dir_mode_t mode) {
     /* Read current value in file */
     res = read_file(path, &current);
     if (res < 0)
-        goto out;
+        return -1;
 
     /* Open file in read/write mode to update the new current */
     res = update_file(path, current);
     if (res < 0)
-        goto out;
+        return -1;
 
     snprintf(path, sizeof(path), "%s%d", dir, current);
     /* Call rmfr which will fail if the path does not exist
@@ -448,17 +454,23 @@ int find_new_crashlog_dir(e_dir_mode_t mode) {
     /* Create a fresh directory */
     if (mkdir(path, 0777) == -1) {
         LOGE("%s: Cannot create dir %s\n", __FUNCTION__, path);
-        raise_infoerror(ERROREVENT, CRASHLOG_ERROR_PATH);
-        return -errno;
+        /* Full partition (no space left on device)
+         * path could either indicate LOGS_DIR or SDCARD_DIR
+         * CRASHLOG_ERROR_FULL shall only be raised if path indicates LOGS_DIR
+         */
+        if ((errno == ENOSPC) && check_partlogfull(path)) {
+            raise_infoerror(ERROREVENT, CRASHLOG_ERROR_FULL);
+        } else {
+            /* Error */
+            raise_infoerror(ERROREVENT, CRASHLOG_ERROR_PATH);
+        }
+        return -1;
     }
 
     if (!strstr(path, "sdcard"))
         do_chown(path, PERM_USER, PERM_GROUP);
 
     return current;
-
-    out:
-    return -1;
 }
 
 int find_matching_file(char *dir_to_search, char *pattern, char *filename_found)
@@ -650,6 +662,8 @@ ssize_t do_write(int fd, const void *buf, size_t len)
         nr = write(fd, buf, len);
         if ((nr < 0) && (errno == EAGAIN || errno == EINTR))
             continue;
+        else if (nr < 0)
+            return -errno;
         return nr;
     }
 }
@@ -680,32 +694,41 @@ int do_copy_eof(const char *src, const char *des)
         return -errno;
     }
 
+    /* Start copy loop */
     while (1) {
+        /* Read data from src */
         r_count = do_read(fd1, buffer, CPBUFFERSIZE);
         if (r_count < 0) {
             LOGE("%s: read failed, err:%s", __FUNCTION__, strerror(errno));
-            goto out_err;
+            rc = -1;
+            break;
         }
+
         if (r_count == 0)
             break;
 
+        /* Copy data to des */
         w_count = do_write(fd2, buffer, r_count);
         if (w_count < 0) {
             LOGE("%s: write failed, err:%s", __FUNCTION__, strerror(errno));
-            goto out_err;
+            rc = -1;
+            break;
         }
         if (r_count != w_count) {
             LOGE("%s: write failed, r_count:%d w_count:%d",
                  __FUNCTION__, r_count, w_count);
-            goto out_err;
+            rc = -1;
+            break;
         }
     }
 
-    rc = 0;
-    goto out;
-out_err:
-    rc = -1;
-out:
+    /* Error occurred while copying data */
+    if ((rc == -1) && (w_count == -ENOSPC)) {
+        /* CRASHLOG_ERROR_FULL shall only be raised if des indicates LOGS_DIR */
+        if (check_partlogfull(des))
+            raise_infoerror(ERROREVENT, CRASHLOG_ERROR_FULL);
+    }
+
     if (fd1 >= 0)
         close(fd1);
     if (fd2 >= 0)
@@ -736,13 +759,16 @@ int do_copy_tail(char *src, char *dest, int limit) {
         return -errno;
     }
 
-    if (limit == 0)
+    if ((limit == 0) || (info.st_size < limit))
         limit = info.st_size;
 
     if (info.st_size > limit)
         offset = info.st_size - limit;
 
     rc = sendfile(fdest, fsrc, &offset, limit);
+    /* CRASHLOG_ERROR_FULL shall only be raised if dest indicates LOGS_DIR */
+    if ((rc != -1) && (rc != limit) && check_partlogfull(dest))
+        raise_infoerror(ERROREVENT, CRASHLOG_ERROR_FULL);
 
     close(fsrc);
     close(fdest);
@@ -753,8 +779,13 @@ int do_copy_tail(char *src, char *dest, int limit) {
 int do_copy(char *src, char *dest, int limit) {
     int rc = 0;
     int fsrc = -1, fdest = -1;
+    struct stat info;
 
     if (src == NULL || dest == NULL) return -EINVAL;
+
+    if (stat(src, &info) < 0) {
+        return -errno;
+    }
 
     if ( ( fsrc = open(src, O_RDONLY) ) < 0 ) {
         return -errno;
@@ -775,7 +806,13 @@ int do_copy(char *src, char *dest, int limit) {
         return 0;
     }
 
+    if (info.st_size <= limit)
+        limit = info.st_size;
+
     rc = sendfile(fdest, fsrc, NULL, limit);
+    /* CRASHLOG_ERROR_FULL shall only be raised if dest indicates LOGS_DIR */
+    if ((rc != -1) && (rc != limit) && check_partlogfull(dest))
+        raise_infoerror(ERROREVENT, CRASHLOG_ERROR_FULL);
 
     close(fsrc);
     close(fdest);

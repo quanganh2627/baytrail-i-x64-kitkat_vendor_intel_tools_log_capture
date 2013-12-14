@@ -55,12 +55,15 @@ extern pconfig g_first_modem_config;
 * note: a watched directory can only have one mask value
 */
 struct watch_entry wd_array[] = {
-    /* -------------Warning: if table is updated, don't forget to update also WDCOUNT and gwdcountstart in main function--- */
+    /* -------------Warning: if table is updated, don't forget to update the  enum in privconfig.h
+     * ---          it should be ALWAYS aligned with this enum of event type   */
     {0, DROPBOX_DIR_MASK,   LOST_TYPE,      0,      LOST_EVNAME,        DROPBOX_DIR,        ".lost",                    NULL}, /* for full dropbox */
     {0, DROPBOX_DIR_MASK,   SYSSERVER_TYPE, 0,      SYSSERVER_EVNAME,   DROPBOX_DIR,        "system_server_watchdog",   NULL},
     {0, DROPBOX_DIR_MASK,   ANR_TYPE,       0,      ANR_EVNAME,         DROPBOX_DIR,        "anr",                      NULL},
     {0, TOMBSTONE_DIR_MASK, TOMBSTONE_TYPE, 0,      TOMBSTONE_EVNAME,   TOMBSTONE_DIR,      "tombstone",                NULL},
-    {0, DROPBOX_DIR_MASK,   JAVACRASH_TYPE, 0,      JAVACRASH_EVNAME,   DROPBOX_DIR,        "crash",                    NULL},
+    {0, DROPBOX_DIR_MASK,   JAVATOMBSTONE_TYPE, 0,  JAVA_TOMBSTONE_EVNAME,   DROPBOX_DIR,   "native_crash",             NULL},
+    {0, DROPBOX_DIR_MASK,   JAVACRASH_TYPE, 0,      JAVACRASH_EVNAME,   DROPBOX_DIR,        "app_crash",                NULL},
+    {0, DROPBOX_DIR_MASK,   JAVACRASH_TYPE2, 0,     JAVACRASH_EVNAME,   DROPBOX_DIR,        "system_server_crash",      NULL},
 #ifdef FULL_REPORT
     {0, CORE_DIR_MASK,      APCORE_TYPE,    0,      APCORE_EVNAME,      HISTORY_CORE_DIR,   ".core",                    NULL},
     {0, CORE_DIR_MASK,      HPROF_TYPE,     0,      HPROF_EVNAME,       HISTORY_CORE_DIR,   ".hprof",                   NULL},

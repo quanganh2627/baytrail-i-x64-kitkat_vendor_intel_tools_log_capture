@@ -40,6 +40,7 @@
 #include "panic.h"
 #include "config_handler.h"
 #include "ramdump.h"
+#include "tcs_wrapper.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -116,6 +117,71 @@ int process_command_event(struct watch_entry *entry, struct inotify_event *event
     LOGE("%s: Unknown action found in %s: %s %s\n", __FUNCTION__,
         path, action, args);
     return -1;
+}
+
+/**
+ * @brief Check that the modem_version file is up-to-date
+ * and (re-)writes it otherwise.
+ *
+ * @return int
+ *  - < 0: if an error occured
+ *  - = 0: if the file was up-to-date
+ *  - > 0: if the file was updated successfully
+ */
+static int update_modem_name() {
+    FILE *fd = NULL;
+    int res = 0;
+    char modem_name[PROPERTY_VALUE_MAX] = "";
+    char previous_modem_name[PROPERTY_VALUE_MAX] = "";
+
+    /*
+     * Retrieve modem name
+     */
+    res = get_modem_name(modem_name);
+    if(res < 0) {
+        LOGE("%s: Could not retrieve modem name, file %s will not be written.\n", __FUNCTION__, LOG_MODEM_VERSION);
+        return res;
+    }
+
+    /*
+     * Check the modem version file.
+     */
+    if ( (fd = fopen(LOG_MODEM_VERSION, "r")) != NULL) {
+        res = fscanf(fd, "%s", previous_modem_name);
+        fclose(fd);
+        /* Check whether there is something to do or not */
+        if ( res == 1 && !strncmp(previous_modem_name, modem_name, PROPERTY_VALUE_MAX) ) {
+            /* Modem version has not changed we can stop here */
+            return 0;
+        }
+    }
+
+    /*
+     * Update file
+     */
+    if ( (fd = fopen(LOG_MODEM_VERSION, "w")) == NULL) {
+        LOGE("%s: Could not open file %s for writing.\n",
+            __FUNCTION__,
+            LOG_MODEM_VERSION);
+        return -1;
+    }
+    fprintf(fd, "%s", modem_name);
+    fclose(fd);
+
+    /* Change file ownership and permissions */
+    if(chmod(LOG_MODEM_VERSION, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH) < 0) {
+        LOGE("%s: Cannot change %s file permissions %s\n",
+            __FUNCTION__,
+            LOG_MODEM_VERSION,
+            strerror(errno));
+        return -1;
+    }
+    do_chown(LOG_MODEM_VERSION, "root", "log");
+
+    /*
+     * Return the result
+     */
+    return res;
 }
 
 static int swupdated(char *buildname) {
@@ -233,6 +299,7 @@ static void early_check(char *encryptstate, int test) {
     char startupreason[32] = { '\0', };
     char flashtype[32] = { '\0', };
     char watchdog[16] = { '\0', };
+    int modem_name_check_result = 0;
     const char *datelong;
     char *key;
     struct stat info;
@@ -273,6 +340,17 @@ static void early_check(char *encryptstate, int test) {
     key = raise_event_nouptime(STATEEVENT, encryptstate, NULL, NULL);
     LOGE("%-8s%-22s%-20s%s\n", STATEEVENT, key, datelong, encryptstate);
     free(key);
+
+    if(cfg_check_modem_version()) {
+        modem_name_check_result = update_modem_name();
+        if(modem_name_check_result < 0) {
+            LOGI("%s: An error occurred when read/writing %s.", __FUNCTION__, LOG_MODEM_VERSION);
+        } else if (modem_name_check_result == 0) {
+            LOGI("%s: The file %s was up-to-date.", __FUNCTION__, LOG_MODEM_VERSION);
+        } else {
+            LOGI("%s: File %s updated successfully.", __FUNCTION__, LOG_MODEM_VERSION);
+        }
+    }
 }
 
 void spid_read_concat(const char *path, char *complete_value)
@@ -434,7 +512,9 @@ int do_monitor() {
     set_watch_entry_callback(SYSSERVER_TYPE,    process_anruiwdt_event);
     set_watch_entry_callback(ANR_TYPE,          process_anruiwdt_event);
     set_watch_entry_callback(TOMBSTONE_TYPE,    process_usercrash_event);
+    set_watch_entry_callback(JAVATOMBSTONE_TYPE,    process_usercrash_event);
     set_watch_entry_callback(JAVACRASH_TYPE,    process_usercrash_event);
+    set_watch_entry_callback(JAVACRASH_TYPE2,   process_usercrash_event);
 #ifdef FULL_REPORT
     set_watch_entry_callback(HPROF_TYPE,        process_hprof_event);
     set_watch_entry_callback(STATTRIG_TYPE,     process_stat_event);

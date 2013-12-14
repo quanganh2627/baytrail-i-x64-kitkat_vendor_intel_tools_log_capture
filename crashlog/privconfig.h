@@ -71,6 +71,7 @@
 #define KERNEL_HWWDT_CRASH      "IPANIC_HWWDT"
 #define FABRIC_FAKE_CRASH       "FABRIC_FAKE"
 #define KERNEL_FAKE_CRASH       "IPANIC_FAKE"
+#define KERNEL_SWWDT_FAKE_CRASH "IPANIC_SWWDT_FAKE"
 #define IPANIC_CORRUPTED        "IPANIC_CORRUPTED"
 #define KDUMP_CRASH             "KDUMP"
 #define RAMDUMP_EVENT           "RAMDUMP"
@@ -92,6 +93,7 @@
 #define ANR_EVNAME              "ANR"
 #define TOMBSTONE_EVNAME        "TOMBSTONE"
 #define JAVACRASH_EVNAME        "JAVACRASH"
+#define JAVA_TOMBSTONE_EVNAME   "JAVA_TOMBSTONE"
 #define APCORE_EVNAME           "APCOREDUMP"
 #define LOST_EVNAME             "LOST_DROPBOX"
 #define HPROF_EVNAME            "HPROF"
@@ -121,7 +123,9 @@ enum {
     SYSSERVER_TYPE,
     ANR_TYPE,
     TOMBSTONE_TYPE,
+    JAVATOMBSTONE_TYPE,
     JAVACRASH_TYPE,
+    JAVACRASH_TYPE2,
     APCORE_TYPE,
     HPROF_TYPE,
     STATTRIG_TYPE,
@@ -320,6 +324,7 @@ extern enum crashlog_mode g_crashlog_mode;
 #define APLOGS_CURRENT_LOG      LOGS_DIR "/currentaplogslog"
 #define LOG_UUID                LOGS_DIR "/uuid.txt"
 #define LOG_BUILDID             LOGS_DIR "/buildid.txt"
+#define LOG_MODEM_VERSION       LOGS_DIR "/modem_version.txt"
 #define MODEM_UUID              LOGS_DIR "/modemid.txt"
 #define APLOG_FILE_0            LOGS_DIR "/aplog"
 #define APLOG_FILE_1            LOGS_DIR "/aplog.1"
