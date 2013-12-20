@@ -15,19 +15,15 @@
  */
 
 /**
- * @file panic.h
- * @brief File containing functions to detect and process ipanic events.
+ * @file kct_netlink.h
+ * @brief File containing functions for getting Kernel events.
  */
 
-#ifndef __PANIC_H__
-#define __PANIC_H__
+#ifndef __KCT_NETLINK_H__
+#define __KCT_NETLINK_H__
 
-extern int cfg_check_ram_panic;
+void kct_netlink_init_comm(void);
+int kct_netlink_get_fd();
+void kct_netlink_handle_msg(void);
 
-int crashlog_check_panic(char *reason, int test);
-int crashlog_check_ram_panic(char *reason);
-int crashlog_check_panic_header(char *reason);
-int crashlog_check_kdump(char *reason, int test);
-void crashlog_check_panic_events(char *reason, char *watchdog, int test);
-
-#endif /* __PANIC_H__ */
+#endif /* __KCT_NETLINK_H__ */

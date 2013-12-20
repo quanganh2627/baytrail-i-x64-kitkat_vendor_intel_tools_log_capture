@@ -141,11 +141,12 @@ static void set_ipanic_crashtype_and_reason(char *console_name, char *crashtype,
  *   1 if the panic console file doesn't exist
  */
 int crashlog_check_panic(char *reason, int test) {
-    char destination[PATHMAX];
-    char destination_thread_name[PATHMAX];
-    char destination_console_name[PATHMAX];
+    char crash_path[PATHMAX] = {'\0'};
+    char destination_tmp_name[PATHMAX] = {'\0'};
+    char crash_console_name[PATHMAX] = {'\0'};
     char crashtype[32] = {'\0'};
-    int dir, dir_err = 0;
+    int dir;
+    int copy_to_crash = 0, copy_to_panic = 0;
     const char *dateshort = get_current_time_short(1);
     char *key;
 
@@ -154,79 +155,88 @@ int crashlog_check_panic(char *reason, int test) {
         return 1;
     }
 
-    destination_thread_name[0] = '\0';
-    destination_console_name[0] = '\0';
     dir = find_new_crashlog_dir(MODE_CRASH);
-    if (dir < 0) {
-        LOGE("%s: Cannot get a valid new crash directory...\n", __FUNCTION__);
-        /* Set directory error flag and initialize destination filename to compute crashtype */
-        dir_err = 1;
-        snprintf(destination_console_name, sizeof(destination_console_name), "%s", LOG_PANICTEMP);
-    } else {
-        if (dir_exists(PANIC_DIR)) {
-            /* copy files into data/dontpanic */
-            snprintf(destination_thread_name,
-                    sizeof(destination_thread_name), "%s", SAVED_THREAD_NAME);
-            snprintf(destination_console_name,
-                    sizeof(destination_console_name), "%s", SAVED_CONSOLE_NAME);
-        } else {
-            /* data/dontpanic does not exist - copy files into CRASH_DIR */
-            snprintf(destination_thread_name,
-                    sizeof(destination_thread_name), "%s%d/%s_%s.txt", CRASH_DIR, dir,
-                    THREAD_NAME, dateshort);
-            snprintf(destination_console_name,
-                    sizeof(destination_console_name), "%s%d/%s_%s.txt", CRASH_DIR, dir,
-                    CONSOLE_NAME, dateshort);
-        }
-    }
+    copy_to_crash = (dir >= 0);
+    copy_to_panic = dir_exists(PANIC_DIR);
 
-    //legacy : copy console to data/dontpanic
-    do_copy_eof(PANIC_THREAD_NAME, destination_thread_name);
-    do_copy_eof(PANIC_CONSOLE_NAME, destination_console_name);
-    //crashtype calculation should be done after CONSOLE_NAME computation
-    set_ipanic_crashtype_and_reason(destination_console_name, crashtype, reason, PANIC_MODE);
+    if (copy_to_crash) {
+        // use crash file directly
+        snprintf(crash_path, sizeof(crash_path), "%s%d/", CRASH_DIR, dir);
 
-    if (dir_err == 0) {
-        destination[0] = '\0';
-        snprintf(destination, sizeof(destination), "%s%d/%s_%s.txt", CRASH_DIR, dir,
-                THREAD_NAME, dateshort);
-        do_copy(SAVED_THREAD_NAME, destination, MAXFILESIZE);
+        // Not created here...?
+        snprintf(destination_tmp_name, sizeof(destination_tmp_name),
+                    "%s%s_%s.txt", crash_path, LOGCAT_NAME, dateshort);
+        do_copy(SAVED_LOGCAT_NAME, destination_tmp_name, MAXFILESIZE);
 
-        destination[0] = '\0';
-        snprintf(destination, sizeof(destination), "%s%d/%s_%s.txt", CRASH_DIR, dir,
-                CONSOLE_NAME, dateshort);
-        do_copy(SAVED_CONSOLE_NAME, destination, MAXFILESIZE);
+        // OPTIMIZE: Copy without dateshort to save proxy arrays
+        snprintf(destination_tmp_name, sizeof(destination_tmp_name),
+                    "%s%s_%s.txt", crash_path, EMMC_HEADER_NAME, dateshort);
+        do_copy_eof(PANIC_HEADER_NAME, destination_tmp_name);
 
-        destination[0] = '\0';
-        snprintf(destination, sizeof(destination), "%s%d/%s_%s.txt", CRASH_DIR, dir,
-                LOGCAT_NAME, dateshort);
-        do_copy(SAVED_LOGCAT_NAME, destination, MAXFILESIZE);
+        snprintf(crash_console_name, sizeof(crash_console_name),
+                    "%s%s_%s.txt", crash_path, CONSOLE_NAME, dateshort);
+        do_copy_eof(PANIC_CONSOLE_NAME, crash_console_name);
 
-        destination[0] = '\0';
-        snprintf(destination, sizeof(destination), "%s%d/%s_%s.bin", CRASH_DIR, dir,
-                GBUFFER_NAME, dateshort);
-        do_copy(GBUFFER_FILE, destination, MAXFILESIZE);
+        snprintf(destination_tmp_name, sizeof(destination_tmp_name),
+                    "%s%s_%s.txt", crash_path, THREAD_NAME, dateshort);
+        do_copy_eof(PANIC_THREAD_NAME, destination_tmp_name);
+
+        snprintf(destination_tmp_name, sizeof(destination_tmp_name),
+                    "%s%s_%s.bin", crash_path, GBUFFER_NAME, dateshort);
+        do_copy_eof(PANIC_GBUFFER_NAME, destination_tmp_name);
 
         do_last_kmsg_copy(dir);
+    } else {
+        LOGE("%s: Cannot get a valid new crash directory...\n", __FUNCTION__);
+    }
 
-        overwrite_file(CURRENT_PANIC_CONSOLE_NAME, "1");
+    // not exclusive with copy_to_crash
+    if (copy_to_panic) {
+        // copy to panic folder
+        do_copy_eof(PANIC_HEADER_NAME, SAVED_HEADER_NAME);
+        do_copy_eof(PANIC_CONSOLE_NAME, SAVED_CONSOLE_NAME);
+        do_copy_eof(PANIC_THREAD_NAME, SAVED_THREAD_NAME);
+        do_copy_eof(PANIC_GBUFFER_NAME, SAVED_GBUFFER_NAME);
 
-        destination[0] = '\0';
-        snprintf(destination, sizeof(destination), "%s%d/", CRASH_DIR, dir);
-        key = raise_event(CRASHEVENT, crashtype, NULL, destination);
-        LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, get_current_time_long(0), crashtype, destination);
+        // Ram console (if available)
+        snprintf(destination_tmp_name, sizeof(destination_tmp_name),
+            "%s/%s.txt", PANIC_DIR, CONSOLE_RAMOOPS_FILE);
+        if (file_exists(LAST_KMSG)) {
+            do_copy_tail(LAST_KMSG, destination_tmp_name, MAXFILESIZE);
+        } else if (file_exists(CONSOLE_RAMOOPS)) {
+            do_copy_tail(CONSOLE_RAMOOPS, destination_tmp_name, MAXFILESIZE);
+        }
+
+        // saved file to use for processing
+        snprintf(crash_console_name, sizeof(crash_console_name),
+                    "%s", SAVED_CONSOLE_NAME);
+    }
+
+    if (!copy_to_crash && !copy_to_panic) {
+        // use temp file
+        snprintf(crash_console_name, sizeof(crash_console_name),
+                    "%s", LOG_PANICTEMP);
+        do_copy_eof(PANIC_CONSOLE_NAME, LOG_PANICTEMP);
+    }
+
+    //crashtype calculation should be done after CONSOLE_NAME computation
+    set_ipanic_crashtype_and_reason(crash_console_name, crashtype, reason, PANIC_MODE);
+
+    if (copy_to_crash) {
+        key = raise_event(CRASHEVENT, crashtype, NULL, crash_path);
+        LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, get_current_time_long(0), crashtype, crash_path);
         free(key);
 
         // if a pattern is found in the console file, upload a large number of aplogs
         // property persist.crashlogd.panic.pattern is used to fill the list of pattern
         // Each pattern is split by a semicolon in the property
-        check_aplogs_tobackup(destination_console_name);
+        check_aplogs_tobackup(crash_console_name);
         return 0;
     } else {
         key = raise_event(CRASHEVENT, crashtype, NULL, NULL);
         LOGE("%-8s%-22s%-20s%s\n", CRASHEVENT, key, get_current_time_long(0), crashtype);
         free(key);
-        /* Remove temporary file */
+        /* Remove temporary files */
         remove(LOG_PANICTEMP);
         return -1;
     }
@@ -243,17 +253,16 @@ int crashlog_check_panic(char *reason, int test) {
  *   0 for nominal case
  *   1 if the RAM console doesn't exist or if it exists but no panic detected.
  */
-int crashlog_check_ram_panic(char *reason)
-{
-    char date_tmp[32];
-    char date_tmp_2[32];
-    time_t t;
-    char destination[PATHMAX];
+int crashlog_check_ram_panic(char *reason) {
+    char crash_path[PATHMAX] = {'\0'};
+    char crash_ramconsole_name[PATHMAX] = {'\0'};
+    char crash_header_name[PATHMAX] = {'\0'};
+    char ram_console[PATHMAX] = {'\0'};
     char crashtype[32] = {'\0'};
-    int dir, dir_err = 0;
-    char *key;
-    char ram_console[PATHMAX];
+    int dir;
+    int copy_to_crash = 0, copy_to_panic = 0;
     const char *dateshort = get_current_time_short(1);
+    char *key;
 
     if (file_exists(LAST_KMSG)) {
         strcpy(ram_console, LAST_KMSG);
@@ -268,40 +277,148 @@ int crashlog_check_ram_panic(char *reason)
         return 1; /* Not a PANIC : return */
     }
 
-    destination[0] = '\0';
     dir = find_new_crashlog_dir(MODE_CRASH);
-    if (dir < 0) {
-        LOGE("%s: Cannot get a valid new crash directory...\n", __FUNCTION__);
-        /* Set directory error flag and initialize destination filename to compute crashtype */
-        dir_err = 1;
-        snprintf(destination, sizeof(destination), "%s", LOG_PANICTEMP);
+
+    copy_to_crash = (dir >= 0);
+    copy_to_panic = dir_exists(PANIC_DIR);
+
+    if (copy_to_crash) {
+        // use crash file directly
+        snprintf(crash_path, sizeof(crash_path), "%s%d/", CRASH_DIR, dir);
+
+        snprintf(crash_header_name, sizeof(crash_header_name),
+                    "%s%s_%s.txt", crash_path, EMMC_HEADER_NAME, dateshort);
+        do_copy_eof(PANIC_HEADER_NAME, crash_header_name);
+
+        snprintf(crash_ramconsole_name, sizeof(crash_ramconsole_name),
+            "%s%s_%s.txt", crash_path, CONSOLE_RAMOOPS_FILE, dateshort);
+        // to be homogeneous with do_last_kmsg_copy, we use do_copy_tail
+        do_copy_tail(ram_console, crash_ramconsole_name, MAXFILESIZE);
     } else {
-        /* Check presence of panic directory */
-        if (dir_exists(PANIC_DIR)) {
-            snprintf(destination, sizeof(destination), "%s", SAVED_PANIC_RAM);
-        } else {
-            snprintf(destination, sizeof(destination), "%s%d/%s", CRASH_DIR, dir,
-                    CONSOLE_RAMOOPS_FILE);
-        }
+        LOGE("%s: Cannot get a valid new crash directory...\n", __FUNCTION__);
     }
 
-    // to be homogeneous with do_last_kmsg_copy, we use do_copy_tail
-    do_copy_tail(ram_console, destination, MAXFILESIZE);
+    // NOT exclusive with copy_to_crash
+    if (copy_to_panic) {
+        snprintf(crash_header_name, sizeof(crash_header_name),
+                    "%s", SAVED_HEADER_NAME);
+        do_copy_eof(PANIC_HEADER_NAME, crash_header_name);
 
-    //crashtype calculation should be done after CONSOLE_NAME computation
-    set_ipanic_crashtype_and_reason(destination, crashtype, reason, RAM_PANIC_MODE);
+        // saved file to use for processing
+        snprintf(crash_ramconsole_name, sizeof(crash_ramconsole_name),
+            "%s/%s.txt", PANIC_DIR, CONSOLE_RAMOOPS_FILE);
+        // to be homogeneous with do_last_kmsg_copy, we use do_copy_tail
+        do_copy_tail(ram_console, crash_ramconsole_name, MAXFILESIZE);
+    }
+
+    // exclusive
+    if (!copy_to_crash && !copy_to_panic) {
+        // use temp file
+        snprintf(crash_ramconsole_name, sizeof(crash_ramconsole_name),
+                    "%s", LOG_PANICTEMP);
+        // to be homogeneous with do_last_kmsg_copy, we use do_copy_tail
+        do_copy_tail(ram_console, crash_ramconsole_name, MAXFILESIZE);
+    }
+
+    //crashtype calculation should be done after RAM_CONSOLE computation
+    set_ipanic_crashtype_and_reason(crash_ramconsole_name, crashtype, reason, PANIC_MODE);
 
     // if a pattern is found in the console file, upload a large number of aplogs
     // property persist.crashlogd.panic.pattern is used to fill the list of pattern
     // Each pattern is split by a semicolon in the property
-    check_aplogs_tobackup(destination);
+    check_aplogs_tobackup(crash_ramconsole_name);
 
-    if (dir_err == 0) {
-        destination[0] = '\0';
-        snprintf(destination, sizeof(destination), "%s%d/", CRASH_DIR, dir);
-        key = raise_event(CRASHEVENT, crashtype, NULL, destination);
-        LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, get_current_time_long(0), crashtype, destination);
+    if (copy_to_crash) {
+        key = raise_event(CRASHEVENT, crashtype, NULL, crash_path);
+        LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, get_current_time_long(0), crashtype, crash_path);
         free(key);
+
+        return 0;
+    } else {
+        key = raise_event(CRASHEVENT, crashtype, NULL, NULL);
+        LOGE("%-8s%-22s%-20s%s\n", CRASHEVENT, key, get_current_time_long(0), crashtype);
+        free(key);
+        /* Remove temporary file */
+        remove(LOG_PANICTEMP);
+        return -1;
+    }
+}
+
+/**
+ * @brief Checks in PANIC header if previous solutions failed
+ *
+ * This functions is called at reboot (ie at crashlogd boot ) and checks if a
+ * PANIC event occurred by checking the panic partition header.
+ * It then sets the IPANIC event type.
+ * Returned values are :
+ *  -1 if a problem occurs (can't create crash dir)
+ *   0 for nominal case
+ *   1 if the panic header doesn't exist or if it exists but no panic detected.
+ */
+int crashlog_check_panic_header(char *reason) {
+    char crash_path[PATHMAX] = {'\0'};
+    char crash_header_name[PATHMAX] = {'\0'};
+    char destination_tmp_name[PATHMAX] = {'\0'};
+    char crashtype[32] = {'\0'};
+    int dir;
+    int copy_to_crash = 0, copy_to_panic = 0;
+    const char *dateshort = get_current_time_short(1);
+    char *key;
+
+    if ( !file_exists(CURRENT_PANIC_HEADER_NAME) ) {
+        /* Nothing to do */
+        return 1;
+    }
+
+    dir = find_new_crashlog_dir(MODE_CRASH);
+
+    copy_to_crash = (dir >= 0);
+    copy_to_panic = dir_exists(PANIC_DIR);
+
+    if (copy_to_crash) {
+        // use crash file directly
+        snprintf(crash_path, sizeof(crash_path), "%s%d/", CRASH_DIR, dir);
+
+        snprintf(crash_header_name, sizeof(crash_header_name),
+                    "%s%s_%s.txt", crash_path, EMMC_HEADER_NAME, dateshort);
+        do_copy_eof(PANIC_HEADER_NAME, crash_header_name);
+
+        do_last_kmsg_copy(dir);
+    }
+
+    // NOT exclusive with copy_to_crash
+    if (copy_to_panic) {
+        // Ram console (if available, even if no panic-pattern)
+        snprintf(destination_tmp_name, sizeof(destination_tmp_name),
+            "%s/%s.txt", PANIC_DIR, CONSOLE_RAMOOPS_FILE);
+        if (file_exists(LAST_KMSG)) {
+            do_copy_tail(LAST_KMSG, destination_tmp_name, MAXFILESIZE);
+        } else if (file_exists(CONSOLE_RAMOOPS)) {
+            do_copy_tail(CONSOLE_RAMOOPS, destination_tmp_name, MAXFILESIZE);
+        }
+
+        // saved file to use for processing
+        snprintf(crash_header_name, sizeof(crash_header_name),
+                    "%s", SAVED_HEADER_NAME);
+        do_copy_eof(PANIC_HEADER_NAME, crash_header_name);
+    }
+
+    // exclusive
+    if (!copy_to_crash && !copy_to_panic) {
+        // use temp file
+        snprintf(crash_header_name, sizeof(crash_header_name),
+                    "%s", LOG_PANICTEMP);
+        do_copy_eof(PANIC_HEADER_NAME, crash_header_name);
+    }
+
+    //crashtype calculation should be done after HEADER_NAME computation
+    set_ipanic_crashtype_and_reason(crash_header_name, crashtype, reason, PANIC_MODE);
+
+    if (copy_to_crash) {
+        key = raise_event(CRASHEVENT, crashtype, NULL, crash_path);
+        LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, get_current_time_long(0), crashtype, crash_path);
+        free(key);
+
         return 0;
     } else {
         key = raise_event(CRASHEVENT, crashtype, NULL, NULL);
@@ -329,7 +446,7 @@ int crashlog_check_kdump(char *reason, int test) {
     int finish_flag = 0;
     int curr_stat = 0;
     char *crashtype = NULL;
-    char destination[PATHMAX];
+    char destination[PATHMAX] = {'\0'};
     int dir;
     char *key;
     const char *dateshort = get_current_time_short(1);
@@ -369,7 +486,6 @@ int crashlog_check_kdump(char *reason, int test) {
         }
 
         if (curr_stat == 2 || curr_stat == 3) {
-            destination[0] = '\0';
             snprintf(destination, sizeof(destination), "%s%d/%s_%s.core",
                     KDUMP_CRASH_DIR, dir, "kdumpfile", dateshort);
             do_mv(KDUMP_FILE_NAME, destination);
@@ -378,7 +494,6 @@ int crashlog_check_kdump(char *reason, int test) {
         /* Copy aplogs to KDUMP crash directory */
         do_log_copy(crashtype, dir, dateshort, KDUMP_TYPE);
 
-        destination[0] = '\0';
         snprintf(destination, sizeof(destination), "%s%d/", KDUMP_CRASH_DIR, dir);
         key = raise_event(CRASHEVENT, crashtype, NULL, destination);
         LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, get_current_time_long(0), crashtype, destination);
@@ -404,8 +519,13 @@ void crashlog_check_panic_events(char *reason, char *watchdog, int test) {
 
     if (crashlog_check_panic(reason, test) == 1)
         /* No panic console file : check RAM console to determine the watchdog event type */
-        if ( (crashlog_check_ram_panic(reason) == 1) &&
-                strstr(reason, "SWWDT_") &&
-                (cfg_check_ram_panic == 1) )
-            strcpy(watchdog, "WDT_UNHANDLED");
+        if (crashlog_check_ram_panic(reason) == 1)
+            /* Last resort: copy the panic partition header */
+            if ( (crashlog_check_panic_header(reason) == 1) &&
+                    strstr(reason, "SWWDT_") &&
+                    (cfg_check_ram_panic == 1) )
+                strcpy(watchdog, "WDT_UNHANDLED");
+
+    /* Clears /proc/emmc_ipanic* entries */
+    overwrite_file(CURRENT_PANIC_HEADER_NAME, "1");
 }

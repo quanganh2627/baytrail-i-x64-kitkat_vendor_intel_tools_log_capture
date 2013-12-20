@@ -41,6 +41,8 @@
 #include "config_handler.h"
 #include "ramdump.h"
 #include "tcs_wrapper.h"
+#include "kct_netlink.h"
+#include "iptrak.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -75,6 +77,7 @@ char *BZ_DIR = NULL;
 
 //Variables containing paths of files triggering IPANIC & FABRICERR & WDT treatment
 char CURRENT_PANIC_CONSOLE_NAME[PATHMAX]={PANIC_CONSOLE_NAME};
+char CURRENT_PANIC_HEADER_NAME[PATHMAX]={PANIC_HEADER_NAME};
 char CURRENT_PROC_FABRIC_ERROR_NAME[PATHMAX]={PROC_FABRIC_ERROR_NAME};
 char CURRENT_PROC_OFFLINE_SCU_LOG_NAME[PATHMAX]={PROC_OFFLINE_SCU_LOG_NAME};
 char CURRENT_KERNEL_CMDLINE[PATHMAX]={KERNEL_CMDLINE};
@@ -351,6 +354,8 @@ static void early_check(char *encryptstate, int test) {
             LOGI("%s: File %s updated successfully.", __FUNCTION__, LOG_MODEM_VERSION);
         }
     }
+    /* Update the iptrak file */
+    check_iptrak_file(RETRY_ONCE);
 }
 
 void spid_read_concat(const char *path, char *complete_value)
@@ -431,6 +436,7 @@ static void get_crash_env(char * boot_mode, char *crypt_state, char *encrypt_pro
         snprintf(CURRENT_PROC_FABRIC_ERROR_NAME, sizeof(CURRENT_PROC_FABRIC_ERROR_NAME), "%s/%s", value, FABRIC_ERROR_NAME);
         snprintf(CURRENT_PROC_OFFLINE_SCU_LOG_NAME, sizeof(CURRENT_PROC_OFFLINE_SCU_LOG_NAME), "%s/%s", value, OFFLINE_SCU_LOG_NAME);
         snprintf(CURRENT_PANIC_CONSOLE_NAME, sizeof(CURRENT_PANIC_CONSOLE_NAME), "%s/%s", value, CONSOLE_NAME);
+        snprintf(CURRENT_PANIC_HEADER_NAME, sizeof(CURRENT_PANIC_HEADER_NAME), "%s/%s", value, EMMC_HEADER_NAME);
         snprintf(CURRENT_KERNEL_CMDLINE, sizeof(CURRENT_KERNEL_CMDLINE), "%s/%s", value, CMDLINE_NAME);
         LOGI("Test Mode : ipanic, fabricerr and wdt trigger path is %s\n", value);
     }
@@ -532,6 +538,8 @@ int do_monitor() {
 
     init_mmgr_cli_source();
 
+    kct_netlink_init_comm();
+
     for(;;) {
         // Clear fd set
         FD_ZERO(&read_fds);
@@ -548,6 +556,13 @@ int do_monitor() {
             FD_SET(mmgr_get_fd(), &read_fds);
             if (mmgr_get_fd() > max)
                 max = mmgr_get_fd();
+        }
+
+        //kct fd setup
+        if (kct_netlink_get_fd() > 0) {
+            FD_SET(kct_netlink_get_fd(), &read_fds);
+            if (kct_netlink_get_fd() > max)
+                max = kct_netlink_get_fd();
         }
 
         // Wait for events
@@ -568,6 +583,11 @@ int do_monitor() {
             if (FD_ISSET(mmgr_get_fd(), &read_fds)) {
                 LOGD("mmgr fd set");
                 mmgr_handle();
+            }
+            // kct monitor
+            if (FD_ISSET(kct_netlink_get_fd(), &read_fds)) {
+                LOGD("kct fd set");
+                kct_netlink_handle_msg();
             }
         }
     }

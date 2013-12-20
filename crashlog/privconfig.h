@@ -52,6 +52,9 @@
 #define UPTIME_FREQUENCY        (5 * 60)
 #define MMGRMAXSTRING           (20)
 #define MMGRMAXEXTRA            (512)
+#define KCT_MAX_CONNECT_TRY      10
+#define KCT_CONNECT_RETRY_TIME_S 2
+#define UPTIME_MAX_LENGTH       11
 
 /* FIELDS DEFINITIONS */
 #define PERM_USER               "system"
@@ -277,6 +280,9 @@ extern enum crashlog_mode g_crashlog_mode;
 #define PROP_APLOG_DEPTH        "persist.crashreport.aplogdepth"
 #define PROP_APLOG_NB_PACKET    "persist.crashreport.packet"
 #define PROP_LOGSYSTEMSTATE     "init.svc.logsystemstate"
+#define PROP_RELEASE_VERSION    "ro.build.version.release"
+#define PROP_SYS_BKC_VERSION    "ro.build.version.incremental"
+#define PROP_SOC_VERSION        "ro.board.platform"
 
 /* DIRECTORIES */
 #ifndef __LINUX__
@@ -348,6 +354,7 @@ extern enum crashlog_mode g_crashlog_mode;
 #define LOG_FABRICTEMP           LOGS_DIR "/fabric_temp"
 #define LAST_KMSG_FILE          "last_kmsg"
 #define CONSOLE_RAMOOPS_FILE    "console-ramoops"
+#define EMMC_HEADER_NAME        "emmc_ipanic_header"
 #define CONSOLE_NAME            "emmc_ipanic_console"
 #define CONSOLE_RAM             "ram_ipanic_console"
 #define THREAD_NAME             "emmc_ipanic_threads"
@@ -360,14 +367,18 @@ extern enum crashlog_mode g_crashlog_mode;
 #define BPLOG_NAME              "bplog"
 #define LAST_KMSG               PROC_DIR "/" LAST_KMSG_FILE
 #define CONSOLE_RAMOOPS         PSTORE_DIR "/" CONSOLE_RAMOOPS_FILE
+#define PANIC_HEADER_NAME       PROC_DIR "/" EMMC_HEADER_NAME
 #define PANIC_CONSOLE_NAME      PROC_DIR "/" CONSOLE_NAME
 #define PANIC_THREAD_NAME       PROC_DIR "/" THREAD_NAME
+#define PANIC_GBUFFER_NAME      PROC_DIR "/" GBUFFER_NAME
 #define PROC_FABRIC_ERROR_NAME  PROC_DIR "/" FABRIC_ERROR_NAME
 #define PROC_OFFLINE_SCU_LOG_NAME PROC_DIR "/" OFFLINE_SCU_LOG_NAME
 #define KERNEL_CMDLINE          PROC_DIR "/" CMDLINE_NAME
 #define PROC_UUID               PROC_DIR "/emmc0_id_entry"
+#define SAVED_HEADER_NAME       PANIC_DIR "/" EMMC_HEADER_NAME
 #define SAVED_CONSOLE_NAME      PANIC_DIR "/" CONSOLE_NAME
 #define SAVED_THREAD_NAME       PANIC_DIR "/" THREAD_NAME
+#define SAVED_GBUFFER_NAME      PANIC_DIR "/" GBUFFER_NAME
 #define SAVED_LOGCAT_NAME       PANIC_DIR "/" LOGCAT_NAME
 #define SAVED_FABRIC_ERROR_NAME PANIC_DIR "/" FABRIC_ERROR_NAME
 #define SAVED_PANIC_RAM         PANIC_DIR "/" CONSOLE_RAM
@@ -383,7 +394,6 @@ extern enum crashlog_mode g_crashlog_mode;
 #define KDUMP_FILE_NAME         KDUMP_DIR "/kdumpfile.core"
 #define KDUMP_FINISH_FLAG       KDUMP_DIR "/kdumpfinished"
 #define KDUMP_CRASH_DIR         LOGS_MEDIA_DIR "/crashlog"
-#define GBUFFER_FILE            PROC_DIR "/emmc_ipanic_gbuffer"
 #define ANR_DUPLICATE_INFOERROR         "anr_duplicate_infoevent"
 #define ANR_DUPLICATE_DATA              "anr_duplicate_data.txt"
 #define UIWDT_DUPLICATE_DATA            "uiwdt_duplicate_data.txt"
@@ -398,6 +408,7 @@ extern enum crashlog_mode g_crashlog_mode;
 #define RESET_IRQ_1             REBOOT_DIR "/RESETIRQ1"
 #define RESET_IRQ_2             REBOOT_DIR "/RESETIRQ2"
 #define EVENTFILE_NAME          "eventfile"
+#define IPTRAK_FILE             LOGS_DIR "/iptrak"
 
 /* MACROS */
 #define MIN(a,b)                ((a) < (b) ? (a) : (b))
@@ -411,6 +422,7 @@ extern char *STATS_DIR;
 extern char *APLOGS_DIR;
 extern char *BZ_DIR;
 extern char CURRENT_PANIC_CONSOLE_NAME[PATHMAX];
+extern char CURRENT_PANIC_HEADER_NAME[PATHMAX];
 extern char CURRENT_PROC_FABRIC_ERROR_NAME[PATHMAX];
 extern char CURRENT_PROC_OFFLINE_SCU_LOG_NAME[PATHMAX];
 extern char CURRENT_KERNEL_CMDLINE[PATHMAX];

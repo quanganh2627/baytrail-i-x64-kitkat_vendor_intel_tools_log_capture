@@ -25,6 +25,7 @@
  */
 
 #include "crashutils.h"
+#include "iptrak.h"
 #include "privconfig.h"
 #include "history.h"
 #include "fsutils.h"
@@ -408,6 +409,11 @@ int add_uptime_event() {
         loop_uptime_event = (hours / gcurrent_uptime_hour_frequency) + 1;
         restart_profile_srv(2);
         check_running_power_service();
+        check_iptrak_file(FORCE_GENERATION);
+    } else {
+        /* We may want to update iptrak file anyway, if all data */
+        /* were not available right after boot for instance.     */
+        check_iptrak_file(ONLY_IF_REQUIRED);
     }
     return 0;
 }

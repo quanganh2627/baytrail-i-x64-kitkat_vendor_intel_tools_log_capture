@@ -36,7 +36,9 @@ LOCAL_SRC_FILES:= main.c \
     panic.c \
     config_handler.c \
     ramdump.c \
-    tcs_wrapper.c
+    tcs_wrapper.c \
+    kct_netlink.c \
+    iptrak.c
 
 LOCAL_CFLAGS += -DFULL_REPORT=1
 
