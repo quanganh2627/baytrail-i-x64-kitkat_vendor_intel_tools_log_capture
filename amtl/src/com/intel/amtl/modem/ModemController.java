@@ -19,10 +19,12 @@
 
 package com.intel.amtl.modem;
 
+import android.app.Application;
 import android.content.Context;
 import android.content.Intent;
 import android.util.Log;
 
+import com.intel.amtl.AMTLApplication;
 import com.intel.amtl.exceptions.ModemControlException;
 import com.intel.amtl.gui.GeneralSetupFrag;
 import com.intel.amtl.gui.AMTLTabLayout;
@@ -51,7 +53,6 @@ public class ModemController implements ModemEventListener, Closeable {
     private static ModemStatus currentModemStatus = ModemStatus.NONE;
     private static ModemController mdmCtrl;
     private static boolean modemAcquired = false;
-    private Context context;
     private CommandParser cmdParser;
     private ArrayList<Master> masterArray;
     private boolean firstAcquire = true;
@@ -60,7 +61,6 @@ public class ModemController implements ModemEventListener, Closeable {
 
         try {
             this.modemStatusManager = ModemStatusManager.getInstance();
-            context = AMTLTabLayout.ctx;
             cmdParser = new CommandParser();
         } catch (InstantiationException ex) {
             throw new ModemControlException("Cannot instantiate Modem Status Manager");
@@ -213,7 +213,7 @@ public class ModemController implements ModemEventListener, Closeable {
     private void sendMessage(String msg) {
         Intent intent = new Intent("modem-event");
         intent.putExtra("message", msg);
-        this.context.sendBroadcast(intent);
+        AMTLApplication.getContext().sendBroadcast(intent);
     }
 
     @Override

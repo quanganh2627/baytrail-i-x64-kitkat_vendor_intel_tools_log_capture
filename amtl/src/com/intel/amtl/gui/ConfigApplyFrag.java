@@ -21,6 +21,7 @@ package com.intel.amtl.gui;
 
 
 import android.app.Activity;
+import android.app.Application;
 import android.app.DialogFragment;
 import android.app.Fragment;
 import android.app.FragmentManager;
@@ -35,6 +36,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ProgressBar;
 
+import com.intel.amtl.AMTLApplication;
 import com.intel.amtl.R;
 import com.intel.amtl.exceptions.ModemControlException;
 import com.intel.amtl.models.config.ModemConf;
@@ -47,7 +49,6 @@ public class ConfigApplyFrag extends DialogFragment {
 
     private final String TAG = "AMTL";
     private final String MODULE = "ConfigApplyFrag";
-    private Context context;
 
     int targetFrag;
     String tag;
@@ -56,10 +57,9 @@ public class ConfigApplyFrag extends DialogFragment {
     // thread executed while Dialog Box is displayed.
     ApplyConfTask exeSetup;
 
-    public ConfigApplyFrag(String tag, int targetFrag, Context context) {
+    public ConfigApplyFrag(String tag, int targetFrag) {
         this.tag = tag;
         this.targetFrag = targetFrag;
-        this.context = context;
     }
 
     public void handlerConf(ApplyConfTask confTask) {
@@ -89,7 +89,7 @@ public class ConfigApplyFrag extends DialogFragment {
     }
 
     public void launch(ModemConf modemConfToApply, Fragment frag, FragmentManager gsfManager) {
-        handlerConf(new ApplyConfTask(modemConfToApply, this.context));
+        handlerConf(new ApplyConfTask(modemConfToApply));
         setTargetFragment(this, targetFrag);
         show(gsfManager, tag);
     }
@@ -146,11 +146,9 @@ public class ConfigApplyFrag extends DialogFragment {
         private MtsManager mtsManager;
         private ModemConf modConfToApply;
         private String exceptReason = "";
-        private Context context;
 
-        public ApplyConfTask (ModemConf confToApply, Context context) {
+        public ApplyConfTask (ModemConf confToApply) {
             this.modConfToApply = confToApply;
-            this.context = context;
         }
 
         void setFragment(ConfigApplyFrag confAppFrag) {
@@ -161,9 +159,11 @@ public class ConfigApplyFrag extends DialogFragment {
         @Override
         protected Void doInBackground(Void... params) {
             SharedPreferences prefs =
-                    context.getSharedPreferences("AMTLPrefsData", Context.MODE_PRIVATE);
+                    AMTLApplication.getContext().getSharedPreferences("AMTLPrefsData",
+                    Context.MODE_PRIVATE);
             SharedPreferences.Editor editor =
-                    context.getSharedPreferences("AMTLPrefsData", Context.MODE_PRIVATE).edit();
+                    AMTLApplication.getContext().getSharedPreferences("AMTLPrefsData",
+                    Context.MODE_PRIVATE).edit();
             try {
                 modemCtrl = ModemController.get();
                 if (modemCtrl != null) {

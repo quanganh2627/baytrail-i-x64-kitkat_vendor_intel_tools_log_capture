@@ -90,9 +90,6 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
     private final int savLogId = 200;
     private final int logTagId = 300;
 
-    // Context used for intents and to display buttons
-    private Context context;
-
     private ArrayList<LogOutput> configArray;
 
     private ModemConf modemConfToApply;
@@ -199,7 +196,7 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
     }
 
     private void updateUi(ModemConf curModConf) {
-        SharedPreferences prefs = context.getSharedPreferences("AMTLPrefsData",
+        SharedPreferences prefs = this.getActivity().getSharedPreferences("AMTLPrefsData",
                 Context.MODE_PRIVATE);
         int id = prefs.getInt("index", -2);
         Log.d(TAG, MODULE + ": Current index = " + id);
@@ -300,11 +297,8 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
             savLog.setTargetFragment(this, SAVELOG_TARGETFRAG);
         }
 
-        context = AMTLTabLayout.ctx;
-        if (context != null) {
-            context.registerReceiver(mMessageReceiver, new IntentFilter("modem-event"));
-            mtsMgr = new MtsManager();
-        }
+        this.getActivity().registerReceiver(mMessageReceiver, new IntentFilter("modem-event"));
+        mtsMgr = new MtsManager();
     }
 
     @Override
@@ -331,9 +325,7 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
 
     @Override
     public void onDestroy() {
-        if (this.context != null) {
-            this.context.unregisterReceiver(mMessageReceiver);
-        }
+        this.getActivity().unregisterReceiver(mMessageReceiver);
         super.onDestroy();
     }
 
@@ -342,7 +334,7 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
             Bundle savedInstanceState) {
 
         View view = inflater.inflate(R.layout.generalsetupfraglayout, container, false);
-        if (view != null && context != null) {
+        if (view != null) {
 
             this.sExpertMode = (Switch) view.findViewById(R.id.switchExpertMode);
             this.tvModemStatus = (TextView) view.findViewById(R.id.modemStatusValueTxt);
@@ -352,7 +344,7 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
             // definition of switch listeners
             if (this.configArray != null) {
                 for (LogOutput o: configArray) {
-                    o.setConfigSwitch(ll, configArray.lastIndexOf(o), context, view);
+                    o.setConfigSwitch(ll, configArray.lastIndexOf(o), this.getActivity(), view);
                 }
             }
 
@@ -374,7 +366,7 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
     public void onViewCreated(View view, Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        if (view != null && context != null) {
+        if (view != null) {
 
             if (this.configArray != null) {
                 for (LogOutput o: configArray) {
@@ -444,7 +436,7 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.MATCH_PARENT);
         appExecConf.setMargins(0, 100, 0, 0);
-        this.bAppConf = new Button(context);
+        this.bAppConf = new Button(this.getActivity());
         this.bAppConf.setId(this.appConfId);
         this.bAppConf.setGravity(Gravity.CENTER);
         this.bAppConf.setTextColor(Color.BLACK);
@@ -458,7 +450,7 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.MATCH_PARENT);
         appSaveLogs.setMargins(0, 50, 0, 0);
-        this.bSavLog = new Button(context);
+        this.bSavLog = new Button(this.getActivity());
         this.bSavLog.setId(this.savLogId);
         this.bSavLog.setGravity(Gravity.CENTER);
         this.bSavLog.setTextColor(Color.BLACK);
@@ -472,7 +464,7 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.MATCH_PARENT);
         appLogTag.setMargins(0, 50, 0, 0);
-        this.bLogTag = new Button(context);
+        this.bLogTag = new Button(this.getActivity());
         this.bLogTag.setId(this.logTagId);
         this.bLogTag.setGravity(Gravity.CENTER);
         this.bLogTag.setTextColor(Color.BLACK);
@@ -504,11 +496,11 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
 
         UIHelper.savePopupDialog(this.getActivity(), "Log Backup", "Please"
                 + " select your backup tag, it will be located in:\n" + BACKUP_LOG_PATH,
-                context, snaplog, logProgressFrag);
+                this.getActivity(), snaplog, logProgressFrag);
     }
 
     public void applyConf() {
-        SharedPreferences prefs = context.getSharedPreferences("AMTLPrefsData",
+        SharedPreferences prefs = this.getActivity().getSharedPreferences("AMTLPrefsData",
                 Context.MODE_PRIVATE);
         /* Determine current index */
         int id = prefs.getInt("index", -2);
@@ -558,7 +550,7 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
         }
 
         ConfigApplyFrag progressFrag = new ConfigApplyFrag(CONFSETUP_TAG,
-                CONFSETUP_TARGETFRAG, context);
+                CONFSETUP_TARGETFRAG);
         progressFrag.launch(modemConfToApply, this, gsfManager);
     }
 
@@ -647,7 +639,7 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
                 break;
             case logTagId:
                 UIHelper.logTagDialog(this.getActivity(), "Log TAG", "Please select the TAG"
-                        + " you want to set in logs:\n", context);
+                        + " you want to set in logs:\n", this.getActivity());
                 break;
         }
     }
