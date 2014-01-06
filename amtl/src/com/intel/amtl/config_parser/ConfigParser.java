@@ -220,6 +220,7 @@ public class ConfigParser {
                     parser.getAttributeValue(null, "oct_fcs"),
                     parser.getAttributeValue(null, "pti1"),
                     parser.getAttributeValue(null, "pti2"),
+                    parser.getAttributeValue(null, "sigusr1_to_send"),
                     flcmd);
 
             Log.d(TAG, MODULE + ": index = " + index
@@ -237,6 +238,7 @@ public class ConfigParser {
                     + ", oct_fcs = " + parser.getAttributeValue(null, "oct_fcs")
                     + ", pti1 = "+ parser.getAttributeValue(null, "pti1")
                     + ", pti2 = "+ parser.getAttributeValue(null, "pti2")
+                    + ", sigusr1_to_send = "+ parser.getAttributeValue(null, "sigusr1_to_send")
                     + ", default_flush_cmd = "+ parser.getAttributeValue(null, "default_flush_cmd")
                     + ", flush_cmd = "+ parser.getAttributeValue(null, "flush_cmd") + ".");
 

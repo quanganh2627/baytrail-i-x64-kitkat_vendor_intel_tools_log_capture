@@ -57,6 +57,7 @@ public class LogOutput {
     private Hashtable<String, Master> masterList = null;
     private Switch confSwitch = null;
     private String flcmd = null;
+    private String sigusr1ToSend = null;
 
     public LogOutput() {
         this.masterList = new Hashtable<String, Master>();
@@ -65,7 +66,7 @@ public class LogOutput {
     public LogOutput(int index, String name, String xsioValue, String buttonColor, String mtsInput,
             String mtsOutput, String mtsOutputType, String mtsRotateNum, String mtsRotateSize,
             String mtsInterface, String mtsMode, String oct, String octFcs, String pti1,
-            String pti2, String flcmd) {
+            String pti2, String sigusr1ToSend, String flcmd) {
         this.setIndex(index);
         this.setName(name);
         this.setXsio(xsioValue);
@@ -82,6 +83,7 @@ public class LogOutput {
         this.setOctFcs(octFcs);
         this.setPti1(pti1);
         this.setPti2(pti2);
+        this.setSigusr1ToSend(sigusr1ToSend);
         this.setFlCmd(flcmd);
     }
 
@@ -149,6 +151,10 @@ public class LogOutput {
         this.flcmd = flcmd;
     }
 
+    public void setSigusr1ToSend(String sigusr1ToSend) {
+        this.sigusr1ToSend = sigusr1ToSend;
+    }
+
     public int getIndex() {
         return this.index;
     }
@@ -211,6 +217,10 @@ public class LogOutput {
 
     public String getFlCmd() {
         return this.flcmd;
+    }
+
+    public String getSigusr1ToSend() {
+        return this.sigusr1ToSend;
     }
 
     public Hashtable<String, Master> getMasterList() {
@@ -334,6 +344,7 @@ public class LogOutput {
                 + ", mts_mode = " + this.mtsMode
                 + ", oct = " + this.oct + ", oct_fcs = " + this.octFcs
                 + ", pti1 = " + this.pti1 + ", pti2 = " + this.pti2
+                + ", sigusr1_to_send = " + this.sigusr1ToSend
                 + ", flush_command = " + this.flcmd + ".");
         while(it.hasNext()) {
             Master master = it.next();
