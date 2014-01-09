@@ -29,7 +29,7 @@
 #include <stdlib.h>
 
 typedef enum e_crashtype_mode {
-    PANIC_MODE = 0, /*< computation of panic crashtype */
+    EMMC_PANIC_MODE = 0, /*< computation of panic crashtype */
     RAM_PANIC_MODE, /*< computation of ram panic crashtype */
 } e_crashtype_mode_t;
 
@@ -110,7 +110,7 @@ static void set_ipanic_crashtype_and_reason(char *console_name, char *crashtype,
     else
         strcpy(crashtype, KERNEL_CRASH);
 
-    if ((mode == PANIC_MODE) &&
+    if ((mode == EMMC_PANIC_MODE) &&
             (find_str_in_file(console_name, "sdhci_pci_power_up_host: host controller power up is done", NULL) <= 0)) {
         // An error is raised when the panic console file does not end normally
        raise_infoerror(ERROREVENT, IPANIC_CORRUPTED);
@@ -220,7 +220,7 @@ int crashlog_check_panic(char *reason, int test) {
     }
 
     //crashtype calculation should be done after CONSOLE_NAME computation
-    set_ipanic_crashtype_and_reason(crash_console_name, crashtype, reason, PANIC_MODE);
+    set_ipanic_crashtype_and_reason(crash_console_name, crashtype, reason, EMMC_PANIC_MODE);
 
     if (copy_to_crash) {
         key = raise_event(CRASHEVENT, crashtype, NULL, crash_path);
@@ -321,7 +321,7 @@ int crashlog_check_ram_panic(char *reason) {
     }
 
     //crashtype calculation should be done after RAM_CONSOLE computation
-    set_ipanic_crashtype_and_reason(crash_ramconsole_name, crashtype, reason, PANIC_MODE);
+    set_ipanic_crashtype_and_reason(crash_ramconsole_name, crashtype, reason, RAM_PANIC_MODE);
 
     // if a pattern is found in the console file, upload a large number of aplogs
     // property persist.crashlogd.panic.pattern is used to fill the list of pattern
@@ -412,7 +412,7 @@ int crashlog_check_panic_header(char *reason) {
     }
 
     //crashtype calculation should be done after HEADER_NAME computation
-    set_ipanic_crashtype_and_reason(crash_header_name, crashtype, reason, PANIC_MODE);
+    set_ipanic_crashtype_and_reason(crash_header_name, crashtype, reason, EMMC_PANIC_MODE);
 
     if (copy_to_crash) {
         key = raise_event(CRASHEVENT, crashtype, NULL, crash_path);
