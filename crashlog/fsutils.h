@@ -112,6 +112,7 @@ int get_value_in_file(char *file, char *keyword, char *value, unsigned int sizem
 int find_str_in_file(char *filename, char *keyword, char *tail);
 int find_str_in_standard_file(char *filename, char *keyword, char *tail);
 int find_oneofstrings_in_file(char *file, char **keywords, int nbkeywords);
+int find_oneofstrings_in_file_with_keyword(char *filename, char **keywords, char *common_keyword,int nbkeywords);
 void flush_aplog(e_aplog_file_t file, const char *mode, int *dir, const char *ts);
 void reset_file(const char *filename);
 int readline(int fd, char buffer[MAXLINESIZE]);
