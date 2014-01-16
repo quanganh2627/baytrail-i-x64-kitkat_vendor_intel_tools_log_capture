@@ -111,7 +111,7 @@ static void set_ipanic_crashtype_and_reason(char *console_name, char *crashtype,
         strcpy(crashtype, KERNEL_CRASH);
 
     if ((mode == EMMC_PANIC_MODE) &&
-            (find_str_in_file(console_name, "sdhci_pci_power_up_host: host controller power up is done", NULL) <= 0)) {
+            (find_str_in_file(console_name, "power_up_host: host controller power up is done", NULL) <= 0)) {
         // An error is raised when the panic console file does not end normally
        raise_infoerror(ERROREVENT, IPANIC_CORRUPTED);
     }
