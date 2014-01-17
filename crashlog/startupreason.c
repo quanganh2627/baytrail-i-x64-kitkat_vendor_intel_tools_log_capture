@@ -23,6 +23,8 @@
 #include "crashutils.h"
 #include "fsutils.h"
 #include "privconfig.h"
+#include "uefivar.h"
+#include "inc/uefi/bootlogic.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -32,8 +34,129 @@
 #include <fcntl.h>
 #include <stdio.h>
 
+static int compute_uefi_startupreason(enum reset_sources rs, enum reset_types rt, enum wake_sources ws, enum shutdown_sources ss, char *startupreason)
+{
+    static const char *wake_source[] = {
+        "WAKE_NOT_APPLICABLE",
+        "WAKE_BATT_INSERT",
+        "WAKE_USB_CHRG_INSERT",
+        "WAKE_ACDC_CHGR_INSERT",
+        "WAKE_PWR_BUTTON_PRESS",
+        "WAKE_RTC_TIMER",
+        "WAKE_BATT_THRESHOLD",
+    };
+    static const char *reset_source[] = {
+        "RESET_NOT_APPLICABLE",
+        "RESET_OS_INITIATED",
+        "RESET_FORCED",
+        "RESET_FW_UPDATE",
+        "RESET_KERNEL_WATCHDOG",
+        "RESET_SECURITY_WATCHDOG",
+        "RESET_SECURITY_INITIATED",
+        "RESET_PMC_WATCHDOG",
+        "RESET_EC_WATCHDOG",
+        "RESET_PLATFORM_WATCHDOG",
+    };
+    static const char *reset_type[] = {
+        "NOT_APPLICABLE",
+        "WARM_RESET",
+        "COLD_RESET",
+        "GLOBAL_RESET",
+    };
+
+    char str_wake_source[32] = { '\0', };
+    char str_reset_source[32] = { '\0', };
+    char str_reset_type[32] = { '\0', };
+    char str_shutdown_source[32] = { '\0', };
+    unsigned int s;
+
+    s = (unsigned int) ws;
+    if  ((s > 0) && (s < (sizeof(wake_source)/sizeof(char*)))) {
+        strcpy(str_wake_source, wake_source[s]);
+        LOGI("wake source (%d): %s", s, str_wake_source);
+    }
+
+    s = (unsigned int) rs;
+    if  ((s > 0) && (s < (sizeof(reset_source)/sizeof(char*)))) {
+        strcpy(str_reset_source, reset_source[s]);
+        LOGI("reset source (%d): %s", s, str_reset_source);
+    }
+
+    s = (unsigned int) rt;
+    if  ((s > 0) && (s < (sizeof(reset_type)/sizeof(char*)))) {
+        strcpy(str_reset_type, reset_type[s]);
+        LOGI("reset type (%d): %s", s, str_reset_type);
+    }
+
+    if (strlen(str_wake_source))
+        strcpy(startupreason, str_wake_source);
+    else if (strlen(str_reset_source))
+      if (strstr(str_reset_source, "KERNEL_WATCHDOG"))
+         strcpy(startupreason, "SWWDT_RESET");
+      else if  (strstr(str_reset_source, "WATCHDOG"))
+         strcpy(startupreason, "HWWDT_RESET");
+      else
+         strcpy(startupreason, str_reset_source);
+    else
+       return -1;
+
+    return 0;
+}
+
+static int get_uefi_startupreason(char *startupreason)
+{
+    int ret = 0;
+
+    const char *var_guid_common = "4a67b082-0a4c-41cf-b6c7-440b29bb8c4f";
+    //const char *var_guid_common = "80868086-8086-8086-8086-000000000200";
+    const char *var_reset_source = "ResetSource";
+    const char *var_reset_type = "ResetType";
+    const char *var_wake_source = "WakeSource";
+    const char *var_shutdown_source = "ShutdownSource";
+
+    enum reset_sources rs;
+    enum reset_types rt;
+    enum wake_sources ws;
+    enum shutdown_sources ss;
+
+    strcpy(startupreason, "UNKNOWN");
+
+    ret = uefivar_get_int(var_reset_source, var_guid_common, (unsigned int *)&rs);
+    if (ret) {
+        LOGE("uefivar_get error %s-%s : %d\n",
+               var_reset_source, var_guid_common, ret);
+        return -1;
+    }
+
+    ret = uefivar_get_int(var_reset_type, var_guid_common, (unsigned int *)&rt);
+    if (ret) {
+        LOGE("uefivar_get error %s-%s : %d\n",
+               var_reset_type, var_guid_common, ret);
+        return -1;
+    }
+
+    ret = uefivar_get_int(var_wake_source, var_guid_common, (unsigned int *)&ws);
+    if (ret) {
+        LOGE("uefivar_get error %s-%s : %d\n",
+               var_wake_source, var_guid_common, ret);
+        return -1;
+    }
+
+    ret = uefivar_get_int(var_shutdown_source, var_guid_common, (unsigned int *)&ss);
+    if (ret) {
+        LOGE("uefivar_get error %s-%s : %d\n",
+               var_shutdown_source, var_guid_common, ret);
+        return -1;
+    }
+
+    LOGI("%s: %s:%d, %s:%d, %s:%d, %s:%d\n", __func__, var_reset_source, rs,
+         var_reset_type, rt, var_wake_source, ws, var_shutdown_source, ss);
+
+    return compute_uefi_startupreason(rs, rt, ws, ss, startupreason);
+}
+
 /*
-* Name          : read_startupreason
+* Name          : get_fdk_startupreason
 * Description   : This function returns the decoded startup reason by reading
 *                 the wake source from the command line. The wake src is translated
 *                 to a crashtool startup reason.
@@ -64,7 +187,7 @@
 * Parameters    :
 *   char *startupreason   -> string containing the translated startup reason
 *   */
-void read_startupreason(char *startupreason)
+void get_fdk_startupreason(char *startupreason)
 {
     char cmdline[1024] = { '\0', };
     char prop_reason[PROPERTY_VALUE_MAX];
@@ -155,6 +278,13 @@ void read_startupreason(char *startupreason)
     }
 }
 
+void read_startupreason(char *startupreason)
+{
+    if (device_has_uefi())
+        get_uefi_startupreason(startupreason);
+    else
+        get_fdk_startupreason(startupreason);
+}
 
 /**
  * @brief generate WDT crash event

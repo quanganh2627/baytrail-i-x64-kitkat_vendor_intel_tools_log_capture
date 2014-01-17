@@ -38,7 +38,8 @@ LOCAL_SRC_FILES:= main.c \
     ramdump.c \
     tcs_wrapper.c \
     kct_netlink.c \
-    iptrak.c
+    iptrak.c \
+    uefivar.c
 
 LOCAL_CFLAGS += -DFULL_REPORT=1
 
