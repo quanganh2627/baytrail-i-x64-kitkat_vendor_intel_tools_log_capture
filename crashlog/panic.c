@@ -108,8 +108,8 @@ static int check_aplogs_tobackup(char *filename) {
 static void set_ipanic_crashtype_and_reason(char *console_name, char *crashtype, char *reason,
         e_crashtype_mode_t mode) {
     char *key;
-    char *fake_32_pattern[] = {"EIP is at panic_dbg_set", "EIP is at kwd_trigger_open"};
-    char *fake_64_pattern[] = {"panic_dbg_set"};
+    char *fake_32_pattern[] = {"EIP is at panic_dbg_set", "EIP is at kwd_trigger_open", "EIP is at kwd_trigger_write"};
+    char *fake_64_pattern[] = {"panic_dbg_set", "kwd_trigger_write"};
     char *hwwdt_64_pattern[] = {"pmu_sc_irq"};
 
     /* Set crash type according to pattern found in Ipanic console file or according to startup reason value*/
