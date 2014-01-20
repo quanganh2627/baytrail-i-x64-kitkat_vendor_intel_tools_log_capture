@@ -152,7 +152,11 @@ public class LogOutput {
     }
 
     public void setSigusr1ToSend(String sigusr1ToSend) {
-        this.sigusr1ToSend = sigusr1ToSend;
+        if (null == sigusr1ToSend) {
+            this.sigusr1ToSend = "false";
+        } else {
+            this.sigusr1ToSend = sigusr1ToSend;
+        }
     }
 
     public int getIndex() {
