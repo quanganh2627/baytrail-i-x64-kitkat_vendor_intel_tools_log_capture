@@ -125,7 +125,12 @@ public class ModemController implements ModemEventListener, Closeable {
                     throw new ModemControlException("Cannot send at command, "
                             + "modem is not ready: status = " + this.currentModemStatus);
                 }
-                ret = this.ttyManager.writeToModemControl(command);
+                this.ttyManager.writeToModemControl(command);
+
+                do {
+                    ret = this.ttyManager.readFromModemControl();
+                } while (ret.contains("PBREADY"));
+
                 if (!ret.contains("OK")) {
                     throw new ModemControlException("Modem has answered" + ret
                             + "to the AT command sent " + command);
