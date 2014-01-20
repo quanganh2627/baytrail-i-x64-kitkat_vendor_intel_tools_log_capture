@@ -360,6 +360,8 @@ static void get_crash_env(char * boot_mode, char *crypt_state, char *encrypt_pro
 
     char value[PROPERTY_VALUE_MAX];
     FILE *fd;
+    char * default_uuid = "Medfield";
+    int found = 0;
 
     if( property_get("crashlogd.debug.proc_path", value, NULL) > 0 )
     {
@@ -384,24 +386,47 @@ static void get_crash_env(char * boot_mode, char *crypt_state, char *encrypt_pro
     property_get("vold.decrypt", decrypt, "");
     property_get("crashlogd.token", token, "");
 
-   /* Read UUID */
+    /* Read UUID */
     if (g_current_serial_device_id == 1) {
         /* Get serial ID from properties and updates UUID file */
         property_get("ro.serialno", guuid, "empty_serial");
-        write_uuid(LOG_UUID, guuid);
-    } else {
-        /* Read UUID value from /proc (emmc) and set UUID file with retrieved value.
-         * If reading fails set "Medfield" as default value */
+        found = 1;
+    }
+
+    if (!found) {
+        /* Read UUID value from /proc (emmc) and set UUID file with retrieved value. */
         fd = fopen(PROC_UUID, "r");
-        if (fd != NULL && fscanf(fd, "%s", guuid) == 1) {
+        if (fd != NULL) {
+            if (fscanf(fd, "%s", guuid) == 1)
+                found = 1;
+
             fclose(fd);
-            write_uuid(LOG_UUID, guuid);
-        } else {
-            LOGE("%s: Cannot read uuid from %s - %s\n",
-                __FUNCTION__, PROC_UUID, strerror(errno));
-            write_uuid(LOG_UUID, "Medfield");
         }
     }
+
+    if (!found) {
+        /* Read UUID value from DMI and set UUID file with retrieved value. */
+        LOGW("%s: Try to read DMI UUID...\n", __FUNCTION__);
+
+        fd = fopen(DMI_PRODUCT_UUID, "r");
+        if (fd != NULL) {
+            if (fscanf(fd, "%s", guuid) == 1)
+                found = 1;
+
+            fclose(fd);
+        }
+    }
+
+    if (found)
+        write_uuid(LOG_UUID, guuid);
+    else {
+        /* If reading fails set a default value */
+        LOGE("%s: Cannot get valid uuid. Set default value: %s\n",
+                __FUNCTION__, default_uuid);
+
+        write_uuid(LOG_UUID, default_uuid);
+    }
+
     /* Read SPID */
     read_sys_spid(LOG_SPID);
 
