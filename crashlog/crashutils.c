@@ -156,6 +156,19 @@ void do_last_kmsg_copy(int dir) {
         snprintf(destion, sizeof(destion), "%s%d/%s", CRASH_DIR, dir, CONSOLE_RAMOOPS_FILE);
         do_copy_tail(CONSOLE_RAMOOPS, destion, MAXFILESIZE);
     }
+    if ( file_exists(FTRACE_RAMOOPS) ) {
+        snprintf(destion, sizeof(destion), "%s%d/%s", CRASH_DIR, dir, FTRACE_RAMOOPS_FILE);
+        do_copy_tail(FTRACE_RAMOOPS, destion, MAXFILESIZE);
+    }
+}
+
+void do_last_fw_msg_copy(int dir) {
+    char destion[PATHMAX];
+
+    if ( (dir >= 0) && file_exists(CURRENT_PROC_OFFLINE_SCU_LOG_NAME) ) {
+        snprintf(destion, sizeof(destion), "%s%d/%s.txt", CRASH_DIR, dir, OFFLINE_SCU_LOG_NAME);
+        do_copy_eof(CURRENT_PROC_OFFLINE_SCU_LOG_NAME, destion);
+    }
 }
 
 /* Compute key shall be checked only once at the first call to insure the

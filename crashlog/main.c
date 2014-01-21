@@ -321,7 +321,7 @@ static void early_check(char *encryptstate, int test) {
 
     strcpy(watchdog,"WDT");
 
-    crashlog_check_fabric(startupreason, test);
+    crashlog_check_fabric_events(startupreason, watchdog, test);
     crashlog_check_panic_events(startupreason, watchdog, test);
     crashlog_check_kdump(startupreason, test);
     crashlog_check_modem_shutdown();

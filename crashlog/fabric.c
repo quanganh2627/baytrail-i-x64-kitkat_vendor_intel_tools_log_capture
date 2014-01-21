@@ -73,6 +73,8 @@ static const struct fabric_type fabric_event[] = {
     [ F_INFORMATIVE_MSG ] = {"DW0:", "f506", "FIRMWARE"},
 };
 
+int cfg_check_hwwdt = 0;
+
 int crashlog_check_fabric(char *reason, int test) {
     const char *dateshort = get_current_time_short(1);
     char destination[PATHMAX];
@@ -82,18 +84,10 @@ int crashlog_check_fabric(char *reason, int test) {
     unsigned int i = 0;
     char *key;
 
-    if ( !test && !file_exists(CURRENT_PROC_FABRIC_ERROR_NAME) ) return 0;
+    if ( !test && !file_exists(CURRENT_PROC_FABRIC_ERROR_NAME) ) return 1;
 
     destination[0] = '\0';
     dir = find_new_crashlog_dir(MODE_CRASH);
-
-    /* If available, copy the SCU log from /proc/offline_scu_log */
-    if ((dir > 0) && file_exists(CURRENT_PROC_OFFLINE_SCU_LOG_NAME)) {
-        snprintf(destination, sizeof(destination), "%s%d/%s_%s.bin", CRASH_DIR, dir,
-                 OFFLINE_SCU_LOG_NAME, dateshort);
-
-        do_copy_eof(CURRENT_PROC_OFFLINE_SCU_LOG_NAME, destination);
-    }
 
     if (dir < 0) {
         LOGE("%s: find_new_crashlog_dir failed\n", __FUNCTION__);
@@ -144,6 +138,7 @@ int crashlog_check_fabric(char *reason, int test) {
 
     if (dir_err == 0) {
         do_last_kmsg_copy(dir);
+        do_last_fw_msg_copy(dir);
         destination[0] = '\0';
         snprintf(destination, sizeof(destination),"%s%d/", CRASH_DIR, dir);
         key = raise_event(event_name, crashtype, NULL, destination);
@@ -159,6 +154,13 @@ int crashlog_check_fabric(char *reason, int test) {
         free(key);
         /* Remove temporary file */
         remove(LOG_FABRICTEMP);
-        return -1;
+        return 0;
     }
+}
+
+void crashlog_check_fabric_events(char *reason, char *watchdog, int test) {
+
+     if (crashlog_check_fabric(reason, test) == 1)
+        if (strstr(reason, "HWWDT_") && (cfg_check_hwwdt))
+            strcpy(watchdog, "HWWDT_UNHANDLED");
 }
