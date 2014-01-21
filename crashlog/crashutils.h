@@ -58,6 +58,7 @@ char **commachain_to_fixedarray(char *chain,
 int do_screenshot_copy(char* bz_description, char* bzdir);
 
 void do_last_kmsg_copy(int dir);
+void do_last_fw_msg_copy(int dir);
 void clean_crashlog_in_sd(char *dir_to_search, int max);
 void check_crashlog_died();
 int raise_infoerror(char *type, char *subtype);

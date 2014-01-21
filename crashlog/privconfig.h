@@ -272,7 +272,6 @@ extern enum crashlog_mode g_crashlog_mode;
 #define MODEM_FIELD             "gsm.version.baseband"
 #define IMEI_FIELD              "persist.radio.device.imei"
 #define OPERATOR_FIELD          "gsm.operator.alpha"
-#define PROP_CRASH              "persist.service.crashlog.enable"
 #define PROP_COREDUMP           "persist.core.enabled"
 #define PROP_CRASH_MODE         "persist.sys.crashlogd.mode"
 #define PROP_ANR_USERSTACK      "persist.anr.userstack.disabled"
@@ -356,6 +355,7 @@ extern enum crashlog_mode g_crashlog_mode;
 #define LOG_FABRICTEMP           LOGS_DIR "/fabric_temp"
 #define LAST_KMSG_FILE          "last_kmsg"
 #define CONSOLE_RAMOOPS_FILE    "console-ramoops"
+#define FTRACE_RAMOOPS_FILE     "ftrace-ramoops"
 #define EMMC_HEADER_NAME        "emmc_ipanic_header"
 #define CONSOLE_NAME            "emmc_ipanic_console"
 #define CONSOLE_RAM             "ram_ipanic_console"
@@ -369,6 +369,7 @@ extern enum crashlog_mode g_crashlog_mode;
 #define BPLOG_NAME              "bplog"
 #define LAST_KMSG               PROC_DIR "/" LAST_KMSG_FILE
 #define CONSOLE_RAMOOPS         PSTORE_DIR "/" CONSOLE_RAMOOPS_FILE
+#define FTRACE_RAMOOPS          PSTORE_DIR "/" FTRACE_RAMOOPS_FILE
 #define PANIC_HEADER_NAME       PROC_DIR "/" EMMC_HEADER_NAME
 #define PANIC_CONSOLE_NAME      PROC_DIR "/" CONSOLE_NAME
 #define PANIC_THREAD_NAME       PROC_DIR "/" THREAD_NAME

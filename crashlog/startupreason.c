@@ -195,6 +195,7 @@ int crashlog_check_startupreason(char *reason, char *watchdog) {
     usleep(TIMEOUT_VALUE);
     do_log_copy("WDT", dir, dateshort, APLOG_TYPE);
     do_last_kmsg_copy(dir);
+    do_last_fw_msg_copy(dir);
     free(key);
 
     return 0;
