@@ -38,9 +38,10 @@ import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.View.OnClickListener;
-import android.view.View.OnTouchListener;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.CompoundButton;
+import android.widget.CompoundButton.OnCheckedChangeListener;
 import android.widget.LinearLayout;
 import android.widget.Switch;
 import android.widget.TextView;
@@ -62,7 +63,7 @@ import java.lang.RuntimeException;
 import java.util.ArrayList;
 
 
-public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTouchListener {
+public class GeneralSetupFrag extends Fragment implements OnClickListener, OnCheckedChangeListener {
 
     private final String TAG = "AMTL";
     private final String MODULE = "GeneralSetupFrag";
@@ -110,6 +111,9 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
     // Callback object pointer. Active only when associated to Main layout.
     private GSFCallBack gsfCb = nullCb;
     private OnModeChanged modeChangedCallBack = nullModeCb;
+
+    // Used to not execute OnCheckedChanged()
+    private Boolean isIgnore = false;
 
     // Callback interface for Toast messages in Main layout.
     public interface GSFCallBack {
@@ -186,9 +190,11 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
     private void changeButtonColor(boolean changed) {
         if (this.bAppConf != null) {
             if (changed) {
+                this.bAppConf.setEnabled(true);
                 this.bAppConf.setBackgroundColor(Color.BLUE);
                 this.bAppConf.setTextColor(Color.WHITE);
             } else {
+                this.bAppConf.setEnabled(false);
                 this.bAppConf.setBackgroundColor(Color.LTGRAY);
                 this.bAppConf.setTextColor(Color.BLACK);
             }
@@ -371,14 +377,13 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
             if (this.configArray != null) {
                 for (LogOutput o: configArray) {
                     if (view != null) {
-                        view.findViewById(o.getSwitchId()).setOnClickListener(this);
-                        view.findViewById(o.getSwitchId()).setOnTouchListener(this);
+                        ((Switch) view.findViewById(o.getSwitchId()))
+                                .setOnCheckedChangeListener(this);
                     }
                 }
             }
             if (this.sExpertMode != null) {
-                this.sExpertMode.setOnTouchListener(this);
-                this.sExpertMode.setOnClickListener(this);
+                this.sExpertMode.setOnCheckedChangeListener(this);
             }
             if (this.bAppConf != null) {
                 this.bAppConf.setOnClickListener(this);
@@ -555,77 +560,72 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
     }
 
     @Override
-    public boolean onTouch(View view, MotionEvent event) {
-        this.updateText(this.mtsMgr.getMtsState(), tvMtsStatus);
-        /* set config buttons exclusive by retrieving the id
-         * of the button checked and disabling all the others */
-        if (this.configArray != null) {
-            int idChecked = -1;
-            for (LogOutput o: configArray) {
-                if (view.getId() == o.getSwitchId()) {
-                    this.buttonChanged = true;
-                    modeChangedCallBack.onModeChanged(this.buttonChanged);
-                    this.changeButtonColor(this.buttonChanged);
-                    idChecked = o.getSwitchId();
-                }
-            }
-            if (idChecked != -1) {
+    public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+        if (this.isIgnore) {
+            /* Ignore this callback */
+            this.isIgnore = false;
+        } else {
+            SharedPreferences prefs = this.getActivity().getSharedPreferences("AMTLPrefsData",
+                    Context.MODE_PRIVATE);
+            /* Determine current index */
+            int currentIndex = prefs.getInt("index", -2);
+
+            this.updateText(this.mtsMgr.getMtsState(), tvMtsStatus);
+            /* set config buttons exclusive by retrieving the id
+             * of the button checked and disabling all the others */
+            if (this.configArray != null) {
+                int idChecked = -1;
                 for (LogOutput o: configArray) {
-                    if (o.getSwitchId() != idChecked) {
-                        o.getConfSwitch().setChecked(false);
+                    if (buttonView.getId() == o.getSwitchId()) {
+                        this.buttonChanged = true;
+                        modeChangedCallBack.onModeChanged(this.buttonChanged);
+                        if (isChecked) {
+                            idChecked = o.getSwitchId();
+                        }
+                        if (currentIndex == idChecked) {
+                            /* Same configuration than actual one */
+                            /* => Deactivate "Execute Configuration" button */
+                            this.changeButtonColor(false);
+                        } else {
+                            /* New configuration */
+                            /* => Activate "Execute Configuration" button */
+                            this.changeButtonColor(true);
+                        }
                     }
                 }
-                return false;
+
+                if (idChecked != -1) {
+                    for (LogOutput o: configArray) {
+                        if ((o.getSwitchId() != idChecked) && (o.getConfSwitch().isChecked())) {
+                            /* We must ignore the next call to onCheckedChanged because
+                            /* it will be due to te modification of this switch */
+                            this.isIgnore = true;
+                            o.getConfSwitch().setChecked(false);
+                            break;
+                        }
+                    }
+                }
             }
         }
-        switch (view.getId()) {
+
+        switch (buttonView.getId()) {
             case R.id.switchExpertMode:
                 this.buttonChanged = true;
                 modeChangedCallBack.onModeChanged(this.buttonChanged);
                 this.changeButtonColor(this.buttonChanged);
-                this.setSwitchesEnabled(this.sExpertMode.isChecked());
-                if (!this.sExpertMode.isChecked()) {
+                this.setSwitchesEnabled(!isChecked);
+                if (isChecked) {
                     this.setSwitchesChecked(false);
                 }
                 break;
         }
-        return false;
     }
 
     @Override
     public void onClick(View view) {
         this.updateText(this.mtsMgr.getMtsState(), tvMtsStatus);
-        /* set config buttons exclusive by retrieving the id
-         * of the button checked and disabling all the others */
-        if (this.configArray != null) {
-            int idChecked = -1;
-            for (LogOutput o: configArray) {
-                if (view.getId() == o.getSwitchId()) {
-                    this.buttonChanged = true;
-                    modeChangedCallBack.onModeChanged(this.buttonChanged);
-                    this.changeButtonColor(this.buttonChanged);
-                    idChecked = o.getSwitchId();
-                }
-            }
-            if (idChecked != -1) {
-                for (LogOutput o: configArray) {
-                    if (o.getSwitchId() != idChecked) {
-                        o.getConfSwitch().setChecked(false);
-                    }
-                }
-                return;
-            }
-        }
+
         switch (view.getId()) {
-            case R.id.switchExpertMode:
-                this.buttonChanged = true;
-                modeChangedCallBack.onModeChanged(this.buttonChanged);
-                this.changeButtonColor(this.buttonChanged);
-                this.setSwitchesEnabled(!this.sExpertMode.isChecked());
-                if (this.sExpertMode.isChecked()) {
-                    this.setSwitchesChecked(false);
-                }
-                break;
             case savLogId:
                 this.bAppConf.setEnabled(false);
                 this.saveLogs();
