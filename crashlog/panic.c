@@ -111,6 +111,9 @@ static void set_ipanic_crashtype_and_reason(char *console_name, char *crashtype,
     char *fake_32_pattern[] = {"EIP is at panic_dbg_set", "EIP is at kwd_trigger_open", "EIP is at kwd_trigger_write"};
     char *fake_64_pattern[] = {"panic_dbg_set", "kwd_trigger_write"};
     char *hwwdt_64_pattern[] = {"pmu_sc_irq"};
+    const int size_fake_32_pattern = ( sizeof (fake_32_pattern) ) / ( sizeof fake_32_pattern[0] );
+    const int size_fake_64_pattern = ( sizeof (fake_64_pattern) ) / ( sizeof fake_64_pattern[0] );
+    const int size_hwwdt_64_pattern = ( sizeof (hwwdt_64_pattern) ) / ( sizeof hwwdt_64_pattern[0] );
 
     /* Set crash type according to pattern found in Ipanic console file or according to startup reason value*/
     if (find_str_in_file(console_name, "Kernel panic - not syncing: Kernel Watchdog", NULL) > 0) {
@@ -119,13 +122,13 @@ static void set_ipanic_crashtype_and_reason(char *console_name, char *crashtype,
             strcpy(crashtype, KERNEL_SWWDT_FAKE_CRASH);
     }
     else if (find_str_in_file(console_name, "EIP is at pmu_sc_irq", NULL) > 0 ||
-            (find_oneofstrings_in_file_with_keyword(console_name, hwwdt_64_pattern, "RIP:", 1) > 0))
+            (find_oneofstrings_in_file_with_keyword(console_name, hwwdt_64_pattern, "RIP:", size_hwwdt_64_pattern) > 0))
         // This panic is triggered by a fabric error
         // It is marked as a kernel panic linked to a HW watdchog
         // to create a link between these 2 critical crashes
         strcpy(crashtype, KERNEL_HWWDT_CRASH);
-    else if ((find_oneofstrings_in_file(console_name, fake_32_pattern,2) > 0) ||
-            (find_oneofstrings_in_file_with_keyword(console_name, fake_64_pattern, "RIP:", 1) > 0))
+    else if ((find_oneofstrings_in_file(console_name, fake_32_pattern,size_fake_32_pattern) > 0) ||
+            (find_oneofstrings_in_file_with_keyword(console_name, fake_64_pattern, "RIP:", size_fake_64_pattern) > 0))
         strcpy(crashtype, KERNEL_FAKE_CRASH);
     else
         strcpy(crashtype, KERNEL_CRASH);
