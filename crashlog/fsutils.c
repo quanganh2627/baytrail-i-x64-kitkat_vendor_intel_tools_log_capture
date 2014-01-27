@@ -229,6 +229,39 @@ int find_oneofstrings_in_file(char *filename, char **keywords, int nbkeywords) {
     return 0;
 }
 
+int find_oneofstrings_in_file_with_keyword(char *filename, char **keywords, char *common_keyword,int nbkeywords){
+
+    char buffer[MAXLINESIZE];
+    int fd, linesize, idx;
+
+    if (!keywords || !filename || !nbkeywords)
+        return -EINVAL;
+
+    fd = open(filename, O_RDONLY);
+    if(fd <= 0) return -errno;
+
+    while((linesize = readline(fd, buffer)) > 0) {
+        /* Remove the trailing '\n' if it's there */
+        if (buffer[linesize-1] == '\n') {
+            linesize--;
+            buffer[linesize] = 0;
+        }
+
+        /* Check the keywords */
+        for (idx = 0 ; idx < nbkeywords ; idx++) {
+            if ( strstr(buffer, keywords[idx]) ) {
+                //and check the additional keyword
+                if ( strstr(buffer, common_keyword) ) {
+                    close(fd);
+                    return 1;
+                }
+            }
+        }
+    }
+    close(fd);
+    return 0;
+}
+
 /**
  * Finds if file defined by filename contains given keyword and
  * if the matching line also ends with given tails (if provided).

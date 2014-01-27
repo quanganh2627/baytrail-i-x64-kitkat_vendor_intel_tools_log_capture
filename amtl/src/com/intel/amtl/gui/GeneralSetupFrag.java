@@ -58,6 +58,7 @@ import com.intel.internal.telephony.ModemStatus;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.RuntimeException;
 import java.util.ArrayList;
 
 
@@ -103,6 +104,9 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
     private Boolean buttonChanged;
 
     private Boolean firstCreated;
+
+    private int PTI_KILL_WAIT = 1000;
+    private Runtime rtm = java.lang.Runtime.getRuntime();
 
     // Target fragment for progress popup.
     private FragmentManager gsfManager;
@@ -504,6 +508,11 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
     }
 
     public void applyConf() {
+        SharedPreferences prefs = context.getSharedPreferences("AMTLPrefsData",
+                Context.MODE_PRIVATE);
+        /* Determine current index */
+        int id = prefs.getInt("index", -2);
+
         if (!this.sExpertMode.isChecked()) {
             SystemProperties.set(EXPERT_PROPERTY, "0");
             if (this.configArray != null) {
@@ -533,6 +542,21 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
                 }
             }
         }
+
+        /* Determine if pti is activated */
+        if (id >= 0) {
+            if (configArray.get(id).getSigusr1ToSend().equalsIgnoreCase("true")) {
+                /* pti is activated => need to send sigusr1 signal */
+                try {
+                    Log.d(TAG, MODULE + ": send SIGUSR1 signal");
+                    rtm.exec("start pti_sigusr1");
+                    android.os.SystemClock.sleep(PTI_KILL_WAIT);
+                } catch (IOException e) {
+                    Log.e(TAG, MODULE + ": can't send sigusr1 signal");
+                }
+            }
+        }
+
         ConfigApplyFrag progressFrag = new ConfigApplyFrag(CONFSETUP_TAG,
                 CONFSETUP_TARGETFRAG, context);
         progressFrag.launch(modemConfToApply, this, gsfManager);

@@ -2,6 +2,7 @@
 LOCAL_PATH:=vendor/intel/tools/log_capture/amtl/src/com/intel/amtl/config_catalog
 ifneq (, $(findstring "$(TARGET_BUILD_VARIANT)", "eng" "userdebug"))
 PRODUCT_COPY_FILES += \
+        $(LOCAL_PATH)/ANNIEDALE_XMM_7160_REV3_5.cfg:system/etc/amtl/catalog/ANNIEDALE_XMM_7160_REV3_5.cfg \
         $(LOCAL_PATH)/ANNIEDALE_XMM_7260_REV1.cfg:system/etc/amtl/catalog/ANNIEDALE_XMM_7260_REV1.cfg \
         $(LOCAL_PATH)/ANNIEDALE_XMM_7260_REV2.cfg:system/etc/amtl/catalog/ANNIEDALE_XMM_7260_REV2.cfg \
         $(LOCAL_PATH)/TANGIER_XMM_6360.cfg:system/etc/amtl/catalog/TANGIER_XMM_6360.cfg \

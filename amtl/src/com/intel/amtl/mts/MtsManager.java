@@ -93,7 +93,7 @@ public class MtsManager {
     private void startMtsOneshot() {
         Log.d(TAG, MODULE + ": starting mts oneshot");
         try {
-            rtm.exec("start mtsp");
+            rtm.exec("start mtso");
         } catch (IOException ex) {
             Log.e(TAG, MODULE + ": cannot start mts oneshot");
         }
@@ -117,7 +117,7 @@ public class MtsManager {
     private void stopMtsOneshot() {
         try {
             Log.d(TAG, MODULE + ": stopping mts oneshot");
-            rtm.exec("stop mtsp");
+            rtm.exec("stop mtso");
         } catch (IOException ex) {
             Log.e(TAG, MODULE + ": can't stop current running mts oneshot");
         }

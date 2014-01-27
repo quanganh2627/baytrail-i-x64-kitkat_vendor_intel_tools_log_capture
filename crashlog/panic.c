@@ -44,44 +44,60 @@ int cfg_check_ram_panic = 1;
 static int check_aplogs_tobackup(char *filename) {
     char ipanic_chain[PROPERTY_VALUE_MAX];
     int nbpatterns, res;
-    char **patterns_array;
+    char **patterns_array_32;
+    char **patterns_array_64;
+    char *SGX_64_pattern[] = {"SGXInitialise"};
     int idx, nbrecords = 10, recordsize = PROPERTY_VALUE_MAX;
 
     if (property_get(PROP_IPANIC_PATTERN, ipanic_chain, "") > 0) {
         /* Found the property, split it into an array */
-        patterns_array = commachain_to_fixedarray(ipanic_chain, recordsize, nbrecords, &nbpatterns);
+        patterns_array_32 = commachain_to_fixedarray(ipanic_chain, recordsize, nbrecords, &nbpatterns);
         if (nbpatterns < 0 ) {
             LOGE("%s: Cannot transform the property %s(which is %s) into an array... error is %d - %s\n",
                 __FUNCTION__, PROP_IPANIC_PATTERN, ipanic_chain, nbpatterns, strerror(-nbpatterns));
             for (idx = 0 ; idx < nbrecords ; idx++) {
-                free(patterns_array[idx]);
+                free(patterns_array_32[idx]);
             }
-            free(patterns_array);
+            free(patterns_array_32);
             return 0;
         }
         if ( nbpatterns == 0 ) return 0;
+        //pattern 64 bit is a copy of pattern 32 before transformation
+        patterns_array_64 = (char**)malloc(nbrecords*sizeof(char*));
         /* Add the prepattern "EIP is at" to each of the patterns */
         for (idx = 0 ; idx < nbpatterns ; idx++) {
+            //copy each item for 64 pattern
+            patterns_array_64[idx] = (char*)malloc(recordsize*sizeof(char));
+            strncpy(patterns_array_64[idx], patterns_array_32[idx], recordsize-1);
             char *prepattern = "EIP is at ";
             int prepatternlen = strlen(prepattern);
-            memmove(&patterns_array[idx][prepatternlen], patterns_array[idx],
-                MIN((int)strlen(patterns_array[idx])+1, PROPERTY_VALUE_MAX-prepatternlen));
+            memmove(&patterns_array_32[idx][prepatternlen], patterns_array_32[idx],
+                MIN((int)strlen(patterns_array_32[idx])+1, PROPERTY_VALUE_MAX-prepatternlen));
             /* insure the chain is null terminated */
-            patterns_array[idx][PROPERTY_VALUE_MAX-1] = 0;
-            memcpy(patterns_array[idx], prepattern, prepatternlen);
+            patterns_array_32[idx][PROPERTY_VALUE_MAX-1] = 0;
+            memcpy(patterns_array_32[idx], prepattern, prepatternlen);
         }
-        res = find_oneofstrings_in_file(filename, (char**)patterns_array, nbpatterns);
-        if (res > 0)
+        res = (find_oneofstrings_in_file(filename, (char**)patterns_array_32, nbpatterns) ||
+                find_oneofstrings_in_file_with_keyword(filename,  (char**)patterns_array_64, "RIP:", nbpatterns));
+        if (res > 0){
+            LOGE("%s: before process\n", __FUNCTION__);
             process_log_event(NULL, NULL, MODE_APLOGS);
+        }
         /* Cleanup the patterns_array allocated in commchain... */
         for (idx = 0 ; idx < nbrecords ; idx++) {
-            free(patterns_array[idx]);
+            free(patterns_array_32[idx]);
         }
-        free(patterns_array);
+        // pattern_64 is based on nbpatterns size
+        for (idx = 0 ; idx < nbpatterns ; idx++) {
+            free(patterns_array_64[idx]);
+        }
+        free(patterns_array_32);
+        free(patterns_array_64);
     }
     else {
         /* By default, searches for the single following pattern... */
-        res = find_str_in_file(filename, "EIP is at SGXInitialise", NULL);
+        res = (find_str_in_file(filename, "EIP is at SGXInitialise", NULL) ||
+                find_oneofstrings_in_file_with_keyword(filename, SGX_64_pattern, "RIP:", 1));
         if (res > 0)
             process_log_event(NULL, NULL, MODE_APLOGS);
     }
@@ -92,6 +108,9 @@ static int check_aplogs_tobackup(char *filename) {
 static void set_ipanic_crashtype_and_reason(char *console_name, char *crashtype, char *reason,
         e_crashtype_mode_t mode) {
     char *key;
+    char *fake_32_pattern[] = {"EIP is at panic_dbg_set", "EIP is at kwd_trigger_open", "EIP is at kwd_trigger_write"};
+    char *fake_64_pattern[] = {"panic_dbg_set", "kwd_trigger_write"};
+    char *hwwdt_64_pattern[] = {"pmu_sc_irq"};
 
     /* Set crash type according to pattern found in Ipanic console file or according to startup reason value*/
     if (find_str_in_file(console_name, "Kernel panic - not syncing: Kernel Watchdog", NULL) > 0) {
@@ -99,19 +118,20 @@ static void set_ipanic_crashtype_and_reason(char *console_name, char *crashtype,
         if (find_str_in_file(console_name, "[SHTDWN] WATCHDOG TIMEOUT for test!", NULL) > 0)
             strcpy(crashtype, KERNEL_SWWDT_FAKE_CRASH);
     }
-    else if (find_str_in_file(console_name, "EIP is at pmu_sc_irq", NULL) > 0)
+    else if (find_str_in_file(console_name, "EIP is at pmu_sc_irq", NULL) > 0 ||
+            (find_oneofstrings_in_file_with_keyword(console_name, hwwdt_64_pattern, "RIP:", 1) > 0))
         // This panic is triggered by a fabric error
         // It is marked as a kernel panic linked to a HW watdchog
         // to create a link between these 2 critical crashes
         strcpy(crashtype, KERNEL_HWWDT_CRASH);
-    else if ((find_str_in_file(console_name, "EIP is at panic_dbg_set", NULL) > 0) ||
-            (find_str_in_file(console_name, "EIP is at kwd_trigger_open", NULL) > 0))
+    else if ((find_oneofstrings_in_file(console_name, fake_32_pattern,2) > 0) ||
+            (find_oneofstrings_in_file_with_keyword(console_name, fake_64_pattern, "RIP:", 1) > 0))
         strcpy(crashtype, KERNEL_FAKE_CRASH);
     else
         strcpy(crashtype, KERNEL_CRASH);
 
     if ((mode == EMMC_PANIC_MODE) &&
-            (find_str_in_file(console_name, "sdhci_pci_power_up_host: host controller power up is done", NULL) <= 0)) {
+            (find_str_in_file(console_name, "power_up_host: host controller power up is done", NULL) <= 0)) {
         // An error is raised when the panic console file does not end normally
        raise_infoerror(ERROREVENT, IPANIC_CORRUPTED);
     }
