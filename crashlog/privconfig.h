@@ -283,6 +283,8 @@ extern enum crashlog_mode g_crashlog_mode;
 #define PROP_RELEASE_VERSION    "ro.build.version.release"
 #define PROP_SYS_BKC_VERSION    "ro.build.version.incremental"
 #define PROP_SOC_VERSION        "ro.board.platform"
+#define PROP_REPORT_FAKE        "crashreport.events.fake"
+#define PROP_REPORT_COUNTDOWN   "crashreport.events.countdown"
 
 /* DIRECTORIES */
 #ifndef __LINUX__

@@ -47,6 +47,7 @@ static int nextline = -1;
 static int loop_uptime_event = 1;
 /* last uptime value set at device boot only */
 static char lastbootuptime[24] = "0000:00:00";
+static char lastfakeprop[PROPERTY_VALUE_MAX] = "";
 extern int gabortcleansd;
 // global variable to enable dynamic change of uptime frequency
 int gcurrent_uptime_hour_frequency = UPTIME_HOUR_FREQUENCY;
@@ -373,6 +374,38 @@ int history_has_event(char *eventdir) {
     return 0;
 }
 
+void clean_fake_property() {
+    char current_fake_prop[PROPERTY_VALUE_MAX];
+    char value[PROPERTY_VALUE_MAX];
+    int fake_prop_countdown;
+    char str[15];
+
+    if(property_get(PROP_REPORT_FAKE, current_fake_prop, NULL)){
+        if (!strcmp(current_fake_prop, "")){
+            //no fake property active, need to clean internal value
+            property_set(PROP_REPORT_COUNTDOWN, 0);
+            strcpy(lastfakeprop, "");
+        } else {
+            if (strcmp(current_fake_prop, lastfakeprop)) {
+                //new fake prop =>reset countdown
+                property_set(PROP_REPORT_COUNTDOWN, "3");
+                strcpy(lastfakeprop,current_fake_prop);
+            } else {
+                property_get(PROP_REPORT_COUNTDOWN, value, "3");
+                fake_prop_countdown = atoi(value);
+                // decrease countdown
+                fake_prop_countdown--;
+                if (fake_prop_countdown <=0){
+                    property_set(PROP_REPORT_FAKE,"");
+                    strcpy(lastfakeprop, "");
+                }
+                sprintf(str, "%d", fake_prop_countdown);
+                property_set(PROP_REPORT_COUNTDOWN, str);
+            }
+        }
+    }
+}
+
 /*
 * Name          : add_uptime_event
 * Description   : adds an uptime event to the history file and upload an event if 12hours passed
@@ -470,5 +503,6 @@ int update_history_on_cmd_delete(char *events) {
 
 int process_uptime_event(struct watch_entry __attribute__((unused)) *entry, struct inotify_event __attribute__((unused)) *event) {
 
+    clean_fake_property();
     return add_uptime_event();
 }

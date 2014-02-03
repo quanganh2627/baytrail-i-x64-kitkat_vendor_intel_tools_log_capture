@@ -38,6 +38,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <cutils/log.h>
+#include <cutils/properties.h>
 
 /* private structure */
 struct mmgr_data {
@@ -50,6 +51,17 @@ struct mmgr_data {
 
 mmgr_cli_handle_t *mmgr_hdl = NULL;
 static int mmgr_monitor_fd[2];
+
+static bool is_mmgr_fake_event() {
+    char prop_mmgr[PROPERTY_VALUE_MAX];
+
+    if(property_get(PROP_REPORT_FAKE, prop_mmgr, NULL)){
+        if (!strcmp(prop_mmgr, "modem")) {
+            return 1;
+        }
+    }
+    return 0;
+}
 
 static void write_mmgr_monitor_with_extras(char *chain, char *extra_string, int extra_string_len, int extra_int) {
     struct mmgr_data cur_data;
@@ -553,6 +565,11 @@ int mmgr_handle(void) {
             fclose(fp);
             do_chown(fullpath, PERM_USER, PERM_GROUP);
         }
+    }
+    //last step : need to check if this event should be reported as FAKE
+    if (is_mmgr_fake_event()){
+        //add _FAKE suffix
+        strcat(type,"_FAKE");
     }
     key = raise_event(event_name, type, NULL, destion);
     LOGE("%-8s%-22s%-20s%s %s\n", event_name, key, get_current_time_long(0), type, destion);
