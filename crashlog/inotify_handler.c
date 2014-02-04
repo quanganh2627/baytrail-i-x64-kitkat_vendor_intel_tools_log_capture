@@ -72,6 +72,7 @@ struct watch_entry wd_array[] = {
 #ifdef FULL_REPORT
     {0, APLOG_DIR_MASK,     CMDTRIG_TYPE,   0,      CMDTRIG_EVNAME,     APLOG_DIR,          "_cmd",                     NULL},
 #endif
+    {0, DROPBOX_DIR_MASK,   KPANIC_DMESG_TYPE, 0,   KPANIC_DMESG_EVNAME, DROPBOX_DIR,       "KPANIC_DMESG",             NULL},
     /* -----------------------------above is dir, below is file------------------------------------------------------------ */
     {0, UPTIME_MASK,        UPTIME_TYPE,    0,      UPTIME_EVNAME,      UPTIME_FILE,        NULL,                      NULL},
     /* -------------------------above is AP, below is modem---------------------------------------------------------------- */
