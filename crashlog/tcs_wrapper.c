@@ -24,6 +24,7 @@
  *
  */
 #include "tcs_wrapper.h"
+#include "crashutils.h"
 
 #include "privconfig.h"
 #include "tcs.h"
@@ -40,21 +41,32 @@
 int get_modem_name(char* modem_name) {
     tcs_handle_t *h = NULL;
     tcs_cfg_t *tcs_cfg = NULL;
+    int ret = -1;
 
     h = tcs_init();
     if(!h) {
         LOGE("%s: Could not initialize Telephony Configuration Selector.\n", __FUNCTION__);
-        return -1;
+        goto out;
     }
 
     tcs_cfg = tcs_get_config(h);
-    if(!tcs_cfg) {
+    if((!tcs_cfg) || (!tcs_cfg->mdms.mdm_info)) {
         LOGE("%s: Could not retrieve configuration.\n", __FUNCTION__);
-        tcs_dispose(h);
-        return -1;
+        goto out;
     }
 
-    strncpy(modem_name, tcs_cfg->mdm_info.name, PROPERTY_VALUE_MAX);
+    if(tcs_cfg->mdms.nb == 1) {
+        strncpy(modem_name, tcs_cfg->mdms.mdm_info[0].name, PROPERTY_VALUE_MAX);
+        ret = 0;
+    } else if(tcs_cfg->mdms.nb == 0) {
+        LOGD("%s: no modem", __FUNCTION__);
+        modem_name[0] = '\0';
+    } else {
+        LOGE("%s: Crashlogd doesn't handle multiple modems", __FUNCTION__);
+        raise_infoerror(ERROREVENT, CRASHLOG_ERROR_MODEMS);
+    }
+
+out:
     tcs_dispose(h);
-    return 0;
+    return ret;
 }
