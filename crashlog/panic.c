@@ -108,8 +108,8 @@ static int check_aplogs_tobackup(char *filename) {
 static void set_ipanic_crashtype_and_reason(char *console_name, char *crashtype, char *reason,
         e_crashtype_mode_t mode) {
     char *key;
-    char *fake_32_pattern[] = {"EIP is at panic_dbg_set", "EIP is at kwd_trigger_open", "EIP is at kwd_trigger_write"};
-    char *fake_64_pattern[] = {"panic_dbg_set", "kwd_trigger_write"};
+    char *fake_32_pattern[] = {"EIP is at panic_dbg_set", "EIP is at kwd_trigger_open", "EIP is at kwd_trigger_write", "EIP is at reboot_notifier"};
+    char *fake_64_pattern[] = {"panic_dbg_set", "kwd_trigger_write", "reboot_notifier"};
     char *hwwdt_64_pattern[] = {"pmu_sc_irq"};
     const int size_fake_32_pattern = ( sizeof (fake_32_pattern) ) / ( sizeof fake_32_pattern[0] );
     const int size_fake_64_pattern = ( sizeof (fake_64_pattern) ) / ( sizeof fake_64_pattern[0] );
