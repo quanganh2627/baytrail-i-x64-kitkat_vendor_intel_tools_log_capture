@@ -351,7 +351,10 @@ static int dump_binary_attchmts_in_file(struct ct_event* ev, char* file_path) {
         case CT_ATTCHMT_DATA0:
         case CT_ATTCHMT_DATA1:
         case CT_ATTCHMT_DATA2:
-            /* Nothing to do */
+	case CT_ATTCHMT_DATA3:
+	case CT_ATTCHMT_DATA4:
+	case CT_ATTCHMT_DATA5:
+        /* Nothing to do */
             break;
         default:
             LOGE("Ignoring unknown attachment type: %d\n", at->type);
@@ -391,6 +394,15 @@ static int dump_data_in_file(struct ct_event* ev, char* file_path) {
             break;
         case CT_ATTCHMT_DATA2:
             fprintf(file, "DATA2=%s\n", att->data);
+            break;
+        case CT_ATTCHMT_DATA3:
+            fprintf(file, "DATA3=%s\n", att->data);
+            break;
+        case CT_ATTCHMT_DATA4:
+            fprintf(file, "DATA4=%s\n", att->data);
+            break;
+        case CT_ATTCHMT_DATA5:
+            fprintf(file, "DATA5=%s\n", att->data);
             break;
         default:
             break;
