@@ -252,6 +252,49 @@ int mdm_CORE_DUMP(mmgr_cli_event_t *ev)
     return 0;
 }
 
+int mdm_TFT_EVENT(mmgr_cli_event_t *ev)
+{
+    LOGD("Received E_MMGR_NOTIFY_TFT_EVENT");
+    struct mmgr_data cur_data;
+    mmgr_cli_tft_event_t * tft_ev = (mmgr_cli_tft_event_t *)ev->data;
+    int i;
+
+    // Add "TFT" in top of cur_data.string to recognize the type of event in the next
+    snprintf(cur_data.string, sizeof(cur_data.string), "TFT%s", tft_ev->name);
+
+    // cur_data.extra_int is the merge of the type and the logging rules
+    cur_data.extra_int = (tft_ev->type & 0xFF) + (tft_ev->log << 8);
+
+    if (tft_ev->num_data > 0) {
+        if (tft_ev->data[0].len > 0) {
+            LOGD("len of data 0: %d", tft_ev->data[0].len);
+            strncpy(cur_data.extra_string, tft_ev->data[0].value, sizeof(cur_data.extra_string));
+            cur_data.extra_string[MIN(tft_ev->data[0].len, sizeof(cur_data.extra_string))] = '\0';
+        } else {
+            cur_data.extra_string[0] = '\0';
+        }
+
+        for (i=0; i<tft_ev->num_data-1; i++) {
+            LOGD("len of data %d: %d", i+1, tft_ev->data[i+1].len);
+            if (tft_ev->data[i+1].len > 0) {
+                strncpy(cur_data.extra_tab_string[i], tft_ev->data[i+1].value,
+                        sizeof(cur_data.extra_tab_string[i]));
+                cur_data.extra_tab_string[i][MIN(tft_ev->data[i+1].len,
+                        sizeof(cur_data.extra_tab_string[i]))] = '\0';
+            } else {
+                cur_data.extra_tab_string[i][0] = '\0';
+            }
+        }
+
+        cur_data.extra_nb_causes = tft_ev->num_data - 1;
+    } else {
+        cur_data.extra_nb_causes = 0;
+    }
+
+    write(mmgr_monitor_fd[1], &cur_data, sizeof(struct mmgr_data));
+    return 0;
+}
+
 
 int mmgr_get_fd()
 {
@@ -281,6 +324,7 @@ void init_mmgr_cli_source(void){
     mmgr_cli_subscribe_event(mmgr_hdl, mdm_CORE_DUMP_COMPLETE, E_MMGR_NOTIFY_CORE_DUMP_COMPLETE);
     mmgr_cli_subscribe_event(mmgr_hdl, mdm_AP_RESET, E_MMGR_NOTIFY_AP_RESET);
     mmgr_cli_subscribe_event(mmgr_hdl, mdm_TEL_ERROR, E_MMGR_NOTIFY_ERROR);
+    mmgr_cli_subscribe_event(mmgr_hdl, mdm_TFT_EVENT, E_MMGR_NOTIFY_TFT_EVENT);
 
     uint32_t iMaxTryConnect = MAX_WAIT_MMGR_CONNECT_SECONDS * 1000 / MMGR_CONNECT_RETRY_TIME_MS;
 
@@ -435,8 +479,29 @@ int mmgr_handle(void) {
     }
     //find_dir should be done before event_dir is set
     LOGD("Received string from mmgr: %s  - %d bytes", type,nbytes);
-    if (compute_mmgr_param(type, &event_mode, event_name, &copy_aplog, &copy_bplog, &aplog_mode) < 0) {
-        return -1;
+    // For "TFT" event, parameters are given by the data themselves
+    if (strstr(type, "TFT")) {
+        switch (cur_data.extra_int & 0xFF) {
+             case E_EVENT_ERROR:
+                 sprintf(event_name, "%s", ERROREVENT);
+                 break;
+             case E_EVENT_STATS:
+                 sprintf(event_name, "%s", STATSEVENT);
+                 break;
+             case E_EVENT_INFO:
+             default:
+                 sprintf(event_name, "%s", INFOEVENT);
+        }
+        event_mode = MODE_STATS;
+        aplog_mode = APLOG_STATS_TYPE;
+        copy_aplog = (cur_data.extra_int >> 8) & MMGR_CLI_TFT_AP_LOG_MASK;
+        copy_bplog = ((cur_data.extra_int >> 8) & MMGR_CLI_TFT_BP_LOG_MASK)
+                && check_running_modem_trace();
+    } else {
+       if (compute_mmgr_param(type, &event_mode, event_name, &copy_aplog, &copy_bplog,
+               &aplog_mode) < 0) {
+           return -1;
+       }
     }
     //set DATA0/1 value
     if (strstr(type, "MPANIC" )) {
@@ -494,7 +559,32 @@ int mmgr_handle(void) {
         snprintf(data0,sizeof(data0),"%d", cur_data.extra_int);
         LOGD("Extra string value : %s ",cur_data.extra_string);
         snprintf(data1,sizeof(data1),"%s", cur_data.extra_string);
-    }else if (strstr(type, "START_CD" )){
+    } else if (strstr(type, "TFT")) {
+        LOGD("Extra string value : %s ",cur_data.extra_string);
+        snprintf(data0,sizeof(data0),"%s", cur_data.extra_string);
+        if(cur_data.extra_nb_causes > 0) {
+            LOGD("Extra tab string value 0: %s ",cur_data.extra_tab_string[0]);
+            snprintf(data1,sizeof(data1),"%s", cur_data.extra_tab_string[0]);
+            if(cur_data.extra_nb_causes > 1) {
+                LOGD("Extra tab string value 1: %s ",cur_data.extra_tab_string[1]);
+                snprintf(data2,sizeof(data2),"%s", cur_data.extra_tab_string[1]);
+            }
+            if(cur_data.extra_nb_causes > 2) {
+                LOGD("Extra tab string value 2: %s ",cur_data.extra_tab_string[2]);
+                snprintf(data3,sizeof(data3),"%s", cur_data.extra_tab_string[2]);
+            }
+            if(cur_data.extra_nb_causes > 3) {
+                LOGD("Extra tab string value 3: %s ",cur_data.extra_tab_string[3]);
+                snprintf(data4,sizeof(data4),"%s", cur_data.extra_tab_string[3]);
+            }
+            if(cur_data.extra_nb_causes > 4) {
+                LOGD("Extra tab string value 4 %s ",cur_data.extra_tab_string[4]);
+                snprintf(data5,sizeof(data5),"%s", cur_data.extra_tab_string[4]);
+            }
+        }
+        // Remove the "TFT" tag added in top of cur_data.string
+        strcpy(type, &cur_data.string[3]);
+    } else if (strstr(type, "START_CD" )){
         FILE *fp = fopen(MCD_PROCESSING,"w");
         if (fp == NULL){
             LOGE("can not create file: %s\n", MCD_PROCESSING);
@@ -540,6 +630,8 @@ int mmgr_handle(void) {
             snprintf(fullpath, sizeof(fullpath)-1, "%s/%s_errorevent", destion,type );
         }else if (strstr(event_name , INFOEVENT)) {
             snprintf(fullpath, sizeof(fullpath)-1, "%s/%s_infoevent", destion,type );
+        }else if (strstr(event_name , STATSEVENT)) {
+            snprintf(fullpath, sizeof(fullpath)-1, "%s/%s_trigger", destion,type );
         }else{
             snprintf(fullpath, sizeof(fullpath)-1, "%s/%s_crashdata", destion,type );
         }
