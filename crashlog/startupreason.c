@@ -24,7 +24,8 @@
 #include "fsutils.h"
 #include "privconfig.h"
 #include "uefivar.h"
-#include "inc/uefi/bootlogic.h"
+
+#include <efilinux/bootlogic.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
