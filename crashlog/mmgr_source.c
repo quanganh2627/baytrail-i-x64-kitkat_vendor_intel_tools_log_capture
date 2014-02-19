@@ -218,30 +218,6 @@ int mdm_AP_RESET(mmgr_cli_event_t *ev)
     return 0;
 }
 
-int mdm_TEL_ERROR(mmgr_cli_event_t *ev)
-{
-    LOGD("Received E_MMGR_NOTIFY_ERROR");
-    char *extra_string = NULL;
-    int extra_int = 0, extra_string_len = 0;
-    mmgr_cli_error_t * err = (mmgr_cli_error_t *)ev->data;
-
-    if (err == NULL) {
-        LOGE("%s: empty data", __FUNCTION__);
-    }else{
-        extra_int = err->id;
-        if (err->len < MMGRMAXEXTRA) {
-            extra_string = err->reason;
-            extra_string_len = err->len;
-            LOGD("error {id:%d reason:\"%s\" len:%d}", err->id, extra_string, extra_string_len);
-        }else{
-            LOGE("%s: length error : %lu", __FUNCTION__, (unsigned long)err->len);
-        }
-    }
-
-    write_mmgr_monitor_with_extras("TELEPHONY", extra_string, extra_string_len, extra_int);
-    return 0;
-}
-
 int mdm_CORE_DUMP(mmgr_cli_event_t *ev)
 {
     LOGD("Received E_MMGR_NOTIFY_CORE_DUMP");
@@ -257,7 +233,7 @@ int mdm_TFT_EVENT(mmgr_cli_event_t *ev)
     LOGD("Received E_MMGR_NOTIFY_TFT_EVENT");
     struct mmgr_data cur_data;
     mmgr_cli_tft_event_t * tft_ev = (mmgr_cli_tft_event_t *)ev->data;
-    int i;
+    size_t i;
 
     // Add "TFT" in top of cur_data.string to recognize the type of event in the next
     snprintf(cur_data.string, sizeof(cur_data.string), "TFT%s", tft_ev->name);
@@ -323,7 +299,6 @@ void init_mmgr_cli_source(void){
     mmgr_cli_subscribe_event(mmgr_hdl, mdm_MRESET, E_MMGR_NOTIFY_SELF_RESET);
     mmgr_cli_subscribe_event(mmgr_hdl, mdm_CORE_DUMP_COMPLETE, E_MMGR_NOTIFY_CORE_DUMP_COMPLETE);
     mmgr_cli_subscribe_event(mmgr_hdl, mdm_AP_RESET, E_MMGR_NOTIFY_AP_RESET);
-    mmgr_cli_subscribe_event(mmgr_hdl, mdm_TEL_ERROR, E_MMGR_NOTIFY_ERROR);
     mmgr_cli_subscribe_event(mmgr_hdl, mdm_TFT_EVENT, E_MMGR_NOTIFY_TFT_EVENT);
 
     uint32_t iMaxTryConnect = MAX_WAIT_MMGR_CONNECT_SECONDS * 1000 / MMGR_CONNECT_RETRY_TIME_MS;
@@ -407,12 +382,6 @@ static int compute_mmgr_param(char *type, e_dir_mode_t *mode, char *name, int *a
         sprintf(name, "%s",CRASHEVENT);
         *log_mode = APLOG_TYPE;
         *aplog = 1;
-    } else if (strstr(type, "TELEPHONY" )) {
-        //CASE TEL_ERROR
-        *mode = MODE_STATS;
-        sprintf(name, "%s", ERROREVENT);
-        *aplog = 1;
-        *log_mode = APLOG_STATS_TYPE;
     } else  if (!strstr(type, "START_CD" )){
         //unknown event name
         LOGE("%s: wrong type found in mmgr_get_fd : %s.\n", __FUNCTION__, type);
@@ -554,11 +523,6 @@ int mmgr_handle(void) {
                 snprintf(data5,sizeof(data5),"%s", cur_data.extra_tab_string[4]);
             }
         }
-    } else if (strstr(type, "TELEPHONY" )){
-        LOGD("Extra int value : %d ",cur_data.extra_int);
-        snprintf(data0,sizeof(data0),"%d", cur_data.extra_int);
-        LOGD("Extra string value : %s ",cur_data.extra_string);
-        snprintf(data1,sizeof(data1),"%s", cur_data.extra_string);
     } else if (strstr(type, "TFT")) {
         LOGD("Extra string value : %s ",cur_data.extra_string);
         snprintf(data0,sizeof(data0),"%s", cur_data.extra_string);
