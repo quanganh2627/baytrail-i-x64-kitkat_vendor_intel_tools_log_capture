@@ -367,6 +367,7 @@ extern enum crashlog_mode g_crashlog_mode;
 #define THREAD_NAME             "emmc_ipanic_threads"
 #define LOGCAT_NAME             "emmc_ipanic_logcat"
 #define FABRIC_ERROR_NAME       "ipanic_fabric_err"
+#define FABRIC_RECOV_NAME       "ipanic_fabric_recv_err"
 #define OFFLINE_SCU_LOG_NAME    "offline_scu_log"
 #define GBUFFER_NAME            "emmc_ipanic_gbuffer"
 #define CMDLINE_NAME            "cmdline"
@@ -380,6 +381,7 @@ extern enum crashlog_mode g_crashlog_mode;
 #define PANIC_THREAD_NAME       PROC_DIR "/" THREAD_NAME
 #define PANIC_GBUFFER_NAME      PROC_DIR "/" GBUFFER_NAME
 #define PROC_FABRIC_ERROR_NAME  PROC_DIR "/" FABRIC_ERROR_NAME
+#define PROC_FABRIC_RECOV_NAME  PROC_DIR "/" FABRIC_RECOV_NAME
 #define PROC_OFFLINE_SCU_LOG_NAME PROC_DIR "/" OFFLINE_SCU_LOG_NAME
 #define KERNEL_CMDLINE          PROC_DIR "/" CMDLINE_NAME
 #define PROC_UUID               PROC_DIR "/emmc0_id_entry"

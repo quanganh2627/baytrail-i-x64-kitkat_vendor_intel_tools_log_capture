@@ -30,6 +30,7 @@
 #include "crashutils.h"
 #include "fsutils.h"
 #include "ct_utils.h"
+#include "ct_eventintegrity.h"
 
 #define BINARY_SUFFIX  ".bin"
 #define PROP_PREFIX    "dev.log"
@@ -41,6 +42,65 @@ static const char *suffixes[] = {
     [CT_EV_CRASH]   = "_errorevent",
     [CT_EV_LAST]    = "_ignored"
 };
+
+static bool copy_file_to_crashdir(char* sourcefile, const char* destpath) {
+
+    char *ptr_filename;               /* Pointer to file in filepath string */
+    char destination[PATHMAX];        /* Absolute path to copy input files */
+
+    if (!sourcefile || !destpath)
+        return 0;
+
+    ptr_filename = strrchr(sourcefile, '/');
+
+    if (!ptr_filename || !ptr_filename[0])
+        return 0;
+
+    /* Start from the character following '/' */
+    ptr_filename++;
+
+    /* Destination file name */
+    snprintf(destination, sizeof(destination), "%s%s",
+             destpath, ptr_filename);
+    /* Copy the file */
+    return !do_copy_eof(sourcefile, destination);
+}
+
+#define FILELIST_MAX_LEN    256    /* max length of filelist string */
+#define FILELIST_SEPARATOR  ";,"
+static int copy_attached_files(struct ct_event* ev, const char* copy_dst) {
+
+    struct ct_attchmt* att = NULL;    /* KCT attachment structure */
+    char filelist[FILELIST_MAX_LEN];  /* Copy of the filelist field string */
+    char *ptr_filepath;               /* Pointer for  each file path */
+    char *savedstate;                 /* Pointer to save state of strtok_r */
+
+    foreach_attchmt(ev, att) {
+        switch (att->type) {
+        case CT_ATTCHMT_FILELIST:
+            if (!att->size || !att->data)
+                break;
+
+            /* Copy the file list into a new array */
+            /* because of strtok_r mechanism       */
+            strncpy(filelist, att->data, FILELIST_MAX_LEN);
+
+            /* Using comma or semicolon to split the list */
+            ptr_filepath = strtok_r(filelist, FILELIST_SEPARATOR, &savedstate);
+
+            while (ptr_filepath != NULL) {
+                copy_file_to_crashdir(ptr_filepath, copy_dst);
+
+                /* Get next token */
+                ptr_filepath = strtok_r(NULL, FILELIST_SEPARATOR, &savedstate);
+            }
+            break;
+        default:
+            break;
+        }
+    }
+    return 0;
+}
 
 void handle_event(struct ct_event *ev) {
 
@@ -131,6 +191,10 @@ void process_msg(struct ct_event *ev)
                 ev->submitter_name, ev->ev_name, BINARY_SUFFIX);
 
         dump_binary_attchmts_in_file(ev, destination);
+
+        snprintf(destination, sizeof(destination), "%s%d/", dir_mode, dir);
+        copy_attached_files(ev, destination);
+        check_event_integrity(ev, destination);
     }
 
     snprintf(destination, sizeof(destination), "%s%d/%s_%s%s",
@@ -180,9 +244,10 @@ int dump_binary_attchmts_in_file(struct ct_event* ev, char* file_path) {
         case CT_ATTCHMT_DATA0:
         case CT_ATTCHMT_DATA1:
         case CT_ATTCHMT_DATA2:
-    case CT_ATTCHMT_DATA3:
-    case CT_ATTCHMT_DATA4:
-    case CT_ATTCHMT_DATA5:
+        case CT_ATTCHMT_DATA3:
+        case CT_ATTCHMT_DATA4:
+        case CT_ATTCHMT_DATA5:
+        case CT_ATTCHMT_FILELIST:
         /* Nothing to do */
             break;
         default:

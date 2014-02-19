@@ -47,7 +47,8 @@ LOCAL_SRC_FILES := \
     kct_netlink.c \
     lct_link.c \
     iptrak.c \
-    uefivar.c
+    uefivar.c \
+    ct_eventintegrity.c
 
 LOCAL_CFLAGS := -DFULL_REPORT=1
 
