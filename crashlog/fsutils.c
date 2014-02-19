@@ -980,7 +980,7 @@ int read_file_prop_uid(char* source, char *filename, char *uid, char* defaultval
 }
 
 #ifndef FULL_REPORT
-static void flush_aplog()
+void flush_aplog()
 {
     struct stat info;
     int status;
