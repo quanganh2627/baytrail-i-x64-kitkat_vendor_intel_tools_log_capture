@@ -50,6 +50,9 @@ public class ConfigApplyFrag extends DialogFragment {
     private final String TAG = "AMTL";
     private final String MODULE = "ConfigApplyFrag";
 
+    private static String EXTRA_TAG = null;
+    private static String EXTRA_FRAG = null;
+
     int targetFrag;
     String tag;
 
@@ -57,9 +60,13 @@ public class ConfigApplyFrag extends DialogFragment {
     // thread executed while Dialog Box is displayed.
     ApplyConfTask exeSetup;
 
-    public ConfigApplyFrag(String tag, int targetFrag) {
-        this.tag = tag;
-        this.targetFrag = targetFrag;
+    public static final ConfigApplyFrag newInstance(String tag, int targetFrag) {
+        ConfigApplyFrag confApplyFrag = new ConfigApplyFrag();
+        Bundle bdl = new Bundle(2);
+        bdl.putString(EXTRA_TAG, tag);
+        bdl.putInt(EXTRA_FRAG, targetFrag);
+        confApplyFrag.setArguments(bdl);
+        return confApplyFrag;
     }
 
     public void handlerConf(ApplyConfTask confTask) {
@@ -99,6 +106,8 @@ public class ConfigApplyFrag extends DialogFragment {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setRetainInstance(true);
+        this.tag = getArguments().getString(EXTRA_TAG);
+        this.targetFrag = getArguments().getInt(EXTRA_FRAG);
         // Spawn the thread to execute modem configuration.
         if (this.exeSetup != null) {
             this.exeSetup.execute();

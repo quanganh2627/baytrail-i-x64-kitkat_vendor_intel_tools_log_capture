@@ -560,7 +560,7 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnChe
             }
         }
 
-        ConfigApplyFrag progressFrag = new ConfigApplyFrag(CONFSETUP_TAG,
+        ConfigApplyFrag progressFrag = ConfigApplyFrag.newInstance(CONFSETUP_TAG,
                 CONFSETUP_TARGETFRAG);
         progressFrag.launch(modemConfToApply, this, gsfManager);
     }
