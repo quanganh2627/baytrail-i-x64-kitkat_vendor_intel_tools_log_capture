@@ -287,6 +287,152 @@ void read_startupreason(char *startupreason)
         get_fdk_startupreason(startupreason);
 }
 
+int read_resetsource(char * resetsource)
+{
+    static const char *reset_source[] = {
+            "RESET_NOT_APPLICABLE",
+            "RESET_OS_INITIATED",
+            "RESET_FORCED",
+            "RESET_FW_UPDATE",
+            "RESET_KERNEL_WATCHDOG",
+            "RESET_SECURITY_WATCHDOG",
+            "RESET_SECURITY_INITIATED",
+            "RESET_PMC_WATCHDOG",
+            "RESET_EC_WATCHDOG",
+            "RESET_PLATFORM_WATCHDOG",
+    };
+
+    int ret = 0;
+    const char *var_guid_common = "4a67b082-0a4c-41cf-b6c7-440b29bb8c4f";
+    const char *var_reset_source = "ResetSource";
+    unsigned int rs;
+
+    ret = uefivar_get_int(var_reset_source, var_guid_common, &rs);
+
+    if (ret) {
+        LOGE("uefivar_get error %s-%s : %d\n",
+                var_reset_source, var_guid_common, ret);
+        return -1;
+    }
+
+    if ((rs > 0) && (rs < (sizeof(reset_source)/sizeof(char*)))) {
+        strcpy(resetsource, reset_source[rs]);
+        LOGI("reset source value (%d): %s", rs, resetsource);
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+
+int read_resettype(char * resettype)
+{
+    static const char *reset_type[] = {
+            "NOT_APPLICABLE",
+            "WARM_RESET",
+            "COLD_RESET",
+            "GLOBAL_RESET",
+    };
+
+    int ret = 0;
+    const char *var_guid_common = "4a67b082-0a4c-41cf-b6c7-440b29bb8c4f";
+    const char *var_reset_type = "ResetType";
+    unsigned int rt;
+
+    ret = uefivar_get_int(var_reset_type, var_guid_common, &rt);
+
+    if (ret) {
+        LOGE("uefivar_get error %s-%s : %d\n",
+                var_reset_type, var_guid_common, ret);
+        return -1;
+    }
+
+    if ((rt > 0) && (rt < (sizeof(reset_type)/sizeof(char*)))) {
+        strcpy(resettype, reset_type[rt]);
+        LOGI("reset type (%d): %s", rt, resettype);
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+int read_wakesource(char * wakesource)
+{
+    static const char *wake_source[] = {
+            "WAKE_NOT_APPLICABLE",
+            "WAKE_BATT_INSERT",
+            "WAKE_USB_CHRG_INSERT",
+            "WAKE_ACDC_CHGR_INSERT",
+            "WAKE_PWR_BUTTON_PRESS",
+            "WAKE_RTC_TIMER",
+            "WAKE_BATT_THRESHOLD",
+    };
+
+    int ret = 0;
+    const char *var_guid_common = "4a67b082-0a4c-41cf-b6c7-440b29bb8c4f";
+    const char *var_wake_source = "WakeSource";
+    unsigned int ws;
+
+    ret = uefivar_get_int(var_wake_source, var_guid_common, &ws);
+
+    if (ret) {
+        LOGE("uefivar_get error %s-%s : %d\n",
+                var_wake_source, var_guid_common, ret);
+        return -1;
+    }
+
+    if ((ws > 0) && (ws < (sizeof(wake_source)/sizeof(char*)))) {
+        strcpy(wakesource, wake_source[ws]);
+        LOGI("wake source (%d): %s", ws, wakesource);
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+
+int read_shutdownsource(char * shutdownsource)
+{
+    static const char *shutdown_source[] = {
+            "SHTDWN_NOT_APPLICABLE",
+            "SHTDWN_POWER_BUTTON_OVERRIDE",
+            "SHTDWN_BATTERY_REMOVAL",
+            "SHTDWN_VCRIT",
+            "SHTDWN_THERMTRIP",
+            "SHTDWN_PMICTEMP",
+            "SHTDWN_SYSTEMP",
+            "SHTDWN_BATTEMP",
+            "SHTDWN_SYSUVP",
+            "SHTDWN_SYSOVP",
+            "SHTDWN_SECURITY_WATCHDOG",
+            "SHTDWN_SECURITY_INITIATED",
+            "SHTDWN_PMC_WATCHDOG",
+            "SHTDWN_ERROR",
+    };
+
+    int ret = 0;
+    const char *var_guid_common = "4a67b082-0a4c-41cf-b6c7-440b29bb8c4f";
+    const char *var_shutdown_source = "ShutdownSource";
+    unsigned int ss;
+
+    ret = uefivar_get_int(var_shutdown_source, var_guid_common, &ss);
+
+    if (ret) {
+        LOGE("uefivar_get error %s-%s : %d\n",
+                var_shutdown_source, var_guid_common, ret);
+        return -1;
+    }
+
+    if ((ss > 0) && (ss < (sizeof(shutdown_source)/sizeof(char*)))) {
+        strcpy(shutdownsource, shutdown_source[ss]);
+        LOGI("shutdown source (%d): %s", ss, shutdownsource);
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+
 /**
  * @brief generate WDT crash event
  *

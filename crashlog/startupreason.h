@@ -23,6 +23,10 @@
 #ifndef __STARTUP_REASON_H__
 #define __STARTUP_REASON_H__
 
+int read_resettype(char * resettype);
+int read_resetsource(char * resetsource);
+int read_wakesource(char * wakesource);
+int read_shutdownsource(char * shutdownsource);
 void read_startupreason(char *startupreason);
 int crashlog_check_startupreason(char *reason, char *watchdog);
 

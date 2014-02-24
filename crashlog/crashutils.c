@@ -48,6 +48,8 @@
 #include <history.h>
 #include <fsutils.h>
 #include <dropbox.h>
+#include "uefivar.h"
+#include "startupreason.h"
 
 char gbuildversion[PROPERTY_VALUE_MAX] = {0,};
 char gboardversion[PROPERTY_VALUE_MAX] = {0,};
@@ -959,8 +961,9 @@ int create_rebootfile(char* key, int data_ready)
 {
     FILE *fp;
     char fullpath[PATHMAX];
+    int ret = 0;
 
-    if(!file_exists(EVENTS_DIR)) {
+    if (!file_exists(EVENTS_DIR)) {
         /* Create a fresh directory */
         errno = 0;
         if (mkdir(EVENTS_DIR, 0777) == -1) {
@@ -975,8 +978,7 @@ int create_rebootfile(char* key, int data_ready)
     //Create crashfile
     errno = 0;
     fp = fopen(fullpath,"w");
-    if (fp == NULL)
-    {
+    if (fp == NULL) {
         LOGE("%s: Cannot create %s - %s\n", __FUNCTION__, fullpath, strerror(errno));
         return -errno;
     }
@@ -985,30 +987,59 @@ int create_rebootfile(char* key, int data_ready)
 
     errno = 0;
     fp = fopen(fullpath,"w");
-    if (fp == NULL)
-    {
+    if (fp == NULL) {
         LOGE("%s: can not open file: %s %s\n", __FUNCTION__, fullpath, strerror(errno));
         return -errno;
     }
 
     fprintf(fp,"DATA_READY=%d\n", data_ready);
-    if (data_ready){
-        LOGI("reset source detected : generating DATA0\n");
-        char tmp[PATHMAX] = "";
-        if(file_exists(RESET_SOURCE_0))
-            snprintf(tmp, sizeof(tmp), RESET_SOURCE_0);
-        else if(file_exists(RESET_IRQ_1))
-            snprintf(tmp, sizeof(tmp), RESET_IRQ_1);
-        get_data_from_boot_file(tmp, "DATA3", fp);
 
-        tmp[0] = '\0';
-        if(file_exists(RESET_SOURCE_1))
-            snprintf(tmp, sizeof(tmp), RESET_SOURCE_1);
-        else if(file_exists(RESET_IRQ_2))
-            snprintf(tmp, sizeof(tmp), RESET_IRQ_2);
-        get_data_from_boot_file(tmp,"DATA4", fp);
+    if (device_has_uefi()) {
+        //generating data0, data1 for edk platforms
+        char resetsource[32] = { '\0', };
+        char resettype[32] = { '\0', };
+        char wakesource[32] = { '\0', };
+        char shutdownsource[32] = { '\0', };
 
+        ret = read_resetsource(resetsource);
+        if (ret > 0) {
+            fprintf(fp,"DATA0=%s\n", resetsource);
+        }
+
+        ret = read_resettype(resettype);
+        if (ret > 0) {
+            fprintf(fp,"DATA1=%s\n", resettype);
+        }
+
+        ret = read_wakesource(wakesource);
+        if (ret > 0) {
+            fprintf(fp,"DATA2=%s\n", wakesource);
+        }
+
+        ret = read_shutdownsource(shutdownsource);
+        if (ret > 0) {
+            fprintf(fp,"DATA3=%s\n", shutdownsource);
+        }
+    } else {
+        //generating data0, data1 for other platforms
+        if (data_ready) {
+            LOGI("reset source detected : generating DATA0\n");
+            char tmp[PATHMAX] = "";
+            if(file_exists(RESET_SOURCE_0))
+                snprintf(tmp, sizeof(tmp), RESET_SOURCE_0);
+            else if(file_exists(RESET_IRQ_1))
+                snprintf(tmp, sizeof(tmp), RESET_IRQ_1);
+            get_data_from_boot_file(tmp, "DATA3", fp);
+
+            tmp[0] = '\0';
+            if(file_exists(RESET_SOURCE_1))
+                snprintf(tmp, sizeof(tmp), RESET_SOURCE_1);
+            else if(file_exists(RESET_IRQ_2))
+                snprintf(tmp, sizeof(tmp), RESET_IRQ_2);
+            get_data_from_boot_file(tmp,"DATA4", fp);
+        }
     }
+
     fprintf(fp,"_END\n");
     fclose(fp);
     return 0;
