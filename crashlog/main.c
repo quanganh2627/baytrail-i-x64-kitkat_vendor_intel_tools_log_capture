@@ -331,6 +331,7 @@ static void early_check(char *encryptstate, int test) {
     crashlog_check_recovery();
 
     key = raise_event_bootuptime(SYS_REBOOT, startupreason, NULL, NULL);
+    save_startuplogs(key);
     datelong = get_current_time_long(0);
     LOGE("%-8s%-22s%-20s%s\n", SYS_REBOOT, key, datelong, startupreason);
     free(key);

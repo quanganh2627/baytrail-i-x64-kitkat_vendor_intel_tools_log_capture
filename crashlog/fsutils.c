@@ -771,6 +771,81 @@ int do_copy_eof(const char *src, const char *des)
     return rc;
 }
 
+int do_copy_utf16_to_utf8(const char *src, const char *des)
+{
+    int buflen;
+    char  buffer16[CPBUFFERSIZE];
+    char  buffer8[CPBUFFERSIZE];
+    int rc = 0;
+    int fd1 = -1, fd2 = -1;
+    struct stat info;
+    int r_count, w_count, i, buf8_count, buf16_count;
+
+    if (src == NULL || des == NULL) return -1;
+
+    if (stat(src, &info) < 0) {
+        LOGE("%s: can not open file: %s\n", __FUNCTION__, src);
+        return -1;
+    }
+
+    if ( ( fd1 = open(src, O_RDONLY) ) < 0 ) {
+        return -1;
+    }
+
+    if ( ( fd2 = open(des, O_WRONLY | O_CREAT | O_TRUNC, 0660) ) < 0) {
+        LOGE("%s: can not open file: %s\n", __FUNCTION__, des);
+        close(fd1);
+        return -1;
+    }
+
+    /* Start copy loop */
+    while (1) {
+        /* Read data from src */
+        r_count = do_read(fd1, buffer16, CPBUFFERSIZE);
+        if (r_count < 0) {
+            LOGE("%s: read failed, err:%s", __FUNCTION__, strerror(errno));
+            rc = -1;
+            break;
+        }
+
+        if (r_count == 0)
+            break;
+        /* convert loop, basic strategy => remove odd char */
+        for (buf8_count = 0, buf16_count = 0; buf16_count < r_count; buf8_count++, buf16_count += 2) {
+            buffer8[buf8_count] = (char) buffer16[buf16_count];
+        }
+
+        /* Copy data to des */
+        w_count = do_write(fd2, buffer8, buf8_count);
+        if (w_count < 0) {
+            LOGE("%s: write failed, err:%s", __FUNCTION__, strerror(errno));
+            rc = -1;
+            break;
+        }
+        if (buf8_count != w_count) {
+            LOGE("%s: write failed, r_count:%d w_count:%d",
+                 __FUNCTION__, r_count, w_count);
+            rc = -1;
+            break;
+        }
+    }
+
+    /* Error occurred while copying data */
+    if ((rc == -1) && (w_count == -ENOSPC)) {
+        /* CRASHLOG_ERROR_FULL shall only be raised if des indicates LOGS_DIR */
+        if (check_partlogfull(des))
+            raise_infoerror(ERROREVENT, CRASHLOG_ERROR_FULL);
+    }
+
+    if (fd1 >= 0)
+        close(fd1);
+    if (fd2 >= 0)
+        close(fd2);
+
+    do_chown(des, PERM_USER, PERM_GROUP);
+    return rc;
+}
+
 int do_copy_tail(char *src, char *dest, int limit) {
     int rc = 0;
     int fsrc = -1, fdest = -1;
@@ -1259,6 +1334,85 @@ void do_log_copy(char *mode, int dir, const char* timestamp, int type) {
         default:
             /* Ignore unknown type, just return */
             return;
+    }
+}
+
+#define LOG_BOOT "log_boot"
+const char* BACKUP_PATTERN = "%s.%d_";
+const char* PATH_PATTERN = "%s/%s";
+
+/**
+ * @brief backup existing log_boot like aplog strategy
+ *
+ * If log_boot.X files are present they are renamed in
+ * a log_bootX+1 files
+ * When X reached the maximum, it is deleted
+ *
+ */
+static void make_log_boot_backup() {
+    int i;
+    int result;
+    char base_log_pattern[PATHMAX];
+    char found_log_name[PATHMAX];
+    char log_path[PATHMAX];
+    char new_path[PATHMAX];
+    const int max_saved_log_boot = 10;
+    char *basename;
+
+
+    snprintf(base_log_pattern, sizeof(base_log_pattern), BACKUP_PATTERN, LOG_BOOT, max_saved_log_boot);
+    result = find_matching_file(LOGS_DIR, base_log_pattern, found_log_name);
+    if (result == 1) {
+        snprintf(log_path, sizeof(log_path), PATH_PATTERN, LOGS_DIR, found_log_name);
+        LOGI("%s: deleting old log_boot : %s\n", __FUNCTION__, log_path);
+        remove(log_path);
+    }
+    /* Check the log_boot to move */
+    for (i = max_saved_log_boot ; i > 1 ; i--) {
+        snprintf(base_log_pattern, sizeof(base_log_pattern), BACKUP_PATTERN, LOG_BOOT, i-1);
+        result = find_matching_file(LOGS_DIR, base_log_pattern, found_log_name);
+        if (result == 1) {
+            basename = strrchr(found_log_name, '_' );
+            snprintf(log_path, sizeof(log_path), PATH_PATTERN, LOGS_DIR, found_log_name);
+            snprintf(new_path, sizeof(new_path), "%s/%s.%d%s", LOGS_DIR, LOG_BOOT, i, basename);
+            if (rename(log_path, new_path) != 0) {
+                LOGE("%s: failure to rename : %s in %s \n", __FUNCTION__, log_path, new_path);
+            }
+        }
+    }
+    /* Finally, check last current log_boot */
+    snprintf(base_log_pattern, sizeof(base_log_pattern), "%s_", LOG_BOOT);
+    result = find_matching_file(LOGS_DIR, base_log_pattern, found_log_name);
+    if (result == 1) {
+        basename = strrchr(found_log_name, '_' );
+        snprintf(log_path, sizeof(log_path), PATH_PATTERN, LOGS_DIR, found_log_name);
+        snprintf(new_path, sizeof(new_path), "%s/%s.1%s", LOGS_DIR, LOG_BOOT, basename);
+        rename(log_path, new_path);
+    }
+}
+
+/**
+ * @brief save EDK boot_log in logs partition
+ *
+ * If device is in EDK configuration
+ * EFILinux logs are copied in a "log_boot_eventid" style file
+ * inside /logs partition
+ *
+ * @param reboot_id - string containing the REBOOT event_id
+ */
+void save_startuplogs(const char *reboot_id) {
+    char start_log_name[PATHMAX];
+    char dest_log_path[PATHMAX];
+    char src_log_path[PATHMAX];
+    int result;
+
+    result = find_matching_file(EFIVARS_DIR, "EfilinuxLogs", start_log_name);
+    if (result == 1) {
+        make_log_boot_backup();
+        snprintf(src_log_path, sizeof(src_log_path), PATH_PATTERN, EFIVARS_DIR, start_log_name);
+        snprintf(dest_log_path, sizeof(dest_log_path), "%s/%s_%s", LOGS_DIR, LOG_BOOT, reboot_id);
+        do_copy_utf16_to_utf8(src_log_path, dest_log_path);
+        LOGI("%s: EFI boot logs found, converted and copied here : %s\n", __FUNCTION__, dest_log_path);
     }
 }
 

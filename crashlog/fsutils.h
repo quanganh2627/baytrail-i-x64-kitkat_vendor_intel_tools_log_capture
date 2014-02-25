@@ -124,6 +124,7 @@ int do_chmod(char *path, char *mode);
 int do_chown(const char *file, char *uid, char *gid);
 int do_copy_eof(const char *src, const char *des);
 int do_copy_tail(char *src, char *dest, int limit);
+int do_copy_utf16(const char *src, const char *des);
 int do_copy(char *src, char *dest, int limit);
 int do_mv(char *src, char *dest);
 int rmfr(char *path);
@@ -136,5 +137,6 @@ int str_simple_replace(char *str, char *search, char *replace);
 int get_parent_dir( char * dir, char *parent_dir );
 
 char *compute_bp_log(const char* ext_file);
+void save_startuplogs(const char *reboot_id);
 
 #endif /* __FSUTILS_H__ */
