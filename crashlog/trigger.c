@@ -81,7 +81,7 @@ int process_log_event(char *rootdir, char *triggername, int mode) {
     char destination[PATHMAX];
     char tmp[PATHMAX] = {'\0',};
     int nbPacket,aplogDepth = 0;
-    int aplogIsPresent, DepthValueRead = 0;
+    int aplogIsPresent, DepthValueRead = 0, res = 0;
     int bplogFlag = 0;
     char value[PROPERTY_VALUE_MAX];
     const char *logrootdir, *suppl_to_copy;
@@ -115,17 +115,31 @@ int process_log_event(char *rootdir, char *triggername, int mode) {
     if (rootdir && triggername)
     {
         snprintf(path, sizeof(path),"%s/%s", rootdir, triggername);
-        if (file_exists(path) ) {
-            LOGI("Received trigger file %s for %s", path, ( (mode == MODE_BZ) ? "BZ" : "APLOG" ));
-            if ( !get_value_in_file(path,"APLOG=", tmp, sizeof(tmp)) && atoi(tmp) >= 0 ) {
+        if (file_exists(path)) {
+            LOGI("Received trigger file %s for %s", path, ((mode == MODE_BZ) ? "BZ" : "APLOG" ));
+
+            res = get_value_in_file(path,"APLOG=", tmp, sizeof(tmp));
+            if (res < 0) {
+                LOGE("%s : got error %s from function call \n",
+                                    __FUNCTION__, strerror(-res));
+            }
+
+            if (!res && atoi(tmp) >= 0) {
                 //if a value is specified inside trigger file, it overrides property value
                 aplogDepth = atoi(tmp);
                 nbPacket = 1;
                 DepthValueRead = 1;
             }
+
             //Read bplog flag value specified inside trigger file
             memset(tmp, '\0', sizeof(tmp));
-            if (!get_value_in_file(path,"BPLOG=", tmp, sizeof(tmp))) {
+
+            res = get_value_in_file(path,"BPLOG=", tmp, sizeof(tmp));
+            if (res < 0) {
+                LOGE("%s : got %s - error %s from function call \n",
+                        __FUNCTION__, path, strerror(-res));
+            }
+            if (!res) {
                 bplogFlag = atoi(tmp);
             }
         }
@@ -177,7 +191,7 @@ int process_log_event(char *rootdir, char *triggername, int mode) {
 
             do_copy_tail(path, destination, 0);
         }
-	    /* When a new crashlog dir is created per packet, send an event per dir */
+        /* When a new crashlog dir is created per packet, send an event per dir */
         if( newdirperpacket && (dir != -1) ) {
             snprintf(destination,sizeof(destination),"%s%d/", logrootdir, dir);
             compress_aplog_folder(destination);
@@ -242,7 +256,7 @@ int process_log_event(char *rootdir, char *triggername, int mode) {
         snprintf(path, sizeof(path),"%s/%s",rootdir, triggername);
         remove(path);
     }
-    return 0;
+    return res;
 }
 
 int process_aplog_event(struct watch_entry *entry, struct inotify_event *event) {

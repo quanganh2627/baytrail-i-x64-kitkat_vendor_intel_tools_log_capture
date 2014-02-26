@@ -238,7 +238,8 @@ int find_oneofstrings_in_file_with_keyword(char *filename, char **keywords, char
         return -EINVAL;
 
     fd = open(filename, O_RDONLY);
-    if(fd <= 0) return -errno;
+    if(fd <= 0)
+        return -errno;
 
     while((linesize = readline(fd, buffer)) > 0) {
         /* Remove the trailing '\n' if it's there */
@@ -368,8 +369,7 @@ int get_value_in_file(char *file, char *keyword, char *value, unsigned int sizem
     if ( !file_exists(file) )
         return -ENOENT;
 
-
-    if ( (fd = fopen(file,"r")) == NULL)
+    if ((fd = fopen(file,"r")) == NULL)
         return -errno;
 
     /* Once and for all */

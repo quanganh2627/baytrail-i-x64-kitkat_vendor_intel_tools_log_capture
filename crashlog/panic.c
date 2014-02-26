@@ -75,8 +75,16 @@ static int check_aplogs_tobackup(char *filename) {
             patterns_array_32[idx][PROPERTY_VALUE_MAX-1] = 0;
             memcpy(patterns_array_32[idx], prepattern, prepatternlen);
         }
-        res = (find_oneofstrings_in_file(filename, (char**)patterns_array_32, nbpatterns) ||
-                find_oneofstrings_in_file_with_keyword(filename,  (char**)patterns_array_64, "RIP:", nbpatterns));
+
+        res = find_oneofstrings_in_file_with_keyword(filename,  (char**)patterns_array_64, "RIP:", nbpatterns);
+
+        if (res < 0) {
+            LOGE("%s : got - error %s from function call \n",
+                    __FUNCTION__, strerror(-res));
+        }
+
+        res = res || find_oneofstrings_in_file(filename, (char**)patterns_array_32, nbpatterns);
+
         if (res > 0){
             LOGE("%s: before process\n", __FUNCTION__);
             process_log_event(NULL, NULL, MODE_APLOGS);
@@ -94,8 +102,14 @@ static int check_aplogs_tobackup(char *filename) {
     }
     else {
         /* By default, searches for the single following pattern... */
-        res = (find_str_in_file(filename, "EIP is at SGXInitialise", NULL) ||
-                find_oneofstrings_in_file_with_keyword(filename, SGX_64_pattern, "RIP:", 1));
+        res = find_oneofstrings_in_file_with_keyword(filename, SGX_64_pattern, "RIP:", 1);
+
+        if (res < 0) {
+            LOGE("%s : got - error %s from function call \n",
+                    __FUNCTION__, strerror(-res));
+        }
+
+        res = res || (find_str_in_file(filename, "EIP is at SGXInitialise", NULL));
         if (res > 0)
             process_log_event(NULL, NULL, MODE_APLOGS);
     }

@@ -40,7 +40,6 @@
 #define UPTIME_HOUR_FREQUENCY   12
 #define TIMESTAMP_MAX_SIZE      10 /* Unix style timestamp on 10 characters max.*/
 #define MAXFILESIZE             (10*MB)
-#define MAXPATHSIZE             (512)
 /* find_str_in_file was implemented with 4KB*/
 #define MAXLINESIZE             MAX((2 * PROPERTY_VALUE_MAX), (4 * KB))
 #define CPBUFFERSIZE            (4*KB)
@@ -48,7 +47,6 @@
 #define TIMEOUT_VALUE           (20*1000)
 #define MAX_WAIT_MMGR_CONNECT_SECONDS  5
 #define MMGR_CONNECT_RETRY_TIME_MS     200
-#define CMDSIZE_MAX             ((21*20) + 1)
 #define UPTIME_FREQUENCY        (5 * 60)
 #define MMGRMAXSTRING           (20)
 #define MMGRMAXEXTRA            (512)
@@ -72,7 +70,6 @@
 #define KERNEL_CRASH            "IPANIC"
 #define KERNEL_SWWDT_CRASH      "IPANIC_SWWDT"
 #define KERNEL_HWWDT_CRASH      "IPANIC_HWWDT"
-#define FABRIC_FAKE_CRASH       "FABRIC_FAKE"
 #define KERNEL_FAKE_CRASH       "IPANIC_FAKE"
 #define KERNEL_SWWDT_FAKE_CRASH "IPANIC_SWWDT_FAKE"
 #define IPANIC_CORRUPTED        "IPANIC_CORRUPTED"
@@ -103,8 +100,6 @@
 #define HPROF_EVNAME            "HPROF"
 #define STATSTRIG_EVNAME        "STTRIG"
 #define APLOGTRIG_EVNAME        "APLOGTRIG"
-#define INFOTRIG_EVNAME         "INFOTRIG"
-#define ERRORTRIG_EVNAME        "ERRORTRIG"
 #define CMDTRIG_EVNAME          "CMDTRIG"
 #define UPTIME_EVNAME           "CURRENTUPTIME"
 #define MDMCRASH_EVNAME         "MPANIC"
@@ -372,7 +367,6 @@ extern enum crashlog_mode g_crashlog_mode;
 #define GBUFFER_NAME            "emmc_ipanic_gbuffer"
 #define CMDLINE_NAME            "cmdline"
 #define CRASHFILE_NAME          "crashfile"
-#define BPLOG_NAME              "bplog"
 #define LAST_KMSG               PROC_DIR "/" LAST_KMSG_FILE
 #define CONSOLE_RAMOOPS         PSTORE_DIR "/" CONSOLE_RAMOOPS_FILE
 #define FTRACE_RAMOOPS          PSTORE_DIR "/" FTRACE_RAMOOPS_FILE
@@ -390,8 +384,6 @@ extern enum crashlog_mode g_crashlog_mode;
 #define SAVED_THREAD_NAME       PANIC_DIR "/" THREAD_NAME
 #define SAVED_GBUFFER_NAME      PANIC_DIR "/" GBUFFER_NAME
 #define SAVED_LOGCAT_NAME       PANIC_DIR "/" LOGCAT_NAME
-#define SAVED_FABRIC_ERROR_NAME PANIC_DIR "/" FABRIC_ERROR_NAME
-#define SAVED_PANIC_RAM         PANIC_DIR "/" CONSOLE_RAM
 #define RECOVERY_ERROR_TRIGGER  CACHE_DIR "/recovery/recoveryfail"
 #define RECOVERY_ERROR_LOG      CACHE_DIR "/recovery/last_log"
 #define SYS_SPID_1              SYS_SPID_DIR "/vendor_id"
