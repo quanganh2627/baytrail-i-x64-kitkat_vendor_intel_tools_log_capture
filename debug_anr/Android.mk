@@ -17,18 +17,15 @@
 # limitations under the License.
 #
 
-LOCAL_PATH := $(call my-dir)
-
+LOCAL_PATH:= $(call my-dir)
 include $(CLEAR_VARS)
-LOCAL_MODULE := libdebug_anr
-LOCAL_MODULE_TAGS := optional
 
-LOCAL_SRC_FILES := \
-    com_android_server_am_DebugAnr.cpp
+LOCAL_SRC_FILES:= \
+	com_android_server_am_DebugAnr.cpp
 
-LOCAL_SHARED_LIBRARIES := \
-    libcutils \
-    libnativehelper \
-    libparse_stack
+LOCAL_MODULE_TAGS := eng debug
+LOCAL_MODULE:= libdebug_anr
+
+LOCAL_SHARED_LIBRARIES:= libnativehelper libc libcutils libparse_stack
 
 include $(BUILD_SHARED_LIBRARY)
