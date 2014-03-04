@@ -15,10 +15,15 @@
 # limitations under the License.
 #
 
-LOCAL_PATH:= $(call my-dir)
+LOCAL_PATH := $(call my-dir)
+
 include $(CLEAR_VARS)
 
-LOCAL_SRC_FILES:= main.c \
+LOCAL_MODULE := crashlogd
+LOCAL_MODULE_TAGS := optional
+
+LOCAL_SRC_FILES := \
+    main.c \
     config.c \
     inotify_handler.c \
     startupreason.c \
@@ -42,15 +47,16 @@ LOCAL_SRC_FILES:= main.c \
     iptrak.c \
     uefivar.c
 
-LOCAL_CFLAGS += -DFULL_REPORT=1
+LOCAL_CFLAGS := -DFULL_REPORT=1
 
-LOCAL_C_INCLUDES += \
+LOCAL_C_INCLUDES := \
   $(TARGET_OUT_HEADERS)/IFX-modem \
-  vendor/intel/tools/log_capture/backtrace \
+  $(LOCAL_PATH)/../backtrace \
   $(TARGET_OUT_HEADERS)/libtcs \
 
-LOCAL_MODULE_TAGS := eng debug
-LOCAL_MODULE:= crashlogd
-
-LOCAL_SHARED_LIBRARIES:= libparse_stack libc libcutils libmmgrcli libtcs
+LOCAL_SHARED_LIBRARIES := \
+    libparse_stack \
+    libcutils \
+    libmmgrcli \
+    libtcs
 include $(BUILD_EXECUTABLE)
