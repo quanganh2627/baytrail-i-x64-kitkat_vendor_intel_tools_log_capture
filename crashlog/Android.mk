@@ -49,6 +49,10 @@ LOCAL_SRC_FILES := \
 
 LOCAL_CFLAGS := -DFULL_REPORT=1
 
+ifeq ($(TARGET_BIOS_TYPE),"uefi")
+    LOCAL_CFLAGS += -DCONFIG_UEFI
+endif
+
 LOCAL_C_INCLUDES := \
   $(TARGET_OUT_HEADERS)/IFX-modem \
   $(LOCAL_PATH)/../backtrace \
