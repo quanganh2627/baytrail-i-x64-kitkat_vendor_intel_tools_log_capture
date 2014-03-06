@@ -44,6 +44,10 @@ LOCAL_SRC_FILES:= main.c \
 
 LOCAL_CFLAGS += -DFULL_REPORT=1
 
+ifeq ($(TARGET_BIOS_TYPE),"uefi")
+    LOCAL_CFLAGS += -DCONFIG_UEFI
+endif
+
 LOCAL_C_INCLUDES += \
   $(TARGET_OUT_HEADERS)/IFX-modem \
   vendor/intel/tools/log_capture/backtrace

@@ -25,7 +25,9 @@
 #include "privconfig.h"
 #include "uefivar.h"
 
+#ifdef CONFIG_UEFI
 #include <efilinux/bootlogic.h>
+#endif
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -35,6 +37,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 
+#ifdef CONFIG_UEFI
 static int compute_uefi_startupreason(enum reset_sources rs, enum reset_types rt, enum wake_sources ws, enum shutdown_sources ss, char *startupreason)
 {
     static const char *wake_source[] = {
@@ -155,6 +158,12 @@ static int get_uefi_startupreason(char *startupreason)
 
     return compute_uefi_startupreason(rs, rt, ws, ss, startupreason);
 }
+#else
+static inline int get_uefi_startupreason(char *startupreason) {
+    LOGE("CONFIG_UEFI is not set, device do not support uefi startup reason.\n");
+    return -1;
+}
+#endif // CONFIG_UEFI
 
 /*
 * Name          : get_fdk_startupreason
