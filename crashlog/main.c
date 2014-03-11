@@ -282,12 +282,21 @@ static void timeup_thread_mainloop()
 static void early_check_nomain(char *boot_mode, int test) {
 
     char startupreason[32] = { '\0', };
+    char watchdog[16] = { '\0', };
     const char *datelong;
     char *key;
 
     read_startupreason(startupreason);
 
+    strcpy(watchdog,"WDT");
+
+    crashlog_check_fabric_events(startupreason, watchdog, test);
+    crashlog_check_panic_events(startupreason, watchdog, test);
+    crashlog_check_startupreason(startupreason, watchdog);
+
     key = raise_event_nouptime(SYS_REBOOT, startupreason, NULL, NULL);
+    save_startuplogs(key);
+
     datelong = get_current_time_long(0);
     LOGE("%-8s%-22s%-20s%s\n", SYS_REBOOT, key, datelong, startupreason);
     free(key);
@@ -332,6 +341,7 @@ static void early_check(char *encryptstate, int test) {
 
     key = raise_event_bootuptime(SYS_REBOOT, startupreason, NULL, NULL);
     save_startuplogs(key);
+
     datelong = get_current_time_long(0);
     LOGE("%-8s%-22s%-20s%s\n", SYS_REBOOT, key, datelong, startupreason);
     free(key);
