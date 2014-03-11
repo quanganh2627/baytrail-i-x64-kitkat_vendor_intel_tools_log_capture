@@ -43,7 +43,9 @@ LOCAL_SRC_FILES := \
     ramdump.c \
     fw_update.c \
     tcs_wrapper.c \
+    ct_utils.c \
     kct_netlink.c \
+    lct_link.c \
     iptrak.c \
     uefivar.c
 

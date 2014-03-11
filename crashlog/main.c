@@ -43,6 +43,7 @@
 #include "fw_update.h"
 #include "tcs_wrapper.h"
 #include "kct_netlink.h"
+#include "lct_link.h"
 #include "iptrak.h"
 
 #include <sys/types.h>
@@ -554,6 +555,8 @@ int do_monitor() {
 
     kct_netlink_init_comm();
 
+    lct_link_init_comm();
+
     for(;;) {
         // Clear fd set
         FD_ZERO(&read_fds);
@@ -579,6 +582,13 @@ int do_monitor() {
                 max = kct_netlink_get_fd();
         }
 
+        //lct fd setup
+        if (lct_link_get_fd() > 0) {
+            FD_SET(lct_link_get_fd(), &read_fds);
+            if (lct_link_get_fd() > max)
+                max = lct_link_get_fd();
+        }
+
         // Wait for events
         select_result = select(max+1, &read_fds, NULL, NULL, NULL);
 
@@ -602,6 +612,11 @@ int do_monitor() {
             if (FD_ISSET(kct_netlink_get_fd(), &read_fds)) {
                 LOGD("kct fd set");
                 kct_netlink_handle_msg();
+            }
+            // lct monitor
+            if (FD_ISSET(lct_link_get_fd(), &read_fds)) {
+                LOGD("lct fd set");
+                lct_link_handle_msg();
             }
         }
     }
