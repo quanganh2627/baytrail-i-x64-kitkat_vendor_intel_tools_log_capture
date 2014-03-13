@@ -1218,10 +1218,13 @@ void do_log_copy(char *mode, int dir, const char* timestamp, int type) {
                 dir_pattern = KDUMP_CRASH_DIR;
             break;
         case BPLOG_TYPE:
+        case BPLOG_STATS_TYPE:
             logfile0 = compute_bp_log(""); //BPLOG_FILE_0
             logfile1 = compute_bp_log(BPLOG_FILE_1_EXT ); //BPLOG_FILE_1;
             extension = ".istp";
             limit = 0; /* no limit size for bplogs copy */
+            if (type == BPLOG_STATS_TYPE)
+                dir_pattern = STATS_DIR;
             break;
         case BPLOG_TYPE_OLD:
             logfile0 = compute_bp_log(BPLOG_FILE_1_OLD_EXT); // BPLOG_FILE_1_OLD;

@@ -170,6 +170,7 @@ enum {
     APLOG_TYPE = 0,
     BPLOG_TYPE,
     APLOG_STATS_TYPE,
+    BPLOG_STATS_TYPE,
     KDUMP_TYPE,
     BPLOG_TYPE_OLD,
 };

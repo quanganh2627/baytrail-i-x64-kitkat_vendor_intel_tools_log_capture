@@ -403,7 +403,7 @@ static int compute_mmgr_param(char *type, e_dir_mode_t *mode, char *name, int *a
  */
 int mmgr_handle(void) {
     e_dir_mode_t event_mode = MODE_CRASH;
-    int aplog_mode, dir;
+    int aplog_mode, bplog_mode = BPLOG_TYPE, dir;
     char *event_dir, *key;
     char event_name[MMGRMAXSTRING];
     char data0[MMGRMAXEXTRA];
@@ -463,6 +463,7 @@ int mmgr_handle(void) {
         }
         event_mode = MODE_STATS;
         aplog_mode = APLOG_STATS_TYPE;
+        bplog_mode = BPLOG_STATS_TYPE;
         copy_aplog = (cur_data.extra_int >> 8) & MMGR_CLI_TFT_AP_LOG_MASK;
         copy_bplog = ((cur_data.extra_int >> 8) & MMGR_CLI_TFT_BP_LOG_MASK)
                 && check_running_modem_trace();
@@ -573,7 +574,7 @@ int mmgr_handle(void) {
         do_log_copy(type, dir, dateshort, aplog_mode);
     }
     if (copy_bplog > 0) {
-        do_log_copy(type, dir, dateshort, BPLOG_TYPE);
+        do_log_copy(type, dir, dateshort, bplog_mode);
     }
     snprintf(destion, sizeof(destion), "%s%d/", event_dir, dir);
     // copying file (if required)
