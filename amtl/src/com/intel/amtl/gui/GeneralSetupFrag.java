@@ -47,6 +47,7 @@ import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.EditText;
 
+import com.intel.amtl.AMTLApplication;
 import com.intel.amtl.R;
 import com.intel.amtl.exceptions.ModemControlException;
 import com.intel.amtl.helper.LogManager;
@@ -410,10 +411,15 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnChe
                         mtsMgr.printMtsProperties();
                         updateUi(currentModemConf);
                         setUIEnabled();
+                        if (AMTLApplication.getPauseState()) {
+                            // Application on Pause => close gsmtty
+                            mdmCtrl.close();
+                        }
                         mdmCtrl = null;
                     } catch (ModemControlException ex) {
                         Log.e(TAG, MODULE + ": fail to send command to the modem " + ex);
                     }
+                    AMTLApplication.setCloseTtyEnable(true);
                 } else if (message.equals("DOWN")) {
                     setUIDisabled();
                 }

@@ -25,6 +25,8 @@ import android.content.Context;
 
 public class AMTLApplication extends Application {
     private static Context ctx;
+    private static boolean isCloseTtyEnable = true;
+    private static boolean isPauseState = true;
 
     public static Context getContext() {
         return ctx;
@@ -32,5 +34,21 @@ public class AMTLApplication extends Application {
 
     public static void setContext(Context context) {
         ctx = context;
+    }
+
+    public static boolean getCloseTtyEnable() {
+        return isCloseTtyEnable;
+    }
+
+    public static void setCloseTtyEnable(boolean isEnable) {
+        isCloseTtyEnable = isEnable;
+    }
+
+    public static boolean getPauseState() {
+        return isPauseState;
+    }
+
+    public static void setPauseState(boolean bState) {
+        isPauseState = bState;
     }
 }

@@ -241,6 +241,7 @@ public class ModemController implements ModemEventListener, Closeable {
         this.currentModemStatus = ModemStatus.UP;
         Log.d(TAG, MODULE + ": Modem is UP");
         try {
+            AMTLApplication.setCloseTtyEnable(false);
             this.openTty();
             sendMessage("UP");
         } catch (ModemControlException ex) {

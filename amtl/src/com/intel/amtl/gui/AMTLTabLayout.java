@@ -295,6 +295,7 @@ public class AMTLTabLayout extends Activity implements GeneralSetupFrag.GSFCallB
     @Override
     public void onResume() {
         super.onResume();
+        AMTLApplication.setPauseState(false);
         try {
             if (this.mdmCtrl != null) {
                 this.mdmCtrl.acquireResource();
@@ -316,9 +317,13 @@ public class AMTLTabLayout extends Activity implements GeneralSetupFrag.GSFCallB
     @Override
     public void onPause() {
         super.onPause();
+        AMTLApplication.setPauseState(true);
         if (this.mdmCtrl != null) {
             this.mdmCtrl.releaseResource();
-            this.mdmCtrl.close();
+            if (AMTLApplication.getCloseTtyEnable()) {
+                // Close Tty enabled
+                this.mdmCtrl.close();
+            }
         }
     }
 
