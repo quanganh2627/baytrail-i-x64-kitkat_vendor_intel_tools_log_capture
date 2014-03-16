@@ -6,6 +6,7 @@ PRODUCT_COPY_FILES += \
         $(LOCAL_PATH)/ANNIEDALE_XMM_7160_REV3_5.cfg:system/etc/amtl/catalog/ANNIEDALE_XMM_7160_REV3_5.cfg \
         $(LOCAL_PATH)/ANNIEDALE_XMM_7260_REV1.cfg:system/etc/amtl/catalog/ANNIEDALE_XMM_7260_REV1.cfg \
         $(LOCAL_PATH)/ANNIEDALE_XMM_7260_REV2.cfg:system/etc/amtl/catalog/ANNIEDALE_XMM_7260_REV2.cfg \
+        $(LOCAL_PATH)/CHERRYVIEW_XMM_7260.cfg:system/etc/amtl/catalog/CHERRYVIEW_XMM_7260.cfg \
         $(LOCAL_PATH)/TANGIER_XMM_6360.cfg:system/etc/amtl/catalog/TANGIER_XMM_6360.cfg \
         $(LOCAL_PATH)/TANGIER_XMM_7160_REV3.cfg:system/etc/amtl/catalog/TANGIER_XMM_7160_REV3.cfg \
         $(LOCAL_PATH)/TANGIER_XMM_7160_REV3_5.cfg:system/etc/amtl/catalog/TANGIER_XMM_7160_REV3_5.cfg \
