@@ -27,6 +27,7 @@ public class MtsProperties {
     public static final String MTS_ROTATE_NUM_PROP = "persist.service.mts.rotate_num";
     public static final String MTS_ROTATE_SIZE_PROP = "persist.service.mts.rotate_size";
     public static final String MTS_INTERFACE_PROP = "persist.service.mts.interface";
+    public static final String MTS_BUFFER_SIZE_PROP = "persist.service.mts.buffer_size";
     public static final String MTS_SERVICE = "persist.service.mtsp.enable";
     public static final String MTS_STATUS_PROP = "init.svc.mtsp";
 

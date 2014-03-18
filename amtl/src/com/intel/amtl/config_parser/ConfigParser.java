@@ -138,7 +138,8 @@ public class ConfigParser {
                                 parser.getAttributeValue(null, "output_type"),
                                 parser.getAttributeValue(null, "rotate_num"),
                                 parser.getAttributeValue(null, "rotate_size"),
-                                parser.getAttributeValue(null, "interface"));
+                                parser.getAttributeValue(null, "interface"),
+                                parser.getAttributeValue(null, "buffer_size"));
                         mtsMode = parser.getAttributeValue(null, "mode");
                         Log.d(TAG, MODULE + ": Get mts input : "
                                 + parser.getAttributeValue(null, "input"));
@@ -152,6 +153,8 @@ public class ConfigParser {
                                 + parser.getAttributeValue(null, "rotate_size"));
                         Log.d(TAG, MODULE + ": Get mts interface : "
                                 + parser.getAttributeValue(null, "interface"));
+                        Log.d(TAG, MODULE + ": Get mts buffer_size : "
+                                + parser.getAttributeValue(null, "buffer_size"));
                         Log.d(TAG, MODULE + ": Get mts type mode : " + mtsMode);
                     }
                 break;
@@ -216,6 +219,7 @@ public class ConfigParser {
                     parser.getAttributeValue(null, "mts_rotate_size"),
                     parser.getAttributeValue(null, "mts_interface"),
                     parser.getAttributeValue(null, "mts_mode"),
+                    parser.getAttributeValue(null, "mts_buffer_size"),
                     parser.getAttributeValue(null, "oct"),
                     parser.getAttributeValue(null, "oct_fcs"),
                     parser.getAttributeValue(null, "pti1"),
@@ -234,6 +238,7 @@ public class ConfigParser {
                     + ", mts_rotate_size = " + parser.getAttributeValue(null, "mts_rotate_size")
                     + ", mts_interface = " + parser.getAttributeValue(null, "mts_interface")
                     + ", mts_mode = " + parser.getAttributeValue(null, "mts_mode")
+                    + ", mts_buffer_size = " + parser.getAttributeValue(null, "mts_buffer_size")
                     + ", oct = " + parser.getAttributeValue(null, "oct")
                     + ", oct_fcs = " + parser.getAttributeValue(null, "oct_fcs")
                     + ", pti1 = "+ parser.getAttributeValue(null, "pti1")
