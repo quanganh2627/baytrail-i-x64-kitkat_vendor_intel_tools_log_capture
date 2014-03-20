@@ -119,6 +119,7 @@ public class ModemController implements ModemEventListener, Closeable {
 
     public String sendAtCommand(String command) throws ModemControlException {
         String ret = "NOK";
+
         if (command != null) {
             if (!command.equals("")) {
                 if (this.currentModemStatus != ModemStatus.UP) {
@@ -129,9 +130,9 @@ public class ModemController implements ModemEventListener, Closeable {
 
                 do {
                     ret = this.ttyManager.readFromModemControl();
-                } while (ret.contains("PBREADY"));
+                } while (!ret.contains("OK") && !ret.contains("ERROR"));
 
-                if (!ret.contains("OK")) {
+                if (ret.contains("ERROR")) {
                     throw new ModemControlException("Modem has answered" + ret
                             + "to the AT command sent " + command);
                 }
