@@ -67,6 +67,7 @@ static int write_iptrak_file(
         const char* uptime) {
     /* Variables used to write/read from files */
     FILE *fd;
+    int ret;
     /* Write iptrak file */
     fd = fopen(IPTRAK_FILE, "w");
     if (fd == NULL) {
@@ -84,11 +85,16 @@ static int write_iptrak_file(
     fclose(fd);
     LOGI("[IPTRAK] Updating uptime value: %s.\n", uptime);
     /* Change file permissions */
-    if(chmod(IPTRAK_FILE, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH) < 0) {
+    ret = do_chmod(IPTRAK_FILE, "640");
+    if (ret) {
         LOGE("[IPTRAK] %s: Cannot change IPTRAK file permissions %s - %s\n",
-            __FUNCTION__,
-            IPTRAK_FILE,
-            strerror(errno));
+             __FUNCTION__, IPTRAK_FILE, strerror(errno));
+        return -1;
+    }
+    ret = do_chown(IPTRAK_FILE, PERM_USER, PERM_GROUP);
+    if (ret) {
+        LOGE("[IPTRAK] %s: Cannot change IPTRAK file owner %s - %d\n",
+             __FUNCTION__, IPTRAK_FILE, ret);
         return -1;
     }
 
