@@ -50,6 +50,7 @@ endif
 
 LOCAL_C_INCLUDES += \
   $(TARGET_OUT_HEADERS)/IFX-modem \
+  $(TARGET_OUT_HEADERS)/libtcs \
   vendor/intel/tools/log_capture/backtrace
 
 LOCAL_MODULE_TAGS := eng debug
