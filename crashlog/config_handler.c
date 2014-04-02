@@ -302,30 +302,6 @@ void load_config(){
                     }
                 }
             }
-            if (sk_exists(GENERAL_CONF_PATTERN,"check_ram_panic",&my_conf_handle)){
-                pchar tmp = get_value(GENERAL_CONF_PATTERN,"check_ram_panic",&my_conf_handle);
-                if (tmp){
-                    i_tmp = atoi(tmp);
-                    if (i_tmp > 0){
-                        cfg_check_ram_panic = 1;
-                    } else {
-                        cfg_check_ram_panic = 0;
-                    }
-                    LOGI("Check RAM panic: %d", cfg_check_ram_panic);
-                }
-            }
-            if (sk_exists(GENERAL_CONF_PATTERN,"check_hwwdt",&my_conf_handle)){
-                pchar tmp = get_value(GENERAL_CONF_PATTERN,"check_hwwdt",&my_conf_handle);
-                if (tmp){
-                    i_tmp = atoi(tmp);
-                    if (i_tmp > 0){
-                        cfg_check_hwwdt = 1;
-                    } else {
-                        cfg_check_hwwdt = 0;
-                    }
-                    LOGI("Check HW watchdog: %d", cfg_check_hwwdt);
-                }
-            }
             if (sk_exists(GENERAL_CONF_PATTERN,"check_modem_version",&my_conf_handle)){
                 pchar tmp = get_value(GENERAL_CONF_PATTERN,"check_modem_version",&my_conf_handle);
                 if (tmp){

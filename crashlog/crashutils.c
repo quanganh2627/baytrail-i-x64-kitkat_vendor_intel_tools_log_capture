@@ -479,8 +479,12 @@ char *raise_event_nouptime(char *event, char *type, char *subtype, char *log) {
     return priv_raise_event(event, type, subtype, log, NO_UPTIME, 1, NULL , NULL, NULL);
 }
 
+char *raise_event_wdt(char *event, char *type, char *subtype, char *log) {
+    return priv_raise_event(event, type, NULL, log, UPTIME, 1, subtype, NULL, NULL);
+}
+
 char *raise_event(char *event, char *type, char *subtype, char *log) {
-    return priv_raise_event(event, type, subtype, log, UPTIME, 1, NULL , NULL, NULL);
+    return priv_raise_event(event, type, subtype, log, UPTIME, 1, NULL, NULL, NULL);
 }
 
 char *raise_event_bootuptime(char *event, char *type, char *subtype, char *log) {
@@ -1039,7 +1043,6 @@ int create_rebootfile(char* key, int data_ready)
             get_data_from_boot_file(tmp,"DATA4", fp);
         }
     }
-
     fprintf(fp,"_END\n");
     fclose(fp);
     return 0;
@@ -1071,4 +1074,16 @@ void get_data_from_boot_file(char *file, char* data, FILE* fp) {
         }
         fclose(fd_source);
     }
+}
+
+void do_wdt_log_copy(int dir) {
+    const char *dateshort = get_current_time_short(1);
+    char destination[PATHMAX] = "";
+
+    destination[0] = '\0';
+    snprintf(destination, sizeof(destination), "%s%d/", CRASH_DIR, dir);
+    flush_aplog(APLOG_BOOT, "WDT", &dir, dateshort);
+    usleep(TIMEOUT_VALUE);
+    do_log_copy("WDT", dir, dateshort, APLOG_TYPE);
+    do_last_fw_msg_copy(dir);
 }

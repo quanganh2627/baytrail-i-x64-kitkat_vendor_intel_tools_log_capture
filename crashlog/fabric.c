@@ -73,8 +73,6 @@ static const struct fabric_type fabric_event[] = {
     [ F_INFORMATIVE_MSG ] = {"DW0:", "f506", "FIRMWARE"},
 };
 
-int cfg_check_hwwdt = 0;
-
 int crashlog_check_fabric(char *reason, int test) {
     const char *dateshort = get_current_time_short(1);
     char destination[PATHMAX];
@@ -137,8 +135,8 @@ int crashlog_check_fabric(char *reason, int test) {
     }
 
     if (dir_err == 0) {
+        do_wdt_log_copy(dir);
         do_last_kmsg_copy(dir);
-        do_last_fw_msg_copy(dir);
         destination[0] = '\0';
         snprintf(destination, sizeof(destination),"%s%d/", CRASH_DIR, dir);
         key = raise_event(event_name, crashtype, NULL, destination);
@@ -161,6 +159,6 @@ int crashlog_check_fabric(char *reason, int test) {
 void crashlog_check_fabric_events(char *reason, char *watchdog, int test) {
 
      if (crashlog_check_fabric(reason, test) == 1)
-        if (strstr(reason, "HWWDT_") && (cfg_check_hwwdt))
+        if (strstr(reason, "HWWDT_"))
             strcpy(watchdog, "HWWDT_UNHANDLED");
 }

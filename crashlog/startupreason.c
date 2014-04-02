@@ -459,7 +459,7 @@ int crashlog_check_startupreason(char *reason, char *watchdog) {
     /* Nothing to do if the reason :
      *  - doesn't contains "HWWDT" or "SWWDT" or "WDT" */
     /*  - contains "WDT" but with "FAKE" suffix */
-    if ( !( strstr(reason, "WDT_") ) || strstr(reason, "FAKE") ) {
+    if ( !( strstr(reason, "WDT_") ) || strstr(reason, "FAKE") || !( strstr(watchdog, "UNHANDLED") ) ) {
         /* Nothing to do */
         return 0;
     }
@@ -475,7 +475,7 @@ int crashlog_check_startupreason(char *reason, char *watchdog) {
 
     destination[0] = '\0';
     snprintf(destination, sizeof(destination), "%s%d/", CRASH_DIR, dir);
-    key = raise_event(CRASHEVENT, watchdog, reason, destination);
+    key = raise_event_wdt(CRASHEVENT, watchdog, reason, destination);
     LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, get_current_time_long(0), "WDT", destination);
     flush_aplog(APLOG_BOOT, "WDT", &dir, dateshort);
     usleep(TIMEOUT_VALUE);

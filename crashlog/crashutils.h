@@ -57,6 +57,7 @@ char **commachain_to_fixedarray(char *chain,
         unsigned int recordsize, unsigned int maxrecords, int *res);
 int do_screenshot_copy(char* bz_description, char* bzdir);
 
+void do_wdt_log_copy(int dir);
 void do_last_kmsg_copy(int dir);
 void do_last_fw_msg_copy(int dir);
 void clean_crashlog_in_sd(char *dir_to_search, int max);
@@ -67,6 +68,7 @@ int reboot_reason_files_present();
 void get_data_from_boot_file(char *file, char* data, FILE* fp);
 char *raise_event(char *event, char *type, char *subtype, char *log);
 char *raise_event_nouptime(char *event, char *type, char *subtype, char *log);
+char *raise_event_wdt(char *event, char *type, char *subtype, char *log);
 char *raise_event_bootuptime(char *event, char *type, char *subtype, char *log);
 char *raise_event_dataready(char *event, char *type, char *subtype, char *log, int data_ready);
 char *raise_event_dataready012(char *event, char *type, char *subtype, char *log,

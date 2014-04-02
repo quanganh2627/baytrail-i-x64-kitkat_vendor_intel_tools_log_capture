@@ -24,8 +24,6 @@
 #ifndef __FABRIC__H__
 #define __FABRIC__H__
 
-extern int cfg_check_hwwdt;
-
 void crashlog_check_fabric_events(char *reason, char *watchdog, int test);
 
 #endif /* __FABRIC__H__ */

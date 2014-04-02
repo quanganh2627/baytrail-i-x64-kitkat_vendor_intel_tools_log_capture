@@ -33,8 +33,6 @@ typedef enum e_crashtype_mode {
     RAM_PANIC_MODE, /*< computation of ram panic crashtype */
 } e_crashtype_mode_t;
 
-int cfg_check_ram_panic = 1;
-
 /*
 * Name          : check_aplogs_tobackup
 * Description   : backup a number of aplogs if a patten is found in a file
@@ -246,6 +244,7 @@ int crashlog_check_panic(char *reason, int test) {
     set_ipanic_crashtype_and_reason(crash_console_name, crashtype, reason, EMMC_PANIC_MODE);
 
     if (copy_to_crash) {
+        do_wdt_log_copy(dir);
         key = raise_event(CRASHEVENT, crashtype, NULL, crash_path);
         LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, get_current_time_long(0), crashtype, crash_path);
         free(key);
@@ -352,6 +351,7 @@ int crashlog_check_ram_panic(char *reason) {
     check_aplogs_tobackup(crash_ramconsole_name);
 
     if (copy_to_crash) {
+        do_wdt_log_copy(dir);
         key = raise_event(CRASHEVENT, crashtype, NULL, crash_path);
         LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, get_current_time_long(0), crashtype, crash_path);
         free(key);
@@ -438,6 +438,7 @@ int crashlog_check_panic_header(char *reason) {
     set_ipanic_crashtype_and_reason(crash_header_name, crashtype, reason, EMMC_PANIC_MODE);
 
     if (copy_to_crash) {
+        do_wdt_log_copy(dir);
         key = raise_event(CRASHEVENT, crashtype, NULL, crash_path);
         LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, get_current_time_long(0), crashtype, crash_path);
         free(key);
@@ -540,14 +541,13 @@ int crashlog_check_kdump(char *reason, int test) {
 */
 void crashlog_check_panic_events(char *reason, char *watchdog, int test) {
 
-    if (crashlog_check_panic(reason, test) == 1)
+   if (crashlog_check_panic(reason, test) == 1)
         /* No panic console file : check RAM console to determine the watchdog event type */
         if (crashlog_check_ram_panic(reason) == 1)
             /* Last resort: copy the panic partition header */
-            if ( (crashlog_check_panic_header(reason) == 1) &&
-                    strstr(reason, "SWWDT_") &&
-                    (cfg_check_ram_panic == 1) )
-                strcpy(watchdog, "WDT_UNHANDLED");
+            if ((crashlog_check_panic_header(reason) == 1) &&
+                    strstr(reason, "SWWDT_")) 
+           strcpy(watchdog, "SWWDT_UNHANDLED");
 
     /* Clears /proc/emmc_ipanic* entries */
     overwrite_file(CURRENT_PANIC_HEADER_NAME, "1");
