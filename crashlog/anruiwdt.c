@@ -157,6 +157,28 @@ static void backtrace_anruiwdt(char *dest, int dir) {
 #endif
 }
 
+#define PATH_LENGTH			256
+void do_copy_pvr(char * src, char * dest) {
+   char *token = NULL;
+   char *str = NULL;
+   char buf[PATH_LENGTH] = {0, };
+   char path[PATH_LENGTH] = {0, };
+   FILE * fs = NULL;
+   FILE * fd = NULL;
+   fs = fopen(src,"r");
+   fd = fopen(dest,"w");
+   if (fs && fd) {
+		while(fgets(buf, PATH_LENGTH, fs)) {
+		    fputs(buf ,fd);
+		 }
+   }
+   if (fs)
+      fclose(fs);
+   if (fd)
+      fclose(fd);
+
+   return;
+}
 /*
 * Name          :
 * Description   :
@@ -174,6 +196,8 @@ int process_anruiwdt_event(struct watch_entry *entry, struct inotify_event *even
         return 1;
 
     dir = find_new_crashlog_dir(MODE_CRASH);
+    snprintf(destion,sizeof(destion),"%s%d/%s", CRASH_DIR, dir, "pvr_debug_dump.txt");
+    do_copy_pvr("/d/pvr/debug_dump", destion);
     snprintf(path, sizeof(path),"%s/%s", entry->eventpath, event->name);
     if (dir < 0 || !file_exists(path)) {
         if (dir < 0)
