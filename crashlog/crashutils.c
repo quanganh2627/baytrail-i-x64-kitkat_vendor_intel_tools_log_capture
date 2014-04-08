@@ -37,6 +37,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <sys/sha1.h>
+#include <sys/wait.h>
 
 #include <cutils/properties.h>
 #ifndef __TEST__
@@ -780,8 +781,6 @@ void start_daemon(const char *daemonname) {
     property_set("ctl.start", (char *)daemonname);
 }
 
-
-
 void notify_crashreport() {
     char boot_state[PROPERTY_VALUE_MAX];
 
@@ -795,8 +794,53 @@ void notify_crashreport() {
         return;
 
     int status = system("am broadcast -n com.intel.crashreport/.specific.NotificationReceiver -a com.intel.crashreport.intent.CRASH_NOTIFY -c android.intent.category.ALTERNATIVE");
-    if (status != 0)
-        LOGI("notify crashreport status: %d.\n", status);
+    if (status == -1) {
+        LOGI("notify crash report failed: fork\n");
+        return;
+    }
+
+    if (WIFEXITED(status) && WEXITSTATUS(status)) {
+        LOGI("notify crash report status: %d.\n", WEXITSTATUS(status));
+        return;
+    }
+}
+
+/**
+ * @brief Notify partition error
+ *
+ * @return Notify partition error : 1 if successfull
+ */
+int notify_partition_error(enum partition_error type) {
+    char boot_state[PROPERTY_VALUE_MAX];
+    int status = 0;
+
+    property_get(PROP_BOOT_STATUS, boot_state, "-1");
+    if (strcmp(boot_state, "1"))
+        return 0;
+
+    switch(type) {
+        case ERROR_LOGS_MISSING :
+             status = system("am broadcast -a intel.intent.action.phonedoctor.REPORT_ERROR --es \"intel.intent.extra.phonedoctor.TYPE\" \"PARTITION\" --es \"intel.intent.extra.phonedoctor.DATA0\" \"LOGS MISSING\"");
+             break;
+        case ERROR_LOGS_RO :
+             status = system("am broadcast -a intel.intent.action.phonedoctor.REPORT_ERROR --es \"intel.intent.extra.phonedoctor.TYPE\" \"PARTITION\" --es \"intel.intent.extra.phonedoctor.DATA0\" \"LOGS READ ONLY\"");
+             break;
+        case ERROR_PARTITIONS_MISSING :
+             status = system("am broadcast -a intel.intent.action.phonedoctor.REPORT_ERROR --es \"intel.intent.extra.phonedoctor.TYPE\" \"PARTITION\" --es \"intel.intent.extra.phonedoctor.DATA0\" \"PARTITION MISSING\"");
+             break;
+        default :
+             break;
+    }
+    if (status == -1) {
+        LOGI("notify partition error failed: fork\n");
+        return 0;
+    }
+
+    if (WIFEXITED(status) && WEXITSTATUS(status)) {
+        LOGI("notify partition error status: %d.\n", WEXITSTATUS(status));
+        return 0;
+    }
+    return 1;
 }
 
 /**

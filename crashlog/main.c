@@ -84,6 +84,70 @@ char CURRENT_PROC_FABRIC_ERROR_NAME[PATHMAX]={PROC_FABRIC_ERROR_NAME};
 char CURRENT_PROC_OFFLINE_SCU_LOG_NAME[PATHMAX]={PROC_OFFLINE_SCU_LOG_NAME};
 char CURRENT_KERNEL_CMDLINE[PATHMAX]={KERNEL_CMDLINE};
 
+int partition_notified = 1;
+
+static const char * const mountpoints[] = {
+    "/system",
+    "/cache",
+    "/config",
+    "/logs",
+    "/factory",
+};
+
+static int check_mounted_partition(const char *partition_name)
+{
+    unsigned int i;
+    for (i=0; i < DIM(mountpoints); i++)
+         if (!strncmp(partition_name, mountpoints[i], strlen(mountpoints[i])))
+             return 1;
+    return 0;
+}
+
+static int check_mounted_partitions()
+{
+    FILE *fd;
+    char mount_dev[256];
+    char mount_dir[256];
+    char mount_type[256];
+    char mount_opts[256];
+    char list_partition[256];
+    int match;
+    int mount_passno;
+    int mount_freq;
+    unsigned int nb_partition = 0;
+    /* if an error is detected, output is set to 0 */
+    int output = 1;
+
+    memset(list_partition, '\0', sizeof(list_partition));
+    fd = fopen("/proc/mounts", "r");
+    if (fd == NULL) {
+        LOGE("can not open mounts file \n");
+        return output;
+    }
+    do {
+        memset(mount_dev, '\0', sizeof(mount_dev));
+        match = fscanf(fd, "%255s %255s %255s %255s %d %d\n",
+                       mount_dev, mount_dir, mount_type,
+                       mount_opts, &mount_freq, &mount_passno);
+         if (strstr(mount_dev, "by-label") && check_mounted_partition(mount_dir)) {
+             nb_partition++;
+             strncat(list_partition, mount_dir, sizeof(list_partition) - 1);
+             if (((strncmp(mount_dir, "/logs", 5)) == 0) && strstr(mount_opts, "ro,"))
+                  output = notify_partition_error(ERROR_LOGS_RO);
+         }
+    } while (match != EOF);
+
+    if (nb_partition < DIM(mountpoints)) {
+        if (!strstr(list_partition, "/logs"))
+            output = notify_partition_error(ERROR_LOGS_MISSING);
+        else
+            output = notify_partition_error(ERROR_PARTITIONS_MISSING);
+    }
+    fclose(fd);
+
+    return output;
+}
+
 int process_command_event(struct watch_entry *entry, struct inotify_event *event) {
     char path[PATHMAX];
     char action[MAXLINESIZE];
@@ -257,6 +321,11 @@ static void timeup_thread_mainloop()
     char logenable[PROPERTY_VALUE_MAX];
 
     while (1) {
+        /*
+         * checks the mounted partitions ...
+         */
+        if (partition_notified && !check_mounted_partitions())
+              partition_notified = 0;
         /*
          * checks the logging services are still alive...
          * restart it if necessary

@@ -37,6 +37,13 @@ enum time_format {
     TIME_FORMAT_LONG,
 };
 
+/* Define error type */
+enum partition_error {
+    ERROR_LOGS_MISSING = 0,
+    ERROR_PARTITIONS_MISSING,
+    ERROR_LOGS_RO,
+};
+
 #define TIME_FORMAT_LENGTH  32
 #define DUPLICATE_TIME_FORMAT    "%Y-%m-%d/%H:%M:%S"
 
@@ -92,5 +99,6 @@ void monitor_crashenv();
 
 int process_info_and_error_inotify_callback(struct watch_entry *entry, struct inotify_event *event);
 int process_info_and_error(char *filename, char *name);
+int notify_partition_error(enum partition_error type);
 
 #endif /* __CRASHUTILS_H__ */
