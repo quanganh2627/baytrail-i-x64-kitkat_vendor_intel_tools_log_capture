@@ -27,7 +27,6 @@ LOCAL_SRC_FILES := \
     config.c \
     inotify_handler.c \
     startupreason.c \
-    mmgr_source.c \
     crashutils.c \
     usercrash.c \
     anruiwdt.c \
@@ -42,7 +41,6 @@ LOCAL_SRC_FILES := \
     config_handler.c \
     ramdump.c \
     fw_update.c \
-    tcs_wrapper.c \
     ct_utils.c \
     kct_netlink.c \
     lct_link.c \
@@ -63,7 +61,18 @@ LOCAL_C_INCLUDES := \
 
 LOCAL_SHARED_LIBRARIES := \
     libparse_stack \
-    libcutils \
+    libcutils
+
+ifeq ($(BOARD_HAVE_MODEM),true)
+LOCAL_CFLAGS += -DBOARD_HAVE_MODEM
+
+LOCAL_SHARED_LIBRARIES += \
     libmmgrcli \
     libtcs
+
+LOCAL_SRC_FILES += \
+    tcs_wrapper.c \
+    mmgr_source.c
+endif
+
 include $(BUILD_EXECUTABLE)

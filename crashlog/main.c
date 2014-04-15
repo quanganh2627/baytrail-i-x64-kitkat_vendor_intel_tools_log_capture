@@ -359,6 +359,7 @@ static void early_check(char *encryptstate, int test) {
     LOGE("%-8s%-22s%-20s%s\n", STATEEVENT, key, datelong, encryptstate);
     free(key);
 
+#ifdef BOARD_HAVE_MODEM
     if(cfg_check_modem_version()) {
         modem_name_check_result = update_modem_name();
         if(modem_name_check_result < 0) {
@@ -369,6 +370,7 @@ static void early_check(char *encryptstate, int test) {
             LOGI("%s: File %s updated successfully.", __FUNCTION__, LOG_MODEM_VERSION);
         }
     }
+#endif
     /* Update the iptrak file */
     check_iptrak_file(RETRY_ONCE);
 }
@@ -551,7 +553,9 @@ int do_monitor() {
     set_watch_entry_callback(APIMR_TYPE,        process_modem_event);
     set_watch_entry_callback(MRST_TYPE,         process_modem_event);
 
+#ifdef BOARD_HAVE_MODEM
     init_mmgr_cli_source();
+#endif
 
     kct_netlink_init_comm();
 
@@ -568,13 +572,14 @@ int do_monitor() {
                 max = file_monitor_fd;
         }
 
+#ifdef BOARD_HAVE_MODEM
         //mmgr fd setup
         if (mmgr_get_fd() > 0) {
             FD_SET(mmgr_get_fd(), &read_fds);
             if (mmgr_get_fd() > max)
                 max = mmgr_get_fd();
         }
-
+#endif
         //kct fd setup
         if (kct_netlink_get_fd() > 0) {
             FD_SET(kct_netlink_get_fd(), &read_fds);
@@ -603,11 +608,13 @@ int do_monitor() {
             if (FD_ISSET(file_monitor_fd, &read_fds)) {
                 receive_inotify_events(file_monitor_fd);
             }
+ #ifdef BOARD_HAVE_MODEM
             // mmgr monitor
             if (FD_ISSET(mmgr_get_fd(), &read_fds)) {
                 LOGD("mmgr fd set");
                 mmgr_handle();
             }
+#endif
             // kct monitor
             if (FD_ISSET(kct_netlink_get_fd(), &read_fds)) {
                 LOGD("kct fd set");
@@ -620,8 +627,9 @@ int do_monitor() {
             }
         }
     }
-
+#ifdef BOARD_HAVE_MODEM
     close_mmgr_cli_source();
+#endif
     free_config(g_first_modem_config);
     LOGE("Exiting main monitor loop\n");
     return -1;
