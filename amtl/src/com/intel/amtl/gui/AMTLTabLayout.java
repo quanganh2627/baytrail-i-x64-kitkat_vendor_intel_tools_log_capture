@@ -124,7 +124,7 @@ public class AMTLTabLayout extends Activity implements GeneralSetupFrag.GSFCallB
 
         try {
             // Use of getXmlPlatform
-            this.platform = new Platform(this);
+            this.platform = new Platform();
             this.currentCatalogPath = this.platform.getPlatformConf();
 
             Log.d(TAG, MODULE + ": Will load " + this.currentCatalogPath +

@@ -21,6 +21,7 @@ package com.intel.amtl.platform;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.os.SystemProperties;
 import android.util.Log;
 
 import java.io.BufferedReader;
@@ -33,78 +34,9 @@ import java.io.FileInputStream;
 public class Platform {
 
     private final String TAG = "AMTL";
-    private final String MODULE = "Platform";
-    private final String CPU_FILE = "/sys/kernel/telephony/cpu_name";
-    private final String MODEM_FILE = "/sys/kernel/telephony/modem_name";
-    private String cpuName = "";
-    private String modemName = "";
-    private String catalogPath = "/system/etc/amtl/catalog/";
-
-    public Platform(Context context) {
-        getCpuName();
-        getModemName();
-        // Store modem and cpu names
-        SharedPreferences.Editor editor =
-                 context.getSharedPreferences("AMTLPrefsData",
-                 Context.MODE_PRIVATE).edit();
-        editor.putString("cpuName", this.cpuName);
-        editor.putString("modemName", this.modemName);
-        editor.commit();
-    }
+    private String catalogPath = "/system/etc/telephony/";
 
     public String getPlatformConf() {
-        return catalogPath + cpuName + "_" + modemName + ".cfg";
-    }
-
-    private void getModemName() {
-        InputStream inStream = null;
-        try {
-            inStream = new FileInputStream(MODEM_FILE);
-            if (inStream != null) {
-                byte[] b = new byte[inStream.available()];
-                inStream.read(b);
-                String name = new String(b);
-                this.modemName = name.substring(0, name.indexOf("\n"));
-                Log.d(TAG, MODULE + ": Identified cpu name: " + this.modemName);
-            }
-        } catch (FileNotFoundException ex) {
-            Log.e(TAG, MODULE + ": " + MODEM_FILE + " has not been found" + ex);
-        } catch (IOException ex) {
-            Log.e(TAG, MODULE + ": Unable to read file " + MODEM_FILE + " " + ex);
-        } finally {
-            if (inStream != null) {
-                try {
-                    inStream.close();
-                } catch (IOException ex) {
-                    Log.e(TAG, MODULE + ": Error during close " + ex);
-                }
-            }
-        }
-    }
-
-    private void getCpuName() {
-        InputStream inStream = null;
-        try {
-            inStream = new FileInputStream(CPU_FILE);
-            if (inStream != null) {
-                byte[] b = new byte[inStream.available()];
-                inStream.read(b);
-                String name = new String(b);
-                this.cpuName = name.substring(0, name.indexOf("\n"));
-                Log.d(TAG, MODULE + ": Identified cpu name: " + this.cpuName);
-            }
-        } catch (FileNotFoundException ex) {
-            Log.e(TAG, MODULE + ": " + CPU_FILE + " has not been found" + ex);
-        } catch (IOException ex) {
-            Log.e(TAG, MODULE + ": Unable to read file " + CPU_FILE + " " + ex);
-        } finally {
-            if (inStream != null) {
-                try {
-                    inStream.close();
-                } catch (IOException ex) {
-                    Log.e(TAG, MODULE + ": Error during close " + ex);
-                }
-            }
-        }
+        return catalogPath + "amtl_" + SystemProperties.get("service.amtl.config", "") + ".cfg";
     }
 }
