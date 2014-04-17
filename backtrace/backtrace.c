@@ -727,6 +727,8 @@ void backtrace_parse_tombstone_file( char *filename)
 			}
 		else {
 			farther = false;
+			fputs(data,fp_copy);
+			continue;
 		}
 		if (farther == true) //parse map info, skip write map info to new file. only read map info for farther task
 		{
@@ -738,14 +740,15 @@ void backtrace_parse_tombstone_file( char *filename)
 				if ( (str = strstr(data, "maps start")) )  // got the farther task id,
 					{
 						while(fgets(data, PATH_LENGTH, fp)) {
-							mapinfo *mi = parse_map_line(data);
+							if ( strstr(data,"maps end"))
+								goto f;
+
+							mapinfo *mi = parse_map_line_64(data);
 							if(mi) {
 								mi->next = milist;
 								milist = mi;
 								iElfCount ++;
 							}
-							if ( strstr(data,"maps end"))
-								goto f;
 						}
 					}
 
