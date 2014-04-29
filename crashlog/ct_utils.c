@@ -28,6 +28,7 @@
 #include "cutils/properties.h"
 #include "privconfig.h"
 #include "crashutils.h"
+#include "trigger.h"
 #include "fsutils.h"
 #include "ct_utils.h"
 #include "ct_eventintegrity.h"
@@ -214,6 +215,9 @@ void process_msg(struct ct_event *ev)
     LOGE("%-8s%-22s%-20s%s %s\n", name_event, key,
             get_current_time_long(0), name, destination);
     free(key);
+    /* in case of CT crash, create an extra event to upload current logs */
+    if (ev->type == CT_EV_CRASH)
+        process_log_event(NULL, NULL, MODE_APLOGS);
 }
 
 int dump_binary_attchmts_in_file(struct ct_event* ev, char* file_path) {
@@ -316,4 +320,3 @@ void convert_name_to_upper_case(char * name) {
         name[i] = toupper(name[i]);
     }
 }
-
