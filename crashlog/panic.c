@@ -275,7 +275,7 @@ int crashlog_check_panic(char *reason, int test) {
  *   0 for nominal case
  *   1 if the RAM console doesn't exist or if it exists but no panic detected.
  */
-int crashlog_check_ram_panic(char *reason) {
+int crashlog_check_ram_panic(char *reason, const char *extrastring) {
     char crash_path[PATHMAX] = {'\0'};
     char crash_ramconsole_name[PATHMAX] = {'\0'};
     char crash_header_name[PATHMAX] = {'\0'};
@@ -296,6 +296,9 @@ int crashlog_check_ram_panic(char *reason) {
     }
 
     if (find_str_in_file(ram_console, "Kernel panic - not syncing:", NULL) <= 0) {
+        return 1; /* Not a PANIC : return */
+    }
+    if (extrastring && (find_str_in_file(ram_console, extrastring, NULL) <= 0)) {
         return 1; /* Not a PANIC : return */
     }
 
@@ -539,16 +542,20 @@ int crashlog_check_kdump(char *reason, int test) {
 *
 * @retval returns 'void'
 */
+
 void crashlog_check_panic_events(char *reason, char *watchdog, int test) {
 
-   if (crashlog_check_panic(reason, test) == 1)
+    if (crashlog_check_panic(reason, test) == 1)
         /* No panic console file : check RAM console to determine the watchdog event type */
-        if (crashlog_check_ram_panic(reason) == 1)
+        if (crashlog_check_ram_panic(reason, NULL) == 1)
             /* Last resort: copy the panic partition header */
             if ((crashlog_check_panic_header(reason) == 1) &&
-                    strstr(reason, "SWWDT_")) 
-           strcpy(watchdog, "SWWDT_UNHANDLED");
+                    strstr(reason, "SWWDT_"))
+                strcpy(watchdog, "SWWDT_UNHANDLED");
 
     /* Clears /proc/emmc_ipanic* entries */
     overwrite_file(CURRENT_PANIC_HEADER_NAME, "1");
+
+    /* check double panic through RAM console */
+    crashlog_check_ram_panic(reason, "Crash partition in use!");
 }
