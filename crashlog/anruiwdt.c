@@ -198,6 +198,8 @@ int process_anruiwdt_event(struct watch_entry *entry, struct inotify_event *even
     dir = find_new_crashlog_dir(MODE_CRASH);
     snprintf(destion,sizeof(destion),"%s%d/%s", CRASH_DIR, dir, "pvr_debug_dump.txt");
     do_copy_pvr("/d/pvr/debug_dump", destion);
+    snprintf(destion,sizeof(destion),"%s%d/%s", CRASH_DIR, dir, "fence_sync.txt");
+    do_copy_pvr("/d/sync", destion);
     snprintf(path, sizeof(path),"%s/%s", entry->eventpath, event->name);
     if (dir < 0 || !file_exists(path)) {
         if (dir < 0)
