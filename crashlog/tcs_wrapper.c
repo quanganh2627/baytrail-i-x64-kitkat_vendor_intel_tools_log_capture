@@ -50,15 +50,19 @@ int get_modem_name(char* modem_name) {
     }
 
     tcs_cfg = tcs_get_config(h);
-    if((!tcs_cfg) || (!tcs_cfg->mdms.mdm_info)) {
+    if(!tcs_cfg) {
         LOGE("%s: Could not retrieve configuration.\n", __FUNCTION__);
         goto out;
     }
 
-    if(tcs_cfg->mdms.nb == 1) {
-        strncpy(modem_name, tcs_cfg->mdms.mdm_info[0].name, PROPERTY_VALUE_MAX);
-        ret = 0;
-    } else if(tcs_cfg->mdms.nb == 0) {
+    if(tcs_cfg->nb == 1) {
+        if (tcs_cfg->mdm) {
+            strncpy(modem_name, tcs_cfg->mdm[0].core.name, PROPERTY_VALUE_MAX);
+            ret = 0;
+        } else {
+            LOGE("%s: Wrong TCS value", __FUNCTION__);
+        }
+    } else if(tcs_cfg->nb == 0) {
         LOGD("%s: no modem", __FUNCTION__);
         modem_name[0] = '\0';
     } else {
