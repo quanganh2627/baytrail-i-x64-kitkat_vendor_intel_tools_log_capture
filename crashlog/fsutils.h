@@ -109,9 +109,9 @@ int sdcard_allowed();
 
 int find_matching_file(char *dir_to_search, char *pattern, char *filename_found);
 int get_value_in_file(char *file, char *keyword, char *value, unsigned int sizemax);
-int find_str_in_file(char *filename, char *keyword, char *tail);
+int find_str_in_file(const char *filename, const char *keyword, const char *tail);
 int find_str_in_standard_file(char *filename, char *keyword, char *tail);
-int find_oneofstrings_in_file(char *file, char **keywords, int nbkeywords);
+int find_oneofstrings_in_file(const char *filename, char *const keywords[], int nbkeywords);
 int find_oneofstrings_in_file_with_keyword(char *filename, char **keywords, char *common_keyword,int nbkeywords);
 void flush_aplog(e_aplog_file_t file, const char *mode, int *dir, const char *ts);
 void reset_file(const char *filename);

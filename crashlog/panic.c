@@ -264,6 +264,35 @@ int crashlog_check_panic(char *reason, int test) {
     }
 }
 
+static inline int
+crashlog_check_ram_panic_found(const char *ram_console,
+                               char *const panic_kw[],
+                               const char *extrastring)
+{
+    int ret;
+
+    ret = find_oneofstrings_in_file(ram_console, panic_kw, DIM(panic_kw));
+    if (ret < 0) {
+        LOGE("%s: search for panic keywords failed in %s (%d)\n",
+             __FUNCTION__, ram_console, ret);
+        return -1;
+    }
+
+    if (!extrastring)
+        return ret;
+
+    ret = find_str_in_file(ram_console, extrastring, NULL);
+    if (ret < 0) {
+        LOGE("%s: search for %s failed in %s (%d)\n",
+             __FUNCTION__, extrastring, ram_console, ret);
+        return -1;
+    } else if (ret) {
+        return 1;
+    }
+
+    return 0;
+}
+
 /**
  * @brief Checks in RAM console if a PANIC event occurred
  *
@@ -276,12 +305,14 @@ int crashlog_check_panic(char *reason, int test) {
  *   1 if the RAM console doesn't exist or if it exists but no panic detected.
  */
 int crashlog_check_ram_panic(char *reason, const char *extrastring) {
+    char *const panic_kw[] = {"Kernel panic - not syncing:",
+                              "BUG: unable to handle kernel"};
     char crash_path[PATHMAX] = {'\0'};
     char crash_ramconsole_name[PATHMAX] = {'\0'};
     char crash_header_name[PATHMAX] = {'\0'};
     char ram_console[PATHMAX] = {'\0'};
     char crashtype[32] = {'\0'};
-    int dir;
+    int dir, ret;
     int copy_to_crash = 0, copy_to_panic = 0;
     const char *dateshort = get_current_time_short(1);
     char *key;
@@ -295,11 +326,12 @@ int crashlog_check_ram_panic(char *reason, const char *extrastring) {
         return 1;
     }
 
-    if (find_str_in_file(ram_console, "Kernel panic - not syncing:", NULL) <= 0) {
-        return 1; /* Not a PANIC : return */
-    }
-    if (extrastring && (find_str_in_file(ram_console, extrastring, NULL) <= 0)) {
-        return 1; /* Not a PANIC : return */
+    ret = crashlog_check_ram_panic_found(ram_console, panic_kw, extrastring);
+    if (ret < 0) {
+        return -1;
+    } else if (!ret) {
+        LOGE("%s: not a panic, return\n", __FUNCTION__);
+        return 1;
     }
 
     dir = find_new_crashlog_dir(MODE_CRASH);

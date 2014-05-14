@@ -199,7 +199,7 @@ int freadline(FILE *fd, char buffer[MAXLINESIZE]) {
     return size;
 }
 
-int find_oneofstrings_in_file(char *filename, char **keywords, int nbkeywords) {
+int find_oneofstrings_in_file(const char *filename, char *const keywords[], int nbkeywords) {
 
     char buffer[MAXLINESIZE];
     int fd, linesize, idx;
@@ -312,7 +312,7 @@ int find_str_in_standard_file(char *filename, char *keyword, char *tail) {
  * if the matching line also ends with given tails (if provided).
  * It returns 1 if a match is found. 0 otherwise.
  */
-int find_str_in_file(char *filename, char *keyword, char *tail)
+int find_str_in_file(const char *filename, const char *keyword, const char *tail)
 {
     char buffer[4 * KB];
     int rc = 0;
