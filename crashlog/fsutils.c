@@ -28,6 +28,7 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <limits.h>
 #include <dirent.h>
 #include <string.h>
 #include <stdlib.h>

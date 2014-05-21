@@ -8,19 +8,25 @@ TEST_USER 	= $(shell grep `whoami` /etc/passwd > .tmp.txt && awk -F: '{ print $$
 CFLAGS 		= -D__LINUX__ -DTEST_USER=$(TEST_USER) -D__TEST__
 CFLAGS 	   	+= -g3 -Istubs -I ..
 
-CHECKFLAGS 	= -Wall -Wextra -Werror
+CHECKFLAGS 	= -Wall -Wextra
 
-LDFLAGS 	= -g3 -Wall -Wextra -Werror
+LDFLAGS 	= -g3 -Wall -Wextra
 
-TESTTARGETS	= bin/test_fsutils \
-	bin/test_inotify \
-	bin/test_crashutils \
-	bin/test_history \
-	bin/test_crashlogd
+# TESTTARGETS = \
+# 	bin/test_fsutils \
+# 	bin/test_inotify \
+# 	bin/test_crashutils \
+# 	bin/test_history \
+# 	bin/test_crashlogd
+
+TESTTARGETS = \
+	bin/test_fsutils
 
 FULLTARTGET	= bin/crashlogd
 
-all: check_dirs $(TESTTARGETS) $(FULLTARTGET)
+# all: check_dirs $(TESTTARGETS) $(FULLTARTGET)
+all: check_dirs $(TESTTARGETS)
+
 
 # Rule for test sources
 obj/%.o:%.c
