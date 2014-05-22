@@ -114,9 +114,6 @@ mapinfo *parse_map_line_64(char *line)
 	if (len < 2)
 		return 0;
 	line[--len] = 0;
-	mi = malloc(sizeof(mapinfo));
-	if (mi == NULL)
-		return 0;
 
 	token = strtok(line, " ");
 	if (token == NULL)
@@ -144,6 +141,10 @@ mapinfo *parse_map_line_64(char *line)
 	}
 	if (counter != 4)
 		return NULL;
+
+	mi = malloc(sizeof(mapinfo));
+	if (mi == NULL)
+		return 0;
 
 	//fill struct
 	mi->start = start_addr;
@@ -828,10 +829,17 @@ f:      	if (farther == true)  {
 						free(milist);
 						milist = next;
 					}
+					milist = 0;
 					break;
 				}
 			}
 		}
+	}
+	while(milist) {
+		mapinfo *next = milist->next;
+		symbol_tables_free(milist->symbols);
+		free(milist);
+		milist = next;
 	}
 	if (fp)
 		fclose(fp);
