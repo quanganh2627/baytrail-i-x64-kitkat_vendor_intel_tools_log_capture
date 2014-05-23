@@ -210,9 +210,13 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnChe
         if (id >= 0) {
             if (curModConf.getTrace().equals("0")) {
                 if (mtsMgr.getMtsState().equals("running")) {
+                    Log.e(TAG, MODULE + ": stopping mts running wrongly");
                     mtsMgr.stopServices();
                 }
-            } else {
+                Log.d(TAG, MODULE + ": reinit switches");
+                this.setSwitchesChecked(false);
+            }
+            else {
                 for (LogOutput o: configArray) {
                     o.getConfSwitch().setChecked(configArray.indexOf(o) == id);
                 }
