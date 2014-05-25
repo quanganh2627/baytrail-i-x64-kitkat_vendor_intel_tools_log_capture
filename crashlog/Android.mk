@@ -55,7 +55,6 @@ ifeq ($(TARGET_BIOS_TYPE),"uefi")
 endif
 
 LOCAL_C_INCLUDES := \
-  $(TARGET_OUT_HEADERS)/IFX-modem \
   $(LOCAL_PATH)/../backtrace \
   $(TARGET_OUT_HEADERS)/libtcs \
 
@@ -65,6 +64,9 @@ LOCAL_SHARED_LIBRARIES := \
 
 ifeq ($(BOARD_HAVE_MODEM),true)
 LOCAL_CFLAGS += -DBOARD_HAVE_MODEM
+
+LOCAL_C_INCLUDES += \
+  $(TARGET_OUT_HEADERS)/IFX-modem
 
 LOCAL_SHARED_LIBRARIES += \
     libmmgrcli \

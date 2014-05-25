@@ -25,7 +25,6 @@
 
 #include "inotify_handler.h"
 #include "startupreason.h"
-#include "mmgr_source.h"
 #include "crashutils.h"
 #include "privconfig.h"
 #include "usercrash.h"
@@ -45,6 +44,10 @@
 #include "kct_netlink.h"
 #include "lct_link.h"
 #include "iptrak.h"
+
+#ifdef BOARD_HAVE_MODEM
+#include "mmgr_source.h"
+#endif
 
 #include <sys/types.h>
 #include <sys/stat.h>
