@@ -208,8 +208,14 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnChe
         int id = prefs.getInt("index", -2);
         Log.d(TAG, MODULE + ": Current index = " + id);
         if (id >= 0) {
-            for (LogOutput o: configArray) {
-                o.getConfSwitch().setChecked(configArray.indexOf(o) == id);
+            if (curModConf.getTrace().equals("0")) {
+                if (mtsMgr.getMtsState().equals("running")) {
+                    mtsMgr.stopServices();
+                }
+            } else {
+                for (LogOutput o: configArray) {
+                    o.getConfSwitch().setChecked(configArray.indexOf(o) == id);
+                }
             }
         } else {
             if (curModConf.getTrace().equals("0") && mtsMgr.getMtsState().equals("running")) {
