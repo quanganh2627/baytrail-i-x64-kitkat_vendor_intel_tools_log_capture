@@ -103,6 +103,48 @@ static int copy_attached_files(struct ct_event* ev, const char* copy_dst) {
     return 0;
 }
 
+static int do_additionl_steps(struct ct_event* ev, const char * destination) {
+    struct ct_attchmt* att = NULL;
+    uint32_t steps;
+    char destion[PATHMAX];
+
+    foreach_attchmt(ev, att) {
+        if (att->type == CT_ATTCHMT_ADDITIONAL && att->data
+                && (att->size == sizeof(uint32_t))) {
+            memcpy(&steps, att->data, att->size);
+            if ((steps & CT_ADDITIONAL_APLOG) && file_exists(APLOG_FILE_0)) {
+                snprintf(destion, sizeof(destion), "%saplog", destination);
+                do_copy_tail(APLOG_FILE_0, destion, MAXFILESIZE);
+            }
+
+            if (steps & CT_ADDITIONAL_LAST_KMSG) {
+                if (file_exists(LAST_KMSG)) {
+                    snprintf(destion, sizeof(destion), "%s%s", destination,
+                        LAST_KMSG_FILE);
+                    do_copy_tail(LAST_KMSG, destion, MAXFILESIZE);
+                } else if (file_exists(CONSOLE_RAMOOPS)) {
+                    snprintf(destion, sizeof(destion), "%s%s", destination,
+                            CONSOLE_RAMOOPS_FILE);
+                    do_copy_tail(CONSOLE_RAMOOPS, destion, MAXFILESIZE);
+                }
+                if (file_exists(FTRACE_RAMOOPS)) {
+                    snprintf(destion, sizeof(destion), "%s%s", destination,
+                            FTRACE_RAMOOPS_FILE);
+                    do_copy_tail(FTRACE_RAMOOPS, destion, MAXFILESIZE);
+                }
+            }
+
+            if ((steps & CT_ADDITIONAL_FWMSG) &&
+                    file_exists(CURRENT_PROC_OFFLINE_SCU_LOG_NAME)) {
+                snprintf(destion, sizeof(destion), "%s%s.txt", destination,
+                        OFFLINE_SCU_LOG_NAME);
+                do_copy_eof(CURRENT_PROC_OFFLINE_SCU_LOG_NAME, destion);
+            }
+        }
+    }
+    return 0;
+}
+
 void handle_event(struct ct_event *ev) {
 
     char submitter[PROPERTY_KEY_MAX];
@@ -195,6 +237,7 @@ void process_msg(struct ct_event *ev)
 
         snprintf(destination, sizeof(destination), "%s%d/", dir_mode, dir);
         copy_attached_files(ev, destination);
+        do_additionl_steps(ev, destination);
         check_event_integrity(ev, destination);
     }
 
@@ -252,6 +295,7 @@ int dump_binary_attchmts_in_file(struct ct_event* ev, char* file_path) {
         case CT_ATTCHMT_DATA4:
         case CT_ATTCHMT_DATA5:
         case CT_ATTCHMT_FILELIST:
+        case CT_ATTCHMT_ADDITIONAL:
         /* Nothing to do */
             break;
         default:
