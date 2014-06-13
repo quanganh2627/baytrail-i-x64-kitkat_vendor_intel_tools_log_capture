@@ -37,7 +37,7 @@
 #define MAX_RECORDS             5000
 #define MAX_DIRS                1000
 #define PATHMAX                 512
-#define UPTIME_HOUR_FREQUENCY   12
+#define UPTIME_HOUR_FREQUENCY   6
 #define TIMESTAMP_MAX_SIZE      10 /* Unix style timestamp on 10 characters max.*/
 #define MAXFILESIZE             (10*MB)
 /* find_str_in_file was implemented with 4KB*/
