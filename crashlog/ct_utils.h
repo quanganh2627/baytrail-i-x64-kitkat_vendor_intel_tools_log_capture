@@ -25,7 +25,7 @@
 
 #include <linux/kct.h>
 
-void handle_event(struct ct_event *ev);
+int event_pass_filter(struct ct_event *ev);
 void process_msg(struct ct_event *ev);
 int dump_binary_attchmts_in_file(struct ct_event* ev, char* file_path);
 int dump_data_in_file(struct ct_event* ev, char* file_path);

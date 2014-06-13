@@ -113,8 +113,9 @@ void lct_link_handle_msg(void)
         return;
     }
 
-    handle_event(ev);
-    /* Process Kernel user space message */
-    process_msg(ev);
+    if (event_pass_filter(ev) == TRUE) {
+        /* Process Kernel user space message */
+        process_msg(ev);
+    }
     free(ev);
 }

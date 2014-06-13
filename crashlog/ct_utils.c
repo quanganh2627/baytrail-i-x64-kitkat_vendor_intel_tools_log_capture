@@ -145,14 +145,14 @@ static int do_additionl_steps(struct ct_event* ev, const char * destination) {
     return 0;
 }
 
-void handle_event(struct ct_event *ev) {
+int event_pass_filter(struct ct_event *ev) {
 
     char submitter[PROPERTY_KEY_MAX];
     char propval[PROPERTY_VALUE_MAX];
 
     if (ev->type >= CT_EV_LAST) {
         LOGE("Unknown event type '%d', discarding", ev->type);
-        return;
+        return FALSE;
     }
 
     snprintf(submitter, sizeof(submitter), "%s.%s",
@@ -166,11 +166,16 @@ void handle_event(struct ct_event *ev) {
      * event should be flagged to be manage by this property.
      */
     if (ev->flags & EV_FLAGS_PRIORITY_LOW) {
-        if (!property_get(submitter, propval, NULL))
-            return;
-        if (strcmp(propval, "ON"))
-            return;
+        if (!property_get(submitter, propval, NULL)) {
+            LOGI("Filter out %s, cannot get prop", ev->submitter_name);
+            return FALSE;
+        }
+        if (strcmp(propval, "ON")) {
+            LOGI("Filter out %s, OFF", ev->submitter_name);
+            return FALSE;
+        }
     }
+    return TRUE;
 }
 
 void process_msg(struct ct_event *ev)

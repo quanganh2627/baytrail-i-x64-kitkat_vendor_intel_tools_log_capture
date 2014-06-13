@@ -182,7 +182,6 @@ void kct_netlink_handle_msg(void) {
         return;
     }
 
-    handle_event(&msg->event);
     /* Process Kernel message */
     process_msg(&msg->event);
     free(msg);
