@@ -35,6 +35,8 @@
 #define KB                      (1024)
 #define MB                      (KB*KB)
 #define MAX_RECORDS             5000
+#define MAX_RECORDS_HIST_FILE   (MAX_RECORDS + 1000)
+#define HIST_FILE_HEADER_SIZE   2
 #define MAX_DIRS                1000
 #define PATHMAX                 512
 #define UPTIME_HOUR_FREQUENCY   6

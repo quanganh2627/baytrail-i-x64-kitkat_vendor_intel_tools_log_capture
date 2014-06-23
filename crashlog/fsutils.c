@@ -200,6 +200,23 @@ int freadline(FILE *fd, char buffer[MAXLINESIZE]) {
     return size;
 }
 
+int count_lines_in_file(const char *filename) {
+    char buffer[MAXLINESIZE];
+    int fd, line_idx = 0;
+
+    if (!filename)
+        return -EINVAL;
+
+    fd = open(filename, O_RDONLY);
+    if(fd <= 0) return -errno;
+
+    while(readline(fd, buffer) > 0) {
+        line_idx++;
+    }
+    close(fd);
+    return line_idx;
+}
+
 int find_oneofstrings_in_file(const char *filename, char *const keywords[], int nbkeywords) {
 
     char buffer[MAXLINESIZE];

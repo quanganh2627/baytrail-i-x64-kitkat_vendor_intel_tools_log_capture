@@ -315,6 +315,7 @@ static void reset_after_swupdate(void)
     reset_file(CRASH_CURRENT_LOG);
     reset_file(STATS_CURRENT_LOG);
     reset_file(APLOGS_CURRENT_LOG);
+    reset_file(HISTORY_FILE);
     reset_uptime_history();
 }
 

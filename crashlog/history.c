@@ -45,6 +45,7 @@
 
 static char *historycache[MAX_RECORDS];
 static int nextline = -1;
+static int fileentries = -1;
 static int loop_uptime_event = 1;
 /* last uptime value set at device boot only */
 static char lastbootuptime[24] = "0000:00:00";
@@ -128,21 +129,45 @@ static int cache_history_file() {
         fprintf(to, "%s", firstline);
         fprintf(to, HISTORY_BLANK_LINE2);
         fclose(to);
+        nextline = 0;
+        fileentries = 0;
+        return 0;
     }
-    /* Cache the history file without the 2 first lines */
-    res = cache_file(HISTORY_FILE, (char**)historycache, MAX_RECORDS, CACHE_TAIL, 2);
 
+    res = count_lines_in_file(HISTORY_FILE);
     if ( res < 0 ) {
         LOGE("%s: Cannot cache the contents of %s - %s.\n",
             __FUNCTION__, HISTORY_FILE, strerror(-res));
         return res;
     }
+
+    int offset = HIST_FILE_HEADER_SIZE;
+    if (res > (HIST_FILE_HEADER_SIZE + MAX_RECORDS)) {
+        offset = res - MAX_RECORDS;
+    }
+
+    if (res > HIST_FILE_HEADER_SIZE) {
+        fileentries = res - HIST_FILE_HEADER_SIZE;
+        /* Cache the history file without the 2 first lines */
+        res = cache_file(HISTORY_FILE, (char**)historycache, MAX_RECORDS, CACHE_TAIL, offset);
+
+        if ( res < 0 ) {
+            LOGE("%s: Cannot cache the contents of %s - %s.\n",
+                __FUNCTION__, HISTORY_FILE, strerror(-res));
+            return res;
+        }
+    } else {
+        fileentries = 0;
+        nextline = 0;
+        return 0;
+    }
+
     nextline = res % MAX_RECORDS;
     return res;
 }
 
 int reset_history_cache() {
-    if (nextline > 0) {
+    if ((nextline > 0) || (historycache[0] != NULL)) {
         int idx;
         /* delete the cache first */
         for (idx = 0 ; idx < MAX_RECORDS ; idx++)
@@ -212,15 +237,19 @@ int update_history_file(struct history_entry *entry) {
     }
 
     /* Check if the buffer is full */
-    if ( historycache[nextline] == NULL ) {
-        /* Still have some room */
-        if ( (historycache[nextline] = strdup(newline)) == NULL) {
-            newline[strlen(newline) - 1] = 0; /*Remove trailing character for display purpose*/
-            LOGE("%s: Cannot copy the line %s - %s.\n", __FUNCTION__,
-                newline, strerror(nextline));
-            return -errno;
-        }
-        nextline = (nextline + 1) % MAX_RECORDS;
+    if ( historycache[nextline] != NULL ) 
+        free(historycache[nextline]);
+
+    if ( (historycache[nextline] = strdup(newline)) == NULL) {
+        newline[strlen(newline) - 1] = 0; /*Remove trailing character for display purpose*/
+        LOGE("%s: Cannot copy the line %s - %s.\n", __FUNCTION__,
+            newline, strerror(nextline));
+        return -errno;
+    }
+
+    nextline = (nextline + 1) % MAX_RECORDS;
+    fileentries = (fileentries + 1) % MAX_RECORDS_HIST_FILE;
+    if (fileentries != 0){
         /* We can just write the new line at the end of the file */
         res = append_file(HISTORY_FILE, newline);
         if (res > 0) return 0;
@@ -230,17 +259,10 @@ int update_history_file(struct history_entry *entry) {
         return res;
     }
 
-    /* The buffer is full */
-    LOGD("%s : History cache buffer is full\n", __FUNCTION__);
+    /* The file reached MAX_RECORDS_HIST_FILE records append buffer */
+    LOGD("%s : History cache file trimmed from %d to %d records \n", __FUNCTION__, 
+        MAX_RECORDS_HIST_FILE, MAX_RECORDS);
 
-    free(historycache[nextline]);
-    if ( (historycache[nextline] = strdup(newline)) == NULL) {
-        newline[strlen(newline) - 1] = 0; /*Remove trailing character for display purpose*/
-        LOGE("%s: Cannot copy the line %s - %s.\n", __FUNCTION__,
-            newline, strerror(nextline));
-        return -errno;
-    }
-    nextline = (nextline + 1) % MAX_RECORDS;
     /* We need to recreate a new file and write the full buffer
      * costly!!!
      */
