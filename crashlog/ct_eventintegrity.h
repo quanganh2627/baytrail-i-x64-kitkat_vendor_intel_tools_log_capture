@@ -24,6 +24,7 @@
 #ifndef __EVENTINTEGRITY_H__
 #define __EVENTINTEGRITY_H__
 
+#include <sys/socket.h>
 #include <linux/kct.h>
 
 int check_event_integrity(struct ct_event* ev, char* event_dir);
