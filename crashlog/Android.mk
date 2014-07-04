@@ -56,7 +56,8 @@ ifeq ($(TARGET_BIOS_TYPE),"uefi")
 endif
 
 LOCAL_STATIC_LIBRARIES += \
-  libdmi
+  libdmi \
+  libuefivar
 
 LOCAL_C_INCLUDES := \
   $(LOCAL_PATH)/../backtrace \

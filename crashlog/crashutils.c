@@ -52,11 +52,23 @@
 #include "uefivar.h"
 #include "startupreason.h"
 #include "ingredients.h"
+#include <libuefivar.h>
 
 char gbuildversion[PROPERTY_VALUE_MAX] = {0,};
 char gboardversion[PROPERTY_VALUE_MAX] = {0,};
 char guuid[256] = {0,};
 int gabortcleansd = 0;
+
+struct {
+    char * name;
+    char * description;
+} target_os_boot_array[] = {
+    {"", "N/A"},
+    {"main", "MOS"},
+    {"fastboot", "POS"},
+    {"recovery", "ROS"},
+    {"charging", "COS"}
+};
 
 /**
  * @brief Returns the date/time under the input format.
@@ -1009,12 +1021,54 @@ void clean_crashlog_in_sd(char *dir_to_search, int max) {
     gabortcleansd = (i < max);
 }
 
+static void trim_wchar_to_char(char *src, char * dest, int length) {
+    int src_count, dest_count;
+    for (src_count = 0, dest_count = 0; src_count < length; dest_count++, src_count += 2) {
+        dest[dest_count] = (char) src[src_count];
+    }
+}
+
+static char * check_os_boot_entry_description(const char* name, const char *guid){
+    const int max_len = 1024;
+    char target_mode[max_len];
+    int ret = 0;
+
+    int entries = sizeof(target_os_boot_array) / sizeof(target_os_boot_array[0]);
+
+    if ((ret = libuefivar_read_string(name, guid, target_mode, max_len)<=0)) {
+        LOGE("%s: Could not retrieve last target mode name or empty, returned: %d", __FUNCTION__, ret);
+        return target_os_boot_array[0].description;
+    }
+    trim_wchar_to_char(target_mode, target_mode, max_len);
+
+    while (entries--) {
+        if (!strcmp(target_mode, target_os_boot_array[entries].name))
+            break;
+    }
+    entries = (entries<0) ? 0 : entries;
+    return target_os_boot_array[entries].description;
+}
+
+static char * compute_bootmode(char* retVal, int len){
+    const char *last_target_mode_name = "LoaderEntryLast";
+    const char *previous_target_mode_name = "LoadEntryPrevious";
+    const char *guid = "4a67b082-0a4c-41cf-b6c7-440b29bb8c4f";
+
+    snprintf(retVal, len, "%s-%s",
+             check_os_boot_entry_description(previous_target_mode_name, guid),
+             check_os_boot_entry_description(last_target_mode_name, guid));
+
+    return retVal;
+}
+
 //This function creates a reboot file(DATA0/1 set to RESETSRC0/1).
 int create_rebootfile(char* key, int data_ready)
 {
     FILE *fp;
     char fullpath[PATHMAX];
     int ret = 0;
+    const int bootmode_len = 16;
+    char bootmode[bootmode_len];
 
     if (!file_exists(EVENTS_DIR)) {
         /* Create a fresh directory */
@@ -1092,6 +1146,7 @@ int create_rebootfile(char* key, int data_ready)
             get_data_from_boot_file(tmp,"DATA4", fp);
         }
     }
+    fprintf(fp,"BOOTMODE=%s\n", compute_bootmode(bootmode, bootmode_len));
     fprintf(fp,"_END\n");
     fclose(fp);
     return 0;
