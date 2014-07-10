@@ -267,6 +267,7 @@ extern enum crashlog_mode g_crashlog_mode;
 #define VALHOOKS_VERSION        "sys.valhooks.version"
 #define FINGERPRINT_FIELD       "ro.build.fingerprint"
 #define MODEM_FIELD             "gsm.version.baseband"
+#define MODEM_FIELD2            "gsm.version.baseband2"
 #define IMEI_FIELD              "persist.radio.device.imei"
 #define OPERATOR_FIELD          "gsm.operator.alpha"
 #define PROP_COREDUMP           "persist.core.enabled"
@@ -333,6 +334,7 @@ extern enum crashlog_mode g_crashlog_mode;
 #define LOG_BUILDID             LOGS_DIR "/buildid.txt"
 #define LOG_MODEM_VERSION       LOGS_DIR "/modem_version.txt"
 #define MODEM_UUID              LOGS_DIR "/modemid.txt"
+#define MODEM_UUID2             LOGS_DIR "/modemid2.txt"
 #define APLOG_FILE_0            LOGS_DIR "/aplog"
 #define APLOG_FILE_1            LOGS_DIR "/aplog.1"
 #define BPLOG_FILE_0            LOGS_DIR "/bplog"
@@ -412,6 +414,8 @@ extern enum crashlog_mode g_crashlog_mode;
 #define EVENTFILE_NAME          "eventfile"
 #define IPTRAK_FILE             LOGS_DIR "/iptrak"
 #define FW_UPDATE_STATUS_PATH   "/sys/firmware/osnib/fw_update_status"
+#define INGREDIENTS_CONFIG      SYSTEM_DIR "/etc/ingredients.conf"
+#define INGREDIENTS_FILE        LOGS_DIR "/ingredients.txt"
 
 /* MACROS */
 #define MIN(a,b)                ((a) < (b) ? (a) : (b))

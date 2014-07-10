@@ -46,7 +46,8 @@ LOCAL_SRC_FILES := \
     lct_link.c \
     iptrak.c \
     uefivar.c \
-    ct_eventintegrity.c
+    ct_eventintegrity.c \
+    ingredients.c
 
 LOCAL_CFLAGS := -DFULL_REPORT=1
 
@@ -54,9 +55,13 @@ ifeq ($(TARGET_BIOS_TYPE),"uefi")
     LOCAL_CFLAGS += -DCONFIG_UEFI
 endif
 
+LOCAL_STATIC_LIBRARIES += \
+  libdmi
+
 LOCAL_C_INCLUDES := \
   $(LOCAL_PATH)/../backtrace \
   $(TARGET_OUT_HEADERS)/libtcs \
+  $(TARGET_OUT_HEADERS)/libdmi \
 
 LOCAL_SHARED_LIBRARIES := \
     libparse_stack \

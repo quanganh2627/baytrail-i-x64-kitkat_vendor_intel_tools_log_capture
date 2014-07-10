@@ -29,6 +29,7 @@
 #include "privconfig.h"
 #include "history.h"
 #include "fsutils.h"
+#include "ingredients.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -443,10 +444,12 @@ int add_uptime_event() {
         restart_profile_srv(2);
         check_running_power_service();
         check_iptrak_file(FORCE_GENERATION);
+        check_ingredients_file();
     } else {
         /* We may want to update iptrak file anyway, if all data */
         /* were not available right after boot for instance.     */
         check_iptrak_file(ONLY_IF_REQUIRED);
+        check_ingredients_file();
     }
     return 0;
 }

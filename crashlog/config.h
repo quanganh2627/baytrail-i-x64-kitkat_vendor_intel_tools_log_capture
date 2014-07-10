@@ -116,4 +116,5 @@ pchar get_first_section_name (pchar base_section, pconfig_handle  conf_handle);
 */
 pchar get_next_section_name (pchar base_section, pconfig_handle  conf_handle);
 
-
+int cmp_config(pconfig_handle h1, pconfig_handle h2);
+int dump_config(pchar filename, pconfig_handle conf_handle);

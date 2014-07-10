@@ -44,6 +44,7 @@
 #include "kct_netlink.h"
 #include "lct_link.h"
 #include "iptrak.h"
+#include "ingredients.h"
 
 #ifdef BOARD_HAVE_MODEM
 #include "mmgr_source.h"
@@ -445,6 +446,7 @@ static void early_check(char *encryptstate, int test) {
 #endif
     /* Update the iptrak file */
     check_iptrak_file(RETRY_ONCE);
+    check_ingredients_file();
 }
 
 void spid_read_concat(const char *path, char *complete_value)

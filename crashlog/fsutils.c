@@ -1202,6 +1202,8 @@ int read_file_prop_uid(char* source, char *filename, char *uid, char* defaultval
             LOGE("Can't open file %s \n", filename);
             return -1;
         }
+        /*Success + the file was updated*/
+        return 1;
     }
     return 0;
 }

@@ -314,6 +314,80 @@ int init_config_file(pchar  filename, pconfig_handle  conf_handle) {
     return 0;
 }
 
+/**
+ * Write handler content into the specified file
+ * @param filename
+ * @param conf_handle
+ * @return 0 if everything is OK
+ */
+int dump_config(pchar filename, pconfig_handle conf_handle) {
+    psection current_psection;
+    pkv current_kv;
+    FILE * f;
+    f = fopen(filename, "w");
+
+    if (!f) {
+        return -1;
+    }
+
+    current_psection = conf_handle->first;
+    while (current_psection) {
+        fprintf(f, "\n[%s]\n", current_psection->name);
+        current_kv = current_psection->kvlist;
+        while (current_kv) {
+            fprintf(f, "%s=%s\n", current_kv->key, current_kv->value);
+            current_kv = current_kv->next;
+        }
+        current_psection = current_psection->next;
+    }
+
+    fclose(f);
+    return 0;
+}
+
+/**
+ * Compare  2 config handlers
+ * @param h1
+ * @param h2
+ * @return 0 if identical
+ */
+int cmp_config(pconfig_handle h1, pconfig_handle h2) {
+    psection s1, s2;
+    pkv k1, k2;
+
+    if (!h1 || !h2) {
+        return 1;
+    }
+
+    s1 = h1->first;
+    s2 = h2->first;
+
+    while (s1 && s2) {
+        if (strcmp(s1->name, s2->name))
+            return 1;
+        k1 = s1->kvlist;
+        k2 = s2->kvlist;
+        while (k1 && k2) {
+            if (strcmp(k1->key, k2->key))
+                return 1;
+
+            if (strcmp(k1->value, k2->value))
+                return 1;
+
+            k1 = k1->next;
+            k2 = k2->next;
+        }
+
+        /*both k should be NULL*/
+        if (k1 != k2)
+            return 1;
+        s1 = s1->next;
+        s2 = s2->next;
+    }
+    if (s1 != s2)
+        return 1;
+    return 0;
+}
 
 void free_config_file(pconfig_handle  conf_handle)
 {

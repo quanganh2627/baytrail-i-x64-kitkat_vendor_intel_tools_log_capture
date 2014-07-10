@@ -51,6 +51,7 @@
 #include <dropbox.h>
 #include "uefivar.h"
 #include "startupreason.h"
+#include "ingredients.h"
 
 char gbuildversion[PROPERTY_VALUE_MAX] = {0,};
 char gboardversion[PROPERTY_VALUE_MAX] = {0,};
@@ -211,11 +212,9 @@ static int compute_key(char* key, char *event, char *type)
 }
 
 static void check_prop_modemid(){
-    static int propFound = -1;
     char prop[PROPERTY_VALUE_MAX];
-    if (propFound !=0){
-        propFound = read_file_prop_uid(MODEM_FIELD, MODEM_UUID, prop, "unknown");
-    }
+    if(read_file_prop_uid(MODEM_FIELD, MODEM_UUID, prop, "unknown")>0)
+        check_ingredients_file();
 }
 
 char **commachain_to_fixedarray(char *chain,
@@ -400,6 +399,7 @@ static char *priv_raise_event(char *event, char *type, char *subtype, char *log,
 
     //check property of modemid at each event
     check_prop_modemid();
+
 
     /* UPTIME      : event uptime value is get from system
      * UPTIME_BOOT : event uptime value get from history file first line
@@ -719,6 +719,7 @@ void create_infoevent(char* filename, char* data0, char* data1, char* data2)
 const char *get_build_footprint() {
     static char footprint[SIZE_FOOTPRINT_MAX+1] = {0,};
     char prop[PROPERTY_VALUE_MAX];
+    int mdmIdUpdate;
 
     /* footprint contains:
      * buildId
@@ -751,9 +752,13 @@ const char *get_build_footprint() {
     strncat(footprint, prop, SIZE_FOOTPRINT_MAX);
     strncat(footprint, ",", SIZE_FOOTPRINT_MAX);
 
-    read_file_prop_uid(MODEM_FIELD, MODEM_UUID, prop, "unknown");
+    mdmIdUpdate = read_file_prop_uid(MODEM_FIELD, MODEM_UUID, prop, "unknown");
     strncat(footprint, prop, SIZE_FOOTPRINT_MAX);
     strncat(footprint, ",", SIZE_FOOTPRINT_MAX);
+    if(mdmIdUpdate>0)
+    {
+        check_ingredients_file();
+    }
 
     property_get(IFWI_FIELD, prop, "");
     strncat(footprint, prop, SIZE_FOOTPRINT_MAX);
