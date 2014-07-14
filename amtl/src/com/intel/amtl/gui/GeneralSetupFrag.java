@@ -243,8 +243,19 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnChe
                 } else {
                     if (this.configArray != null) {
                         for (LogOutput o: configArray) {
-                            o.getConfSwitch().setChecked(o.getXsio().equals(curModConf.getXsio())
-                                    && o.getMtsOutput().equals(curModConf.getMtsConf().getOutput()));
+                            if (o != null
+                                    && o.getConfSwitch() != null
+                                    && o.getXsio() != null
+                                    && curModConf != null
+                                    && curModConf.getXsio() != null
+                                    && o.getMtsOutput() != null
+                                    && curModConf.getMtsConf() != null
+                                    && curModConf.getMtsConf().getOutput() != null) {
+                                o.getConfSwitch().setChecked(
+                                    o.getXsio().equals(curModConf.getXsio())
+                                    && o.getMtsOutput().equals(
+                                        curModConf.getMtsConf().getOutput()));
+                            }
                         }
                     }
                 }
