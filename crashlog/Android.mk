@@ -61,8 +61,7 @@ LOCAL_STATIC_LIBRARIES += \
 
 LOCAL_C_INCLUDES := \
   $(LOCAL_PATH)/../backtrace \
-  $(TARGET_OUT_HEADERS)/libtcs \
-  $(TARGET_OUT_HEADERS)/libdmi \
+  $(TARGET_OUT_HEADERS)/libtcs
 
 LOCAL_SHARED_LIBRARIES := \
     libparse_stack \
