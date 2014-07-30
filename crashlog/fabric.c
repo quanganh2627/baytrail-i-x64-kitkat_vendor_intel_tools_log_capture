@@ -46,6 +46,7 @@ struct fabric_type fabric_types_array[] = {
     {"DW3:", "0000e10b", "KERNELWDT"},
     {"DW3:", "0000e10c", "SCUWDT"},
     {"DW3:", "0000e10d", "FABRICXML"},
+    {"DW3:", "0000e10e", "CHAABIWDT"},
     {"DW3:", "0000e601", "PLLLOCKERR"},
     {"DW3:", "0000e603", "UNDEFL1ERR"},
     {"DW3:", "0000e604", "PUNITMBBTIMEOUT"},
