@@ -32,7 +32,7 @@
 #include <ctype.h>
 #include "config.h"
 #define LOG_TAG "CRASHCONFIG"
-#include <cutils/log.h>
+#include "log.h"
 
 #define MAXLEN 127
 

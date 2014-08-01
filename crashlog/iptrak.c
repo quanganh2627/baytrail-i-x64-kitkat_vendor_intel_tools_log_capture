@@ -22,11 +22,12 @@
  */
 
 #include <cutils/properties.h>
-#include <iptrak.h>
-#include <privconfig.h>
-
 #include <stdlib.h>
 #include <sys/stat.h>
+
+#include "iptrak.h"
+#include "privconfig.h"
+#include "fsutils.h"
 
 #define PMIC_DEBUG_DIR          "/sys/kernel/pmic_debug/pmic_debug"
 

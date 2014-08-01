@@ -32,7 +32,9 @@
 
 #include <cutils/properties.h>
 #ifdef FULL_REPORT
+#ifdef CRASHLOGD_MODULE_BACKTRACE
 #include <backtrace.h>
+#endif
 #endif
 
 #include "crashutils.h"
@@ -132,7 +134,11 @@ static void process_anruiwdt_tracefile(char *destion, int dir, int removeunparse
                 LOGE("%s: Failed to remove tracefile %s:%s\n", __FUNCTION__, tracefile, strerror(errno));
             }
             // parse
+#ifdef CRASHLOGD_MODULE_BACKTRACE
             backtrace_parse_tombstone_file(dest_path);
+#else
+            LOGW("%s: CRASHLOGD_MODULE_BACKTRACE disabled, no tombstone backtrace parsing\n", __FUNCTION__);
+#endif
             if ( removeunparsed && unlink(dest_path)) {
                 LOGE("Failed to remove unparsed tracefile %s:%s\n", dest_path, strerror(errno));
             }

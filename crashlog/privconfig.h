@@ -24,12 +24,7 @@
 #define __CRASHLOGD_H__
 
 #define LOG_TAG                 "CRASHLOG"
-#include <cutils/log.h>
-
-#ifndef LOGE
-#define LOGE ALOGE
-#define LOGI ALOGI
-#endif
+#include "log.h"
 
 /* CONSTRAINTS */
 #define KB                      (1024)

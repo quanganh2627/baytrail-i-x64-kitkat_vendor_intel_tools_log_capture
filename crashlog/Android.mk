@@ -17,6 +17,10 @@
 
 LOCAL_PATH := $(call my-dir)
 
+CRASHLOGD_MODULE_BACKTRACE := false
+CRASHLOGD_MODULE_KCT := false
+CRASHLOGD_MODULE_MODEM := false
+
 include $(CLEAR_VARS)
 
 LOCAL_MODULE := crashlogd
@@ -41,37 +45,43 @@ LOCAL_SRC_FILES := \
     config_handler.c \
     ramdump.c \
     fw_update.c \
-    ct_utils.c \
-    kct_netlink.c \
-    lct_link.c \
     iptrak.c \
     uefivar.c \
     ct_eventintegrity.c \
     ingredients.c
 
-LOCAL_CFLAGS := -DFULL_REPORT=1
+LOCAL_SHARED_LIBRARIES := libcutils
+
+LOCAL_CFLAGS := -DFULL_REPORT
 
 ifeq ($(TARGET_BIOS_TYPE),"uefi")
-    LOCAL_CFLAGS += -DCONFIG_UEFI
+LOCAL_CFLAGS += -DCONFIG_UEFI
+LOCAL_STATIC_LIBRARIES += libdmi
 endif
 
-LOCAL_STATIC_LIBRARIES += \
-  libdmi
+ifeq ($(CRASHLOGD_MODULE_BACKTRACE),true)
+LOCAL_CFLAGS += -DCRASHLOGD_MODULE_BACKTRACE
+LOCAL_C_INCLUDES += $(LOCAL_PATH)/../backtrace
+LOCAL_SHARED_LIBRARIES += libparse_stack
+endif
 
-LOCAL_C_INCLUDES := \
-  $(LOCAL_PATH)/../backtrace \
-  $(TARGET_OUT_HEADERS)/libtcs \
-  $(TARGET_OUT_HEADERS)/libdmi \
+ifeq ($(CRASHLOGD_MODULE_KCT),true)
+LOCAL_CFLAGS += -DCRASHLOGD_MODULE_KCT
+LOCAL_SRC_FILES += \
+    ct_utils.c \
+    kct_netlink.c \
+    lct_link.c \
+    ct_eventintegrity.c
+endif
 
-LOCAL_SHARED_LIBRARIES := \
-    libparse_stack \
-    libcutils
-
+ifeq ($(CRASHLOGD_MODULE_MODEM),true)
 ifeq ($(BOARD_HAVE_MODEM),true)
+
 LOCAL_CFLAGS += -DBOARD_HAVE_MODEM
 
 LOCAL_C_INCLUDES += \
-  $(TARGET_OUT_HEADERS)/IFX-modem
+    $(TARGET_OUT_HEADERS)/IFX-modem \
+    $(TARGET_OUT_HEADERS)/libtcs
 
 LOCAL_SHARED_LIBRARIES += \
     libmmgrcli \
@@ -80,6 +90,8 @@ LOCAL_SHARED_LIBRARIES += \
 LOCAL_SRC_FILES += \
     tcs_wrapper.c \
     mmgr_source.c
+
+endif
 endif
 
 include $(BUILD_EXECUTABLE)

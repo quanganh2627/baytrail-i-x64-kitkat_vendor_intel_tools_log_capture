@@ -24,8 +24,11 @@
 #include "ingredients.h"
 #include "privconfig.h"
 #include "fsutils.h"
-#include <libdmi.h>
 #include "config.h"
+
+#ifdef CONFIG_UEFI
+#include <libdmi.h>
+#endif
 
 #define UNDEF_INGR "unknown"
 #define INGREDIENT_VALUE_MAX_SIZE   PROPERTY_VALUE_MAX
@@ -68,8 +71,8 @@ static void check_config(pconfig_handle handle) {
     }
 }
 
+#ifdef CONFIG_UEFI
 static int fetch_dmi_properties(psection section) {
-
     int status = 1;
     char *property;
     pkv kv = section->kvlist;
@@ -88,6 +91,11 @@ static int fetch_dmi_properties(psection section) {
     }
     return status;
 }
+#else
+static int fetch_dmi_properties(psection section) {
+    return 0;
+}
+#endif
 
 static int fetch_android_properties(psection section) {
     int status = 1;

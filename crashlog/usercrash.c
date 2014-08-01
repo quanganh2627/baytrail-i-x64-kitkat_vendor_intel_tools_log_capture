@@ -26,7 +26,7 @@
 #include "dropbox.h"
 #include "fsutils.h"
 
-#include "cutils/log.h"
+#include "log.h"
 #include <sys/sha1.h>
 #include <stdlib.h>
 

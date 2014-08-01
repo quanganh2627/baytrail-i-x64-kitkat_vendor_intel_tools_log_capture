@@ -37,7 +37,6 @@
 #include <stdio.h>
 #include <fcntl.h>
 
-#include <cutils/log.h>
 #ifndef __TEST__
 #include <private/android_filesystem_config.h>
 #endif

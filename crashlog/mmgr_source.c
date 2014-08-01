@@ -28,6 +28,7 @@
 #include "crashutils.h"
 #include "privconfig.h"
 #include "fsutils.h"
+#include "log.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -37,7 +38,6 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <errno.h>
-#include <cutils/log.h>
 #include <cutils/properties.h>
 
 /* private structure */

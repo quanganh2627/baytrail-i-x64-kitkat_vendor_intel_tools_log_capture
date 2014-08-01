@@ -63,7 +63,6 @@
 #include <ctype.h>
 
 #include <cutils/properties.h>
-#include <cutils/log.h>
 
 extern char gbuildversion[PROPERTY_VALUE_MAX];
 extern char gboardversion[PROPERTY_VALUE_MAX];
@@ -632,9 +631,11 @@ int do_monitor() {
     init_mmgr_cli_source();
 #endif
 
+#ifdef CRASHLOGD_MODULE_KCT
     kct_netlink_init_comm();
 
     lct_link_init_comm();
+#endif
 
     for(;;) {
         // Clear fd set
@@ -655,6 +656,8 @@ int do_monitor() {
                 max = mmgr_get_fd();
         }
 #endif
+
+#ifdef CRASHLOGD_MODULE_KCT
         //kct fd setup
         if (kct_netlink_get_fd() > 0) {
             FD_SET(kct_netlink_get_fd(), &read_fds);
@@ -668,6 +671,7 @@ int do_monitor() {
             if (lct_link_get_fd() > max)
                 max = lct_link_get_fd();
         }
+#endif
 
         // Wait for events
         select_result = select(max+1, &read_fds, NULL, NULL, NULL);
@@ -690,6 +694,8 @@ int do_monitor() {
                 mmgr_handle();
             }
 #endif
+
+#ifdef CRASHLOGD_MODULE_KCT
             // kct monitor
             if (FD_ISSET(kct_netlink_get_fd(), &read_fds)) {
                 LOGD("kct fd set");
@@ -700,6 +706,7 @@ int do_monitor() {
                 LOGD("lct fd set");
                 lct_link_handle_msg();
             }
+#endif
         }
     }
 #ifdef BOARD_HAVE_MODEM
