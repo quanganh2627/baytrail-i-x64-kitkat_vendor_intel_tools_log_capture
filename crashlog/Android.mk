@@ -53,11 +53,10 @@ LOCAL_CFLAGS := -DFULL_REPORT=1
 
 ifeq ($(TARGET_BIOS_TYPE),"uefi")
     LOCAL_CFLAGS += -DCONFIG_UEFI
+    LOCAL_STATIC_LIBRARIES += \
+        libdmi \
+        libuefivar
 endif
-
-LOCAL_STATIC_LIBRARIES += \
-  libdmi \
-  libuefivar
 
 LOCAL_C_INCLUDES := \
   $(LOCAL_PATH)/../backtrace \

@@ -52,7 +52,9 @@
 #include "uefivar.h"
 #include "startupreason.h"
 #include "ingredients.h"
+#ifdef CONFIG_UEFI
 #include <libuefivar.h>
+#endif
 
 char gbuildversion[PROPERTY_VALUE_MAX] = {0,};
 char gboardversion[PROPERTY_VALUE_MAX] = {0,};
@@ -1021,6 +1023,7 @@ void clean_crashlog_in_sd(char *dir_to_search, int max) {
     gabortcleansd = (i < max);
 }
 
+#ifdef CONFIG_UEFI
 static void trim_wchar_to_char(char *src, char * dest, int length) {
     int src_count, dest_count;
     for (src_count = 0, dest_count = 0; src_count < length; dest_count++, src_count += 2) {
@@ -1060,6 +1063,7 @@ static char * compute_bootmode(char* retVal, int len){
 
     return retVal;
 }
+#endif
 
 //This function creates a reboot file(DATA0/1 set to RESETSRC0/1).
 int create_rebootfile(char* key, int data_ready)
@@ -1146,7 +1150,9 @@ int create_rebootfile(char* key, int data_ready)
             get_data_from_boot_file(tmp,"DATA4", fp);
         }
     }
+#ifdef CONFIG_UEFI
     fprintf(fp,"BOOTMODE=%s\n", compute_bootmode(bootmode, bootmode_len));
+#endif
     fprintf(fp,"_END\n");
     fclose(fp);
     return 0;
