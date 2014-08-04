@@ -121,11 +121,14 @@ static int fs_to_prop(const char *src, const char *dst) {
 }
 
 static int parse(const char *line) {
-	char *dst, *src, *type;
+	char *dst, *src, *type, *tmp;
 	int ret;
 	struct type_setup *entry;
 
 	type = strdup(line);
+	if (!type) {
+		return -EPINVAL;
+	}
 	src = strchr(type, FIELD_SEPARATOR);
 	if (!src) {
 		free(type);
@@ -142,8 +145,10 @@ static int parse(const char *line) {
 	dst[0] = 0;
 	dst++;
 	/*remove \n */
-	if (strchr(dst, '\n'))
-		strchr(dst, '\n')[0] = 0;
+
+	tmp = strchr(dst, '\n');
+	if (tmp)
+		tmp[0] = 0;
 
 	if (!strlen(dst) || !strlen(src) || !strlen(type)) {
 		free(type);
