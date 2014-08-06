@@ -59,6 +59,10 @@ LOCAL_CFLAGS += -DCONFIG_UEFI
 LOCAL_STATIC_LIBRARIES += libdmi
 endif
 
+# sha1.h has been moved out of default bionic includes
+LOCAL_C_INCLUDES += \
+    bionic/libc/upstream-netbsd/android/include
+
 ifeq ($(CRASHLOGD_MODULE_BACKTRACE),true)
 LOCAL_CFLAGS += -DCRASHLOGD_MODULE_BACKTRACE
 LOCAL_C_INCLUDES += $(LOCAL_PATH)/../backtrace
