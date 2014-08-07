@@ -794,14 +794,14 @@ f:      	if (farther == true)  {
 							if (is_thread) {
 								if (result[i] != NULL){
 									strcpy(data, "         	");
-									strncat(data, result[i], strlen(result[i]));
+									strncat(data, result[i], PATH_LENGTH-strlen(data)-1);
 									fputs(data, fp_copy);}
 							}
 							else
                                                            {
 								   strcpy(data, "");
 								   if( result[i] != NULL){
-									   strncat(data, result[i], strlen(result[i]));
+									   strncat(data, result[i], PATH_LENGTH-strlen(data)-1);
 									   fputs(data, fp_copy);}
 							   }
 							free(result[i]);

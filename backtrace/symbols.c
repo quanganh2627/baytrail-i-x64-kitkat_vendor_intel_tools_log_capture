@@ -252,6 +252,9 @@ const struct symbol *symbol_tables_lookup(struct symbol_table *table,
 	if(!table)
 		return NULL;
 
+        if(!addr)
+		return NULL;
+
 	return bsearch((void*)addr, table->symbols,
 			table->num_symbols,
 			sizeof(struct symbol), bcompar);
@@ -342,17 +345,17 @@ int unwind_backtrace_with_stack_file( unsigned long eip[],unsigned long ebp,mapi
 			sym = symbol_tables_lookup(mi->symbols, rel_pc);
 		}
 		if (sym) {
-			buf[i] = (char *)malloc(256);
+			buf[i] = (char *)malloc(512);
 			sprintf(buf[i],"pc: 0x%08lx  %s (%s+%u)\n", rel_pc, mi ? mi->name : "", sym->name, rel_pc - sym->addr);
 		} else {
-			buf[i] = (char *)malloc(256);
+			buf[i] = (char *)malloc(512);
 			sprintf(buf[i],"pc: 0x%08lx  %s\n", rel_pc, mi ? mi->name : "");
 		}
 		stack_level++;
 		i++;
 		if (stack_level >= STACK_DEPTH-1 )
 		{
-			buf[i] = (char *)malloc(256);
+			buf[i] = (char *)malloc(512);
 			sprintf(buf[i]," break stack level=%d\n ",stack_level);
 			break;
 		}
