@@ -725,8 +725,18 @@ int do_monitor() {
  */
 int compute_crashlogd_mode(char *boot_mode, int ramdump_flag ) {
 
+#define PROP_CRASHLOGD_ENABLE "persist.crashlogd.enable"
+
+    char property_value[PROPERTY_VALUE_MAX];
+    property_get(PROP_CRASHLOGD_ENABLE, property_value, "");
+
     if (!strcmp(boot_mode, "main")) {
-        g_crashlog_mode = NOMINAL_MODE;
+        // safe strategy, only activate nominal mode if requested
+        if (!strcmp(property_value, "1")) {
+            g_crashlog_mode = NOMINAL_MODE;
+        } else {
+            g_crashlog_mode = MINIMAL_MODE;
+        }
     } else if (!strcmp(boot_mode, "ramconsole")) {
         if (ramdump_flag)
             g_crashlog_mode = RAMDUMP_MODE;
