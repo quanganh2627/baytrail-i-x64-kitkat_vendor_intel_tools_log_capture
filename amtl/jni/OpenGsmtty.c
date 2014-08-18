@@ -41,28 +41,28 @@ JNIEXPORT jint JNICALL Java_com_intel_amtl_modem_Gsmtty_OpenSerial(JNIEnv *env, 
     const char *tty_name = (*env)->GetStringUTFChars(env, jtty_name, 0);
 
     struct termios tio;
-    LOGI("OpenSerial: opening %s", tty_name);
+    ALOGI("OpenSerial: opening %s", tty_name);
 
     fd = open(tty_name, O_RDWR | CLOCAL | O_NOCTTY);
     if (fd < 0) {
-        LOGE("OpenSerial: %s (%d)", strerror(errno), errno);
+        ALOGE("OpenSerial: %s (%d)", strerror(errno), errno);
         goto open_serial_failure;
     }
 
     struct termios terminalParameters;
     if (tcgetattr(fd, &terminalParameters)) {
-        LOGE("OpenSerial: %s (%d)", strerror(errno), errno);
+        ALOGE("OpenSerial: %s (%d)", strerror(errno), errno);
         goto open_serial_failure;
     }
 
     cfmakeraw(&terminalParameters);
     if (tcsetattr(fd, TCSANOW, &terminalParameters)) {
-        LOGE("OpenSerial: %s (%d)", strerror(errno), errno);
+        ALOGE("OpenSerial: %s (%d)", strerror(errno), errno);
         goto open_serial_failure;
     }
 
     if (fcntl(fd, F_SETFL, O_NONBLOCK) < 0 ) {
-        LOGE("OpenSerial: %s (%d)", strerror(errno), errno);
+        ALOGE("OpenSerial: %s (%d)", strerror(errno), errno);
         goto open_serial_failure;
     }
 
@@ -88,7 +88,7 @@ open_serial_failure:
 
 open_serial_success:
     if (fd != TTY_CLOSED)
-        LOGI("OpenSerial: %s opened (%d)", tty_name, fd);
+        ALOGI("OpenSerial: %s opened (%d)", tty_name, fd);
     (*env)->ReleaseStringUTFChars(env, jtty_name, tty_name);
     return fd;
 }
@@ -96,14 +96,14 @@ open_serial_success:
 JNIEXPORT jint JNICALL Java_com_intel_amtl_modem_Gsmtty_CloseSerial(JNIEnv *env,
         jobject obj, jint fd)
 {
-    LOGI("CloseSerial: closing file descriptor (%d)", fd);
+    ALOGI("CloseSerial: closing file descriptor (%d)", fd);
     if (fd >= 0) {
         close(fd);
         fd = TTY_CLOSED;
-        LOGD("CloseSerial: closed");
+        ALOGD("CloseSerial: closed");
     }
     else {
-        LOGD("CloseSerial: already closed");
+        ALOGD("CloseSerial: already closed");
     }
     return 0;
 }
