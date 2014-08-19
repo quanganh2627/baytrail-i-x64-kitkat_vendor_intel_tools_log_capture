@@ -55,8 +55,10 @@ LOCAL_SHARED_LIBRARIES := libcutils
 LOCAL_CFLAGS := -DFULL_REPORT
 
 ifeq ($(TARGET_BIOS_TYPE),"uefi")
-LOCAL_CFLAGS += -DCONFIG_UEFI
-LOCAL_STATIC_LIBRARIES += libdmi
+    LOCAL_CFLAGS += -DCONFIG_UEFI
+    LOCAL_STATIC_LIBRARIES += \
+        libdmi \
+        libuefivar
 endif
 
 # sha1.h has been moved out of default bionic includes
@@ -65,7 +67,8 @@ LOCAL_C_INCLUDES += \
 
 ifeq ($(CRASHLOGD_MODULE_BACKTRACE),true)
 LOCAL_CFLAGS += -DCRASHLOGD_MODULE_BACKTRACE
-LOCAL_C_INCLUDES += $(LOCAL_PATH)/../backtrace
+LOCAL_C_INCLUDES := \
+  $(LOCAL_PATH)/../backtrace
 LOCAL_SHARED_LIBRARIES += libparse_stack
 endif
 

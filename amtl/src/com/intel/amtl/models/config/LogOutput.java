@@ -50,6 +50,7 @@ public class LogOutput {
     private String mtsRotateNum = null;
     private String mtsInterface = null;
     private String mtsMode = null;
+    private String mtsBufferSize = null;
     private String oct = null;
     private String octFcs = null;
     private String pti1 = null;
@@ -65,8 +66,8 @@ public class LogOutput {
 
     public LogOutput(int index, String name, String xsioValue, String buttonColor, String mtsInput,
             String mtsOutput, String mtsOutputType, String mtsRotateNum, String mtsRotateSize,
-            String mtsInterface, String mtsMode, String oct, String octFcs, String pti1,
-            String pti2, String sigusr1ToSend, String flcmd) {
+            String mtsInterface, String mtsMode, String mtsBufferSize, String oct, String octFcs,
+            String pti1, String pti2, String sigusr1ToSend, String flcmd) {
         this.setIndex(index);
         this.setName(name);
         this.setXsio(xsioValue);
@@ -78,6 +79,7 @@ public class LogOutput {
         this.setMtsRotateSize(mtsRotateSize);
         this.setMtsInterface(mtsInterface);
         this.setMtsMode(mtsMode);
+        this.setMtsBufferSize(mtsBufferSize);
         this.masterList = new Hashtable<String, Master>();
         this.setOct(oct);
         this.setOctFcs(octFcs);
@@ -129,6 +131,10 @@ public class LogOutput {
 
     public void setMtsMode(String mtsMode) {
         this.mtsMode = mtsMode;
+    }
+
+    public void setMtsBufferSize(String mtsBufferSize) {
+        this.mtsBufferSize = mtsBufferSize;
     }
 
     public void setOct(String oct) {
@@ -201,6 +207,10 @@ public class LogOutput {
 
     public String getMtsMode() {
         return this.mtsMode;
+    }
+
+    public String getMtsBufferSize() {
+        return this.mtsBufferSize;
     }
 
     public String getOct() {
@@ -346,6 +356,7 @@ public class LogOutput {
                 + ", mts_rotate_size = " + this.mtsRotateSize
                 + ", mts_interface = " + this.mtsInterface
                 + ", mts_mode = " + this.mtsMode
+                + ", mts_buffer_size = " + this.mtsBufferSize
                 + ", oct = " + this.oct + ", oct_fcs = " + this.octFcs
                 + ", pti1 = " + this.pti1 + ", pti2 = " + this.pti2
                 + ", sigusr1_to_send = " + this.sigusr1ToSend
