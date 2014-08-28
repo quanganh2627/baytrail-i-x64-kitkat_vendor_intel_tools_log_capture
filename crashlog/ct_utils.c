@@ -135,10 +135,10 @@ static int do_additionl_steps(struct ct_event* ev, const char * destination) {
             }
 
             if ((steps & CT_ADDITIONAL_FWMSG) &&
-                    file_exists(CURRENT_PROC_OFFLINE_SCU_LOG_NAME)) {
+                    file_exists(CURRENT_PROC_ONLINE_SCU_LOG_NAME)) {
                 snprintf(destion, sizeof(destion), "%s%s.txt", destination,
-                        OFFLINE_SCU_LOG_NAME);
-                do_copy_eof(CURRENT_PROC_OFFLINE_SCU_LOG_NAME, destion);
+                        ONLINE_SCU_LOG_NAME);
+                do_copy_eof(CURRENT_PROC_ONLINE_SCU_LOG_NAME, destion);
             }
         }
     }
