@@ -99,3 +99,8 @@ LOCAL_SRC_FILES += \
 endif
 
 include $(BUILD_EXECUTABLE)
+
+include $(CLEAR_VARS)
+LOCAL_COPY_HEADERS := lct.h
+LOCAL_COPY_HEADERS_TO := crashlog
+include $(BUILD_COPY_HEADERS)
