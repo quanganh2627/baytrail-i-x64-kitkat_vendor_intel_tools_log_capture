@@ -138,6 +138,7 @@ int str_simple_replace(char *str, char *search, char *replace);
 int get_parent_dir( char * dir, char *parent_dir );
 
 char *compute_bp_log(const char* ext_file);
+void copy_bplogs(const char *patern, const char *extra, int dir, int limit);
 void save_startuplogs(const char *reboot_id);
 
 #endif /* __FSUTILS_H__ */

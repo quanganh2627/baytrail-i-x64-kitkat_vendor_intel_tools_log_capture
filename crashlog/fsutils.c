@@ -1286,8 +1286,30 @@ char *compute_bp_log(const char* ext_file) {
     return strdup(destination);
 }
 
+void copy_bplogs(const char *patern, const char *extra, int dir, int limit) {
+    char src[PATHMAX], dst[PATHMAX], prop[PROPERTY_VALUE_MAX];
+    struct stat info;
+    /*first bplog is ethed "persist.service.mts.output" or "persist.service.mts.output".istp
+     * and will be copied in bplog.istp*/
+    property_get("persist.service.mts.output", prop, BPLOG_FILE_0);
+    if(file_exists(prop)) {
+        strncpy(src, prop, PROPERTY_VALUE_MAX);
+    } else {
+        snprintf(src, PATHMAX, "%s%s", prop, BPLOG_FILE_0_EXT);
+    }
+    snprintf(dst, PATHMAX, "%s%d/%s%s%s", patern, dir, strrchr(prop,'/')+1, extra, BPLOG_FILE_0_EXT);
+    if(stat(src, &info) == 0) {
+        do_copy_tail(src, dst, limit);
+        if(info.st_size < 1*MB) {
+            snprintf(src, PATHMAX, "%s%s", prop, BPLOG_FILE_1_EXT);
+            snprintf(dst, PATHMAX, "%s%d/%s%s%s", patern, dir, strrchr(prop,'/')+1, extra, BPLOG_FILE_1_EXT);
+            do_copy_tail(src, dst, limit);
+        }
+    }
+}
+
 void do_log_copy(char *mode, int dir, const char* timestamp, int type) {
-    char destination[PATHMAX], *logfile0, *logfile1, *extension;
+    char destination[PATHMAX], bp_extra[PATHMAX], *logfile0, *logfile1, *extension;
     struct stat info;
     char *dir_pattern = CRASH_DIR;
     int limit = MAXFILESIZE;
@@ -1309,13 +1331,11 @@ void do_log_copy(char *mode, int dir, const char* timestamp, int type) {
             break;
         case BPLOG_TYPE:
         case BPLOG_STATS_TYPE:
-            logfile0 = compute_bp_log(""); //BPLOG_FILE_0
-            logfile1 = compute_bp_log(BPLOG_FILE_1_EXT ); //BPLOG_FILE_1;
-            extension = ".istp";
-            limit = 0; /* no limit size for bplogs copy */
             if (type == BPLOG_STATS_TYPE)
                 dir_pattern = STATS_DIR;
-            break;
+            snprintf(bp_extra, sizeof(bp_extra), "_%s_%s", mode, timestamp);
+            copy_bplogs(dir_pattern, bp_extra, dir, limit);
+            return;
         case BPLOG_TYPE_OLD:
             logfile0 = compute_bp_log(BPLOG_FILE_1_OLD_EXT); // BPLOG_FILE_1_OLD;
             logfile1 = compute_bp_log(BPLOG_FILE_2_OLD_EXT); // BPLOG_FILE_2_OLD;
@@ -1344,7 +1364,6 @@ void do_log_copy(char *mode, int dir, const char* timestamp, int type) {
         case KDUMP_TYPE:
             //nothing to do
             break;
-        case BPLOG_TYPE:
         case BPLOG_TYPE_OLD:
             free(logfile0);
             free(logfile1);
