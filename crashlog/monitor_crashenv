@@ -3,28 +3,28 @@
 # Usage: monitor_crashenv [-l directory]
 # -l : to list a directory content
 
-/system/bin/mkdir -p /logs/info
-/system/bin/chmod 0770 /logs/info
-/system/bin/chown system.system /logs/info
-if [ -f /logs/reserved ]; then
-    /system/bin/rm /logs/reserved
+/system/bin/mkdir -p /data/logs/info
+/system/bin/chmod 0770 /data/logs/info
+/system/bin/chown system.system /data/logs/info
+if [ -f /data/logs/reserved ]; then
+    /system/bin/rm /data/logs/reserved
 fi
-/system/bin/date > /logs/info/infosystem.txt
-/system/bin/df >> /logs/info/infosystem.txt
-/system/bin/du -k /logs >> /logs/info/infosystem.txt
-/system/bin/cat /logs/history_event >> /logs/info/infosystem.txt
+/system/bin/date > /data/logs/info/infosystem.txt
+/system/bin/df >> /data/logs/info/infosystem.txt
+/system/bin/du -k /data/logs >> /data/logs/info/infosystem.txt
+/system/bin/cat /data/logs/history_event >> /data/logs/info/infosystem.txt
 
 # list content of directories crashlogd failed to watch
 while getopts l: OPT; do
     case "$OPT" in
     l)
         DIR=$OPTARG
-        echo "\n=========  list content of directory : $DIR  =========" >> /logs/info/infosystem.txt
-        ls -l $DIR >> /logs/info/infosystem.txt
+        echo "\n=========  list content of directory : $DIR  =========" >> /data/logs/info/infosystem.txt
+        ls -l $DIR >> /data/logs/info/infosystem.txt
         ;;
     esac
 done
 
-/system/bin/chmod 0660 /logs/info/infosystem.txt
-/system/bin/chown system.log /logs/info/infosystem.txt
-/system/bin/dd if=/dev/zero of=/logs/reserved bs=1024 count=20
+/system/bin/chmod 0660 /data/logs/info/infosystem.txt
+/system/bin/chown system.log /data/logs/info/infosystem.txt
+/system/bin/dd if=/dev/zero of=/data/logs/reserved bs=1024 count=20

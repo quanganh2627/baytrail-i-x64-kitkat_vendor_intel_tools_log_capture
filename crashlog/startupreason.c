@@ -41,9 +41,9 @@ static void flush_aplog_atboot(char *mode, int dir, const char* ts)
     snprintf(log_boot_name, sizeof(log_boot_name)-1, "%s%d/%s_%s_%s", CRASH_DIR, dir, strrchr(APLOG_FILE_BOOT,'/')+1,mode,ts);
     int status;
 #ifdef FULL_REPORT
-    status = system("/system/bin/logcat -b system -b main -b radio -b events -b kernel -v threadtime -d -f /logs/aplog_boot");
+    status = system("/system/bin/logcat -b system -b main -b radio -b events -b kernel -v threadtime -d -f /data/logs/aplog_boot");
 #else
-    status = system("/system/bin/logcat -b system -b main -b radio -b events -v threadtime -d -f /logs/aplog_boot");
+    status = system("/system/bin/logcat -b system -b main -b radio -b events -v threadtime -d -f /data/logs/aplog_boot");
 #endif
     if (status != 0) {
         LOGE("flush ap log from boot returns status: %d.\n", status);

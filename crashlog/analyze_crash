@@ -13,7 +13,7 @@ prepare_crashfile()
     echo "EVENT=CRASH" > $2
   fi
   echo "ID=$3" >> $2
-  echo "SN=`cat /logs/uuid.txt`" >> $2
+  echo "SN=`cat /data/logs/uuid.txt`" >> $2
   echo "DATE=$7" >> $2
   echo "UPTIME=$4" >> $2
   echo "BUILD=$5" >> $2

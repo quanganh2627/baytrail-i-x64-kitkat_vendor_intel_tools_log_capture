@@ -19,7 +19,7 @@
 
 if [ $# -eq 1 ] ; then
 
-  diremmc="/logs"
+  diremmc="/data/logs"
   dirsd="/mnt/sdcard/logs"
   num=$1
 

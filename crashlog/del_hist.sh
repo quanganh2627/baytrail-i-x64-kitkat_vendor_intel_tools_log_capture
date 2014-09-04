@@ -25,7 +25,7 @@ if [ $# -le 1 ] ; then
   fi
   tmp=$filename".tmp"
 
-  cd /logs
+  cd /data/logs
   if [ -f $filename ]; then
           read line < $filename
           echo $line > $tmp
