@@ -114,7 +114,7 @@ int finalize_dropbox_pending_event(const struct inotify_event __attribute__((unu
 int convert_dropbox_timestamp(char* dropboxname, char *timestamp) {
     int res;
     int year, month, day, hours, minutes, seconds;
-    LOGD("%s\n", __FUNCTION__);
+    ALOGD("%s\n", __FUNCTION__);
     if (dropboxname == NULL) return -EINVAL;
 
     res = sscanf(dropboxname, "dropbox.%04d-%02d-%02d-%02d-%02d-%02d.txt",
@@ -144,7 +144,7 @@ long extract_dropbox_timestamp(char* filename)
     char *ptr_timestamp_start,*ptr_timestamp_end;
     char timestamp[TIMESTAMP_MAX_SIZE+1] = { '\0', };
     unsigned int i;
-    LOGD("%s\n", __FUNCTION__);
+    ALOGD("%s\n", __FUNCTION__);
     //DropBox log filename format is : 'error/log type' + '@' + 'timestamp' + '.' + 'file suffix'
     //Examples : system_app_anr@1350992829414.txt or system_app_crash@1266667499976.txt
     //So we look for '@' then we look for '.' then extract characters between those two characters

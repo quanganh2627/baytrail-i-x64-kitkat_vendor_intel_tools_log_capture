@@ -406,7 +406,7 @@ static void get_crash_env(char * boot_mode, char *crypt_state, char *encrypt_pro
 
     if (!found) {
         /* Read UUID value from DMI and set UUID file with retrieved value. */
-        LOGW("%s: Try to read DMI UUID...\n", __FUNCTION__);
+        ALOGW("%s: Try to read DMI UUID...\n", __FUNCTION__);
 
         fd = fopen(DMI_PRODUCT_UUID, "r");
         if (fd != NULL) {
@@ -524,7 +524,7 @@ int do_monitor() {
             }
             // mmgr monitor
             if (FD_ISSET(mmgr_get_fd(), &read_fds)) {
-                LOGD("mmgr fd set");
+                ALOGD("mmgr fd set");
                 mmgr_handle();
             }
         }

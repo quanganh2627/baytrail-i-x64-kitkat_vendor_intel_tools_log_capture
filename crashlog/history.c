@@ -228,7 +228,7 @@ int update_history_file(struct history_entry *entry) {
     }
 
     /* The buffer is full */
-    LOGD("%s : History cache buffer is full\n", __FUNCTION__);
+    ALOGD("%s : History cache buffer is full\n", __FUNCTION__);
 
     free(historycache[nextline]);
     if ( (historycache[nextline] = strdup(newline)) == NULL) {

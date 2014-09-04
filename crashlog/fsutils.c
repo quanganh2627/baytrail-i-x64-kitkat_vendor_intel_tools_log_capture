@@ -1177,7 +1177,7 @@ int sdcard_allowed()
 {
     /* Does current crashlog mode allow SDcard storage ?*/
     if ( !CRASHLOG_MODE_SD_STORAGE(g_crashlog_mode) ) {
-        LOGD("%s : Current crashlog mode is %s - SDCard storage disabled.\n", __FUNCTION__, CRASHLOG_MODE_NAME(g_crashlog_mode));
+        ALOGD("%s : Current crashlog mode is %s - SDCard storage disabled.\n", __FUNCTION__, CRASHLOG_MODE_NAME(g_crashlog_mode));
         return 0;
     }
     //now check remain size on SD

@@ -92,7 +92,7 @@ int set_watch_entry_callback(unsigned int watch_type, inotify_callback pcallback
     if ( CRASHLOG_MODE_EVENT_TYPE_ENABLED(g_crashlog_mode, wd_array[watch_type].eventtype) )
         wd_array[watch_type].pcallback = pcallback;
     else
-        LOGD("event type '%s' is disabled : Don't set callback function\n",
+        ALOGD("event type '%s' is disabled : Don't set callback function\n",
              print_eventtype[watch_type] );
 
     return 0;
@@ -229,7 +229,7 @@ void build_crashenv_dir_list_option( char crashenv_param[PATHMAX] ) {
     for (idx = 0 ; idx < (int)DIM(wd_array) ; idx++) {
         if (wd_array[idx].wd >= 0 && wd_array[idx].inotify_error == 0) continue; /* Skip if well watched */
         if ( get_parent_dir( wd_array[idx].eventpath, path ) != 0 ) {
-            LOGD("%s : error - can't get parent path of %s\n", __FUNCTION__, wd_array[idx].eventpath);
+            ALOGD("%s : error - can't get parent path of %s\n", __FUNCTION__, wd_array[idx].eventpath);
             continue;
         }
         /* Skip path if same parent path already got */
@@ -248,7 +248,7 @@ void build_crashenv_dir_list_option( char crashenv_param[PATHMAX] ) {
         if( PATHMAX-1 - strlen(crashenv_param) >= strlen(tmp) )
             strncat( crashenv_param, tmp, PATHMAX-1);
         else
-            LOGW("%s : error - can't add path %s in monitor_crashenv -l option : no available space\n",
+            ALOGW("%s : error - can't add path %s in monitor_crashenv -l option : no available space\n",
                     __FUNCTION__, wd_array[idx].eventpath);
     }
     return;
@@ -282,9 +282,9 @@ static void dump_inotify_events(char *buffer, unsigned int len,
     struct inotify_event *event;
     int i;
 
-    LOGD("%s: Dump the wd_array:\n", __FUNCTION__);
+    ALOGD("%s: Dump the wd_array:\n", __FUNCTION__);
     for (i = 0; i < (int)DIM(wd_array) ; i++) {
-        LOGD("%s: wd_array[%d]: filename=%s, wd=%d\n", __FUNCTION__, i, wd_array[i].eventpath, wd_array[i].wd);
+        ALOGD("%s: wd_array[%d]: filename=%s, wd=%d\n", __FUNCTION__, i, wd_array[i].eventpath, wd_array[i].wd);
     }
 
     while (1) {
@@ -305,7 +305,7 @@ static void dump_inotify_events(char *buffer, unsigned int len,
             buffer += sizeof(struct inotify_event) + event->len;
             len -= sizeof(struct inotify_event) + event->len;
         }
-        LOGD("%s: event received (name=%s, wd=%d, mask=0x%x, len=%d)\n", __FUNCTION__, event->name, event->wd, event->mask, event->len);
+        ALOGD("%s: event received (name=%s, wd=%d, mask=0x%x, len=%d)\n", __FUNCTION__, event->name, event->wd, event->mask, event->len);
     }
 }
 
@@ -416,7 +416,7 @@ int receive_inotify_events(int inotify_fd) {
                  * a dropbox final event... */
                 if (event->len > 8 && !strncmp(event->name, "dropbox-", 8)) {
                     /* dumpstate is done so remove the watcher */
-                    LOGD("%s: Received a dropbox event(%s)...",
+                    ALOGD("%s: Received a dropbox event(%s)...",
                         __FUNCTION__, event->name);
                     inotify_rm_watch(inotify_fd, event->wd);
                     finalize_dropbox_pending_event(event);
@@ -424,7 +424,7 @@ int receive_inotify_events(int inotify_fd) {
                 }
     #endif
                 /* Stray event... */
-                LOGD("%s: Can't handle the event \"%s\", no valid entry found, drop it...\n",
+                ALOGD("%s: Can't handle the event \"%s\", no valid entry found, drop it...\n",
                     __FUNCTION__, (event->len ? event->name : "empty event"));
                 continue;
             }
@@ -447,7 +447,7 @@ int receive_inotify_events(int inotify_fd) {
                         LOGE("Can't add watch for %s.\n", entry->eventpath);
                         return -1;
                     }
-                    LOGW("%s: watched directory %s : \'%s\' has been created and snooped",__FUNCTION__,
+                    ALOGW("%s: watched directory %s : \'%s\' has been created and snooped",__FUNCTION__,
                             (event->mask & (IN_DELETE_SELF) ? "deleted" : "moved"), entry->eventpath);
                     /* if the watch was duplicated, set it for all the entries */
                     for (idx = 0 ; idx < (int)DIM(wd_array) ; idx++) {

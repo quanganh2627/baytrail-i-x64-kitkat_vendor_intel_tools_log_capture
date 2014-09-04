@@ -205,7 +205,7 @@ void store_config(char *section, struct config_handle a_conf_handle){
             snprintf(newconf->path, sizeof(newconf->path), "%s", tmp);
             LOGI("path loaded :  %s \n",newconf->path);
         }else{
-            LOGW("missing configuration for %s on %s \n",section,"path_trigger");
+            ALOGW("missing configuration for %s on %s \n",section,"path_trigger");
             //path is not mandatory, config is still valid
         }
         //path_linked

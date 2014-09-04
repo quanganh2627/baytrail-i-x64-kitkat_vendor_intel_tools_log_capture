@@ -741,7 +741,7 @@ void notify_crashreport() {
 
     /* Does current crashlog mode allow notifs to crashreport ?*/
     if ( !CRASHLOG_MODE_NOTIFS_ENABLED(g_crashlog_mode) ) {
-        LOGD("%s : Current crashlog mode is %s - crashreport notifs disabled.\n", __FUNCTION__, CRASHLOG_MODE_NAME(g_crashlog_mode) );
+        ALOGD("%s : Current crashlog mode is %s - crashreport notifs disabled.\n", __FUNCTION__, CRASHLOG_MODE_NAME(g_crashlog_mode) );
         return;
     }
     property_get(PROP_BOOT_STATUS, boot_state, "-1");
@@ -782,13 +782,13 @@ void monitor_crashenv()
 
     /* Does current crashlog mode allow monitor_crash_env ?*/
     if ( !CRASHLOG_MODE_MONITOR_CRASHENV(g_crashlog_mode) ) {
-        LOGD("%s : Current crashlog mode is %s - monitor_crashenv disabled.\n", __FUNCTION__, CRASHLOG_MODE_NAME(g_crashlog_mode));
+        ALOGD("%s : Current crashlog mode is %s - monitor_crashenv disabled.\n", __FUNCTION__, CRASHLOG_MODE_NAME(g_crashlog_mode));
         return;
     }
 
     build_crashenv_parameters(parameters);
     snprintf(cmd, sizeof(cmd), "/system/bin/monitor_crashenv %s", parameters);
-    LOGD("%s: execute %s ", __FUNCTION__, cmd);
+    ALOGD("%s: execute %s ", __FUNCTION__, cmd);
     int status = system(cmd);
     if (status != 0)
         LOGE("monitor_crashenv status: %d.\n", status);
@@ -900,7 +900,7 @@ void clean_crashlog_in_sd(char *dir_to_search, int max) {
                  (strstr(path, SDCARD_APLOGS_DIR))) )
                 /* If current path is not written in the history file, it's a legacy folder to remove */
                 if (!history_has_event(path)) {
-                    LOGD("%s : remove legacy crash folder %s", __FUNCTION__, path);
+                    ALOGD("%s : remove legacy crash folder %s", __FUNCTION__, path);
                     if  (rmfr(path) < 0)
                         LOGE("%s: failed to remove folder %s", __FUNCTION__, path);
                     i++;
