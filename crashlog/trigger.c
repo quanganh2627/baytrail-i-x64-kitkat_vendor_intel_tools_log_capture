@@ -142,7 +142,7 @@ int process_log_event(char *rootdir, char *triggername, int mode) {
        nbPacket = atoi(value);
        if (nbPacket < 0)
            nbPacket = 0;
-       LOGD("%s: Trigger file not usable so get values from properties : Aplog Depth (%d) and Packet Nb (%d)", __FUNCTION__,
+       ALOGD("%s: Trigger file not usable so get values from properties : Aplog Depth (%d) and Packet Nb (%d)", __FUNCTION__,
                aplogDepth, nbPacket);
     }
 #ifndef FULL_REPORT

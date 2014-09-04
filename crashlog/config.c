@@ -78,7 +78,7 @@ static void config_trim(pchar s)
 static void add_section(pchar config, pconfig_handle  conf_handle) {
     psection newsect = malloc(sizeof(struct section));
     if(!newsect) {
-        LOGE("%s:malloc failed\n", __FUNCTION__);
+        ALOGE("%s:malloc failed\n", __FUNCTION__);
         return;
     }
     if (conf_handle->first == NULL){
@@ -94,7 +94,7 @@ static void add_section(pchar config, pconfig_handle  conf_handle) {
         if(newsect) {
             free(newsect);
         }
-        LOGE("%s:malloc failed\n", __FUNCTION__);
+        ALOGE("%s:malloc failed\n", __FUNCTION__);
         return;
     }
     strncpy(newsect->name,config+1,strlen(config)-1); /*+1 for removing [ char */
@@ -136,7 +136,7 @@ static int add_kv_pair(pchar config,pconfig_handle  conf_handle) {
 
     newkv = malloc(sizeof(struct kv));
     if(!newkv) {
-        LOGE("%s: newkv malloc failed\n", __FUNCTION__);
+        ALOGE("%s: newkv malloc failed\n", __FUNCTION__);
         return 0;
     }
     key=malloc(p+1);
@@ -144,7 +144,7 @@ static int add_kv_pair(pchar config,pconfig_handle  conf_handle) {
         if (newkv){
             free(newkv);
         }
-        LOGE("%s: key malloc failed\n", __FUNCTION__);
+        ALOGE("%s: key malloc failed\n", __FUNCTION__);
         return 0;
     }
     strncpy(key,config,p);
@@ -159,7 +159,7 @@ static int add_kv_pair(pchar config,pconfig_handle  conf_handle) {
         if (key){
             free(key);
         }
-        LOGE("%s: key value malloc failed\n", __FUNCTION__);
+        ALOGE("%s: key value malloc failed\n", __FUNCTION__);
         return 0;
     }
     strncpy(value,config+p+1,valuelen );
@@ -285,7 +285,7 @@ int sk_exists(pchar section,pchar name, pconfig_handle  conf_handle) {
 
 
 int init_config_file(pchar  filename, pconfig_handle  conf_handle) {
-    LOGD("init_config_file start");
+    ALOGD("init_config_file start");
     FILE * f;
     char buff[MAXLEN];
     f = fopen(filename,"rt");
@@ -295,13 +295,13 @@ int init_config_file(pchar  filename, pconfig_handle  conf_handle) {
         conf_handle->current = NULL;
         return -1;
     }
-    LOGD("file opened");
+    ALOGD("file opened");
     if (conf_handle->first){
-        LOGD("default free");
+        ALOGD("default free");
         //memory protection - clean previous config file if free has not been called
         free_config_file(conf_handle);
     }
-    LOGD("before while");
+    ALOGD("before while");
     conf_handle->first = NULL;
     while (!feof(f)) {
         if (fgets(buff,MAXLEN-2,f)==NULL){
