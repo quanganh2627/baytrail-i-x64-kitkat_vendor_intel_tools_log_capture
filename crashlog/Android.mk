@@ -19,7 +19,6 @@ LOCAL_PATH := $(call my-dir)
 
 CRASHLOGD_MODULE_BACKTRACE := false
 CRASHLOGD_MODULE_KCT := false
-CRASHLOGD_MODULE_MODEM := false
 
 include $(CLEAR_VARS)
 
@@ -81,7 +80,6 @@ LOCAL_SRC_FILES += \
     ct_eventintegrity.c
 endif
 
-ifeq ($(CRASHLOGD_MODULE_MODEM),true)
 ifeq ($(BOARD_HAVE_MODEM),true)
 
 LOCAL_CFLAGS += -DBOARD_HAVE_MODEM
@@ -98,7 +96,6 @@ LOCAL_SRC_FILES += \
     tcs_wrapper.c \
     mmgr_source.c
 
-endif
 endif
 
 include $(BUILD_EXECUTABLE)
