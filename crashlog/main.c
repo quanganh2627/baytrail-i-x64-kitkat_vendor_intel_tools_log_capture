@@ -731,11 +731,11 @@ int compute_crashlogd_mode(char *boot_mode, int ramdump_flag ) {
     property_get(PROP_CRASHLOGD_ENABLE, property_value, "");
 
     if (!strcmp(boot_mode, "main")) {
-        // safe strategy, only activate nominal mode if requested
-        if (!strcmp(property_value, "1")) {
-            g_crashlog_mode = NOMINAL_MODE;
-        } else {
+        // nominal strategy, only switch to minimal mode if requested
+        if (!strcmp(property_value, "0")) {
             g_crashlog_mode = MINIMAL_MODE;
+        } else {
+            g_crashlog_mode = NOMINAL_MODE;
         }
     } else if (!strcmp(boot_mode, "ramconsole")) {
         if (ramdump_flag)
