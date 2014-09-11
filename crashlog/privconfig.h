@@ -108,6 +108,7 @@
 #define MPANIC_ABORT            "COREDUMP_ABORTED_BY_PLATFORM_SHUTDOWN"
 #define CRASHLOG_WATCHER_ERROR  "CRASHLOG_WATCHER"
 #define RAMCONSOLE              "RAMCONSOLE"
+#define DEVICE_ID_UNKNOWN       "UnknownId"
 
 /*
  * Take care that this enum is ALWAYS aligned with
@@ -379,6 +380,7 @@ extern enum crashlog_mode g_crashlog_mode;
 #define PROC_OFFLINE_SCU_LOG_NAME PROC_DIR "/" OFFLINE_SCU_LOG_NAME
 #define KERNEL_CMDLINE          PROC_DIR "/" CMDLINE_NAME
 #define PROC_UUID               PROC_DIR "/emmc0_id_entry"
+#define SYS_BLK_MMC0_CID        SYS_DIR "/block/mmcblk0/device/cid"
 #define SAVED_HEADER_NAME       PANIC_DIR "/" EMMC_HEADER_NAME
 #define SAVED_CONSOLE_NAME      PANIC_DIR "/" CONSOLE_NAME
 #define SAVED_THREAD_NAME       PANIC_DIR "/" THREAD_NAME

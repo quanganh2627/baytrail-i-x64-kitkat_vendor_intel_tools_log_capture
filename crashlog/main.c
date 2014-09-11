@@ -51,6 +51,7 @@
 #endif
 
 #include <sys/types.h>
+#include <sys/sha1.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <pthread.h>
@@ -500,6 +501,39 @@ void read_sys_spid(char *filename)
 }
 
 /**
+ * Provide SHA1 of mmcblk0 CID (Card IDentification)
+ *
+ * @param id data returned, must be allocated,
+ *        minimum 41 bytes (2 * SHA1_DIGEST_LENGTH + 1)
+ * @return id data length, should be 40 (2 * SHA1_DIGEST_LENGTH),
+ *         otherwise -errno if errors
+ */
+static int get_mmc_id(char* id) {
+    int ret, i;
+    SHA1_CTX ctx;
+    char buf[50] = { '\0', };
+    unsigned char sha1[SHA1_DIGEST_LENGTH];
+    char *id_tmp = id;
+
+    if (!id)
+        return -EINVAL;
+
+    ret = file_read_string(SYS_BLK_MMC0_CID, buf);
+    if (ret <= 0)
+        return ret;
+
+    SHA1Init(&ctx);
+    SHA1Update(&ctx, (unsigned char*)buf, strlen(buf));
+    SHA1Final(sha1, &ctx);
+
+    for (i = 0; i < SHA1_DIGEST_LENGTH; i++, id_tmp += 2)
+        sprintf(id_tmp, "%02x", sha1[i]);
+    *id_tmp = '\0';
+
+    return strlen(id);
+}
+
+/**
  * Writes given UUID value into specified file
  */
 void write_uuid(char* filename, char *uuid_value)
@@ -517,10 +551,43 @@ void write_uuid(char* filename, char *uuid_value)
     }
 }
 
+/**
+ * Set guuid global variable and write it to uuid.txt
+ */
+static void get_device_id(void) {
+    int ret;
+
+    if (g_current_serial_device_id == 1) {
+        /* Get serial ID from properties and updates UUID file */
+        property_get("ro.serialno", guuid, "empty_serial");
+        goto write;
+    }
+
+    ret = file_read_string(PROC_UUID, guuid);
+    if ((ret < 0 && ret != -ENOENT) || !ret)
+        LOGE("%s: Could not read %s (%s)\n", __FUNCTION__,
+             PROC_UUID, strerror(-ret));
+    else if (ret > 0)
+        goto write;
+
+    ret = get_mmc_id(guuid);
+    if (ret <= 0)
+        LOGE("%s: Could not get mmc id: %d (%s)\n",
+             __FUNCTION__, ret, strerror(-ret));
+    else
+        goto write;
+
+    LOGE("%s: Could not find DeviceId, set it to '%s'\n",
+         __FUNCTION__, DEVICE_ID_UNKNOWN);
+    strncpy(guuid, DEVICE_ID_UNKNOWN, strlen(DEVICE_ID_UNKNOWN));
+
+  write:
+    write_uuid(LOG_UUID, guuid);
+}
+
 static void get_crash_env(char * boot_mode, char *crypt_state, char *encrypt_progress, char *decrypt, char *token) {
 
     char value[PROPERTY_VALUE_MAX];
-    FILE *fd;
 
     if( property_get("crashlogd.debug.proc_path", value, NULL) > 0 )
     {
@@ -547,24 +614,8 @@ static void get_crash_env(char * boot_mode, char *crypt_state, char *encrypt_pro
     property_get("vold.decrypt", decrypt, "");
     property_get("crashlogd.token", token, "");
 
-   /* Read UUID */
-    if (g_current_serial_device_id == 1) {
-        /* Get serial ID from properties and updates UUID file */
-        property_get("ro.serialno", guuid, "empty_serial");
-        write_uuid(LOG_UUID, guuid);
-    } else {
-        /* Read UUID value from /proc (emmc) and set UUID file with retrieved value.
-         * If reading fails set "Medfield" as default value */
-        fd = fopen(PROC_UUID, "r");
-        if (fd != NULL && fscanf(fd, "%s", guuid) == 1) {
-            fclose(fd);
-            write_uuid(LOG_UUID, guuid);
-        } else {
-            LOGE("%s: Cannot read uuid from %s - %s\n",
-                __FUNCTION__, PROC_UUID, strerror(errno));
-            write_uuid(LOG_UUID, "Medfield");
-        }
-    }
+    get_device_id();
+
     /* Read SPID */
     read_sys_spid(LOG_SPID);
 

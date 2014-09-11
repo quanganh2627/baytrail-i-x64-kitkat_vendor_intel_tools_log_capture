@@ -1614,3 +1614,40 @@ void update_logs_permission(void)
     return;
 #endif
 }
+
+/**
+ * Read a one word string from file
+ *
+ * @param file path
+ * @param string to be allocated before
+ * @return string length, 0 if none, -errno code if error
+ */
+int file_read_string(const char *file, char *string) {
+    FILE *fd;
+    int ret;
+
+    if (!file || !string)
+        return -EINVAL;
+
+    if (!file_exists(file))
+        return -ENOENT;
+
+    fd = fopen(file, "r");
+    if (!fd)
+        return -errno;;
+
+    ret = fscanf(fd, "%s", string);
+    if (ret == EOF && ferror(fd)) {
+        ret = -errno;
+        clearerr(fd);
+        fclose(fd);
+        return ret;
+    } else if (ret != 1) {
+        fclose(fd);
+        return 0;
+    }
+
+    fclose(fd);
+
+    return strlen(string);
+}
