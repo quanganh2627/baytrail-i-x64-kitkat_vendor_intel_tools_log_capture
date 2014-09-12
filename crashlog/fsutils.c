@@ -1069,7 +1069,7 @@ int cache_file(char *filename, char **records, int maxrecords, int cachemode, in
     if (cachemode != CACHE_START && cachemode != CACHE_TAIL) {
         return -EINVAL;
     }
-    if ( !filename || !records || (offset < 0) || (offset >= maxrecords)) {
+    if ( !filename || !records || (offset < 0) || ((offset >= maxrecords) && (cachemode == CACHE_START))) {
         return -EINVAL;
     }
     if (maxrecords == 0) return 0;

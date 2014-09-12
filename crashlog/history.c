@@ -45,7 +45,7 @@
 
 static char *historycache[MAX_RECORDS];
 static int nextline = -1;
-static int fileentries = -1;
+static unsigned int fileentries = 0;
 static int loop_uptime_event = 1;
 /* last uptime value set at device boot only */
 static char lastbootuptime[24] = "0000:00:00";
@@ -136,7 +136,7 @@ static int cache_history_file() {
 
     res = count_lines_in_file(HISTORY_FILE);
     if ( res < 0 ) {
-        LOGE("%s: Cannot cache the contents of %s - %s.\n",
+        LOGE("%s: Cannot count the number of lines in %s - %s.\n",
             __FUNCTION__, HISTORY_FILE, strerror(-res));
         return res;
     }
@@ -248,8 +248,7 @@ int update_history_file(struct history_entry *entry) {
     }
 
     nextline = (nextline + 1) % MAX_RECORDS;
-    fileentries = (fileentries + 1) % MAX_RECORDS_HIST_FILE;
-    if (fileentries != 0){
+    if (++fileentries < MAX_RECORDS_HIST_FILE) {
         /* We can just write the new line at the end of the file */
         res = append_file(HISTORY_FILE, newline);
         if (res > 0) return 0;
@@ -306,6 +305,7 @@ int update_history_file(struct history_entry *entry) {
             return -errno;
         }
     }
+    fileentries = MAX_RECORDS;
     close(fd);
     return 0;
 }
