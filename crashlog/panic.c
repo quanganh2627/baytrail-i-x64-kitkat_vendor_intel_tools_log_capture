@@ -513,7 +513,7 @@ int crashlog_check_panic_header(char *reason) {
  *  -1 if a problem occurs (can't create crash dir)
  *   0 for nominal case
  */
-int crashlog_check_kdump(char *reason, int test) {
+int crashlog_check_kdump(char *reason __unused, int test) {
     int start_flag = 0;
     int file_flag = 0;
     int finish_flag = 0;

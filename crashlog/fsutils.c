@@ -428,6 +428,7 @@ int get_sdcard_paths(e_dir_mode_t mode) {
     BZ_DIR = EMMC_BZ_DIR;
 
 #ifndef FULL_REPORT
+    (void)mode; /* unused */
     return 0;
 #else
 
@@ -1598,9 +1599,9 @@ int sdcard_allowed()
 /**
  * Updates rights of folders containing logs
  */
+#ifdef FULL_REPORT
 void update_logs_permission(void)
 {
-#ifdef FULL_REPORT
     char value[PROPERTY_VALUE_MAX] = "0";
 
     if (property_get(PROP_COREDUMP, value, "") <= 0) {
@@ -1610,10 +1611,10 @@ void update_logs_permission(void)
         chmod(LOGS_DIR,0777);
         chmod(HISTORY_CORE_DIR,0777);
     }
-#else
-    return;
-#endif
 }
+#else
+inline void update_logs_permission(void) {}
+#endif
 
 /**
  * Read a one word string from file

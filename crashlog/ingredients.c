@@ -92,7 +92,7 @@ static int fetch_dmi_properties(psection section) {
     return status;
 }
 #else
-static int fetch_dmi_properties(psection section) {
+static int fetch_dmi_properties(psection section __unused) {
     return 0;
 }
 #endif

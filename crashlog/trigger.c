@@ -31,9 +31,9 @@
 #include <ctype.h>
 #include <dirent.h>
 
+#ifdef FULL_REPORT
 static void compress_aplog_folder(char *folder_path)
 {
-#ifdef FULL_REPORT
     char cmd[PATHMAX];
     char spath[PATHMAX];
     DIR *d;
@@ -56,8 +56,10 @@ static void compress_aplog_folder(char *folder_path)
         }
         closedir(d);
     }
-#endif
 }
+#else
+static inline void compress_aplog_folder(char *folder_path __unused) {}
+#endif
 
 /**
 * Name          : process_log_event

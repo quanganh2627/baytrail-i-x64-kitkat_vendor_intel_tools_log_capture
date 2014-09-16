@@ -38,8 +38,9 @@
 #include <stdio.h>
 
 #ifdef CONFIG_UEFI
-static int compute_uefi_startupreason(enum reset_sources rs, enum reset_types rt, enum wake_sources ws, enum shutdown_sources ss, char *startupreason)
-{
+static int compute_uefi_startupreason(enum reset_sources rs, enum reset_types rt,
+                                      enum wake_sources ws, enum shutdown_sources ss __unused,
+                                      char *startupreason) {
     static const char *wake_source[] = {
         "WAKE_NOT_APPLICABLE",
         "WAKE_BATT_INSERT",
@@ -159,7 +160,7 @@ static int get_uefi_startupreason(char *startupreason)
     return compute_uefi_startupreason(rs, rt, ws, ss, startupreason);
 }
 #else
-static inline int get_uefi_startupreason(char *startupreason) {
+static inline int get_uefi_startupreason(char *startupreason __unused) {
     LOGE("CONFIG_UEFI is not set, device do not support uefi startup reason.\n");
     return -1;
 }

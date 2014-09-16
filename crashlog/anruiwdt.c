@@ -150,18 +150,18 @@ static void process_anruiwdt_tracefile(char *destion, int dir, int removeunparse
     snprintf(dest_path_symb, sizeof(dest_path_symb), "%s_symbol", dest_path);
     do_chown(dest_path_symb, PERM_USER, PERM_GROUP);
 }
-#endif
 
 static void backtrace_anruiwdt(char *dest, int dir) {
-#ifdef FULL_REPORT
     char value[PROPERTY_VALUE_MAX];
 
     property_get(PROP_ANR_USERSTACK, value, "0");
     if (strncmp(value, "1", 1)) {
         process_anruiwdt_tracefile(dest, dir, 0);
     }
-#endif
 }
+#else
+static inline void backtrace_anruiwdt(char *dest __unused, int dir __unused) {}
+#endif
 
 #define PATH_LENGTH			256
 void do_copy_pvr(char * src, char * dest) {
