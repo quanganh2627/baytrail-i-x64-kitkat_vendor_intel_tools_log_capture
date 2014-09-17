@@ -35,3 +35,7 @@
 #ifndef LOGD
 #define LOGD ALOGD
 #endif
+
+#ifndef LOGV
+#define LOGV ALOGV
+#endif
