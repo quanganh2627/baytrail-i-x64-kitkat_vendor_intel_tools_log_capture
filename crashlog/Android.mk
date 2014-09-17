@@ -94,6 +94,10 @@ LOCAL_SRC_FILES += \
 
 endif
 
+ifneq ($(CRASHLOGD_LOGS_PATH),)
+LOCAL_CFLAGS += -DCONFIG_LOGS_PATH='$(CRASHLOGD_LOGS_PATH)'
+endif
+
 include $(BUILD_EXECUTABLE)
 
 include $(CLEAR_VARS)

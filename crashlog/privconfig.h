@@ -249,6 +249,7 @@ extern enum crashlog_mode g_crashlog_mode;
 #define DIM(array)              ( sizeof(array) / sizeof(array[0]) )
 
 /* PROPERTIES */
+#define PROP_LOGS_ROOT          "persist.crashlogd.root"
 #define PROP_CRASH_MODE         "persist.sys.crashlogd.mode"
 #define PROP_PROFILE            "persist.service.profile.enable"
 #define PROP_BOOT_STATUS        "sys.boot_completed"
@@ -286,7 +287,13 @@ extern enum crashlog_mode g_crashlog_mode;
 #else
 #define RESDIR                  "res"
 #endif
+
+#ifndef CONFIG_LOGS_PATH
 #define LOGS_DIR                RESDIR "/logs"
+#else
+#define LOGS_DIR                RESDIR CONFIG_LOGS_PATH
+#endif
+
 #define SDCARD_DIR              RESDIR "/mnt/sdcard"
 #define PROC_DIR                RESDIR "/proc"
 #define DATA_DIR                RESDIR "/data"
@@ -420,7 +427,7 @@ extern enum crashlog_mode g_crashlog_mode;
 #define MAX(a,b)                ((a) > (b) ? (a) : (b))
 
 /* SYSTEM COMMANDS */
-#define SDSIZE_SYSTEM_CMD "du -sk /mnt/sdcard/logs/ > /logs/currentsdsize"
+#define SDSIZE_SYSTEM_CMD "du -sk " SDCARD_LOGS_DIR "/ > " LOGS_DIR "/currentsdsize"
 
 extern char *CRASH_DIR;
 extern char *STATS_DIR;

@@ -106,6 +106,7 @@ static int check_mounted_partition(const char *partition_name)
     return 0;
 }
 
+// TODO: make /logs mount check an option per CONFIG_LOGS_PATH
 static int check_mounted_partitions()
 {
     FILE *fd;
@@ -790,6 +791,12 @@ int main(int argc, char **argv) {
     char encryptstate[16] = { '\0', };
 
     crashlogd_wait_for_user();
+
+#ifdef CONFIG_LOGS_PATH
+    /* let others know the new root directory for logs */
+    property_set(PROP_LOGS_ROOT, LOGS_DIR);
+    LOGI("Logs root property set: [%s]: [%s]\n", PROP_LOGS_ROOT, LOGS_DIR);
+#endif
 
     /* Check the args */
     if (argc > 2) {
