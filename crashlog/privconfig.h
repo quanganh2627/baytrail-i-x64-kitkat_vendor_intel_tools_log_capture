@@ -287,7 +287,13 @@ extern enum crashlog_mode g_crashlog_mode;
 #else
 #define RESDIR                  "res"
 #endif
+
+#ifndef CONFIG_LOGS_PATH
 #define LOGS_DIR                RESDIR "/logs"
+#else
+#define LOGS_DIR                RESDIR CONFIG_LOGS_PATH
+#endif
+
 #define SDCARD_DIR              RESDIR "/mnt/sdcard"
 #define PROC_DIR                RESDIR "/proc"
 #define DATA_DIR                RESDIR "/data"
