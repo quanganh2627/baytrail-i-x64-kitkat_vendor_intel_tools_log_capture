@@ -782,7 +782,7 @@ int compute_crashlogd_mode(char *boot_mode, int ramdump_flag ) {
     char property_value[PROPERTY_VALUE_MAX];
     property_get(PROP_CRASHLOGD_ENABLE, property_value, "");
 
-    if (!strcmp(boot_mode, "main")) {
+    if (!strcmp(boot_mode, "main") || !strcmp(boot_mode, "")) {
         // nominal strategy, only switch to minimal mode if requested
         if (!strcmp(property_value, "0")) {
             g_crashlog_mode = MINIMAL_MODE;
