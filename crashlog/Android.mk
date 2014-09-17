@@ -24,6 +24,7 @@ include $(CLEAR_VARS)
 
 LOCAL_MODULE := crashlogd
 LOCAL_MODULE_TAGS := optional
+LOCAL_MODULE_OWNER := intel
 
 LOCAL_SRC_FILES := \
     main.c \
