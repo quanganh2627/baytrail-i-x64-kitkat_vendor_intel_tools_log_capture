@@ -165,14 +165,14 @@ static int parse(const char *line) {
 		entry++;
 	}
 	if (ret) {
-		LOGW("Cannot set %s from %s of type %s ", dst, src,
+		ALOGW("Cannot set %s from %s of type %s ", dst, src,
 				type);
 		free(type);
 		return -EPNSUPP;
 	}
 
 	if (!entry->signature) {
-		LOGW("Unknown type %s for %s  ", type, dst);
+		ALOGW("Unknown type %s for %s  ", type, dst);
 		free(type);
 		return -EPINVAL;
 	}
