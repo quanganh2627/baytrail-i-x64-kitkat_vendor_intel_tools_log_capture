@@ -422,7 +422,7 @@ extern enum crashlog_mode g_crashlog_mode;
 #define MAX(a,b)                ((a) > (b) ? (a) : (b))
 
 /* SYSTEM COMMANDS */
-#define SDSIZE_SYSTEM_CMD "du -sk /mnt/sdcard/logs/ > /logs/currentsdsize"
+#define SDSIZE_SYSTEM_CMD "du -sk " SDCARD_LOGS_DIR "/ > " LOGS_DIR "/currentsdsize"
 
 extern char *CRASH_DIR;
 extern char *STATS_DIR;

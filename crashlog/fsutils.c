@@ -1235,7 +1235,7 @@ void flush_aplog(e_aplog_file_t file, const char *mode, int *dir, const char *ts
         if (file_exists(APLOG_FILE_0)) {
             remove(APLOG_FILE_0);
         }
-        status = system("/system/bin/logcat -b system -b main -b radio -b events -v threadtime -d -f /logs/aplog");
+        status = system("/system/bin/logcat -b system -b main -b radio -b events -v threadtime -d -f " LOGS_DIR "/aplog");
         if (status != 0)
             LOGE("dump logcat returns status: %d.\n", status);
         do_chown(APLOG_FILE_0, PERM_USER, PERM_GROUP);
@@ -1251,7 +1251,7 @@ void flush_aplog(e_aplog_file_t file, const char *mode, int *dir, const char *ts
         snprintf(log_boot_name, sizeof(log_boot_name)-1, "%s%d/%s_%s_%s",
                 CRASH_DIR, *dir, strrchr(APLOG_FILE_BOOT,'/')+1, mode, ts);
 
-        status = system("/system/bin/logcat -b system -b main -b radio -b events -v threadtime -d -f /logs/aplog_boot");
+        status = system("/system/bin/logcat -b system -b main -b radio -b events -v threadtime -d -f " LOGS_DIR "/aplog_boot");
         if (status != 0) {
             LOGE("flush ap log from boot returns status: %d.\n", status);
             return;
@@ -1607,7 +1607,7 @@ void update_logs_permission(void)
     if (property_get(PROP_COREDUMP, value, "") <= 0) {
         LOGE("Property %s not readable - core dump capture is disabled\n", PROP_COREDUMP);
     } else if ( value[0] == '1' ) {
-        LOGI("Folders /logs and /logs/core set to 0777\n");
+        LOGI("Folders " LOGS_DIR " and " LOGS_DIR "/core set to 0777\n");
         chmod(LOGS_DIR,0777);
         chmod(HISTORY_CORE_DIR,0777);
     }

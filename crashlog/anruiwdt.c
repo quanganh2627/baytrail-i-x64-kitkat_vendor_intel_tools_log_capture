@@ -68,12 +68,12 @@ static void priv_prepare_anruiwdt(char *destion)
 
     if ( destion[len-3] == '.' && destion[len-2] == 'g' && destion[len-1] == 'z') {
         /* extract gzip file */
-        do_copy_tail(destion,"/logs/tmp_anr_uiwdt.gz",0);
-        system("gunzip /logs/tmp_anr_uiwdt.gz");
-        do_chown("/logs/tmp_anr_uiwdt", PERM_USER, PERM_GROUP);
+        do_copy_tail(destion, LOGS_DIR "/tmp_anr_uiwdt.gz",0);
+        system("gunzip " LOGS_DIR "/tmp_anr_uiwdt.gz");
+        do_chown(LOGS_DIR "/tmp_anr_uiwdt", PERM_USER, PERM_GROUP);
         destion[strlen(destion) - 3] = 0;
-        do_copy_tail("/logs/tmp_anr_uiwdt",destion,0);
-        remove("/logs/tmp_anr_uiwdt");
+        do_copy_tail(LOGS_DIR "/tmp_anr_uiwdt",destion,0);
+        remove(LOGS_DIR "/tmp_anr_uiwdt");
     }
 }
 #endif

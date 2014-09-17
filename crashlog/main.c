@@ -107,6 +107,7 @@ static int check_mounted_partition(const char *partition_name)
     return 0;
 }
 
+// TODO: make /logs mount check an option per CONFIG_LOGS_PATH
 static int check_mounted_partitions()
 {
     FILE *fd;
