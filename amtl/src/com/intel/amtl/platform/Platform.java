@@ -24,6 +24,8 @@ import android.content.SharedPreferences;
 import android.os.SystemProperties;
 import android.util.Log;
 
+import com.intel.amtl.AMTLApplication;
+
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -33,12 +35,11 @@ import java.io.FileInputStream;
 
 public class Platform {
 
-    private final String TAG = "AMTL";
+    private final String TAG = AMTLApplication.getAMTLApp().getLogTag();
     private String catalogPath = "/system/etc/telephony/";
 
     public String getPlatformConf() {
-        int inst_id = 1; /* @TODO: add here instance ID handling */
-        String key = "service.amtl" + inst_id + ".cfg";
-        return catalogPath + "amtl_" + SystemProperties.get(key, "") + ".cfg";
+        String property = AMTLApplication.getAMTLApp().getProperty();
+        return catalogPath + "amtl_" + SystemProperties.get(property, "") + ".cfg";
     }
 }

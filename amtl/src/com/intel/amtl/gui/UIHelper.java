@@ -31,11 +31,14 @@ import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.TextView;
 
+import com.intel.amtl.AMTLApplication;
 import com.intel.amtl.helper.LogManager;
 import com.intel.amtl.helper.TelephonyStack;
 
 
 public class UIHelper {
+
+    private final static String TAG = AMTLApplication.getAMTLApp().getLogTag();
 
     /* Print pop-up message with ok and cancel buttons */
     public static void warningDialog(final Activity A, String title, String message,
@@ -128,7 +131,7 @@ public class UIHelper {
                             imm.hideSoftInputFromWindow(saveInput.getWindowToken(), 0);
                         }
                         // if im is null, no specific issue, virtual keyboard will not be cleared
-                        Log.d("AMTL", "UIHelper: " + logTag);
+                        Log.d(TAG, "UIHelper: " + logTag);
                     }
                 })
                 .setNegativeButton("Cancel", new DialogInterface.OnClickListener() {

@@ -37,6 +37,13 @@
             android:text="@string/txt_choose" />
 
         <TextView
+            android:id="@+id/textViewTrace"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="20sp"
+            android:layout_marginTop="20dp" />
+
+        <TextView
             android:id="@+id/textViewXsystrace"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"

@@ -19,14 +19,87 @@
 
 package com.intel.amtl;
 
+import com.intel.amtl.R;
+import com.intel.internal.telephony.ModemStatusManager;
+
 import android.app.Application;
 import android.content.Context;
-
+import android.util.Log;
 
 public class AMTLApplication extends Application {
     private static Context ctx;
     private static boolean isCloseTtyEnable = true;
     private static boolean isPauseState = true;
+    private static AMTLApplication sAMTLApp = null;
+
+    private int mAppId = 1;
+    private String mProperty = "";
+    private String mModemEvent = "";
+    private String mTtyFileName = "";
+    private ModemStatusManager mdmStatusManager = null;
+    private String mAppName = "";
+    private String mdmConfClassName = "";
+    private String mdmctlClassName = "";
+    private String mLogTag = "";
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        try {
+            init(this);
+        } catch (InstantiationException e) {
+            Log.e(mLogTag, "AMTLApplication: init error + " + e.toString());
+        }
+    }
+
+    public static AMTLApplication getAMTLApp() {
+        return sAMTLApp;
+    }
+
+    private void init(AMTLApplication app) throws InstantiationException {
+        sAMTLApp = app;
+        mAppName = app.getString(R.string.app_name);
+        mAppId = app.getResources().getInteger(R.integer.application_id);
+        mProperty = app.getString(R.string.property);
+        mModemEvent = app.getString(R.string.modem_event);
+        mTtyFileName = app.getString(R.string.tty_file_name);
+        mdmConfClassName = app.getString(R.string.modem_conf_class_name);
+        mdmctlClassName = app.getString(R.string.modem_control_class_name);
+        mLogTag = app.getString(R.string.log_tag);
+        mdmStatusManager = ModemStatusManager.getInstance(mAppId);
+    }
+
+    public String getAppName() {
+        return mAppName;
+    }
+
+    public String getModemConClassName() {
+        return mdmConfClassName;
+    }
+
+    public String getModemCtlClassName() {
+        return mdmctlClassName;
+    }
+
+    public String getProperty() {
+        return mProperty;
+    }
+
+    public String getModemEvent() {
+        return mModemEvent;
+    }
+
+    public String getLogTag() {
+        return mLogTag;
+    }
+
+    public ModemStatusManager getModemStatusManager() throws InstantiationException {
+        return mdmStatusManager;
+    }
+
+    public String getTtyFileName() {
+        return mTtyFileName;
+    }
 
     public static Context getContext() {
         return ctx;

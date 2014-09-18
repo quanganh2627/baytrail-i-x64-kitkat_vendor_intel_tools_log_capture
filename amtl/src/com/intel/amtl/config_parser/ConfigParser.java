@@ -23,9 +23,12 @@ package com.intel.amtl.config_parser;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.os.Bundle;
 import android.util.Log;
 import android.util.Xml;
 
+import com.intel.amtl.AMTLApplication;
+import com.intel.amtl.exceptions.ModemConfException;
 import com.intel.amtl.models.config.LogOutput;
 import com.intel.amtl.models.config.Master;
 import com.intel.amtl.models.config.ModemConf;
@@ -44,7 +47,7 @@ import org.xmlpull.v1.XmlPullParserException;
 
 public class ConfigParser {
 
-    private final String TAG = "AMTL";
+    private final String TAG = AMTLApplication.getAMTLApp().getLogTag();
     private final String MODULE = "ConfigParser";
     private Context context = null;
 
@@ -96,6 +99,7 @@ public class ConfigParser {
          MtsConf mtsConf = null;
          XmlPullParser parser = Xml.newPullParser();
          int eventType = 0;
+         ModemConf modConf = null;
 
          parser.setInput(inputStream, null);
 
@@ -107,6 +111,12 @@ public class ConfigParser {
 
             switch (eventType) {
                 case XmlPullParser.START_TAG:
+                    if (isStartOf(parser, "at_trace")) {
+                        if (parser.next() == XmlPullParser.TEXT) {
+                            atTRACE = "AT+TRACE=" + parser.getText() + "\r\n";
+                        }
+                        Log.d(TAG, MODULE + ": Get element type AT+TRACE : " + atTRACE);
+                    }
                     if (isStartOf(parser, "at_xsystrace")) {
                         if (parser.next() == XmlPullParser.TEXT) {
                             atXSYSTRACE = "AT+XSYSTRACE=" + parser.getText() + "\r\n";
@@ -156,7 +166,19 @@ public class ConfigParser {
              eventType = parser.next();
          }
          Log.d(TAG, MODULE + ": Completed XML file parsing.");
-         ModemConf modConf = new ModemConf(atXSIO, atXSYSTRACE, flCmd, "");
+
+         Bundle bundle = new Bundle();
+         bundle.putString(ModemConf.KEY_XSIO, atXSIO);
+         bundle.putString(ModemConf.KEY_TRACE, atTRACE);
+         bundle.putString(ModemConf.KEY_XSYSTRACE, atXSYSTRACE);
+         bundle.putString(ModemConf.KEY_FLCMD, flCmd);
+         bundle.putString(ModemConf.KEY_OCTMODE, "");
+         try {
+             modConf = ModemConf.getInstance(bundle);
+         } catch (ModemConfException e){
+             Log.e(TAG, MODULE + ":Create the modconf error.");
+         }
+
          if (mtsConf != null) {
              modConf.setMtsConf(mtsConf);
          }

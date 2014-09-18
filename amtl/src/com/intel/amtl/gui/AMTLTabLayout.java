@@ -77,7 +77,7 @@ public class AMTLTabLayout extends Activity implements GeneralSetupFrag.GSFCallB
         ExpertSetupFrag.OnExpertModeApplied, ExpertSetupFrag.OnModeChanged,
         MasterSetupFrag.OnModeChanged, GeneralSetupFrag.OnModeChanged {
 
-    private final String TAG = "AMTL";
+    private final String TAG = AMTLApplication.getAMTLApp().getLogTag();
     private final String MODULE = "AMTLTabLayout";
     private final String MDM_CONNECTION_TAG = "AMTL_modem_connection";
 
@@ -269,7 +269,7 @@ public class AMTLTabLayout extends Activity implements GeneralSetupFrag.GSFCallB
 
             try {
                 // instantiation of mdmCtrl to be able to connect and disconnect when exiting AMTL
-                this.mdmCtrl = ModemController.get();
+                this.mdmCtrl = ModemController.getInstance();
             } catch (ModemControlException ex) {
                 Log.e(TAG, MODULE + ": connection to Modem Status Manager failed");
                 UIHelper.exitDialog(this,
@@ -471,7 +471,7 @@ public class AMTLTabLayout extends Activity implements GeneralSetupFrag.GSFCallB
         public void run() {
             String exceptReason = null;
             try {
-                mdmCtrl = ModemController.get();
+                mdmCtrl = ModemController.getInstance();
             } catch (ModemControlException ex) {
                 mdmCtrl = null;
                 exceptReason = ex.getMessage();

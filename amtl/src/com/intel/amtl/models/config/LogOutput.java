@@ -20,6 +20,8 @@
 
 package com.intel.amtl.models.config;
 
+import com.intel.amtl.AMTLApplication;
+
 import android.content.Context;
 import android.graphics.Color;
 import android.util.Log;
@@ -36,8 +38,8 @@ import java.util.Iterator;
 
 public class LogOutput {
 
-    private  final String TAG = "AMTL";
-    private  final String MODULE = "LogOutput";
+    private final String TAG = AMTLApplication.getAMTLApp().getLogTag();
+    private final String MODULE = "LogOutput";
 
     private int index = -1;
     private String name = null;

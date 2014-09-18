@@ -20,6 +20,8 @@
 
 package com.intel.amtl.helper;
 
+import com.intel.amtl.AMTLApplication;
+
 import android.os.FileObserver;
 import android.util.Log;
 
@@ -37,7 +39,7 @@ import java.util.Date;
 
 public class LogManager extends FileObserver {
 
-    private final String TAG = "AMTL";
+    private final String TAG = AMTLApplication.getAMTLApp().getLogTag();
     private final String MODULE = "LogManager";
     private final String APTRIGGER = "/logs/aplogs/aplog_trigger";
     private final String NBAPFILE = "10";

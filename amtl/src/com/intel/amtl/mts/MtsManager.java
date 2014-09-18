@@ -19,6 +19,8 @@
 
 package com.intel.amtl.mts;
 
+import com.intel.amtl.AMTLApplication;
+
 import android.os.SystemProperties;
 import android.util.Log;
 
@@ -27,37 +29,37 @@ import java.lang.RuntimeException;
 
 public class MtsManager {
 
-    private final String TAG = "AMTL";
+    private final String TAG = AMTLApplication.getAMTLApp().getLogTag();
     private final String MODULE = "MtsManager";
 
     public final Runtime rtm = java.lang.Runtime.getRuntime();
 
     public String getMtsInput() {
-        return SystemProperties.get(MtsProperties.MTS_INPUT_PROP);
+        return SystemProperties.get(MtsProperties.getInput());
     }
 
     public String getMtsOutput() {
-        return SystemProperties.get(MtsProperties.MTS_OUTPUT_PROP);
+        return SystemProperties.get(MtsProperties.getOutput());
     }
 
     public String getMtsOutputType() {
-        return SystemProperties.get(MtsProperties.MTS_OUTPUT_TYPE_PROP);
+        return SystemProperties.get(MtsProperties.getOutputType());
     }
 
     public String getMtsRotateNum() {
-        return SystemProperties.get(MtsProperties.MTS_ROTATE_NUM_PROP);
+        return SystemProperties.get(MtsProperties.getRotateNum());
     }
 
     public String getMtsRotateSize() {
-        return SystemProperties.get(MtsProperties.MTS_ROTATE_SIZE_PROP);
+        return SystemProperties.get(MtsProperties.getRotateSize());
     }
 
     public String getMtsInterface() {
-        return SystemProperties.get(MtsProperties.MTS_INTERFACE_PROP);
+        return SystemProperties.get(MtsProperties.getInterface());
     }
 
     public String getMtsBufferSize() {
-        return SystemProperties.get(MtsProperties.MTS_BUFFER_SIZE_PROP);
+        return SystemProperties.get(MtsProperties.getBufferSize());
     }
 
     public void printMtsProperties() {
@@ -74,7 +76,7 @@ public class MtsManager {
     }
 
     public String getMtsState() {
-        return SystemProperties.get(MtsProperties.MTS_STATUS_PROP);
+        return SystemProperties.get(MtsProperties.getStatus());
     }
 
     /* Start mts service */
@@ -91,7 +93,7 @@ public class MtsManager {
     /* Start mts persistent */
     private void startMtsPersistent() {
         Log.d(TAG, MODULE + ": starting mts persistent");
-        SystemProperties.set(MtsProperties.MTS_SERVICE, "1");
+        SystemProperties.set(MtsProperties.getService(), "1");
     }
 
     /* Start mts oneshot */
@@ -114,8 +116,8 @@ public class MtsManager {
 
     /* Stop mts persistent */
     private void stopMtsPersistent() {
-        Log.d (TAG, MODULE + ": stopping mts persistent");
-        SystemProperties.set(MtsProperties.MTS_SERVICE, "0");
+        Log.d(TAG, MODULE + ": stopping mts persistent");
+        SystemProperties.set(MtsProperties.getService(), "0");
     }
 
     /* Stop mts oneshot */

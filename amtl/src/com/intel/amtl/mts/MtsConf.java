@@ -77,12 +77,12 @@ public class MtsConf {
 
     public void applyParameters() {
 
-        SystemProperties.set(MtsProperties.MTS_INPUT_PROP, this.mtsInput);
-        SystemProperties.set(MtsProperties.MTS_OUTPUT_PROP, this.mtsOutput);
-        SystemProperties.set(MtsProperties.MTS_OUTPUT_TYPE_PROP, this.mtsOutputType);
-        SystemProperties.set(MtsProperties.MTS_ROTATE_NUM_PROP, this.mtsRotateNum);
-        SystemProperties.set(MtsProperties.MTS_ROTATE_SIZE_PROP, this.mtsRotateSize);
-        SystemProperties.set(MtsProperties.MTS_INTERFACE_PROP, this.mtsInterface);
-        SystemProperties.set(MtsProperties.MTS_BUFFER_SIZE_PROP, this.mtsBufferSize);
+        SystemProperties.set(MtsProperties.getInput(), this.mtsInput);
+        SystemProperties.set(MtsProperties.getOutput(), this.mtsOutput);
+        SystemProperties.set(MtsProperties.getOutputType(), this.mtsOutputType);
+        SystemProperties.set(MtsProperties.getRotateNum(), this.mtsRotateNum);
+        SystemProperties.set(MtsProperties.getRotateSize(), this.mtsRotateSize);
+        SystemProperties.set(MtsProperties.getInterface(), this.mtsInterface);
+        SystemProperties.set(MtsProperties.getBufferSize(), this.mtsBufferSize);
     }
 }
