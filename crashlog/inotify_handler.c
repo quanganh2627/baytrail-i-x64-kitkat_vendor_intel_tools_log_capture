@@ -64,17 +64,13 @@ struct watch_entry wd_array[] = {
     {0, DROPBOX_DIR_MASK,   JAVATOMBSTONE_TYPE, 0,  JAVA_TOMBSTONE_EVNAME,   DROPBOX_DIR,   "native_crash",             NULL},
     {0, DROPBOX_DIR_MASK,   JAVACRASH_TYPE, 0,      JAVACRASH_EVNAME,   DROPBOX_DIR,        "app_crash",                NULL},
     {0, DROPBOX_DIR_MASK,   JAVACRASH_TYPE2, 0,     JAVACRASH_EVNAME,   DROPBOX_DIR,        "system_server_crash",      NULL},
-#ifdef FULL_REPORT
     {0, CORE_DIR_MASK,      APCORE_TYPE,    0,      APCORE_EVNAME,      HISTORY_CORE_DIR,   ".core",                    NULL},
     {0, CORE_DIR_MASK,      HPROF_TYPE,     0,      HPROF_EVNAME,       HISTORY_CORE_DIR,   ".hprof",                   NULL},
     {0, STAT_DIR_MASK,      STATTRIG_TYPE,  0,      STATSTRIG_EVNAME,   STAT_DIR,           "_trigger",                 NULL},
     {0, STAT_DIR_MASK,      INFOTRIG_TYPE,  0,      STATSTRIG_EVNAME,   STAT_DIR,           "_infoevent",               NULL},
     {0, STAT_DIR_MASK,      ERRORTRIG_TYPE, 0,      STATSTRIG_EVNAME,   STAT_DIR,           "_errorevent",              NULL},
-#endif
     {0, APLOG_DIR_MASK,     APLOGTRIG_TYPE, 0,      APLOGTRIG_EVNAME,   APLOG_DIR,          "_trigger",                 NULL},
-#ifdef FULL_REPORT
     {0, APLOG_DIR_MASK,     CMDTRIG_TYPE,   0,      CMDTRIG_EVNAME,     APLOG_DIR,          "_cmd",                     NULL},
-#endif
     /* -----------------------------above is dir, below is file------------------------------------------------------------ */
     {0, UPTIME_MASK,        UPTIME_TYPE,    0,      UPTIME_EVNAME,      UPTIME_FILE,        NULL,                      NULL},
     /* -------------------------above is AP, below is modem---------------------------------------------------------------- */
