@@ -33,6 +33,8 @@
 #define UNDEF_INGR "unknown"
 #define INGREDIENT_VALUE_MAX_SIZE   PROPERTY_VALUE_MAX
 
+static bool ingredients_disabled = FALSE;
+
 static pconfig_handle parse_ingredients_file(const char *file_path) {
     pconfig_handle pc_handle;
 
@@ -175,6 +177,16 @@ static int fetch_ingredients(pconfig_handle handle) {
 void check_ingredients_file() {
     static pconfig_handle old_values = NULL;
     pconfig_handle new_values = NULL;
+
+    if (ingredients_disabled)
+        return;
+
+    if (!file_exists(INGREDIENTS_CONFIG)) {
+        LOGE("[INGR]: File '%s' not found, disable 'ingredients' feature\n",
+             INGREDIENTS_CONFIG);
+        ingredients_disabled = TRUE;
+        return;
+    }
 
     if (!old_values) {
         /*first run, load last ingredients.txt */
