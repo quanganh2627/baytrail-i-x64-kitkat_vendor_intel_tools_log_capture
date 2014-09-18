@@ -45,7 +45,6 @@ LOCAL_SRC_FILES := \
     config_handler.c \
     ramdump.c \
     fw_update.c \
-    iptrak.c \
     uefivar.c \
     ingredients.c
 
@@ -53,6 +52,11 @@ LOCAL_SHARED_LIBRARIES := libcutils
 
 ifeq ($(CRASHLOGD_FULL_REPORT),true)
 LOCAL_CFLAGS := -DFULL_REPORT
+endif
+
+ifeq ($(CRASHLOGD_MODULE_IPTRAK),true)
+LOCAL_CFLAGS += -DCRASHLOGD_MODULE_IPTRAK
+LOCAL_SRC_FILES += iptrak.c
 endif
 
 ifeq ($(TARGET_BIOS_TYPE),"uefi")
