@@ -20,15 +20,30 @@
 
 package com.intel.amtl.models.config;
 
+import java.lang.reflect.Constructor;
+
+import android.os.Bundle;
 import android.util.Log;
 
+import com.intel.amtl.AMTLApplication;
+import com.intel.amtl.exceptions.ModemConfException;
 import com.intel.amtl.mts.MtsConf;
 
-public class ModemConf {
+public abstract class ModemConf {
 
-    private static final String TAG = "AMTL";
+    private static final String TAG = AMTLApplication.getAMTLApp().getLogTag();
     private static final String MODULE = "ModemConf";
+
+    public static final String KEY_XSIO = "xsio";
+    public static final String KEY_TRACE = "trace";
+    public static final String KEY_XSYSTRACE = "xsystrace";
+    public static final String KEY_MTSMODE = "mtsmode";
+    public static final String KEY_FLCMD = "flcmd";
+    public static final String KEY_OCTMODE = "octmode";
+    public static final int INIT_TRACE_OFF = 0;
+
     private String atXsio = "";
+    private String atTrace = "";
     private String atXsystrace = "";
     private String mtsMode = "";
     private String flCmd = "";
@@ -40,7 +55,45 @@ public class ModemConf {
 
     private String octMode = "";
 
-    public ModemConf(LogOutput config) {
+    public abstract boolean confTraceOutput();
+    public abstract boolean confTraceEnable();
+
+    public synchronized static ModemConf getInstance(LogOutput config)
+                throws ModemConfException{
+        ModemConf mdmConf = null;
+        String className = AMTLApplication.getAMTLApp()
+                .getModemConClassName();
+
+        try {
+            Class <?> c = Class.forName(className);
+            final Constructor<?> constructor = c.getConstructor(LogOutput.class);
+            mdmConf = (ModemConf)constructor.newInstance(config);
+        } catch(Exception e) {
+            throw new ModemConfException("Cannot create the class successfully");
+        }
+
+        return mdmConf;
+    }
+
+    public synchronized static ModemConf getInstance(Bundle bundle)
+            throws ModemConfException{
+        ModemConf mdmConf = null;
+        String className = AMTLApplication.getAMTLApp()
+                .getModemConClassName();
+
+        try {
+            Class <?> c = Class.forName(className);
+            final Constructor<?> constructor = c.getConstructor(Bundle.class);
+            mdmConf = (ModemConf)constructor.newInstance(bundle);
+        } catch(Exception e) {
+            throw new ModemConfException("Cannot create the class successfully");
+        }
+
+        return mdmConf;
+    }
+
+
+    protected ModemConf(LogOutput config) {
         this.config = config;
         this.confIndex = this.config.getIndex();
         this.atXsystrace = "AT+XSYSTRACE=1," + this.config.concatMasterPort();
@@ -82,24 +135,24 @@ public class ModemConf {
         this.atXsystrace += "\r\n";
         if (!this.atXsio.equals("")) {
             this.mtsMode = this.config.getMtsMode();
-            this.mtsConf = new MtsConf(this.config.getMtsInput(), this.config.getMtsOutput(),
-                    this.config.getMtsOutputType(), this.config.getMtsRotateNum(),
-                    this.config.getMtsRotateSize(), this.config.getMtsInterface(),
+            this.mtsConf = new MtsConf(this.config.getMtsInput(),
+                    this.config.getMtsOutput(), this.config.getMtsOutputType(),
+                    this.config.getMtsRotateNum(),
+                    this.config.getMtsRotateSize(),
+                    this.config.getMtsInterface(),
                     this.config.getMtsBufferSize());
         } else {
             this.mtsConf = new MtsConf();
         }
     }
 
-    public ModemConf(String xsio, String xsystrace, String flcmd, String octMode) {
-        this.atXsio = xsio;
-        this.atXsystrace = xsystrace;
-        this.flCmd = flcmd;
+    public ModemConf(Bundle bundle) {
+        this.octMode = "";
+        this.atTrace = "";
+        this.atXsio = bundle.getString(ModemConf.KEY_XSIO);
+        this.atXsystrace = bundle.getString(ModemConf.KEY_XSYSTRACE);
+        this.flCmd = bundle.getString(ModemConf.KEY_FLCMD);
         this.confIndex = -1;
-        this.mtsConf = new MtsConf();
-        if (!octMode.equals("")) {
-            this.octMode = octMode;
-        }
     }
 
     public void setMtsConf (MtsConf conf) {
@@ -112,20 +165,56 @@ public class ModemConf {
         return this.mtsConf;
     }
 
+    public void setXsio(String xsio) {
+        this.atXsio = xsio;
+    }
+
     public String getXsio() {
         return this.atXsio;
+    }
+
+    public void setTrace(String trace) {
+        this.atTrace = trace;
+    }
+
+    public String getTrace() {
+        return this.atTrace;
+    }
+
+    public void setXsystrace(String xsystrace) {
+        this.atXsystrace = xsystrace;
     }
 
     public String getXsystrace() {
         return this.atXsystrace;
     }
 
+    public void setFlcmd(String flcmd) {
+        if (flcmd == null) {
+            this.flCmd = "";
+        } else {
+            this.flCmd = flcmd;
+        }
+    }
+
     public String getFlCmd() {
         return this.flCmd;
     }
 
+    public void setIndex(int index) {
+        this.confIndex = index;
+    }
+
     public int getIndex() {
         return this.confIndex;
+    }
+
+    public void activateConf(boolean activate) {
+        if (activate) {
+            this.atTrace = "AT+TRACE=1\r\n";
+        } else {
+            this.atTrace = "AT+TRACE=0\r\n";
+        }
     }
 
     public String getMtsMode() {
@@ -151,6 +240,10 @@ public class ModemConf {
         return false;
     }
 
+    public void setOctMode(String octMode) {
+        this.octMode = octMode;
+    }
+
     public String getOctMode() {
         return this.octMode;
     }
@@ -173,6 +266,7 @@ public class ModemConf {
     public void printToLog() {
         Log.d(TAG, MODULE + ": ========= MODEM CONFIGURATION =========");
         Log.d(TAG, MODULE + ": XSIO = " + this.atXsio);
+        Log.d(TAG, MODULE + ": TRACE = " + this.atTrace);
         Log.d(TAG, MODULE + ": XSYSTRACE = " + this.atXsystrace);
         Log.d(TAG, MODULE + ": OCT = " + this.octMode);
         Log.d(TAG, MODULE + ": =======================================");

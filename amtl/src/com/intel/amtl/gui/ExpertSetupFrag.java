@@ -46,6 +46,7 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.intel.amtl.AMTLApplication;
 import com.intel.amtl.R;
 import com.intel.amtl.config_parser.ConfigParser;
 import com.intel.amtl.gui.UIHelper;
@@ -61,13 +62,14 @@ import org.xmlpull.v1.XmlPullParserException;
 
 public class ExpertSetupFrag extends Fragment implements OnClickListener {
 
-    private final String TAG = "AMTL";
+    private final String TAG = AMTLApplication.getAMTLApp().getLogTag();
     private final String MODULE = "ExpertSetupFrag";
 
     private String confPath = "/etc/amtl/catalog/default_expert.cfg";
 
     private Button buttonChoose = null;
     private EditText editTextExpertConf = null;
+    private TextView textViewTrace = null;
     private TextView textViewXsystrace = null;
     private TextView textViewXsio = null;
 
@@ -110,6 +112,7 @@ public class ExpertSetupFrag extends Fragment implements OnClickListener {
 
         this.buttonChoose = (Button)view.findViewById(R.id.buttonChoose);
         this.editTextExpertConf = (EditText)view.findViewById(R.id.editTextConfPath);
+        this.textViewTrace = (TextView)view.findViewById(R.id.textViewTrace);
         this.textViewXsystrace = (TextView)view.findViewById(R.id.textViewXsystrace);
         this.textViewXsio = (TextView)view.findViewById(R.id.textViewXsio);
 
@@ -191,9 +194,11 @@ public class ExpertSetupFrag extends Fragment implements OnClickListener {
 
     private void showConfDetails(boolean display, ModemConf modConf) {
         if (display && modConf != null) {
+            this.textViewTrace.setText(modConf.getTrace());
             this.textViewXsystrace.setText(modConf.getXsystrace());
             this.textViewXsio.setText(modConf.getXsio());
         } else {
+            this.textViewTrace.setText("");
             this.textViewXsystrace.setText("");
             this.textViewXsio.setText("");
         }

@@ -21,6 +21,7 @@ package com.intel.amtl.modem;
 
 import android.util.Log;
 
+import com.intel.amtl.AMTLApplication;
 import com.intel.amtl.exceptions.ModemControlException;
 import com.intel.amtl.models.config.Master;
 
@@ -29,7 +30,7 @@ import java.util.ArrayList;
 
 public class CommandParser {
 
-    private final String TAG = "AMTL";
+    private final String TAG = AMTLApplication.getAMTLApp().getLogTag();
     private final String MODULE = "CommandParser";
 
     public String parseXsioResponse(String xsio) {
@@ -76,5 +77,10 @@ public class CommandParser {
             oct = sub.substring(0, 1);
         }
         return oct;
+    }
+
+    public String parseTraceResponse(String trace) {
+        int indexTrace = trace.indexOf("+TRACE: ");
+        return trace.substring(indexTrace + 8, indexTrace + 9);
     }
 }
