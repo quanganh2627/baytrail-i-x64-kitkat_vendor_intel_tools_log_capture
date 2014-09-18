@@ -197,6 +197,12 @@ struct mode_config {
     bool mmgr_enabled:1;
 };
 
+#ifdef CONFIG_COREDUMP
+#define COREDUMP_WATCHED TRUE
+#else
+#define COREDUMP_WATCHED FALSE
+#endif
+
 /* Array defining for each crashlog mode, the associated config */
 static const struct mode_config get_mode_configs[] = {
     [ NOMINAL_MODE ] = {
@@ -204,7 +210,10 @@ static const struct mode_config get_mode_configs[] = {
         .sdcard_storage = TRUE,
         .notifs_crashreport = TRUE,
         .monitor_crashenv = TRUE,
-        .watched_event_types = {[ LOST_TYPE ... MRST_TYPE ] = TRUE, }, /* All directories are watched */
+        .watched_event_types = {
+            [ LOST_TYPE ... JAVACRASH_TYPE2 ] = TRUE,
+            [ APCORE_TYPE ... HPROF_TYPE ] = COREDUMP_WATCHED,
+            [ STATTRIG_TYPE ... MRST_TYPE ] = TRUE },
         .mmgr_enabled = TRUE,
     },
     [ RAMDUMP_MODE ] = {
