@@ -47,7 +47,6 @@ LOCAL_SRC_FILES := \
     fw_update.c \
     iptrak.c \
     uefivar.c \
-    ct_eventintegrity.c \
     ingredients.c
 
 LOCAL_SHARED_LIBRARIES := libcutils
