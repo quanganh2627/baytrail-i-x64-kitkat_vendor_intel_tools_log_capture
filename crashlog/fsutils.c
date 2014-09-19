@@ -1204,7 +1204,7 @@ int read_file_prop_uid(char* source, char *filename, char *uid, char* defaultval
     }
 
     if (property_get(source, temp_uid, "") <= 0) {
-        LOGE("Property %s not readable\n", source);
+        LOGV("Property %s not readable\n", source);
         return -1;
     }
     strncpy(uid, temp_uid, PROPERTY_VALUE_MAX);
@@ -1216,7 +1216,7 @@ int read_file_prop_uid(char* source, char *filename, char *uid, char* defaultval
             do_chown(filename, PERM_USER, PERM_GROUP);
             fclose(fd);
         }else{
-            LOGE("Can't open file %s \n", filename);
+            LOGV("Can't open file %s \n", filename);
             return -1;
         }
         /*Success + the file was updated*/

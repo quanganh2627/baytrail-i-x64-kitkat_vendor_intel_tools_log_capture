@@ -18,6 +18,9 @@
 #define LOG_TAG "CRASHLOG"
 #endif
 
+/* Uncomment below line to enable LOGV logs output */
+/* #define LOG_NDEBUG 0 */
+
 #include <cutils/log.h>
 
 #ifndef LOGE
@@ -34,4 +37,8 @@
 
 #ifndef LOGD
 #define LOGD ALOGD
+#endif
+
+#ifndef LOGV
+#define LOGV ALOGV
 #endif
