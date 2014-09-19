@@ -1652,3 +1652,40 @@ int file_read_string(const char *file, char *string) {
 
     return strlen(string);
 }
+
+/**
+ * Search if a directory contains a file name, could be exact or partial
+ *
+ * @param dir to search in
+ * @param filename to look at
+ * @param exact macth of file name or partial
+ * @return number of matched files, -errno on errors
+ */
+int dir_contains(const char *dir, const char *filename, bool exact) {
+    int ret, count = 0;
+    struct dirent **filelist;
+    char *name;
+
+    if (!dir || !filename)
+        return -EINVAL;
+
+    ret = scandir(dir, &filelist, 0, 0);
+    if (ret < 0)
+        return -errno;
+
+    while (ret--) {
+        name = filelist[ret]->d_name;
+        if (exact) {
+            if (!strcmp(name, filename))
+                count++;
+        } else {
+            if (strstr(name, filename))
+                count++;
+        }
+        free(filelist[ret]);
+    }
+
+    free(filelist);
+
+    return count;
+}

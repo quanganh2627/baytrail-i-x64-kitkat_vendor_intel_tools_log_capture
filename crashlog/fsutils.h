@@ -150,4 +150,14 @@ void save_startuplogs(const char *reboot_id);
  */
 int file_read_string(const char *file, char *string);
 
+/**
+ * Search if a directory contains a file name, could be exact or partial
+ *
+ * @param dir to search in
+ * @param filename to look at
+ * @param exact macth of file name or partial
+ * @return number of matched files, -errno on errors
+ */
+int dir_contains(const char *dir, const char *filename, bool exact);
+
 #endif /* __FSUTILS_H__ */
