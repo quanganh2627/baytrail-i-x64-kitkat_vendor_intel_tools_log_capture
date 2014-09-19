@@ -373,7 +373,7 @@ extern enum crashlog_mode g_crashlog_mode;
 #define CONSOLE_RAMOOPS_FILE    "console-ramoops"
 #define FTRACE_RAMOOPS_FILE     "ftrace-ramoops"
 #define EMMC_HEADER_NAME        "emmc_ipanic_header"
-#define CONSOLE_NAME            "emmc_ipanic_console"
+#define EMMC_CONSOLE_NAME       "emmc_ipanic_console"
 #define CONSOLE_RAM             "ram_ipanic_console"
 #define THREAD_NAME             "emmc_ipanic_threads"
 #define LOGCAT_NAME             "emmc_ipanic_logcat"
@@ -387,7 +387,7 @@ extern enum crashlog_mode g_crashlog_mode;
 #define CONSOLE_RAMOOPS         PSTORE_DIR "/" CONSOLE_RAMOOPS_FILE
 #define FTRACE_RAMOOPS          PSTORE_DIR "/" FTRACE_RAMOOPS_FILE
 #define PANIC_HEADER_NAME       PROC_DIR "/" EMMC_HEADER_NAME
-#define PANIC_CONSOLE_NAME      PROC_DIR "/" CONSOLE_NAME
+#define PANIC_CONSOLE_NAME      PROC_DIR "/" EMMC_CONSOLE_NAME
 #define PANIC_THREAD_NAME       PROC_DIR "/" THREAD_NAME
 #define PANIC_GBUFFER_NAME      PROC_DIR "/" GBUFFER_NAME
 #define PROC_FABRIC_ERROR_NAME  PROC_DIR "/" FABRIC_ERROR_NAME
@@ -397,7 +397,7 @@ extern enum crashlog_mode g_crashlog_mode;
 #define PROC_UUID               PROC_DIR "/emmc0_id_entry"
 #define SYS_BLK_MMC0_CID        SYS_DIR "/block/mmcblk0/device/cid"
 #define SAVED_HEADER_NAME       PANIC_DIR "/" EMMC_HEADER_NAME
-#define SAVED_CONSOLE_NAME      PANIC_DIR "/" CONSOLE_NAME
+#define SAVED_CONSOLE_NAME      PANIC_DIR "/" EMMC_CONSOLE_NAME
 #define SAVED_THREAD_NAME       PANIC_DIR "/" THREAD_NAME
 #define SAVED_GBUFFER_NAME      PANIC_DIR "/" GBUFFER_NAME
 #define SAVED_LOGCAT_NAME       PANIC_DIR "/" LOGCAT_NAME

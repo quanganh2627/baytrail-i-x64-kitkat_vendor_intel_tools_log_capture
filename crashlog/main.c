@@ -594,7 +594,7 @@ static void get_crash_env(char * boot_mode, char *crypt_state, char *encrypt_pro
     {
         snprintf(CURRENT_PROC_FABRIC_ERROR_NAME, sizeof(CURRENT_PROC_FABRIC_ERROR_NAME), "%s/%s", value, FABRIC_ERROR_NAME);
         snprintf(CURRENT_PROC_OFFLINE_SCU_LOG_NAME, sizeof(CURRENT_PROC_OFFLINE_SCU_LOG_NAME), "%s/%s", value, OFFLINE_SCU_LOG_NAME);
-        snprintf(CURRENT_PANIC_CONSOLE_NAME, sizeof(CURRENT_PANIC_CONSOLE_NAME), "%s/%s", value, CONSOLE_NAME);
+        snprintf(CURRENT_PANIC_CONSOLE_NAME, sizeof(CURRENT_PANIC_CONSOLE_NAME), "%s/%s", value, EMMC_CONSOLE_NAME);
         snprintf(CURRENT_PANIC_HEADER_NAME, sizeof(CURRENT_PANIC_HEADER_NAME), "%s/%s", value, EMMC_HEADER_NAME);
         snprintf(CURRENT_KERNEL_CMDLINE, sizeof(CURRENT_KERNEL_CMDLINE), "%s/%s", value, CMDLINE_NAME);
         LOGI("Test Mode : ipanic, fabricerr and wdt trigger path is %s\n", value);

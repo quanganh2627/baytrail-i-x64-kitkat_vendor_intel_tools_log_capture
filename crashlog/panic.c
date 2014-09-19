@@ -209,7 +209,7 @@ int crashlog_check_panic(char *reason, int test) {
         do_copy_eof(PANIC_HEADER_NAME, destination_tmp_name);
 
         snprintf(crash_console_name, sizeof(crash_console_name),
-                    "%s%s_%s.txt", crash_path, CONSOLE_NAME, dateshort);
+                    "%s%s_%s.txt", crash_path, EMMC_CONSOLE_NAME, dateshort);
         do_copy_eof(PANIC_CONSOLE_NAME, crash_console_name);
 
         snprintf(destination_tmp_name, sizeof(destination_tmp_name),
