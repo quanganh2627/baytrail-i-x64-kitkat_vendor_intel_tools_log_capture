@@ -263,6 +263,7 @@ extern enum crashlog_mode g_crashlog_mode;
 /* PROPERTIES */
 #define PROP_CRASH_MODE         "persist.sys.crashlogd.mode"
 #define PROP_PROFILE            "persist.service.profile.enable"
+#define PROP_BOOTREASON         "ro.boot.bootreason"
 #define PROP_BOOT_STATUS        "sys.boot_completed"
 #define PROP_BUILD_FIELD        "ro.build.version.incremental"
 #define PROP_BOARD_FIELD        "ro.product.model"
@@ -370,6 +371,7 @@ extern enum crashlog_mode g_crashlog_mode;
 #define LOG_SPID                LOGS_DIR "/spid.txt"
 #define LOG_PANICTEMP           LOGS_DIR "/panic_temp"
 #define LOG_FABRICTEMP           LOGS_DIR "/fabric_temp"
+#define CONSOLE_NAME            "console"
 #define LAST_KMSG_FILE          "last_kmsg"
 #define CONSOLE_RAMOOPS_FILE    "console-ramoops"
 #define FTRACE_RAMOOPS_FILE     "ftrace-ramoops"

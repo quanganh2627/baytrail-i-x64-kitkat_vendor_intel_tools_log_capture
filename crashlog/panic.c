@@ -27,10 +27,13 @@
 #include "ramdump.h"
 
 #include <stdlib.h>
+#include <sys/types.h>
+#include <dirent.h>
 
 typedef enum e_crashtype_mode {
     EMMC_PANIC_MODE = 0, /*< computation of panic crashtype */
     RAM_PANIC_MODE, /*< computation of ram panic crashtype */
+    DONT_PANIC_MODE, /*< computation of panic crashtype from /data/dontpanic/ files */
 } e_crashtype_mode_t;
 
 /*
@@ -162,6 +165,80 @@ static void set_ipanic_crashtype_and_reason(char *console_name, char *crashtype,
          // In this case, an ERROR is sent to have correct SWWDT metrics
          raise_infoerror(ERROREVENT, CRASHLOG_SWWDT_MISSING);
     }
+}
+
+/**
+ * @brief Checks if a panic console file is available in PANIC_DIR (/data/dontpanic)
+ *
+ * This functions is called at reboot (ie at crashlogd boot ) and checks if a
+ * PANIC event occurred by parsing panic console file.
+ * It then checks the IPANIC event type.
+ * Returned values are :
+ *  -1 if a problem occurs (can't create crash dir)
+ *   0 if panic is found and handled
+ *   1 if the panic console file doesn't exist
+ */
+int crashlog_check_dontpanic(char *reason) {
+    char bootreason[PROPERTY_VALUE_MAX];
+    DIR *d;
+    int dir, ret;
+    struct dirent *de;
+    char src_path[PATHMAX] = {'\0'};
+    char dst_path[PATHMAX] = {'\0'};
+    char console_name[PATHMAX] = {'\0'};
+    char crashtype[32] = {'\0'};
+    char *key;
+    const char *dateshort = get_current_time_short(1);
+
+    ret = property_get(PROP_BOOTREASON, bootreason, "");
+    if (ret < 0) {
+        LOGE("%s: failed to get bootreason\n", __FUNCTION__);
+        return -1;
+    }
+
+    if (!strstr(bootreason, "panic") || !dir_exists(PANIC_DIR) ||
+        dir_contains(PANIC_DIR, CONSOLE_NAME, FALSE) <= 0)
+        return 1;
+
+    dir = find_new_crashlog_dir(MODE_CRASH);
+    if (dir < 0) {
+        LOGE("%s: failed to get a new crash directory\n", __FUNCTION__);
+        return -1;
+    }
+
+    d = opendir(PANIC_DIR);
+    if (!d) {
+        LOGE("%s: failed to open %s: %s (%d)\n", __FUNCTION__, PANIC_DIR,
+             strerror(errno), errno);
+        return -1;
+    }
+
+    while ((de = readdir(d)) != NULL) {
+        if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, "..") ||
+            de->d_type != DT_REG)
+            continue;
+
+        snprintf(src_path, sizeof(src_path), "%s/%s", PANIC_DIR, de->d_name);
+        snprintf(dst_path, sizeof(dst_path), "%s%d/%s_%s.txt", CRASH_DIR,
+                 dir, de->d_name, dateshort);
+        do_copy_eof(src_path, dst_path);
+
+        if (strstr(de->d_name, CONSOLE_NAME))
+            snprintf(console_name, sizeof(console_name), "%s", dst_path);
+    }
+    closedir(d);
+
+    do_last_kmsg_copy(dir);
+    do_wdt_log_copy(dir);
+
+    snprintf(dst_path, sizeof(dst_path), "%s%d/", CRASH_DIR, dir);
+    set_ipanic_crashtype_and_reason(console_name, crashtype, reason, DONT_PANIC_MODE);
+    key = raise_event(CRASHEVENT, crashtype, NULL, dst_path);
+    LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, get_current_time_long(0),
+         crashtype, dst_path);
+    free(key);
+
+    return 0;
 }
 
 /**
@@ -591,13 +668,15 @@ int crashlog_check_kdump(char *reason __unused, int test) {
 
 void crashlog_check_panic_events(char *reason, char *watchdog, int test) {
 
-    if (crashlog_check_panic(reason, test) == 1)
-        /* No panic console file : check RAM console to determine the watchdog event type */
-        if (crashlog_check_ram_panic(reason, NULL) == 1)
-            /* Last resort: copy the panic partition header */
-            if ((crashlog_check_panic_header(reason) == 1) &&
+    if (crashlog_check_dontpanic(reason) == 1)
+        /* No panic console file in PANIC_DIR (/data/dontpanic), fallbaack */
+        if (crashlog_check_panic(reason, test) == 1)
+            /* No panic console file : check RAM console to determine the watchdog event type */
+            if (crashlog_check_ram_panic(reason, NULL) == 1)
+                /* Last resort: copy the panic partition header */
+                if ((crashlog_check_panic_header(reason) == 1) &&
                     strstr(reason, "SWWDT_"))
-                strcpy(watchdog, "SWWDT_UNHANDLED");
+                    strcpy(watchdog, "SWWDT_UNHANDLED");
 
     /* Clears /proc/emmc_ipanic* entries */
     overwrite_file(CURRENT_PANIC_HEADER_NAME, "1");
