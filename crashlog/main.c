@@ -44,6 +44,7 @@
 #include "kct_netlink.h"
 #include "lct_link.h"
 #include "iptrak.h"
+#include "spid.h"
 #include "ingredients.h"
 
 #ifdef BOARD_HAVE_MODEM
@@ -449,56 +450,6 @@ static void early_check(char *encryptstate, int test) {
     /* Update the iptrak file */
     check_iptrak_file(RETRY_ONCE);
     check_ingredients_file();
-}
-
-void spid_read_concat(const char *path, char *complete_value)
-{
-    FILE *fd;
-    char temp_spid[5]="XXXX";
-
-    fd = fopen(path, "r");
-    if (fd != NULL && fscanf(fd, "%s", temp_spid) == 1)
-        fclose(fd);
-    else
-        LOGE("%s: Cannot read %s - %s\n", __FUNCTION__, path, strerror(errno));
-
-    strncat(complete_value,"-",1);
-    strncat(complete_value,temp_spid, sizeof(temp_spid));
-}
-/**
- * Read SPID data from file system, build it and write it into given file
- */
-void read_sys_spid(char *filename)
-{
-    FILE *fd;
-    char complete_spid[256];
-    char temp_spid[5]="XXXX";
-
-    if (filename == 0)
-        return;
-
-    fd = fopen(SYS_SPID_1, "r");
-    if (fd != NULL && fscanf(fd, "%s", temp_spid) == 1)
-        fclose(fd);
-    else
-        LOGE("%s: Cannot read SPID from %s - %s\n", __FUNCTION__, SYS_SPID_1, strerror(errno));
-
-    snprintf(complete_spid, sizeof(complete_spid), "%s", temp_spid);
-
-    spid_read_concat(SYS_SPID_2,complete_spid);
-    spid_read_concat(SYS_SPID_3,complete_spid);
-    spid_read_concat(SYS_SPID_4,complete_spid);
-    spid_read_concat(SYS_SPID_5,complete_spid);
-    spid_read_concat(SYS_SPID_6,complete_spid);
-
-    fd = fopen(filename, "w");
-    if (!fd) {
-        LOGE("%s: Cannot write SPID to %s - %s\n", __FUNCTION__, filename, strerror(errno));
-    } else {
-        fprintf(fd, "%s", complete_spid);
-        fclose(fd);
-    }
-    do_chown(filename, PERM_USER, PERM_GROUP);
 }
 
 /**
