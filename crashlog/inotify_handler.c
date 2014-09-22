@@ -45,6 +45,8 @@
 #include <stdio.h>
 #include <errno.h>
 
+#define LOG_PREFIX "inotify: "
+
 extern pconfig g_first_modem_config;
 
 /**
@@ -82,7 +84,7 @@ struct watch_entry wd_array[] = {
 int set_watch_entry_callback(unsigned int watch_type, inotify_callback pcallback) {
 
     if ( watch_type >= DIM(wd_array) ) {
-        LOGE("%s: Cannot set the callback for type %u (max is %lu)\n",
+        LOGE(LOG_PREFIX "%s: Cannot set the callback for type %u (max is %lu)\n",
              __FUNCTION__, watch_type, (long unsigned int)DIM(wd_array));
         return -1;
     }
@@ -90,7 +92,7 @@ int set_watch_entry_callback(unsigned int watch_type, inotify_callback pcallback
     if ( CRASHLOG_MODE_EVENT_TYPE_ENABLED(g_crashlog_mode, wd_array[watch_type].eventtype) )
         wd_array[watch_type].pcallback = pcallback;
     else
-        LOGD("event type '%s' is disabled : Don't set callback function\n",
+        LOGD(LOG_PREFIX "event type '%s' is disabled : Don't set callback function\n",
              print_eventtype[watch_type] );
 
     return 0;
@@ -117,7 +119,7 @@ int init_inotify_handler() {
     fd = inotify_init1(IN_NONBLOCK);
 #endif
     if (fd < 0) {
-        LOGE("inotify_init failed, %s\n", strerror(errno));
+        LOGE(LOG_PREFIX "inotify_init failed, %s\n", strerror(errno));
         return -errno;
     }
 
@@ -125,7 +127,7 @@ int init_inotify_handler() {
         int alreadywatched = 0, j;
 
         if (!CRASHLOG_MODE_EVENT_TYPE_ENABLED(g_crashlog_mode, wd_array[i].eventtype)) {
-            LOGI("event type '%s' disabled : Don't add watch on %s\n",
+            LOGI(LOG_PREFIX "event type '%s' disabled : Don't add watch on %s\n",
                  print_eventtype[ wd_array[i].eventtype ], wd_array[i].eventpath);
             continue;
         }
@@ -135,7 +137,7 @@ int init_inotify_handler() {
             if (!strcmp(wd_array[j].eventpath, wd_array[i].eventpath) ) {
                 alreadywatched = 1;
                 wd_array[i].wd = wd_array[j].wd;
-                LOGI("Don't duplicate watch operation for %s\n", wd_array[i].eventpath);
+                LOGV(LOG_PREFIX "Don't duplicate watch operation for %s\n", wd_array[i].eventpath);
                 break;
             }
         }
@@ -146,10 +148,10 @@ int init_inotify_handler() {
                                            wd_array[i].eventmask);
         if (wd_array[i].wd < 0) {
             wd_array[i].inotify_error = errno;
-            LOGE("Can't add watch for %s - %s.\n",
+            LOGE(LOG_PREFIX "Can't add watch for %s - %s.\n",
                  wd_array[i].eventpath, strerror(wd_array[i].inotify_error));
         } else
-            LOGI("%s, wd=%d has been snooped\n", wd_array[i].eventpath, wd_array[i].wd);
+            LOGI(LOG_PREFIX "%s, wd=%d has been snooped\n", wd_array[i].eventpath, wd_array[i].wd);
     }
     //add generic watch here
     generic_add_watch(g_first_modem_config, fd);
