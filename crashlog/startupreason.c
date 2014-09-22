@@ -294,7 +294,7 @@ static void get_default_bootreason(char *bootreason) {
     unsigned int i;
     char bootreason_prop[PROPERTY_VALUE_MAX];
 
-    ret = property_get(PROP_BOOTREASON, bootreason_prop, "");
+    ret = get_cmdline_bootreason(bootreason_prop);
     if (ret <= 0)
         return;
 

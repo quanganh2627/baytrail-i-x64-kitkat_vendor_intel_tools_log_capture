@@ -1197,3 +1197,37 @@ void do_wdt_log_copy(int dir) {
     do_log_copy("WDT", dir, dateshort, APLOG_TYPE);
     do_last_fw_msg_copy(dir);
 }
+
+int get_cmdline_bootreason(char *bootreason) {
+    FILE *fd;
+    int res;
+    char *p, *p1;
+    char cmdline[1024] = { '\0', };
+    const char key[] = "bootreason=";
+
+    fd = fopen(CURRENT_KERNEL_CMDLINE, "r");
+    if (!fd) {
+        LOGE("%s: failed to open file %s - %s\n", __FUNCTION__,
+             CURRENT_KERNEL_CMDLINE, strerror(errno));
+        return -1;
+    }
+
+    res = fread(cmdline, 1, sizeof(cmdline)-1, fd);
+    if (res <= 0) {
+        LOGE("%s: failed to read file %s - %s\n", __FUNCTION__,
+             CURRENT_KERNEL_CMDLINE, strerror(errno));
+        return -1;
+    }
+    fclose(fd);
+
+    p = strstr(cmdline, key);
+    if (!p)
+        return 0;
+    p += strlen(key);
+    p1 = strstr(p, " ");
+    if (p1)
+        *p1 = '\0';
+
+    strncpy(bootreason, p, strlen(p) + 1);
+    return strlen(bootreason);
+}

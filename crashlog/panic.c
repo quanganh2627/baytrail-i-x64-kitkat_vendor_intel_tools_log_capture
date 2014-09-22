@@ -191,7 +191,7 @@ int crashlog_check_dontpanic(char *reason) {
     char *key;
     const char *dateshort = get_current_time_short(1);
 
-    ret = property_get(PROP_BOOTREASON, bootreason, "");
+    ret = get_cmdline_bootreason(bootreason);
     if (ret < 0) {
         LOGE("%s: failed to get bootreason\n", __FUNCTION__);
         return -1;
