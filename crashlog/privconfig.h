@@ -263,6 +263,7 @@ extern enum crashlog_mode g_crashlog_mode;
 #define DIM(array)              ( sizeof(array) / sizeof(array[0]) )
 
 /* PROPERTIES */
+#define PROP_LOGS_ROOT          "persist.crashlogd.root"
 #define PROP_CRASH_MODE         "persist.sys.crashlogd.mode"
 #define PROP_PROFILE            "persist.service.profile.enable"
 #define PROP_BOOTREASON         "ro.boot.bootreason"

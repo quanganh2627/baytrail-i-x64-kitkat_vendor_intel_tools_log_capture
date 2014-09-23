@@ -776,6 +776,12 @@ int main(int argc, char **argv) {
 
     crashlogd_wait_for_user();
 
+#ifdef CONFIG_LOGS_PATH
+    /* let others know the new root directory for logs */
+    property_set(PROP_LOGS_ROOT, LOGS_DIR);
+    LOGI("Logs root property set: [%s]: [%s]\n", PROP_LOGS_ROOT, LOGS_DIR);
+#endif
+
     /* Check the args */
     if (argc > 2) {
         LOGE("USAGE: %s [-test|-ramdump|<max_nb_files>] \n", argv[0]);
