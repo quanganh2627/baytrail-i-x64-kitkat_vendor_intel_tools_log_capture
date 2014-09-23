@@ -40,7 +40,6 @@ LOCAL_SRC_FILES := \
     dropbox.c \
     fsutils.c \
     fabric.c \
-    modem.c \
     panic.c \
     config_handler.c \
     ramdump.c \
@@ -105,22 +104,20 @@ LOCAL_SRC_FILES += \
     ct_eventintegrity.c
 endif
 
+ifeq ($(CRASHLOGD_MODULE_MODEM),true)
 ifeq ($(BOARD_HAVE_MODEM),true)
-
-LOCAL_CFLAGS += -DBOARD_HAVE_MODEM
-
+LOCAL_CFLAGS += -DCRASHLOGD_MODULE_MODEM
 LOCAL_C_INCLUDES += \
     $(TARGET_OUT_HEADERS)/IFX-modem \
     $(TARGET_OUT_HEADERS)/libtcs
-
 LOCAL_SHARED_LIBRARIES += \
     libmmgrcli \
     libtcs
-
 LOCAL_SRC_FILES += \
+    modem.c \
     tcs_wrapper.c \
     mmgr_source.c
-
+endif
 endif
 
 ifneq ($(CRASHLOGD_LOGS_PATH),)

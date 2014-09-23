@@ -46,10 +46,7 @@
 #include "iptrak.h"
 #include "spid.h"
 #include "ingredients.h"
-
-#ifdef BOARD_HAVE_MODEM
 #include "mmgr_source.h"
-#endif
 
 #include <sys/types.h>
 #include <sys/sha1.h>
@@ -435,7 +432,7 @@ static void early_check(char *encryptstate, int test) {
     LOGE("%-8s%-22s%-20s%s\n", STATEEVENT, key, datelong, encryptstate);
     free(key);
 
-#ifdef BOARD_HAVE_MODEM
+#ifdef CRASHLOGD_MODULE_MODEM
     if(cfg_check_modem_version()) {
         modem_name_check_result = update_modem_name();
         if(modem_name_check_result < 0) {
@@ -630,9 +627,7 @@ int do_monitor() {
     set_watch_entry_callback(APIMR_TYPE,        process_modem_event);
     set_watch_entry_callback(MRST_TYPE,         process_modem_event);
 
-#ifdef BOARD_HAVE_MODEM
     init_mmgr_cli_source();
-#endif
 
 #ifdef CRASHLOGD_MODULE_KCT
     kct_netlink_init_comm();
@@ -651,14 +646,12 @@ int do_monitor() {
                 max = file_monitor_fd;
         }
 
-#ifdef BOARD_HAVE_MODEM
         //mmgr fd setup
         if (mmgr_get_fd() > 0) {
             FD_SET(mmgr_get_fd(), &read_fds);
             if (mmgr_get_fd() > max)
                 max = mmgr_get_fd();
         }
-#endif
 
 #ifdef CRASHLOGD_MODULE_KCT
         //kct fd setup
@@ -690,13 +683,11 @@ int do_monitor() {
             if (FD_ISSET(file_monitor_fd, &read_fds)) {
                 receive_inotify_events(file_monitor_fd);
             }
- #ifdef BOARD_HAVE_MODEM
             // mmgr monitor
             if (FD_ISSET(mmgr_get_fd(), &read_fds)) {
                 LOGD("mmgr fd set");
                 mmgr_handle();
             }
-#endif
 
 #ifdef CRASHLOGD_MODULE_KCT
             // kct monitor
@@ -712,9 +703,7 @@ int do_monitor() {
 #endif
         }
     }
-#ifdef BOARD_HAVE_MODEM
     close_mmgr_cli_source();
-#endif
     free_config(g_first_modem_config);
     LOGE("Exiting main monitor loop\n");
     return -1;
