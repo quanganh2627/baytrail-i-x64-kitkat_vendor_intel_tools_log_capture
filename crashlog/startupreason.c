@@ -289,8 +289,24 @@ void get_fdk_startupreason(char *startupreason)
     }
 }
 
+static void get_default_bootreason(char *bootreason) {
+    int ret;
+    unsigned int i;
+    char bootreason_prop[PROPERTY_VALUE_MAX];
+
+    ret = property_get(PROP_BOOTREASON, bootreason_prop, "");
+    if (ret <= 0)
+        return;
+
+    for (i = 0; i < strlen(bootreason_prop); i++)
+        bootreason[i] = toupper(bootreason_prop[i]);
+    bootreason[i] = '\0';
+}
+
 void read_startupreason(char *startupreason)
 {
+    get_default_bootreason(startupreason);
+
     if (device_has_uefi())
         get_uefi_startupreason(startupreason);
     else
