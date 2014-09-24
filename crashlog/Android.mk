@@ -42,7 +42,6 @@ LOCAL_SRC_FILES := \
     panic.c \
     config_handler.c \
     ramdump.c \
-    fw_update.c \
     uefivar.c \
     ingredients.c
 
@@ -122,6 +121,11 @@ endif
 ifeq ($(CRASHLOGD_MODULE_FABRIC),true)
 LOCAL_CFLAGS += -DCRASHLOGD_MODULE_FABRIC
 LOCAL_SRC_FILES += fabric.c
+endif
+
+ifeq ($(CRASHLOGD_MODULE_FW_UPDATE),true)
+LOCAL_CFLAGS += -DCRASHLOGD_MODULE_FW_UPDATE
+LOCAL_SRC_FILES += fw_update.c
 endif
 
 ifneq ($(CRASHLOGD_LOGS_PATH),)

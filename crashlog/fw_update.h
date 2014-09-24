@@ -22,6 +22,10 @@
 #ifndef __FW_UPDATE_H__
 #define __FW_UPDATE_H__
 
-int crashlog_check_fw_update_status();
+#ifdef CRASHLOGD_MODULE_FW_UPDATE
+int crashlog_check_fw_update_status(void);
+#else
+static inline int crashlog_check_fw_update_status(void) { return 0; }
+#endif
 
 #endif /* __FW_UPDATE_H__ */
