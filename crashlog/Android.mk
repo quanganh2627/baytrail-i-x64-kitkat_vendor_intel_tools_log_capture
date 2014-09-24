@@ -39,7 +39,6 @@ LOCAL_SRC_FILES := \
     trigger.c \
     dropbox.c \
     fsutils.c \
-    fabric.c \
     panic.c \
     config_handler.c \
     ramdump.c \
@@ -118,6 +117,11 @@ LOCAL_SRC_FILES += \
     tcs_wrapper.c \
     mmgr_source.c
 endif
+endif
+
+ifeq ($(CRASHLOGD_MODULE_FABRIC),true)
+LOCAL_CFLAGS += -DCRASHLOGD_MODULE_FABRIC
+LOCAL_SRC_FILES += fabric.c
 endif
 
 ifneq ($(CRASHLOGD_LOGS_PATH),)
