@@ -22,8 +22,14 @@
 #ifndef __KCT_NETLINK_H__
 #define __KCT_NETLINK_H__
 
+#ifdef CRASHLOGD_MODULE_KCT
 void kct_netlink_init_comm(void);
-int kct_netlink_get_fd();
+int kct_netlink_get_fd(void);
 void kct_netlink_handle_msg(void);
+#else
+static inline void kct_netlink_init_comm(void) {}
+static inline int kct_netlink_get_fd(void) { return 0; }
+static inline void kct_netlink_handle_msg(void) {}
+#endif
 
 #endif /* __KCT_NETLINK_H__ */

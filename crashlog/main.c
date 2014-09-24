@@ -629,11 +629,9 @@ int do_monitor() {
 
     init_mmgr_cli_source();
 
-#ifdef CRASHLOGD_MODULE_KCT
     kct_netlink_init_comm();
 
     lct_link_init_comm();
-#endif
 
     for(;;) {
         // Clear fd set
@@ -653,7 +651,6 @@ int do_monitor() {
                 max = mmgr_get_fd();
         }
 
-#ifdef CRASHLOGD_MODULE_KCT
         //kct fd setup
         if (kct_netlink_get_fd() > 0) {
             FD_SET(kct_netlink_get_fd(), &read_fds);
@@ -667,7 +664,6 @@ int do_monitor() {
             if (lct_link_get_fd() > max)
                 max = lct_link_get_fd();
         }
-#endif
 
         // Wait for events
         select_result = select(max+1, &read_fds, NULL, NULL, NULL);
@@ -688,8 +684,6 @@ int do_monitor() {
                 LOGD("mmgr fd set");
                 mmgr_handle();
             }
-
-#ifdef CRASHLOGD_MODULE_KCT
             // kct monitor
             if (FD_ISSET(kct_netlink_get_fd(), &read_fds)) {
                 LOGD("kct fd set");
@@ -700,7 +694,6 @@ int do_monitor() {
                 LOGD("lct fd set");
                 lct_link_handle_msg();
             }
-#endif
         }
     }
     close_mmgr_cli_source();
