@@ -68,11 +68,21 @@ LOCAL_CFLAGS += -DCRASHLOGD_MODULE_SPID
 LOCAL_SRC_FILES += spid.c
 endif
 
-ifeq ($(TARGET_BIOS_TYPE),"uefi")
-    LOCAL_CFLAGS += -DCONFIG_UEFI
-    LOCAL_STATIC_LIBRARIES += \
-        libdmi \
-        libuefivar
+ifeq ($(CRASHLOGD_EFILINUX),true)
+LOCAL_CFLAGS += -DCONFIG_EFILINUX
+LOCAL_STATIC_LIBRARIES += \
+    libdmi \
+    libuefivar
+endif
+
+ifeq ($(CRASHLOGD_FDK),true)
+LOCAL_CFLAGS += -DCONFIG_FDK
+endif
+
+ifeq ($(CRASHLOGD_EFILINUX),true)
+ifeq ($(CRASHLOGD_FDK),true)
+$(error CRASHLOGD_EFILINUX and CRASHLOGD_FDK options are exclusive.)
+endif
 endif
 
 # sha1.h has been moved out of default bionic includes

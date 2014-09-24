@@ -26,7 +26,7 @@
 #include "fsutils.h"
 #include "config.h"
 
-#ifdef CONFIG_UEFI
+#ifdef CONFIG_EFILINUX
 #include <libdmi.h>
 #endif
 
@@ -73,7 +73,7 @@ static void check_config(pconfig_handle handle) {
     }
 }
 
-#ifdef CONFIG_UEFI
+#ifdef CONFIG_EFILINUX
 static int fetch_dmi_properties(psection section) {
     int status = 1;
     char *property;

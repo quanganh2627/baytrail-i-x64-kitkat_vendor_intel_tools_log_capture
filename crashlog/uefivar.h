@@ -14,10 +14,4 @@
  * limitations under the License.
  */
 
-#include "fsutils.h"
-
-static inline int device_has_uefi() {
-    return dir_exists("/sys/firmware/efi/");
-}
-
 int uefivar_get_int(const char *name, const char *guid, unsigned int *value);

@@ -39,9 +39,11 @@ struct fw_update_status_ops {
     int (*clear_fw_update_status)(char *msg_reason, char *msg_status);
 };
 
+#if !defined(CONFIG_EFILINUX) && !defined(CONFIG_FDK)
+static const struct fw_update_status_ops fw_ope;
+#endif
 
-#ifdef CONFIG_UEFI
-
+#ifdef CONFIG_EFILINUX
 static int edk2_get_fw_update_status()
 {
     const char *var_guid_common = "4a67b082-0a4c-41cf-b6c7-440b29bb8c4f";
@@ -79,9 +81,9 @@ static const struct fw_update_status_ops fw_ope = {
     .get_fw_update_status = edk2_get_fw_update_status,
     .clear_fw_update_status = edk2_clear_fw_update_status
 };
+#endif
 
-#else
-
+#ifdef CONFIG_FDK
 static int fdk_get_fw_update_status()
 {
     FILE *filed = NULL;
@@ -138,14 +140,12 @@ static const struct fw_update_status_ops fw_ope = {
     .get_fw_update_status = fdk_get_fw_update_status,
     .clear_fw_update_status = fdk_clear_fw_update_status
 };
-
 #endif
-
 
 /**
  * @brief generate fw update crash event
  *
- * By reading the OSNIB fw update status set by the IA FW, the OS can check
+ * By reading the fw update status set by the IA FW, the OS can check
  * if problems have occured during the update, and then report the reasons
  * in a crashfile.
  * It also reports if the fw status was succeffully cleared in case of a
@@ -168,6 +168,11 @@ int crashlog_check_fw_update_status(void)
     int fw_update_status;
     unsigned int i;
     int result = 0;
+
+    if (!fw_ope.get_fw_update_status || !fw_ope.clear_fw_update_status) {
+        LOGE("fw_update module has no ops registered\n");
+        return -1;
+    }
 
     fw_update_status = fw_ope.get_fw_update_status();
     if (fw_update_status == -1) {
