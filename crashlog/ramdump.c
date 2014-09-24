@@ -43,7 +43,7 @@
 *
 * @retval returns -1 if a problem occurs (no LM_DUMP file..). 0 otherwise.
 */
-int crashlog_check_ramdump(const char * reason)
+static int crashlog_check_ramdump(const char * reason)
 {
     char destination[PATHMAX] = {'\0'};
     char *crashtype = RAMDUMP_EVENT;
@@ -104,7 +104,7 @@ int crashlog_check_ramdump(const char * reason)
 *
 * @retval return 0.
 */
-int request_global_reset() {
+static int request_global_reset() {
 
 #define CMD_SET_RESET_TO_GLOBAL "peeknpoke w fed0304a 8 33" // ETR register, bit cf9gr
 #define CMD_REBOOT "reboot"
