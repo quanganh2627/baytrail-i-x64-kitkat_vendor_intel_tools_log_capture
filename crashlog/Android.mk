@@ -1,5 +1,5 @@
 #
-# Copyright (C) Intel 2010
+# Copyright (C) Intel 2014
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,8 +17,7 @@
 
 LOCAL_PATH := $(call my-dir)
 
-CRASHLOGD_MODULE_BACKTRACE := false
-CRASHLOGD_MODULE_KCT := false
+include $(LOCAL_PATH)/default_config.mk
 
 include $(CLEAR_VARS)
 
@@ -46,22 +45,18 @@ LOCAL_SRC_FILES := \
 
 LOCAL_SHARED_LIBRARIES := libcutils
 
+# sys/sha1.h has been moved out of default bionic includes
+LOCAL_C_INCLUDES += \
+    bionic/libc/upstream-netbsd/android/include
+
+# Options
+
 ifeq ($(CRASHLOGD_FULL_REPORT),true)
 LOCAL_CFLAGS += -DFULL_REPORT
 endif
 
 ifeq ($(CRASHLOGD_COREDUMP),true)
 LOCAL_CFLAGS += -DCONFIG_COREDUMP
-endif
-
-ifeq ($(CRASHLOGD_MODULE_IPTRAK),true)
-LOCAL_CFLAGS += -DCRASHLOGD_MODULE_IPTRAK
-LOCAL_SRC_FILES += iptrak.c
-endif
-
-ifeq ($(CRASHLOGD_MODULE_SPID),true)
-LOCAL_CFLAGS += -DCRASHLOGD_MODULE_SPID
-LOCAL_SRC_FILES += spid.c
 endif
 
 ifeq ($(CRASHLOGD_EFILINUX),true)
@@ -81,14 +76,25 @@ $(error CRASHLOGD_EFILINUX and CRASHLOGD_FDK options are exclusive.)
 endif
 endif
 
-# sha1.h has been moved out of default bionic includes
-LOCAL_C_INCLUDES += \
-    bionic/libc/upstream-netbsd/android/include
+ifneq ($(CRASHLOGD_LOGS_PATH),)
+LOCAL_CFLAGS += -DCONFIG_LOGS_PATH='$(CRASHLOGD_LOGS_PATH)'
+endif
+
+# Modules
+
+ifeq ($(CRASHLOGD_MODULE_IPTRAK),true)
+LOCAL_CFLAGS += -DCRASHLOGD_MODULE_IPTRAK
+LOCAL_SRC_FILES += iptrak.c
+endif
+
+ifeq ($(CRASHLOGD_MODULE_SPID),true)
+LOCAL_CFLAGS += -DCRASHLOGD_MODULE_SPID
+LOCAL_SRC_FILES += spid.c
+endif
 
 ifeq ($(CRASHLOGD_MODULE_BACKTRACE),true)
 LOCAL_CFLAGS += -DCRASHLOGD_MODULE_BACKTRACE
-LOCAL_C_INCLUDES += \
-  $(LOCAL_PATH)/../backtrace
+LOCAL_C_INCLUDES += $(LOCAL_PATH)/../backtrace
 LOCAL_SHARED_LIBRARIES += libparse_stack
 endif
 
@@ -130,10 +136,6 @@ endif
 ifeq ($(CRASHLOGD_MODULE_RAMDUMP),true)
 LOCAL_CFLAGS += -DCRASHLOGD_MODULE_RAMDUMP
 LOCAL_SRC_FILES += ramdump.c
-endif
-
-ifneq ($(CRASHLOGD_LOGS_PATH),)
-LOCAL_CFLAGS += -DCONFIG_LOGS_PATH='$(CRASHLOGD_LOGS_PATH)'
 endif
 
 include $(BUILD_EXECUTABLE)
