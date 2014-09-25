@@ -31,10 +31,9 @@
 #include <stdio.h>
 
 #include <cutils/properties.h>
-#ifdef FULL_REPORT
-#ifdef CRASHLOGD_MODULE_BACKTRACE
-#include <backtrace.h>
-#endif
+
+#ifdef CONFIG_BTDUMP
+#include <libbtdump.h>
 #endif
 
 #include "crashutils.h"
@@ -133,12 +132,6 @@ static void process_anruiwdt_tracefile(char *destion, int dir, int removeunparse
             if (unlink(tracefile) != 0) {
                 LOGE("%s: Failed to remove tracefile %s:%s\n", __FUNCTION__, tracefile, strerror(errno));
             }
-            // parse
-#ifdef CRASHLOGD_MODULE_BACKTRACE
-            backtrace_parse_tombstone_file(dest_path);
-#else
-            LOGW("%s: CRASHLOGD_MODULE_BACKTRACE disabled, no tombstone backtrace parsing\n", __FUNCTION__);
-#endif
             if ( removeunparsed && unlink(dest_path)) {
                 LOGE("Failed to remove unparsed tracefile %s:%s\n", dest_path, strerror(errno));
             }
@@ -185,6 +178,61 @@ void do_copy_pvr(char * src, char * dest) {
 
    return;
 }
+
+#ifdef CONFIG_BTDUMP
+
+struct bt_dump_arg {
+    int eventtype;
+    int dir;
+    char *destion;
+    char *eventname;
+};
+
+void *dump_bt_all(void *param) {
+    struct bt_dump_arg *args = (struct bt_dump_arg *) param;
+    char destion_btdump[PATHMAX];
+    FILE *f_btdump;
+    char *key;
+    char cmd[512];
+
+    LOGV("Full process backtrace dump started");
+    snprintf(destion_btdump, sizeof(destion_btdump), "%s/all_back_traces.txt",
+             args->destion);
+    f_btdump = fopen(destion_btdump, "w");
+    if (f_btdump) {
+        bt_all(f_btdump);
+        fclose(f_btdump);
+    }
+
+    key = raise_event(CRASHEVENT, args->eventname, NULL, args->destion);
+    LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, get_current_time_long(0),
+         args->eventname, args->destion);
+#ifdef FULL_REPORT
+    if (args->eventtype != ANR_TYPE
+        || start_dumpstate_srv(CRASH_DIR, args->dir, key) <= 0) {
+#endif
+        /*done */
+        snprintf(cmd, sizeof(cmd) - 1, "am broadcast -n com.intel.crashreport"
+                 "/.specific.NotificationReceiver -a com.intel.crashreport.intent.CRASH_LOGS_COPY_FINISHED "
+                 "-c android.intent.category.ALTERNATIVE --es com.intel.crashreport.extra.EVENT_ID %s",
+                 key);
+
+        int status = system(cmd);
+        if (status != 0)
+            LOGI("%s: Notify crashreport status(%d) for command \"%s\".\n",
+                 __FUNCTION__, status, cmd);
+        free(key);
+#ifdef FULL_REPORT
+    }
+#endif
+
+    free(args->eventname);
+    free(args->destion);
+    free(param);
+    return NULL;
+}
+#endif
+
 /*
 * Name          :
 * Description   :
@@ -194,9 +242,13 @@ int process_anruiwdt_event(struct watch_entry *entry, struct inotify_event *even
     char path[PATHMAX];
     char destion[PATHMAX];
     const char *dateshort = get_current_time_short(1);
-    char *key;
+    char *key = NULL;
     int dir;
-
+#ifdef CONFIG_BTDUMP
+    struct bt_dump_arg *btd_param;
+    pthread_t btd_thread;
+    char bt_dis_prop[PROPERTY_VALUE_MAX];
+#endif
     /* Check for duplicate dropbox event first */
     if ( manage_duplicate_dropbox_events(event) )
         return 1;
@@ -226,8 +278,31 @@ int process_anruiwdt_event(struct watch_entry *entry, struct inotify_event *even
     backtrace_anruiwdt(destion, dir);
     restart_profile_srv(1);
     snprintf(destion, sizeof(destion), "%s%d", CRASH_DIR, dir);
+#ifdef CONFIG_BTDUMP
+    property_get(PROP_ANR_USERSTACK, bt_dis_prop, "0");
+    if (!strcmp(bt_dis_prop, "0")) {
+        /*alloc arguments */
+        btd_param = malloc(sizeof(struct bt_dump_arg));
+        btd_param->destion = strdup(destion);
+        btd_param->eventname = strdup(entry->eventname);
+        btd_param->eventtype = entry->eventtype;
+        btd_param->dir = dir;
+
+        if (pthread_create(&btd_thread, NULL, dump_bt_all, (void *) btd_param)) {
+            LOGE("Cannot start full process list backtrace dump.");
+        } else {
+            /*Everything will end on the new thread */
+            return 1;
+        }
+        free(btd_param->eventname);
+        free(btd_param->destion);
+        free(btd_param);
+    }
+#endif
     key = raise_event(CRASHEVENT, entry->eventname, NULL, destion);
-    LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, get_current_time_long(0), entry->eventname, destion);
+    LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, get_current_time_long(0),
+         entry->eventname, destion);
+
     switch (entry->eventtype) {
 #ifdef FULL_REPORT
         case ANR_TYPE:
