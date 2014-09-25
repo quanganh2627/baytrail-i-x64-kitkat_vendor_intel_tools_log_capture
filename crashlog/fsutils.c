@@ -1700,3 +1700,38 @@ int dir_contains(const char *dir, const char *filename, bool exact) {
 
     return count;
 }
+
+int write_binary_file(const char *path, const unsigned char *buffer, unsigned int buffer_size) {
+    FILE * fp;
+
+    if (!path || !buffer || buffer_size <=0)
+        return -EINVAL;
+
+    fp = fopen (path, "wb");
+
+    if (fp == NULL) {
+        return -errno;
+    }
+
+    fwrite (buffer, sizeof(char), buffer_size, fp);
+    fclose (fp);
+    return 0;
+}
+
+int read_binary_file(const char *path, unsigned char *buffer, unsigned int buffer_size) {
+    int ret_val;
+    FILE * fp;
+
+    if (!path || !buffer || buffer_size <=0)
+        return -EINVAL;
+
+    fp = fopen (path, "rb");
+
+    if (fp == NULL) {
+        return -errno;
+    }
+
+    ret_val = fread (buffer, sizeof(char), buffer_size, fp);
+    fclose (fp);
+    return ret_val;
+}
