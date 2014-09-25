@@ -41,6 +41,7 @@ LOCAL_SRC_FILES := \
     panic.c \
     config_handler.c \
     uefivar.c \
+    checksum.c \
     ingredients.c
 
 LOCAL_SHARED_LIBRARIES := libcutils

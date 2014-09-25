@@ -46,6 +46,7 @@
 #include "iptrak.h"
 #include "spid.h"
 #include "ingredients.h"
+#include "checksum.h"
 #include "mmgr_source.h"
 
 #include <sys/types.h>
@@ -151,6 +152,45 @@ static int check_mounted_partitions()
     fclose(fd);
 
     return output;
+}
+
+void check_factory_partition_checksum() {
+    unsigned char checksum[CRASHLOG_CHECKSUM_SIZE];
+
+    if (!directory_exists(FACTORY_PARTITION_DIR)) {
+        LOGD("%s: Factory partition not present on current build. Skipping checksum verification\n", __FUNCTION__);
+        return;
+    }
+
+    if (calculate_checksum_directory(FACTORY_PARTITION_DIR, checksum) != 0) {
+        LOGE("%s: failed to calculate factory partition checksum\n", __FUNCTION__);
+        return;
+    }
+
+    if (file_exists(FACTORY_SUM_FILE)) {
+        unsigned char old_checksum[CRASHLOG_CHECKSUM_SIZE+1];
+        if (read_binary_file(FACTORY_SUM_FILE, old_checksum, CRASHLOG_CHECKSUM_SIZE) < 0) {
+            LOGE("%s: failed in reading checksum from file: %s\n", __FUNCTION__, FACTORY_SUM_FILE);
+        }
+
+        if (memcmp(checksum, old_checksum, CRASHLOG_CHECKSUM_SIZE) != 0) {
+            /* send event that something has changed */
+            char *key = raise_event(INFOEVENT, "FACTORY_SUM", NULL, FACTORY_SUM_FILE);
+            free(key);
+            if (write_binary_file(FACTORY_SUM_FILE, checksum, CRASHLOG_CHECKSUM_SIZE) < 0) {
+                LOGE("%s: failed in writing checksum to file: %s\n", __FUNCTION__, FACTORY_SUM_FILE);
+                return;
+            }
+            LOGD("%s: %s file updated\n", __FUNCTION__, FACTORY_SUM_FILE);
+        }
+    }
+    else {
+        if (write_binary_file(FACTORY_SUM_FILE, checksum, CRASHLOG_CHECKSUM_SIZE) < 0) {
+            LOGE("%s: failed in writing checksum to file: %s\n", __FUNCTION__, FACTORY_SUM_FILE);
+            return;
+        }
+        LOGD("%s: %s file created\n", __FUNCTION__, FACTORY_SUM_FILE);
+    }
 }
 
 int process_command_event(struct watch_entry *entry, struct inotify_event *event) {
@@ -592,6 +632,8 @@ int get_inotify_fd() {
 }
 
 int do_monitor() {
+    check_factory_partition_checksum();
+
     fd_set read_fds; /**< file descriptor set watching data availability from sources */
     int max = 0; /**< select max fd value +1 {@see man select(2) nfds} */
     int select_result; /**< select result */

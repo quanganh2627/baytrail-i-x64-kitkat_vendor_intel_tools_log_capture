@@ -78,6 +78,12 @@ static inline int file_exists(const char *filename) {
     return (stat(filename, &info) == 0);
 }
 
+static inline int directory_exists(char *path) {
+    struct stat info;
+
+    return (stat(path, &info) == 0 && S_ISDIR(info.st_mode));
+}
+
 static inline int dir_exists(const char *dirpath) {
     DIR * dir;
 
@@ -128,6 +134,7 @@ int do_copy_tail(char *src, char *dest, int limit);
 int do_copy_utf16(const char *src, const char *des);
 int do_copy(char *src, char *dest, int limit);
 int do_mv(char *src, char *dest);
+ssize_t do_read(int fd, void *buf, size_t len);
 int rmfr(char *path);
 int rmfr_specific(char *path, int remove_dir);
 
@@ -159,5 +166,24 @@ int file_read_string(const char *file, char *string);
  * @return number of matched files, -errno on errors
  */
 int dir_contains(const char *dir, const char *filename, bool exact);
+
+/**
+ * Reads the content of a file passed as parameter into a buffer
+ *
+ * @param path to the file from which we are supposed to read
+ * @param buffer in which to write the read data
+ * @param buffer_size indicates the maximum data to be read, in bytes
+ * @return 0 on success, -errno on errors
+ */
+int read_binary_file(const char *path, unsigned char *buffer, unsigned int buffer_size);
+/**
+ * Writes the content of a buffer to file
+ *
+ * @param path to the file to write to
+ * @param buffer from which it should try to write the data
+ * @param buffer_size indicates how many bytes starting from 'buffer' are to be writen
+ * @return number of written bytes, -errno on errors
+ */
+int write_binary_file(const char *path, const unsigned char *buffer, unsigned int buffer_size);
 
 #endif /* __FSUTILS_H__ */
