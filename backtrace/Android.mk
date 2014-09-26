@@ -7,7 +7,7 @@ LOCAL_SRC_FILES:= \
 	symbols_64.c \
 	generate_tomb_file.c
 
-LOCAL_MODULE_TAGS := optional
+LOCAL_MODULE_TAGS := eng debug
 LOCAL_MODULE:= libparse_stack
 
 LOCAL_SHARED_LIBRARIES:= libc libcutils
