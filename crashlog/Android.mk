@@ -36,9 +36,8 @@ LOCAL_SRC_FILES:= main.c \
     config_handler.c \
     ramdump.c
 
-ifneq ($(CRASH_REPORT_PARTIAL_REPORT),true)
 LOCAL_CFLAGS += -DFULL_REPORT=1
-endif
+
 LOCAL_C_INCLUDES += \
   vendor/intel/tools/log_capture/backtrace
 
