@@ -22,6 +22,7 @@ LOCAL_SRC_FILES:= main.c \
     config.c \
     inotify_handler.c \
     startupreason.c \
+    mmgr_source.c \
     crashutils.c \
     usercrash.c \
     anruiwdt.c \
@@ -39,29 +40,11 @@ LOCAL_SRC_FILES:= main.c \
 LOCAL_CFLAGS += -DFULL_REPORT=1
 
 LOCAL_C_INCLUDES += \
+  $(TARGET_OUT_HEADERS)/IFX-modem \
   vendor/intel/tools/log_capture/backtrace
 
 LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE:= crashlogd
 
-LOCAL_SHARED_LIBRARIES:= libparse_stack libc libcutils
-
-# Modem crash report
-# Outside should use $(CRASH_REPORT_MODEM_SUPPORT)
-# to enable it.
-ifeq ($(CRASH_REPORT_MODEM_SUPPORT),true)
-LOCAL_C_INCLUDES += \
-  $(TARGET_OUT_HEADERS)/IFX-modem \
-
-LOCAL_SRC_FILES += \
-  mmgr_source.c \
-
-LOCAL_SHARED_LIBRARIES += \
-  libmmgrcli \
-
-LOCAL_CFLAGS += \
-  -DMODEM_CRASH_SUPPORT \
-
-endif
-
+LOCAL_SHARED_LIBRARIES:= libparse_stack libc libcutils libmmgrcli
 include $(BUILD_EXECUTABLE)

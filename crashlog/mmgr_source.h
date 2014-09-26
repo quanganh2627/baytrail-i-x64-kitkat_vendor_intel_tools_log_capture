@@ -29,27 +29,11 @@
 
 #include <stdlib.h>
 
-#ifdef MODEM_CRASH_SUPPORT
 #include "mmgr_cli.h"
-
 
 int mmgr_get_fd();
 void init_mmgr_cli_source(void);
 void close_mmgr_cli_source(void);
 int mmgr_handle(void);
-#else
-static inline int mmgr_get_fd() {
-    return -1;
-}
 
-static inline void init_mmgr_cli_source(void) {
-}
-
-static inline void close_mmgr_cli_source(void) {
-}
-
-static inline int mmgr_handle(void) {
-    return 0;
-}
-#endif
 #endif
