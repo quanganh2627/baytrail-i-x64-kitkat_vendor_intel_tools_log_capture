@@ -17,9 +17,6 @@
 
 LOCAL_PATH := $(call my-dir)
 
-CRASHLOGD_MODULE_BACKTRACE := false
-CRASHLOGD_MODULE_KCT := false
-
 include $(CLEAR_VARS)
 
 LOCAL_MODULE := crashlogd
@@ -46,7 +43,6 @@ LOCAL_SRC_FILES := \
     fw_update.c \
     iptrak.c \
     uefivar.c \
-    ct_eventintegrity.c \
     ingredients.c
 
 LOCAL_SHARED_LIBRARIES := libcutils
