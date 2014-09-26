@@ -726,7 +726,7 @@ int do_copy_eof(const char *src, const char *des)
     int rc = 0;
     int fd1 = -1, fd2 = -1;
     struct stat info;
-    int r_count, w_count;
+    int r_count, w_count = 0;
 
     if (src == NULL || des == NULL) return -EINVAL;
 
@@ -797,7 +797,7 @@ int do_copy_utf16_to_utf8(const char *src, const char *des)
     int rc = 0;
     int fd1 = -1, fd2 = -1;
     struct stat info;
-    int r_count, w_count, i, buf8_count, buf16_count;
+    int r_count, w_count = 0, i, buf8_count, buf16_count;
 
     if (src == NULL || des == NULL) return -1;
 
@@ -1190,7 +1190,7 @@ int overwrite_file(char *filename, char *value) {
 
 int read_file_prop_uid(char* source, char *filename, char *uid, char* defaultvalue) {
     FILE *fd;
-    char buffer[MAXLINESIZE];
+    char buffer[MAXLINESIZE] = {'\0'};
     char temp_uid[PROPERTY_VALUE_MAX];
 
     if ((source && filename && uid && defaultvalue) == 0)
@@ -1208,7 +1208,7 @@ int read_file_prop_uid(char* source, char *filename, char *uid, char* defaultval
         return -1;
     }
     strncpy(uid, temp_uid, PROPERTY_VALUE_MAX);
-    if (strncmp(uid, buffer,PROPERTY_VALUE_MAX) != 0){
+    if (strncmp(uid, buffer, PROPERTY_VALUE_MAX) != 0){
         /*need to reopen file in w mode and write the property in the file*/
         fd = fopen(filename, "w");
         if (fd!=NULL){
@@ -1347,10 +1347,10 @@ void do_log_copy(char *mode, int dir, const char* timestamp, int type) {
             /* Ignore unknown type, just return */
             return;
     }
-    if(stat(logfile0, &info) == 0) {
+    if(logfile0 && stat(logfile0, &info) == 0) {
         snprintf(destination,sizeof(destination), "%s%d/%s_%s_%s%s", dir_pattern, dir, strrchr(logfile0,'/')+1, mode, timestamp, extension);
         do_copy_tail(logfile0, destination, limit);
-        if(info.st_size < 1*MB) {
+        if(logfile1 && info.st_size < 1*MB) {
             snprintf(destination,sizeof(destination), "%s%d/%s_%s_%s%s", dir_pattern, dir, strrchr(logfile1,'/')+1, mode, timestamp, extension);
             do_copy_tail(logfile1, destination, limit);
         }
@@ -1411,6 +1411,10 @@ static void make_log_boot_backup() {
         result = find_matching_file(LOGS_DIR, base_log_pattern, found_log_name);
         if (result == 1) {
             basename = strrchr(found_log_name, '_' );
+            if (!basename) {
+                LOGE("%s: Could not extract basename, using found_log_name : %s \n", __FUNCTION__, found_log_name);
+                basename = found_log_name;
+            }
             snprintf(log_path, sizeof(log_path), PATH_PATTERN, LOGS_DIR, found_log_name);
             snprintf(new_path, sizeof(new_path), "%s/%s.%d%s", LOGS_DIR, LOG_BOOT, i, basename);
             if (rename(log_path, new_path) != 0) {
@@ -1423,6 +1427,10 @@ static void make_log_boot_backup() {
     result = find_matching_file(LOGS_DIR, base_log_pattern, found_log_name);
     if (result == 1) {
         basename = strrchr(found_log_name, '_' );
+        if (!basename) {
+            LOGE("%s: Could not extract basename, using found_log_name : %s \n", __FUNCTION__, found_log_name);
+            basename = found_log_name;
+        }
         snprintf(log_path, sizeof(log_path), PATH_PATTERN, LOGS_DIR, found_log_name);
         snprintf(new_path, sizeof(new_path), "%s/%s.1%s", LOGS_DIR, LOG_BOOT, basename);
         rename(log_path, new_path);
@@ -1536,6 +1544,7 @@ int get_parent_dir( char * dir, char *parent_dir )
         return -EINVAL;
 
     strncpy(path, dir, PATHMAX-1);
+    path[PATHMAX-1] = '\0';
     ptr = strrchr(path, '/');
 
     if ( !ptr || strlen(path) <= 1 )
@@ -1545,6 +1554,8 @@ int get_parent_dir( char * dir, char *parent_dir )
     if ( *(ptr + 1) == '\0' ) {
         *(ptr) = '\0';
         ptr = strrchr(path, '/');
+        if (!ptr)
+            return -1;
     }
     *(ptr + 1) = '\0';
 

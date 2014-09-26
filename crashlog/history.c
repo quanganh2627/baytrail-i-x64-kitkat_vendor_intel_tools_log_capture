@@ -94,16 +94,16 @@ static int get_timed_firstline(char *buffer, int *hours, char lastuptime[24], in
     if (!refresh && saved_lastuptime[0] != 0) {
         *hours = saved_hours;
         lastuptime = saved_lastuptime;
-        return (sprintf(buffer, HISTORY_FIRST_LINE_FMT, lastuptime) > 0 ? 0 : -errno);
+        return (snprintf(buffer, MAXLINESIZE, HISTORY_FIRST_LINE_FMT, lastuptime) > 0 ? 0 : -errno);
     }
     /* not initialized yet or to refresh */
     if (get_uptime_string(lastuptime, hours) != 0)
         return -errno;
 
-    if (sprintf(buffer, HISTORY_FIRST_LINE_FMT, lastuptime) > 0) {
+    if (snprintf(buffer, MAXLINESIZE, HISTORY_FIRST_LINE_FMT, lastuptime) > 0) {
         /* save to static variables for next call without refreshing */
         saved_hours = *hours;
-        strcpy(saved_lastuptime, lastuptime);
+        strncpy(saved_lastuptime, lastuptime, sizeof(saved_lastuptime));
         return 0;
     }
     else {
@@ -186,6 +186,7 @@ static void entry_to_history_line(struct history_entry *entry,
         char *ptr;
         char tmp[MAXLINESIZE];
         strncpy(tmp, entry->log, MAXLINESIZE);
+        tmp[MAXLINESIZE-1] = 0;
         ptr = strrchr(tmp,'/');
         if (ptr && ptr[1] == 0) ptr[0] = 0;
         snprintf(newline, MAXLINESIZE, "%-8s%-22s%-20s%s %s\n",
@@ -226,6 +227,9 @@ int update_history_file(struct history_entry *entry) {
         LOGE("%s: Cannot cache %s - %s.\n", __FUNCTION__,
             HISTORY_FILE, strerror(-res));
         return res;
+    } else if ( nextline < 0 ) {
+        /* should never enter this case - added for KW */
+        nextline = 0;
     }
 
     entry_to_history_line(entry, newline);
@@ -453,7 +457,7 @@ int add_uptime_event() {
 
     /* Update history file first line (uptime line) */
     errno = 0;
-    fprintf(fd, firstline, &hours);
+    fprintf(fd, firstline);
     fclose(fd);
     if (errno != 0) {
         return -errno;
@@ -497,7 +501,7 @@ int update_history_on_cmd_delete(char *events) {
     }
     /* Get events list from input events comma chain*/
     events_list = commachain_to_fixedarray(events, maxpatternsize, maxpatterns, &nbpatterns);
-    if (nbpatterns <= 0) {
+    if (nbpatterns <= 0 || !events_list) {
         LOGE("%s: Not patterns found in %s... stop the operation\n",
             __FUNCTION__, events);
         fclose(fd);

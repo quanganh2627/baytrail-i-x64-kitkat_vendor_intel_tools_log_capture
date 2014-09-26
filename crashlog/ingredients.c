@@ -138,11 +138,12 @@ static int get_modem_property(char *property_name, char *value) {
 }
 
 static int fetch_modem_properties(psection section) {
-    char buffer[INGREDIENT_VALUE_MAX_SIZE];
+    char buffer[INGREDIENT_VALUE_MAX_SIZE+1];
     pkv kv = section->kvlist;
     LOGW("[INGR]: modem Props ");
     while (kv) {
         get_modem_property(kv->key, buffer);
+        buffer[INGREDIENT_VALUE_MAX_SIZE] = 0;
         free(kv->value);
         kv->value = strdup(buffer);
 

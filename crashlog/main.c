@@ -133,8 +133,10 @@ static int check_mounted_partitions()
                        mount_dev, mount_dir, mount_type,
                        mount_opts, &mount_freq, &mount_passno);
          if (strstr(mount_dev, "by-name") && check_mounted_partition(mount_dir)) {
+             int max_append_size = sizeof(list_partition) - strlen(list_partition) - 1;
              nb_partition++;
-             strncat(list_partition, mount_dir, sizeof(list_partition) - 1);
+             if (max_append_size > 0)
+                 strncat(list_partition, mount_dir, max_append_size);
              if (((strncmp(mount_dir, "/logs", 5)) == 0) && strstr(mount_opts, "ro,"))
                   output = notify_partition_error(ERROR_LOGS_RO);
          }
