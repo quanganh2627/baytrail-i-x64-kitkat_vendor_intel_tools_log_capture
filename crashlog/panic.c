@@ -20,19 +20,13 @@
  */
 
 #include "crashutils.h"
-#include "dropbox.h"
 #include "fsutils.h"
 #include "privconfig.h"
 #include "inotify_handler.h"
 #include "trigger.h"
 #include "ramdump.h"
 
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <sys/wait.h>
-#include <fcntl.h>
 #include <stdlib.h>
-#include <string.h>
 
 /*
 * Name          : check_aplogs_tobackup
@@ -198,10 +192,22 @@ int crashlog_check_panic(char *reason, int test) {
     return 0;
 }
 
-static int crashlog_check_console_file(char *reason)
+/**
+ * @brief Checks in RAM console if a PANIC event occurred
+ *
+ * This functions is called at reboot (ie at crashlogd boot ) and checks if a
+ * PANIC event occurred by parsing the RAM console.
+ * It then checks the IPANIC event type.
+ * Returned values are :
+ *  -1 if a problem occurs (can't create crash dir)
+ *   0 for nominal case
+ *   1 if the RAM console doesn't exist or if it exists but no panic detected.
+ */
+int crashlog_check_ram_panic(char *reason)
 {
     char date_tmp[32];
     char date_tmp_2[32];
+    struct stat info;
     time_t t;
     char destination[PATHMAX];
     char crashtype[32] = {'\0'};
@@ -210,11 +216,22 @@ static int crashlog_check_console_file(char *reason)
     char ram_console[PATHMAX];
     const char *dateshort = get_current_time_short(1);
 
-    if (!find_str_in_file(SAVED_PANIC_RAM, "Kernel panic - not syncing:", NULL)) {
+    panic_found = 0;
+    if (stat(LAST_KMSG, &info) == 0) {
+        strcpy(ram_console,LAST_KMSG);
+    } else if (stat(CONSOLE_RAMOOPS, &info) == 0) {
+        strcpy(ram_console,CONSOLE_RAMOOPS);
+    } else {
+        // no file found, should return
+        return 1;
+    }
+
+    if (!find_str_in_file(ram_console, "Kernel panic - not syncing:", NULL)) {
         return 1; /* Not a PANIC : return */
     }
     else {
         // to be homogeneous with do_last_kmsg_copy, we use do_copy_tail
+        do_copy_tail(ram_console, SAVED_PANIC_RAM, MAXFILESIZE);
         panic_found = 1;
     }
 
@@ -270,33 +287,6 @@ static int crashlog_check_console_file(char *reason)
        }
     /* No RAM console : nothing to do */
     return 1;
-}
-
-/**
- * @brief Checks in RAM console if a PANIC event occurred
- *
- * This functions is called at reboot (ie at crashlogd boot ) and checks if a
- * PANIC event occurred by parsing the RAM console.
- * It then checks the IPANIC event type.
- * Returned values are :
- *  -1 if a problem occurs (can't create crash dir)
- *   0 for nominal case
- *   1 if the RAM console doesn't exist or if it exists but no panic detected.
- */
-int crashlog_check_ram_panic(char *reason)
-{
-    struct stat info;
-
-    if (stat(LAST_KMSG, &info) == 0) {
-        do_copy_tail(LAST_KMSG, SAVED_PANIC_RAM, MAXFILESIZE);
-    } else if (stat(CONSOLE_RAMOOPS, &info) == 0) {
-        do_copy_tail(CONSOLE_RAMOOPS, SAVED_PANIC_RAM, MAXFILESIZE);
-    } else {
-        // no file found, should return
-        return 1;
-    }
-
-    return crashlog_check_console_file(reason);
 }
 
 /**
@@ -393,26 +383,4 @@ void crashlog_check_panic_events(char *reason, char *watchdog, int test) {
         /* No panic console file : check RAM console to determine the watchdog event type */
         if ( crashlog_check_ram_panic(reason) == 1 && strstr(reason, "SWWDT_") )
             strcpy(watchdog, "WDT_UNHANDLED");
-}
-
-int process_kpanic_dmesg_event(struct watch_entry *entry,
-                               struct inotify_event *event) {
-    char gunzip_command[4096];
-    char reason[256] = "SWWDT_RESET";
-
-    if (manage_duplicate_dropbox_events(event))
-        return 1;
-
-    if (strchr(event->name, '\''))
-        return -1;
-
-    snprintf(gunzip_command, sizeof(gunzip_command), "gzip -d < '%s/%s' > '%s'",
-             DROPBOX_DIR, event->name, SAVED_PANIC_RAM);
-
-    if (system(gunzip_command)) {
-        LOGE("%s: Could not gunzip", __FUNCTION__);
-        return -1;
-    }
-
-    return crashlog_check_console_file(reason);
 }

@@ -26,7 +26,5 @@ int crashlog_check_panic(char *reason, int test);
 int crashlog_check_ram_panic(char *reason);
 int crashlog_check_kdump(char *reason, int test);
 void crashlog_check_panic_events(char *reason, char *watchdog, int test);
-int process_kpanic_dmesg_event(struct watch_entry *entry,
-                               struct inotify_event *event);
 
 #endif /* __PANIC_H__ */

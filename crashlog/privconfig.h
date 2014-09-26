@@ -103,7 +103,6 @@
 #define MDMCRASH_EVNAME         "MPANIC"
 #define APIMR_EVNAME            "APIMR"
 #define MRST_EVNAME             "MRESET"
-#define KPANIC_DMESG_EVNAME     "KPANIC_DMESG"
 #define EXTRA_NAME              "EXTRA"
 #define NOTIFY_CONF_PATTERN     "INOTIFY"
 #define GENERAL_CONF_PATTERN    "GENERAL"
@@ -128,7 +127,6 @@ enum {
     ERRORTRIG_TYPE,
     APLOGTRIG_TYPE,
     CMDTRIG_TYPE,
-    KPANIC_DMESG_TYPE,
     UPTIME_TYPE,
     MDMCRASH_TYPE,
     APIMR_TYPE,

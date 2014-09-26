@@ -480,7 +480,6 @@ int do_monitor() {
     set_watch_entry_callback(CMDTRIG_TYPE,      process_command_event);
     set_watch_entry_callback(APCORE_TYPE,       process_apcore_event);
 #endif
-    set_watch_entry_callback(KPANIC_DMESG_TYPE, process_kpanic_dmesg_event);
     set_watch_entry_callback(APLOGTRIG_TYPE,    process_aplog_event);
     set_watch_entry_callback(LOST_TYPE,         process_lost_event);
     set_watch_entry_callback(UPTIME_TYPE,       process_uptime_event);
