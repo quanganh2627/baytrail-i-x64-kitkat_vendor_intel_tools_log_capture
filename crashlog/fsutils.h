@@ -101,10 +101,6 @@ int freadline(FILE *fd, char buffer[MAXLINESIZE]);
 int append_file(char *filename, char *text);
 int overwrite_file(char *filename, char *value);
 
-// This function is used to flush aplogs ( logcat dumps ) in the crash report.
-void flush_aplog();
-
-
 int do_chmod(char *path, char *mode);
 int do_chown(const char *file, char *uid, char *gid);
 int do_copy_eof(const char *src, const char *des);
