@@ -50,22 +50,43 @@ static int check_aplogs_tobackup(char *filename) {
     if (property_get(PROP_IPANIC_PATTERN, ipanic_chain, "") > 0) {
         /* Found the property, split it into an array */
         patterns_array_32 = commachain_to_fixedarray(ipanic_chain, recordsize, nbrecords, &nbpatterns);
-        if (nbpatterns < 0 ) {
+        if (nbpatterns < 0) {
             LOGE("%s: Cannot transform the property %s(which is %s) into an array... error is %d - %s\n",
                 __FUNCTION__, PROP_IPANIC_PATTERN, ipanic_chain, nbpatterns, strerror(-nbpatterns));
+            /* allocated memory is freed in commachain_to_fixedarray */
+            return 0;
+        }
+        if ( nbpatterns == 0 || !patterns_array_32 ) return 0;
+        //pattern 64 bit is a copy of pattern 32 before transformation
+        patterns_array_64 = (char**)malloc(nbrecords*sizeof(char*));
+        if (!patterns_array_64) {
+            /* in this case it seems logical that we should free memory as we cannot proceed. */
             for (idx = 0 ; idx < nbrecords ; idx++) {
                 free(patterns_array_32[idx]);
             }
             free(patterns_array_32);
             return 0;
         }
-        if ( nbpatterns == 0 ) return 0;
-        //pattern 64 bit is a copy of pattern 32 before transformation
-        patterns_array_64 = (char**)malloc(nbrecords*sizeof(char*));
         /* Add the prepattern "EIP is at" to each of the patterns */
         for (idx = 0 ; idx < nbpatterns ; idx++) {
             //copy each item for 64 pattern
             patterns_array_64[idx] = (char*)malloc(recordsize*sizeof(char));
+            if (!patterns_array_64[idx] || !patterns_array_32[idx]) {
+                LOGE("%s : We ran out of memory, performing the search only on the already allocated patterns(count: %d); \n",
+                    __FUNCTION__, idx);
+                if (idx>0){
+                    nbpatterns = idx;
+                    break;
+                }
+                else {
+                    for(idx = 0 ; idx < nbrecords ; idx++) {
+                        free(patterns_array_32[idx]);
+                    }
+                    free(patterns_array_32);
+                    free(patterns_array_64);
+                    return 0;
+                }
+            }
             strncpy(patterns_array_64[idx], patterns_array_32[idx], recordsize-1);
             char *prepattern = "EIP is at ";
             int prepatternlen = strlen(prepattern);

@@ -325,7 +325,7 @@ int receive_inotify_events(int inotify_fd) {
     int len = 0, orig_len, idx, wd, missing_bytes;
     char orig_buffer[sizeof(struct inotify_event)+PATHMAX], *buffer, lastevent[sizeof(struct inotify_event)+PATHMAX];
     struct inotify_event *event;
-    struct watch_entry *entry;
+    struct watch_entry *entry = NULL;
 
     len = read(inotify_fd, orig_buffer, sizeof(orig_buffer));
     if (len < 0) {
@@ -480,7 +480,7 @@ int receive_inotify_events(int inotify_fd) {
                 continue;
             }
         }
-        if ( entry->pcallback && entry->pcallback(entry, event) < 0 ) {
+        if ( entry && entry->pcallback && entry->pcallback(entry, event) < 0 ) {
             LOGE("%s: Can't handle the event %s...\n", __FUNCTION__,
                 event->name);
             dump_inotify_events(orig_buffer, orig_len, lastevent);
