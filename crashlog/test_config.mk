@@ -15,7 +15,7 @@
 # limitations under the License.
 #
 
-# crashlogd default configuration file
+# crashlogd test configuration file
 
 # Options
 
