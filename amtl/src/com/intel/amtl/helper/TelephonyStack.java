@@ -22,7 +22,7 @@ import android.os.SystemProperties;
 
 public class TelephonyStack {
 
-    public static final String PERSIST_TELEPHONY = "persist.service.telephony.off";
+    public static final String PERSIST_TELEPHONY = "persist.sys.telephony.off";
     private String Enabled = "0";
     private String Disabled = "1";
 

@@ -37,6 +37,8 @@ public class Platform {
     private String catalogPath = "/system/etc/telephony/";
 
     public String getPlatformConf() {
-        return catalogPath + "amtl_" + SystemProperties.get("service.amtl.config", "") + ".cfg";
+        int inst_id = 1; /* @TODO: add here instance ID handling */
+        String key = "service.amtl" + inst_id + ".cfg";
+        return catalogPath + "amtl_" + SystemProperties.get(key, "") + ".cfg";
     }
 }
