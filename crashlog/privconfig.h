@@ -23,6 +23,8 @@
 #ifndef __CRASHLOGD_H__
 #define __CRASHLOGD_H__
 
+#include <sys/param.h>
+
 #define LOG_TAG                 "CRASHLOG"
 #include "log.h"
 
@@ -428,10 +430,6 @@ extern enum crashlog_mode g_crashlog_mode;
 #define FW_UPDATE_STATUS_PATH   "/sys/firmware/osnib/fw_update_status"
 #define INGREDIENTS_CONFIG      SYSTEM_DIR "/etc/ingredients.conf"
 #define INGREDIENTS_FILE        LOGS_DIR "/ingredients.txt"
-
-/* MACROS */
-#define MIN(a,b)                ((a) < (b) ? (a) : (b))
-#define MAX(a,b)                ((a) > (b) ? (a) : (b))
 
 /* SYSTEM COMMANDS */
 #define SDSIZE_SYSTEM_CMD "du -sk " SDCARD_LOGS_DIR "/ > " LOGS_DIR "/currentsdsize"
