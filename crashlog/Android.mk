@@ -17,8 +17,8 @@
 
 LOCAL_PATH := $(call my-dir)
 
+CRASHLOGD_MODULE_BACKTRACE := false
 CRASHLOGD_MODULE_KCT := false
-CRASHLOGD_MODULE_BTDUMP ?= true
 
 include $(CLEAR_VARS)
 
@@ -64,6 +64,13 @@ endif
 LOCAL_C_INCLUDES += \
     bionic/libc/upstream-netbsd/android/include
 
+ifeq ($(CRASHLOGD_MODULE_BACKTRACE),true)
+LOCAL_CFLAGS += -DCRASHLOGD_MODULE_BACKTRACE
+LOCAL_C_INCLUDES := \
+  $(LOCAL_PATH)/../backtrace
+LOCAL_SHARED_LIBRARIES += libparse_stack
+endif
+
 ifeq ($(CRASHLOGD_MODULE_KCT),true)
 LOCAL_CFLAGS += -DCRASHLOGD_MODULE_KCT
 LOCAL_SRC_FILES += \
@@ -89,19 +96,6 @@ LOCAL_SRC_FILES += \
     tcs_wrapper.c \
     mmgr_source.c
 
-endif
-
-ifeq ($(CRASHLOGD_MODULE_BTDUMP),true)
-LOCAL_CFLAGS += \
-    -DCONFIG_BTDUMP
-
-LOCAL_STATIC_LIBRARIES += \
-    libbtdump
-
-LOCAL_SHARED_LIBRARIES += \
-    libbacktrace
-
-include external/stlport/libstlport.mk
 endif
 
 include $(BUILD_EXECUTABLE)
