@@ -475,7 +475,7 @@ static char *priv_raise_event(char *event, char *type, char *subtype, char *log,
 
     /* Notify CrashReport except for UIWDT events */
     if (strncmp(type, SYSSERVER_EVNAME, sizeof(SYSSERVER_EVNAME))) {
-            notify_crashreport();
+        notify_crashreport();
     }
     return strdup(key);
 }
@@ -790,7 +790,7 @@ void start_daemon(const char *daemonname) {
     property_set("ctl.start", (char *)daemonname);
 }
 
-void notify_crashreport() {
+void notify_crashreport_thread() {
     char boot_state[PROPERTY_VALUE_MAX];
 
     /* Does current crashlog mode allow notifs to crashreport ?*/
@@ -811,6 +811,16 @@ void notify_crashreport() {
     if (WIFEXITED(status) && WEXITSTATUS(status)) {
         LOGI("notify crash report status: %d.\n", WEXITSTATUS(status));
         return;
+    }
+}
+
+void notify_crashreport() {
+    int ret = 0;
+    pthread_t thread;
+
+    ret = pthread_create(&thread, NULL, (void *)notify_crashreport_thread, NULL);
+    if (ret < 0) {
+        LOGE("%s: notify_crashreport thread error", __FUNCTION__);
     }
 }
 
