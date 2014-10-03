@@ -19,10 +19,12 @@
 
 package com.intel.amtl.modem;
 
+import android.app.Application;
 import android.content.Context;
 import android.content.Intent;
 import android.util.Log;
 
+import com.intel.amtl.AMTLApplication;
 import com.intel.amtl.exceptions.ModemControlException;
 import com.intel.amtl.gui.GeneralSetupFrag;
 import com.intel.amtl.gui.AMTLTabLayout;
@@ -51,7 +53,6 @@ public class ModemController implements ModemEventListener, Closeable {
     private static ModemStatus currentModemStatus = ModemStatus.NONE;
     private static ModemController mdmCtrl;
     private static boolean modemAcquired = false;
-    private Context context;
     private CommandParser cmdParser;
     private ArrayList<Master> masterArray;
     private boolean firstAcquire = true;
@@ -60,7 +61,6 @@ public class ModemController implements ModemEventListener, Closeable {
 
         try {
             this.modemStatusManager = ModemStatusManager.getInstance();
-            context = AMTLTabLayout.ctx;
             cmdParser = new CommandParser();
         } catch (InstantiationException ex) {
             throw new ModemControlException("Cannot instantiate Modem Status Manager");
@@ -119,14 +119,20 @@ public class ModemController implements ModemEventListener, Closeable {
 
     public String sendAtCommand(String command) throws ModemControlException {
         String ret = "NOK";
+
         if (command != null) {
             if (!command.equals("")) {
                 if (this.currentModemStatus != ModemStatus.UP) {
                     throw new ModemControlException("Cannot send at command, "
                             + "modem is not ready: status = " + this.currentModemStatus);
                 }
-                ret = this.ttyManager.writeToModemControl(command);
-                if (!ret.contains("OK")) {
+                this.ttyManager.writeToModemControl(command);
+
+                do {
+                    ret = this.ttyManager.readFromModemControl();
+                } while (!ret.contains("OK") && !ret.contains("ERROR"));
+
+                if (ret.contains("ERROR")) {
                     throw new ModemControlException("Modem has answered" + ret
                             + "to the AT command sent " + command);
                 }
@@ -159,13 +165,9 @@ public class ModemController implements ModemEventListener, Closeable {
         }
     }
 
-    public void openTty() {
-        try {
-            if (this.ttyManager == null) {
-                this.ttyManager = new GsmttyManager();
-            }
-        } catch (ModemControlException ex) {
-            Log.e(TAG, MODULE + ": there is an issue with tty opening");
+    public void openTty() throws ModemControlException {
+        if (this.ttyManager == null) {
+            this.ttyManager = new GsmttyManager();
         }
     }
 
@@ -212,7 +214,7 @@ public class ModemController implements ModemEventListener, Closeable {
     private void sendMessage(String msg) {
         Intent intent = new Intent("modem-event");
         intent.putExtra("message", msg);
-        this.context.sendBroadcast(intent);
+        AMTLApplication.getContext().sendBroadcast(intent);
     }
 
     @Override
@@ -239,8 +241,13 @@ public class ModemController implements ModemEventListener, Closeable {
     public void onModemUp() {
         this.currentModemStatus = ModemStatus.UP;
         Log.d(TAG, MODULE + ": Modem is UP");
-        this.openTty();
-        sendMessage("UP");
+        try {
+            AMTLApplication.setCloseTtyEnable(false);
+            this.openTty();
+            sendMessage("UP");
+        } catch (ModemControlException ex) {
+            Log.e(TAG, MODULE + ex);
+        }
     }
 
     @Override

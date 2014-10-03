@@ -26,9 +26,20 @@
 #include "dropbox.h"
 #include "fsutils.h"
 
-#include "cutils/log.h"
+#include "log.h"
 #include <sys/sha1.h>
 #include <stdlib.h>
+
+typedef struct {
+    int eventtype;
+    char *keyword;
+    char *tail;
+    char *suffix;
+} crashevent_type;
+
+crashevent_type crashevent_fakes_array[] = {
+    {TOMBSTONE_TYPE, "bionic-unit-tests-cts", "<<<", "_FAKE"}
+};
 
 static void backup_apcoredump(unsigned int dir, char* name, char* path) {
 
@@ -41,6 +52,18 @@ static void backup_apcoredump(unsigned int dir, char* name, char* path) {
         remove(path);
 }
 
+static char * priv_filter_crashevent(int eventtype, char* path) {
+    int entries = sizeof(crashevent_fakes_array) / sizeof(crashevent_fakes_array[0]);
+
+    while (entries--) {
+        if ((crashevent_fakes_array[entries].eventtype == eventtype)
+                && (find_str_in_file(path, crashevent_fakes_array[entries].keyword, crashevent_fakes_array[entries].tail) == 1)) {
+            return crashevent_fakes_array[entries].suffix;
+        }
+    }
+    return "\0";
+}
+
 /*
 * Name          : __process_usercrash_event
 * Description   : processes hprof, apcoredump, javacrash and tombstones events
@@ -51,13 +74,15 @@ static void backup_apcoredump(unsigned int dir, char* name, char* path) {
 static int priv_process_usercrash_event(struct watch_entry *entry, struct inotify_event *event) {
     char path[PATHMAX];
     char destion[PATHMAX];
+    char eventname[PATHMAX];
     char *key;
     int dir;
     /* Check for duplicate dropbox event first */
-    if (entry->eventtype == JAVACRASH_TYPE && manage_duplicate_dropbox_events(event) )
+    if ((entry->eventtype == JAVACRASH_TYPE || entry->eventtype == JAVACRASH_TYPE2 || entry->eventtype == JAVATOMBSTONE_TYPE )
+            && manage_duplicate_dropbox_events(event) )
         return 1;
 
-    dir = find_new_crashlog_dir(CRASH_MODE);
+    dir = find_new_crashlog_dir(MODE_CRASH);
     snprintf(path, sizeof(path),"%s/%s", entry->eventpath, event->name);
     if (dir < 0 || !file_exists(path)) {
         if (dir < 0)
@@ -70,17 +95,20 @@ static int priv_process_usercrash_event(struct watch_entry *entry, struct inotif
         return -1;
     }
 
+    snprintf(eventname, sizeof(eventname),"%s%s", entry->eventname, priv_filter_crashevent(entry->eventtype, path));
     snprintf(destion,sizeof(destion),"%s%d/%s", CRASH_DIR, dir, event->name);
     do_copy_tail(path, destion, MAXFILESIZE);
     switch (entry->eventtype) {
         case APCORE_TYPE:
             backup_apcoredump(dir, event->name, path);
-            do_log_copy(entry->eventname, dir, get_current_time_short(1), APLOG_TYPE);
+            do_log_copy(eventname, dir, get_current_time_short(1), APLOG_TYPE);
             break;
         case TOMBSTONE_TYPE:
+        case JAVATOMBSTONE_TYPE:
+        case JAVACRASH_TYPE2:
         case JAVACRASH_TYPE:
             usleep(TIMEOUT_VALUE);
-            do_log_copy(entry->eventname, dir, get_current_time_short(1), APLOG_TYPE);
+            do_log_copy(eventname, dir, get_current_time_short(1), APLOG_TYPE);
             break;
         case HPROF_TYPE:
             remove(path);
@@ -90,10 +118,11 @@ static int priv_process_usercrash_event(struct watch_entry *entry, struct inotif
             break;
     }
     snprintf(destion, sizeof(destion), "%s%d", CRASH_DIR, dir);
-    key = raise_event(CRASHEVENT, entry->eventname, NULL, destion);
+    key = raise_event(CRASHEVENT, eventname, NULL, destion);
     LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, get_current_time_long(0), entry->eventname, destion);
     switch (entry->eventtype) {
     case TOMBSTONE_TYPE:
+    case JAVACRASH_TYPE2:
     case JAVACRASH_TYPE:
 #ifdef FULL_REPORT
         if ( start_dumpstate_srv(CRASH_DIR, dir, key) <= 0 )

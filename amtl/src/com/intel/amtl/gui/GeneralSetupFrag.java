@@ -28,6 +28,7 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.os.SystemProperties;
@@ -37,14 +38,16 @@ import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.View.OnClickListener;
-import android.view.View.OnTouchListener;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.CompoundButton;
+import android.widget.CompoundButton.OnCheckedChangeListener;
 import android.widget.LinearLayout;
 import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.EditText;
 
+import com.intel.amtl.AMTLApplication;
 import com.intel.amtl.R;
 import com.intel.amtl.exceptions.ModemControlException;
 import com.intel.amtl.helper.LogManager;
@@ -57,10 +60,11 @@ import com.intel.internal.telephony.ModemStatus;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.RuntimeException;
 import java.util.ArrayList;
 
 
-public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTouchListener {
+public class GeneralSetupFrag extends Fragment implements OnClickListener, OnCheckedChangeListener {
 
     private final String TAG = "AMTL";
     private final String MODULE = "GeneralSetupFrag";
@@ -88,9 +92,6 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
     private final int savLogId = 200;
     private final int logTagId = 300;
 
-    // Context used for intents and to display buttons
-    private Context context;
-
     private ArrayList<LogOutput> configArray;
 
     private ModemConf modemConfToApply;
@@ -103,11 +104,17 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
 
     private Boolean firstCreated;
 
+    private int PTI_KILL_WAIT = 1000;
+    private Runtime rtm = java.lang.Runtime.getRuntime();
+
     // Target fragment for progress popup.
     private FragmentManager gsfManager;
     // Callback object pointer. Active only when associated to Main layout.
     private GSFCallBack gsfCb = nullCb;
     private OnModeChanged modeChangedCallBack = nullModeCb;
+
+    // Used to not execute OnCheckedChanged()
+    private Boolean isIgnore = false;
 
     // Callback interface for Toast messages in Main layout.
     public interface GSFCallBack {
@@ -184,9 +191,11 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
     private void changeButtonColor(boolean changed) {
         if (this.bAppConf != null) {
             if (changed) {
+                this.bAppConf.setEnabled(true);
                 this.bAppConf.setBackgroundColor(Color.BLUE);
                 this.bAppConf.setTextColor(Color.WHITE);
             } else {
+                this.bAppConf.setEnabled(false);
                 this.bAppConf.setBackgroundColor(Color.LTGRAY);
                 this.bAppConf.setTextColor(Color.BLACK);
             }
@@ -194,28 +203,60 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
     }
 
     private void updateUi(ModemConf curModConf) {
-        if (curModConf.getTrace().equals("0") && mtsMgr.getMtsState().equals("running")) {
-            mtsMgr.stopServices();
-        }
-        this.updateText(this.mtsMgr.getMtsState(), tvMtsStatus);
-        if (this.isExpertModeEnabled() && !curModConf.getTrace().equals("0")) {
-            if (curModConf.isMtsRequired() && mtsMgr.getMtsState().equals("running")) {
-                this.sExpertMode.setChecked(true);
-            } else if (!curModConf.isMtsRequired()) {
-                this.sExpertMode.setChecked(true);
+        SharedPreferences prefs = this.getActivity().getSharedPreferences("AMTLPrefsData",
+                Context.MODE_PRIVATE);
+        int id = prefs.getInt("index", -2);
+        Log.d(TAG, MODULE + ": Current index = " + id);
+        if (id >= 0) {
+            if (curModConf.getTrace().equals("0")) {
+                if (mtsMgr.getMtsState().equals("running")) {
+                    Log.e(TAG, MODULE + ": stopping mts running wrongly");
+                    mtsMgr.stopServices();
+                }
+                Log.d(TAG, MODULE + ": reinit switches");
+                this.setSwitchesChecked(false);
+            }
+            else {
+                for (LogOutput o: configArray) {
+                    o.getConfSwitch().setChecked(configArray.indexOf(o) == id);
+                }
             }
         } else {
-            SystemProperties.set(EXPERT_PROPERTY, "0");
-            this.sExpertMode.setChecked(false);
-            // if traces are not enabled or mts not started ,uncheck all the conf switches
-            if (curModConf.getTrace().equals("0") || (!mtsMgr.getMtsState().equals("running")
-                    && curModConf.isMtsRequired())) {
-                this.setSwitchesChecked(false);
-            // if traces are enabled, check the corresponding conf switch
+            if (curModConf.getTrace().equals("0") && mtsMgr.getMtsState().equals("running")) {
+                mtsMgr.stopServices();
+            }
+            this.updateText(this.mtsMgr.getMtsState(), tvMtsStatus);
+            if (this.isExpertModeEnabled() && !curModConf.getTrace().equals("0")) {
+                if (curModConf.isMtsRequired() && mtsMgr.getMtsState().equals("running")) {
+                    this.sExpertMode.setChecked(true);
+                } else if (!curModConf.isMtsRequired()) {
+                    this.sExpertMode.setChecked(true);
+                }
             } else {
-                if (this.configArray != null) {
-                    for (LogOutput o: configArray) {
-                        o.getConfSwitch().setChecked(o.getXsio().equals(curModConf.getXsio()));
+                SystemProperties.set(EXPERT_PROPERTY, "0");
+                this.sExpertMode.setChecked(false);
+                // if traces are not enabled or mts not started ,uncheck all the conf switches
+                if (curModConf.getTrace().equals("0") || (!mtsMgr.getMtsState().equals("running")
+                        && curModConf.isMtsRequired())) {
+                    this.setSwitchesChecked(false);
+                // if traces are enabled, check the corresponding conf switch
+                } else {
+                    if (this.configArray != null) {
+                        for (LogOutput o: configArray) {
+                            if (o != null
+                                    && o.getConfSwitch() != null
+                                    && o.getXsio() != null
+                                    && curModConf != null
+                                    && curModConf.getXsio() != null
+                                    && o.getMtsOutput() != null
+                                    && curModConf.getMtsConf() != null
+                                    && curModConf.getMtsConf().getOutput() != null) {
+                                o.getConfSwitch().setChecked(
+                                    o.getXsio().equals(curModConf.getXsio())
+                                    && o.getMtsOutput().equals(
+                                        curModConf.getMtsConf().getOutput()));
+                            }
+                        }
                     }
                 }
             }
@@ -284,11 +325,8 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
             savLog.setTargetFragment(this, SAVELOG_TARGETFRAG);
         }
 
-        context = AMTLTabLayout.ctx;
-        if (context != null) {
-            context.registerReceiver(mMessageReceiver, new IntentFilter("modem-event"));
-            mtsMgr = new MtsManager();
-        }
+        this.getActivity().registerReceiver(mMessageReceiver, new IntentFilter("modem-event"));
+        mtsMgr = new MtsManager();
     }
 
     @Override
@@ -315,9 +353,7 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
 
     @Override
     public void onDestroy() {
-        if (this.context != null) {
-            this.context.unregisterReceiver(mMessageReceiver);
-        }
+        this.getActivity().unregisterReceiver(mMessageReceiver);
         super.onDestroy();
     }
 
@@ -326,7 +362,7 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
             Bundle savedInstanceState) {
 
         View view = inflater.inflate(R.layout.generalsetupfraglayout, container, false);
-        if (view != null && context != null) {
+        if (view != null) {
 
             this.sExpertMode = (Switch) view.findViewById(R.id.switchExpertMode);
             this.tvModemStatus = (TextView) view.findViewById(R.id.modemStatusValueTxt);
@@ -336,7 +372,7 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
             // definition of switch listeners
             if (this.configArray != null) {
                 for (LogOutput o: configArray) {
-                    o.setConfigSwitch(ll, configArray.lastIndexOf(o), context, view);
+                    o.setConfigSwitch(ll, configArray.lastIndexOf(o), this.getActivity(), view);
                 }
             }
 
@@ -358,19 +394,18 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
     public void onViewCreated(View view, Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        if (view != null && context != null) {
+        if (view != null) {
 
             if (this.configArray != null) {
                 for (LogOutput o: configArray) {
                     if (view != null) {
-                        view.findViewById(o.getSwitchId()).setOnClickListener(this);
-                        view.findViewById(o.getSwitchId()).setOnTouchListener(this);
+                        ((Switch) view.findViewById(o.getSwitchId()))
+                                .setOnCheckedChangeListener(this);
                     }
                 }
             }
             if (this.sExpertMode != null) {
-                this.sExpertMode.setOnTouchListener(this);
-                this.sExpertMode.setOnClickListener(this);
+                this.sExpertMode.setOnCheckedChangeListener(this);
             }
             if (this.bAppConf != null) {
                 this.bAppConf.setOnClickListener(this);
@@ -397,10 +432,15 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
                         mtsMgr.printMtsProperties();
                         updateUi(currentModemConf);
                         setUIEnabled();
+                        if (AMTLApplication.getPauseState()) {
+                            // Application on Pause => close gsmtty
+                            mdmCtrl.close();
+                        }
                         mdmCtrl = null;
                     } catch (ModemControlException ex) {
                         Log.e(TAG, MODULE + ": fail to send command to the modem " + ex);
                     }
+                    AMTLApplication.setCloseTtyEnable(true);
                 } else if (message.equals("DOWN")) {
                     setUIDisabled();
                 }
@@ -428,7 +468,7 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.MATCH_PARENT);
         appExecConf.setMargins(0, 100, 0, 0);
-        this.bAppConf = new Button(context);
+        this.bAppConf = new Button(this.getActivity());
         this.bAppConf.setId(this.appConfId);
         this.bAppConf.setGravity(Gravity.CENTER);
         this.bAppConf.setTextColor(Color.BLACK);
@@ -442,7 +482,7 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.MATCH_PARENT);
         appSaveLogs.setMargins(0, 50, 0, 0);
-        this.bSavLog = new Button(context);
+        this.bSavLog = new Button(this.getActivity());
         this.bSavLog.setId(this.savLogId);
         this.bSavLog.setGravity(Gravity.CENTER);
         this.bSavLog.setTextColor(Color.BLACK);
@@ -456,7 +496,7 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.MATCH_PARENT);
         appLogTag.setMargins(0, 50, 0, 0);
-        this.bLogTag = new Button(context);
+        this.bLogTag = new Button(this.getActivity());
         this.bLogTag.setId(this.logTagId);
         this.bLogTag.setGravity(Gravity.CENTER);
         this.bLogTag.setTextColor(Color.BLACK);
@@ -488,10 +528,15 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
 
         UIHelper.savePopupDialog(this.getActivity(), "Log Backup", "Please"
                 + " select your backup tag, it will be located in:\n" + BACKUP_LOG_PATH,
-                context, snaplog, logProgressFrag);
+                this.getActivity(), snaplog, logProgressFrag);
     }
 
     public void applyConf() {
+        SharedPreferences prefs = this.getActivity().getSharedPreferences("AMTLPrefsData",
+                Context.MODE_PRIVATE);
+        /* Determine current index */
+        int id = prefs.getInt("index", -2);
+
         if (!this.sExpertMode.isChecked()) {
             SystemProperties.set(EXPERT_PROPERTY, "0");
             if (this.configArray != null) {
@@ -521,83 +566,93 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
                 }
             }
         }
-        ConfigApplyFrag progressFrag = new ConfigApplyFrag(CONFSETUP_TAG,
-                CONFSETUP_TARGETFRAG, context);
+
+        /* Determine if pti is activated */
+        if (id >= 0) {
+            if (configArray.get(id).getSigusr1ToSend().equalsIgnoreCase("true")) {
+                /* pti is activated => need to send sigusr1 signal */
+                try {
+                    Log.d(TAG, MODULE + ": send SIGUSR1 signal");
+                    rtm.exec("start pti_sigusr1");
+                    android.os.SystemClock.sleep(PTI_KILL_WAIT);
+                } catch (IOException e) {
+                    Log.e(TAG, MODULE + ": can't send sigusr1 signal");
+                }
+            }
+        }
+
+        ConfigApplyFrag progressFrag = ConfigApplyFrag.newInstance(CONFSETUP_TAG,
+                CONFSETUP_TARGETFRAG);
         progressFrag.launch(modemConfToApply, this, gsfManager);
     }
 
     @Override
-    public boolean onTouch(View view, MotionEvent event) {
-        this.updateText(this.mtsMgr.getMtsState(), tvMtsStatus);
-        /* set config buttons exclusive by retrieving the id
-         * of the button checked and disabling all the others */
-        if (this.configArray != null) {
-            int idChecked = -1;
-            for (LogOutput o: configArray) {
-                if (view.getId() == o.getSwitchId()) {
-                    this.buttonChanged = true;
-                    modeChangedCallBack.onModeChanged(this.buttonChanged);
-                    this.changeButtonColor(this.buttonChanged);
-                    idChecked = o.getSwitchId();
-                }
-            }
-            if (idChecked != -1) {
+    public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+        if (this.isIgnore) {
+            /* Ignore this callback */
+            this.isIgnore = false;
+        } else {
+            SharedPreferences prefs = this.getActivity().getSharedPreferences("AMTLPrefsData",
+                    Context.MODE_PRIVATE);
+            /* Determine current index */
+            int currentIndex = prefs.getInt("index", -2);
+
+            this.updateText(this.mtsMgr.getMtsState(), tvMtsStatus);
+            /* set config buttons exclusive by retrieving the id
+             * of the button checked and disabling all the others */
+            if (this.configArray != null) {
+                int idChecked = -1;
                 for (LogOutput o: configArray) {
-                    if (o.getSwitchId() != idChecked) {
-                        o.getConfSwitch().setChecked(false);
+                    if (buttonView.getId() == o.getSwitchId()) {
+                        this.buttonChanged = true;
+                        modeChangedCallBack.onModeChanged(this.buttonChanged);
+                        if (isChecked) {
+                            idChecked = o.getSwitchId();
+                        }
+                        if (currentIndex == idChecked) {
+                            /* Same configuration than actual one */
+                            /* => Deactivate "Execute Configuration" button */
+                            this.changeButtonColor(false);
+                        } else {
+                            /* New configuration */
+                            /* => Activate "Execute Configuration" button */
+                            this.changeButtonColor(true);
+                        }
                     }
                 }
-                return false;
+
+                if (idChecked != -1) {
+                    for (LogOutput o: configArray) {
+                        if ((o.getSwitchId() != idChecked) && (o.getConfSwitch().isChecked())) {
+                            /* We must ignore the next call to onCheckedChanged because
+                            /* it will be due to te modification of this switch */
+                            this.isIgnore = true;
+                            o.getConfSwitch().setChecked(false);
+                            break;
+                        }
+                    }
+                }
             }
         }
-        switch (view.getId()) {
+
+        switch (buttonView.getId()) {
             case R.id.switchExpertMode:
                 this.buttonChanged = true;
                 modeChangedCallBack.onModeChanged(this.buttonChanged);
                 this.changeButtonColor(this.buttonChanged);
-                this.setSwitchesEnabled(this.sExpertMode.isChecked());
-                if (!this.sExpertMode.isChecked()) {
+                this.setSwitchesEnabled(!isChecked);
+                if (isChecked) {
                     this.setSwitchesChecked(false);
                 }
                 break;
         }
-        return false;
     }
 
     @Override
     public void onClick(View view) {
         this.updateText(this.mtsMgr.getMtsState(), tvMtsStatus);
-        /* set config buttons exclusive by retrieving the id
-         * of the button checked and disabling all the others */
-        if (this.configArray != null) {
-            int idChecked = -1;
-            for (LogOutput o: configArray) {
-                if (view.getId() == o.getSwitchId()) {
-                    this.buttonChanged = true;
-                    modeChangedCallBack.onModeChanged(this.buttonChanged);
-                    this.changeButtonColor(this.buttonChanged);
-                    idChecked = o.getSwitchId();
-                }
-            }
-            if (idChecked != -1) {
-                for (LogOutput o: configArray) {
-                    if (o.getSwitchId() != idChecked) {
-                        o.getConfSwitch().setChecked(false);
-                    }
-                }
-                return;
-            }
-        }
+
         switch (view.getId()) {
-            case R.id.switchExpertMode:
-                this.buttonChanged = true;
-                modeChangedCallBack.onModeChanged(this.buttonChanged);
-                this.changeButtonColor(this.buttonChanged);
-                this.setSwitchesEnabled(!this.sExpertMode.isChecked());
-                if (this.sExpertMode.isChecked()) {
-                    this.setSwitchesChecked(false);
-                }
-                break;
             case savLogId:
                 this.bAppConf.setEnabled(false);
                 this.saveLogs();
@@ -611,7 +666,7 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnTou
                 break;
             case logTagId:
                 UIHelper.logTagDialog(this.getActivity(), "Log TAG", "Please select the TAG"
-                        + " you want to set in logs:\n", context);
+                        + " you want to set in logs:\n", this.getActivity());
                 break;
         }
     }

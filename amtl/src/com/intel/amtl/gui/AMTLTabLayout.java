@@ -21,6 +21,7 @@
 package com.intel.amtl.gui;
 
 import android.app.Activity;
+import android.app.Application;
 import android.app.DialogFragment;
 import android.app.Fragment;
 import android.app.FragmentManager;
@@ -39,6 +40,7 @@ import android.widget.TabHost;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.intel.amtl.AMTLApplication;
 import com.intel.amtl.R;
 import com.intel.amtl.config_parser.ConfigParser;
 import com.intel.amtl.exceptions.ModemControlException;
@@ -67,7 +69,6 @@ import org.xmlpull.v1.XmlPullParserException;
 // @log_active (boolean) indicates if logging is active
 // @cpuName (string) the platform CPU name
 // @modemName (string) the platform modem name
-// @expert_mode (boolean) indicates if expert mode is engaged
 // @default_flush_cmd (string) if populated, the command to execute to flush to NVM
 
 public class AMTLTabLayout extends Activity implements GeneralSetupFrag.GSFCallBack,
@@ -113,12 +114,9 @@ public class AMTLTabLayout extends Activity implements GeneralSetupFrag.GSFCallB
     // Telephony stack check - in order to enable it if disabled
     private TelephonyStack telStackSetter;
 
-    // ctx used by ModemController to use intent between GeneralSetupFrag and ModemController
-    static public Context ctx;
-
     private void loadConfiguration() throws ParsingException {
         FileInputStream fin = null;
-        SharedPreferences.Editor editor = ctx.getSharedPreferences("AMTLPrefsData",
+        SharedPreferences.Editor editor = this.getSharedPreferences("AMTLPrefsData",
                 Context.MODE_PRIVATE).edit();
         Log.d(TAG, MODULE + ": Will remove default_flush_cmd entry.");
         editor.remove("default_flush_cmd");
@@ -126,7 +124,7 @@ public class AMTLTabLayout extends Activity implements GeneralSetupFrag.GSFCallB
 
         try {
             // Use of getXmlPlatform
-            this.platform = new Platform(ctx);
+            this.platform = new Platform();
             this.currentCatalogPath = this.platform.getPlatformConf();
 
             Log.d(TAG, MODULE + ": Will load " + this.currentCatalogPath +
@@ -233,7 +231,7 @@ public class AMTLTabLayout extends Activity implements GeneralSetupFrag.GSFCallB
         setContentView(R.layout.amtltablayout);
         Log.d(TAG, MODULE + ": creation of AMTL activity ");
         telStackSetter = new TelephonyStack();
-        this.ctx = getBaseContext();
+        ((AMTLApplication) this.getApplication()).setContext(getBaseContext());
 
         if (!telStackSetter.isEnabled()) {
             UIHelper.messageSetupTelStack(this,
@@ -241,7 +239,7 @@ public class AMTLTabLayout extends Activity implements GeneralSetupFrag.GSFCallB
                     telStackSetter);
         } else {
             try {
-                this.configParser = new ConfigParser(this.ctx);
+                this.configParser = new ConfigParser(this);
                 this.loadConfiguration();
 
             } catch (ParsingException ex) {
@@ -297,26 +295,35 @@ public class AMTLTabLayout extends Activity implements GeneralSetupFrag.GSFCallB
     @Override
     public void onResume() {
         super.onResume();
-        if (this.mdmCtrl != null) {
-            try {
+        AMTLApplication.setPauseState(false);
+        try {
+            if (this.mdmCtrl != null) {
                 this.mdmCtrl.acquireResource();
                 if (this.mdmCtrl.isModemAcquired()) {
                     this.mdmCtrl.openTty();
                 }
-            } catch (MmgrClientException ex) {
-                Log.e(TAG, MODULE + ": Cannot acquire modem resource " + ex);
-                UIHelper.exitDialog(this,
-                        "Cannot acquire modem resource ", "AMTL will exit: " + ex);
             }
+        } catch (MmgrClientException ex) {
+            Log.e(TAG, MODULE + ": Cannot acquire modem resource " + ex);
+            UIHelper.exitDialog(this,
+                    "Cannot acquire modem resource ", "AMTL will exit: " + ex);
+        } catch (ModemControlException ex) {
+            Log.e(TAG, MODULE + ex);
+            UIHelper.exitDialog(this,
+                    "Cannot open tty ", "AMTL will exit: " + ex);
         }
     }
 
     @Override
     public void onPause() {
         super.onPause();
+        AMTLApplication.setPauseState(true);
         if (this.mdmCtrl != null) {
             this.mdmCtrl.releaseResource();
-            this.mdmCtrl.close();
+            if (AMTLApplication.getCloseTtyEnable()) {
+                // Close Tty enabled
+                this.mdmCtrl.close();
+            }
         }
     }
 

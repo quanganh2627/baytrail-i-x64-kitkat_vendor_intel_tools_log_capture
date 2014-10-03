@@ -29,13 +29,16 @@
 #include <errno.h>
 #include <stdio.h>
 #include <ctype.h>
+#include <sys/sha1.h>
 
 #include "crashutils.h"
 #include "privconfig.h"
 #include "fsutils.h"
 #include "dropbox.h"
 
-static char *gcurrent_key = NULL;
+static char gcurrent_key[2][SHA1_DIGEST_LENGTH+1] = {{0,},{0,}};
+static int index_prod = 0;
+static int index_cons = 0;
 static int  gfile_monitor_fd = -1;
 
 void dropbox_set_file_monitor_fd(int file_monitor_fd) {
@@ -69,8 +72,8 @@ int start_dumpstate_srv(char* crash_dir, int crashidx, char *key) {
             dumpstate_dir, strerror(errno));
         return -1;
     }
-    if (gcurrent_key) free(gcurrent_key);
-    gcurrent_key = key;
+    strncpy(gcurrent_key[index_prod],key,SHA1_DIGEST_LENGTH+1);
+    index_prod = (index_prod + 1) % 2;
     return 1;
 }
 
@@ -81,7 +84,7 @@ int finalize_dropbox_pending_event(const struct inotify_event __attribute__((unu
     char boot_state[PROPERTY_VALUE_MAX];
 
     /* gcurrent_key is in provision */
-    if (!gcurrent_key) {
+    if (gcurrent_key[index_cons][0] == 0) {
         LOGE("%s: Received a dropbox event but no key is pending, drop it...\n", __FUNCTION__);
         return -1;
     }
@@ -90,17 +93,18 @@ int finalize_dropbox_pending_event(const struct inotify_event __attribute__((unu
     if (strcmp(boot_state, "1"))
         return -1;
 
+
     snprintf(cmd,sizeof(cmd)-1,"am broadcast -n com.intel.crashreport"
         "/.specific.NotificationReceiver -a com.intel.crashreport.intent.CRASH_LOGS_COPY_FINISHED "
         "-c android.intent.category.ALTERNATIVE --es com.intel.crashreport.extra.EVENT_ID %s",
-        gcurrent_key);
+        gcurrent_key[index_cons]);
 
     int status = system(cmd);
     if (status != 0)
         LOGI("%s: Notify crashreport status(%d) for command \"%s\".\n", __FUNCTION__, status, cmd);
 
-    free(gcurrent_key);
-    gcurrent_key = NULL;
+    gcurrent_key[index_cons][0] = 0;
+    index_cons = (index_cons + 1) % 2;
     return 0;
 }
 
@@ -293,7 +297,7 @@ int process_lost_event(struct watch_entry __attribute__((unused)) *entry, struct
 
     snprintf(lostevent_subtype, sizeof(lostevent_subtype), "%s_%s", LOST_EVNAME, lostevent);
 
-    dir = find_new_crashlog_dir(CRASH_MODE_NOSD);
+    dir = find_new_crashlog_dir(MODE_CRASH_NOSD);
     if (dir < 0) {
         LOGE("%s: Find dir for lost dropbox failed\n", __FUNCTION__);
         key = raise_event(CRASHEVENT, lostevent, lostevent_subtype, NULL);

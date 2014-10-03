@@ -37,6 +37,13 @@ enum time_format {
     TIME_FORMAT_LONG,
 };
 
+/* Define error type */
+enum partition_error {
+    ERROR_LOGS_MISSING = 0,
+    ERROR_PARTITIONS_MISSING,
+    ERROR_LOGS_RO,
+};
+
 #define TIME_FORMAT_LENGTH  32
 #define DUPLICATE_TIME_FORMAT    "%Y-%m-%d/%H:%M:%S"
 
@@ -57,7 +64,9 @@ char **commachain_to_fixedarray(char *chain,
         unsigned int recordsize, unsigned int maxrecords, int *res);
 int do_screenshot_copy(char* bz_description, char* bzdir);
 
+void do_wdt_log_copy(int dir);
 void do_last_kmsg_copy(int dir);
+void do_last_fw_msg_copy(int dir);
 void clean_crashlog_in_sd(char *dir_to_search, int max);
 void check_crashlog_died();
 int raise_infoerror(char *type, char *subtype);
@@ -66,8 +75,11 @@ int reboot_reason_files_present();
 void get_data_from_boot_file(char *file, char* data, FILE* fp);
 char *raise_event(char *event, char *type, char *subtype, char *log);
 char *raise_event_nouptime(char *event, char *type, char *subtype, char *log);
+char *raise_event_wdt(char *event, char *type, char *subtype, char *log);
 char *raise_event_bootuptime(char *event, char *type, char *subtype, char *log);
 char *raise_event_dataready(char *event, char *type, char *subtype, char *log, int data_ready);
+char *raise_event_dataready012(char *event, char *type, char *subtype, char *log,
+                            int data_ready,char* data0, char* data1, char* data2);
 void create_infoevent(char* filename, char* data0, char* data1,
     char* data2);
 void notify_crashreport();
@@ -81,13 +93,14 @@ int check_running_modem_trace();
 
 int get_build_board_versions(char *filename, char *buildver, char *boardver);
 const char *get_build_footprint();
-int create_minimal_crashfile(char * event, const char* type, const char* path,
-               char* key, const char* uptime, const char* date, int data_ready);
 
 void build_crashenv_parameters( char * crashenv_param );
 void monitor_crashenv();
 
 int process_info_and_error_inotify_callback(struct watch_entry *entry, struct inotify_event *event);
 int process_info_and_error(char *filename, char *name);
+int notify_partition_error(enum partition_error type);
+
+int get_cmdline_bootreason(char *bootreason);
 
 #endif /* __CRASHUTILS_H__ */

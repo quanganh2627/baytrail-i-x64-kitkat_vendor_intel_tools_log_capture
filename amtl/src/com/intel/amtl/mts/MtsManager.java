@@ -52,6 +52,14 @@ public class MtsManager {
         return SystemProperties.get(MtsProperties.MTS_ROTATE_SIZE_PROP);
     }
 
+    public String getMtsInterface() {
+        return SystemProperties.get(MtsProperties.MTS_INTERFACE_PROP);
+    }
+
+    public String getMtsBufferSize() {
+        return SystemProperties.get(MtsProperties.MTS_BUFFER_SIZE_PROP);
+    }
+
     public void printMtsProperties() {
         Log.d(TAG, MODULE + ": ========= MTS CONFIGURATION =========");
         Log.d(TAG, MODULE + ": INPUT = " + this.getMtsInput());
@@ -59,6 +67,8 @@ public class MtsManager {
         Log.d(TAG, MODULE + ": OUTPUT TYPE = " + this.getMtsOutputType());
         Log.d(TAG, MODULE + ": ROTATE NUM = " + this.getMtsRotateNum());
         Log.d(TAG, MODULE + ": ROTATE SIZE = " + this.getMtsRotateSize());
+        Log.d(TAG, MODULE + ": INTERFACE = " + this.getMtsInterface());
+        Log.d(TAG, MODULE + ": BUFFER SIZE = " + this.getMtsBufferSize());
         Log.d(TAG, MODULE + ": STATUS = " + this.getMtsState());
         Log.d(TAG, MODULE + ": =======================================");
     }
@@ -88,7 +98,7 @@ public class MtsManager {
     private void startMtsOneshot() {
         Log.d(TAG, MODULE + ": starting mts oneshot");
         try {
-            rtm.exec("start mtsp");
+            rtm.exec("start mtso");
         } catch (IOException ex) {
             Log.e(TAG, MODULE + ": cannot start mts oneshot");
         }
@@ -112,7 +122,7 @@ public class MtsManager {
     private void stopMtsOneshot() {
         try {
             Log.d(TAG, MODULE + ": stopping mts oneshot");
-            rtm.exec("stop mtsp");
+            rtm.exec("stop mtso");
         } catch (IOException ex) {
             Log.e(TAG, MODULE + ": can't stop current running mts oneshot");
         }

@@ -21,6 +21,7 @@ package com.intel.amtl.gui;
 
 
 import android.app.Activity;
+import android.app.Application;
 import android.app.DialogFragment;
 import android.app.Fragment;
 import android.app.FragmentManager;
@@ -35,6 +36,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ProgressBar;
 
+import com.intel.amtl.AMTLApplication;
 import com.intel.amtl.R;
 import com.intel.amtl.exceptions.ModemControlException;
 import com.intel.amtl.models.config.ModemConf;
@@ -47,7 +49,9 @@ public class ConfigApplyFrag extends DialogFragment {
 
     private final String TAG = "AMTL";
     private final String MODULE = "ConfigApplyFrag";
-    private Context context;
+
+    private static String EXTRA_TAG = null;
+    private static String EXTRA_FRAG = null;
 
     int targetFrag;
     String tag;
@@ -56,10 +60,13 @@ public class ConfigApplyFrag extends DialogFragment {
     // thread executed while Dialog Box is displayed.
     ApplyConfTask exeSetup;
 
-    public ConfigApplyFrag(String tag, int targetFrag, Context context) {
-        this.tag = tag;
-        this.targetFrag = targetFrag;
-        this.context = context;
+    public static final ConfigApplyFrag newInstance(String tag, int targetFrag) {
+        ConfigApplyFrag confApplyFrag = new ConfigApplyFrag();
+        Bundle bdl = new Bundle(2);
+        bdl.putString(EXTRA_TAG, tag);
+        bdl.putInt(EXTRA_FRAG, targetFrag);
+        confApplyFrag.setArguments(bdl);
+        return confApplyFrag;
     }
 
     public void handlerConf(ApplyConfTask confTask) {
@@ -77,8 +84,7 @@ public class ConfigApplyFrag extends DialogFragment {
 
         this.exeSetup = null;
         if (!exceptReason.equals("")) {
-            Log.e(TAG, MODULE + ": modem conf application failed: " +
-                    exceptReason);
+            Log.e(TAG, MODULE + ": modem conf application failed: " + exceptReason);
             UIHelper.okDialog(getActivity(),
                     "Error ", "Configuration not applied:\n" + exceptReason);
         }
@@ -89,9 +95,8 @@ public class ConfigApplyFrag extends DialogFragment {
         }
     }
 
-    public void launch(ModemConf modemConfToApply, Fragment frag,
-             FragmentManager gsfManager) {
-        handlerConf(new ApplyConfTask(modemConfToApply, this.context));
+    public void launch(ModemConf modemConfToApply, Fragment frag, FragmentManager gsfManager) {
+        handlerConf(new ApplyConfTask(modemConfToApply));
         setTargetFragment(this, targetFrag);
         show(gsfManager, tag);
     }
@@ -101,6 +106,8 @@ public class ConfigApplyFrag extends DialogFragment {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setRetainInstance(true);
+        this.tag = getArguments().getString(EXTRA_TAG);
+        this.targetFrag = getArguments().getInt(EXTRA_FRAG);
         // Spawn the thread to execute modem configuration.
         if (this.exeSetup != null) {
             this.exeSetup.execute();
@@ -148,11 +155,9 @@ public class ConfigApplyFrag extends DialogFragment {
         private MtsManager mtsManager;
         private ModemConf modConfToApply;
         private String exceptReason = "";
-        private Context context;
 
-        public ApplyConfTask (ModemConf confToApply, Context context) {
+        public ApplyConfTask (ModemConf confToApply) {
             this.modConfToApply = confToApply;
-            this.context = context;
         }
 
         void setFragment(ConfigApplyFrag confAppFrag) {
@@ -162,10 +167,11 @@ public class ConfigApplyFrag extends DialogFragment {
         // Function overrides for Apply configuration thread.
         @Override
         protected Void doInBackground(Void... params) {
-            SharedPreferences prefs = context.getSharedPreferences("AMTLPrefsData",
+            SharedPreferences prefs =
+                    AMTLApplication.getContext().getSharedPreferences("AMTLPrefsData",
                     Context.MODE_PRIVATE);
             SharedPreferences.Editor editor =
-                    context.getSharedPreferences("AMTLPrefsData",
+                    AMTLApplication.getContext().getSharedPreferences("AMTLPrefsData",
                     Context.MODE_PRIVATE).edit();
             try {
                 modemCtrl = ModemController.get();
@@ -181,7 +187,7 @@ public class ConfigApplyFrag extends DialogFragment {
                         // give time to the modem to sync - 1 second
                         SystemClock.sleep(1000);
                     } else {
-                        // fall back - check if a default flush cmf is set
+                        // fall back - check if a default flush cmd is set
                         Log.d(TAG, MODULE + ": Fall back - check default_flush_cmd");
                         String flCmd = prefs.getString("default_flush_cmd", "");
                         if (!flCmd.equalsIgnoreCase("")) {
@@ -196,13 +202,6 @@ public class ConfigApplyFrag extends DialogFragment {
                             + modConfToApply.getIndex());
 
                     editor.putInt("index", modConfToApply.getIndex());
-                    if (modConfToApply.getIndex() != -1)  {
-                        editor.putBoolean("expert_mode", false);
-                        Log.d(TAG, MODULE + ": Selected configuration index: " +
-                                modConfToApply.getIndex());
-                    } else {
-                        editor.putBoolean("expert_mode", true);
-                    }
 
                     // check if the configuration requires mts
                     mtsManager = new MtsManager();
@@ -230,8 +229,7 @@ public class ConfigApplyFrag extends DialogFragment {
                         exceptReason = "no configuration to apply";
                     }
                 } else {
-                    exceptReason =
-                            "cannot apply configuration: modemCtrl is null";
+                    exceptReason = "cannot apply configuration: modemCtrl is null";
                 }
                 // Everything went right, so let s commit trace configuration.
                 editor.commit();
@@ -239,7 +237,6 @@ public class ConfigApplyFrag extends DialogFragment {
                 exceptReason = ex.getMessage();
                 Log.e(TAG, MODULE + ": cannot change modem configuration " + ex);
                 // if config change failed, logging is stopped
-                editor.remove("expert_mode");
                 editor.remove("index");
                 editor.commit();
                 try {

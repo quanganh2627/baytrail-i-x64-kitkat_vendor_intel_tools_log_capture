@@ -13,6 +13,7 @@ fi
 /system/bin/df >> /logs/info/infosystem.txt
 /system/bin/du -k /logs >> /logs/info/infosystem.txt
 /system/bin/cat /logs/history_event >> /logs/info/infosystem.txt
+/system/bin/logcat -b system -b events -b main -b radio -v threadtime -t 1000 >> /logs/info/infosystem.txt
 
 # list content of directories crashlogd failed to watch
 while getopts l: OPT; do

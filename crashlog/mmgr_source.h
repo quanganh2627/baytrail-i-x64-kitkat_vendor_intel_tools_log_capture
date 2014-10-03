@@ -27,13 +27,19 @@
 #ifndef MMGR_SOURCE_H_INCLUDED
 #define MMGR_SOURCE_H_INCLUDED
 
+#ifdef CRASHLOGD_MODULE_MODEM
 #include <stdlib.h>
-
 #include "mmgr_cli.h"
 
-int mmgr_get_fd();
 void init_mmgr_cli_source(void);
 void close_mmgr_cli_source(void);
+int mmgr_get_fd(void);
 int mmgr_handle(void);
+#else
+static inline void init_mmgr_cli_source(void) {}
+static inline void close_mmgr_cli_source(void) {}
+static inline int mmgr_get_fd(void) { return 0; }
+static inline int mmgr_handle(void) { return 0; }
+#endif
 
 #endif

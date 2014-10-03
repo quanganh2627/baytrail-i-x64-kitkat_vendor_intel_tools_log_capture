@@ -23,6 +23,11 @@
 #include "crashutils.h"
 #include "fsutils.h"
 #include "privconfig.h"
+#include "uefivar.h"
+
+#ifdef CONFIG_EFILINUX
+#include <efilinux/bootlogic.h>
+#endif
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -32,31 +37,133 @@
 #include <fcntl.h>
 #include <stdio.h>
 
-static void flush_aplog_atboot(char *mode, int dir, const char* ts)
-{
-    char cmd[512] = { '\0', };
-    char log_boot_name[512] = { '\0', };
-    struct stat info;
+#ifdef CONFIG_EFILINUX
+static int compute_uefi_startupreason(enum reset_sources rs, enum reset_types rt,
+                                      enum wake_sources ws, enum shutdown_sources ss __unused,
+                                      char *startupreason) {
+    static const char *wake_source[] = {
+        "WAKE_NOT_APPLICABLE",
+        "WAKE_BATT_INSERT",
+        "WAKE_USB_CHRG_INSERT",
+        "WAKE_ACDC_CHGR_INSERT",
+        "WAKE_PWR_BUTTON_PRESS",
+        "WAKE_RTC_TIMER",
+        "WAKE_BATT_THRESHOLD",
+    };
+    static const char *reset_source[] = {
+        "RESET_NOT_APPLICABLE",
+        "RESET_OS_INITIATED",
+        "RESET_FORCED",
+        "RESET_FW_UPDATE",
+        "RESET_KERNEL_WATCHDOG",
+        "RESET_SECURITY_WATCHDOG",
+        "RESET_SECURITY_INITIATED",
+        "RESET_PMC_WATCHDOG",
+        "RESET_EC_WATCHDOG",
+        "RESET_PLATFORM_WATCHDOG",
+    };
+    static const char *reset_type[] = {
+        "NOT_APPLICABLE",
+        "WARM_RESET",
+        "COLD_RESET",
+        "GLOBAL_RESET",
+    };
 
-    snprintf(log_boot_name, sizeof(log_boot_name)-1, "%s%d/%s_%s_%s", CRASH_DIR, dir, strrchr(APLOG_FILE_BOOT,'/')+1,mode,ts);
-    int status;
-#ifdef FULL_REPORT
-    status = system("/system/bin/logcat -b system -b main -b radio -b events -b kernel -v threadtime -d -f /logs/aplog_boot");
-#else
-    status = system("/system/bin/logcat -b system -b main -b radio -b events -v threadtime -d -f /logs/aplog_boot");
-#endif
-    if (status != 0) {
-        LOGE("flush ap log from boot returns status: %d.\n", status);
-        return;
+    char str_wake_source[32] = { '\0', };
+    char str_reset_source[32] = { '\0', };
+    char str_reset_type[32] = { '\0', };
+    char str_shutdown_source[32] = { '\0', };
+    unsigned int s;
+
+    s = (unsigned int) ws;
+    if  ((s > 0) && (s < (sizeof(wake_source)/sizeof(char*)))) {
+        strcpy(str_wake_source, wake_source[s]);
+        LOGI("wake source (%d): %s", s, str_wake_source);
     }
-    if(!stat(APLOG_FILE_BOOT,&info)) {
-        do_copy(APLOG_FILE_BOOT,log_boot_name,0);
-        remove(APLOG_FILE_BOOT);
+
+    s = (unsigned int) rs;
+    if  ((s > 0) && (s < (sizeof(reset_source)/sizeof(char*)))) {
+        strcpy(str_reset_source, reset_source[s]);
+        LOGI("reset source (%d): %s", s, str_reset_source);
     }
+
+    s = (unsigned int) rt;
+    if  ((s > 0) && (s < (sizeof(reset_type)/sizeof(char*)))) {
+        strcpy(str_reset_type, reset_type[s]);
+        LOGI("reset type (%d): %s", s, str_reset_type);
+    }
+
+    if (strlen(str_wake_source))
+        strcpy(startupreason, str_wake_source);
+    else if (strlen(str_reset_source))
+      if (strstr(str_reset_source, "KERNEL_WATCHDOG"))
+         strcpy(startupreason, "SWWDT_RESET");
+      else if  (strstr(str_reset_source, "WATCHDOG"))
+         strcpy(startupreason, "HWWDT_RESET");
+      else
+         strcpy(startupreason, str_reset_source);
+    else
+       return -1;
+
+    return 0;
 }
 
+static int get_uefi_startupreason(char *startupreason)
+{
+    int ret = 0;
+
+    const char *var_guid_common = "4a67b082-0a4c-41cf-b6c7-440b29bb8c4f";
+    //const char *var_guid_common = "80868086-8086-8086-8086-000000000200";
+    const char *var_reset_source = "ResetSource";
+    const char *var_reset_type = "ResetType";
+    const char *var_wake_source = "WakeSource";
+    const char *var_shutdown_source = "ShutdownSource";
+
+    enum reset_sources rs;
+    enum reset_types rt;
+    enum wake_sources ws;
+    enum shutdown_sources ss;
+
+    strcpy(startupreason, "UNKNOWN");
+
+    ret = uefivar_get_int(var_reset_source, var_guid_common, (unsigned int *)&rs);
+    if (ret) {
+        LOGE("uefivar_get error %s-%s : %d\n",
+               var_reset_source, var_guid_common, ret);
+        return -1;
+    }
+
+    ret = uefivar_get_int(var_reset_type, var_guid_common, (unsigned int *)&rt);
+    if (ret) {
+        LOGE("uefivar_get error %s-%s : %d\n",
+               var_reset_type, var_guid_common, ret);
+        return -1;
+    }
+
+    ret = uefivar_get_int(var_wake_source, var_guid_common, (unsigned int *)&ws);
+    if (ret) {
+        LOGE("uefivar_get error %s-%s : %d\n",
+               var_wake_source, var_guid_common, ret);
+        return -1;
+    }
+
+    ret = uefivar_get_int(var_shutdown_source, var_guid_common, (unsigned int *)&ss);
+    if (ret) {
+        LOGE("uefivar_get error %s-%s : %d\n",
+               var_shutdown_source, var_guid_common, ret);
+        return -1;
+    }
+
+    LOGI("%s: %s:%d, %s:%d, %s:%d, %s:%d\n", __func__, var_reset_source, rs,
+         var_reset_type, rt, var_wake_source, ws, var_shutdown_source, ss);
+
+    return compute_uefi_startupreason(rs, rt, ws, ss, startupreason);
+}
+#endif // CONFIG_EFILINUX
+
+#ifdef CONFIG_FDK
 /*
-* Name          : read_startupreason
+* Name          : get_fdk_startupreason
 * Description   : This function returns the decoded startup reason by reading
 *                 the wake source from the command line. The wake src is translated
 *                 to a crashtool startup reason.
@@ -87,7 +194,7 @@ static void flush_aplog_atboot(char *mode, int dir, const char* ts)
 * Parameters    :
 *   char *startupreason   -> string containing the translated startup reason
 *   */
-void read_startupreason(char *startupreason)
+void get_fdk_startupreason(char *startupreason)
 {
     char cmdline[1024] = { '\0', };
     char prop_reason[PROPERTY_VALUE_MAX];
@@ -177,7 +284,181 @@ void read_startupreason(char *startupreason)
             __FUNCTION__, startupreason);
     }
 }
+#endif // CONFIG_FDK
 
+static void get_default_bootreason(char *bootreason) {
+    int ret;
+    unsigned int i;
+    char bootreason_prop[PROPERTY_VALUE_MAX];
+
+    ret = get_cmdline_bootreason(bootreason_prop);
+    if (ret <= 0)
+        return;
+
+    for (i = 0; i < strlen(bootreason_prop); i++)
+        bootreason[i] = toupper(bootreason_prop[i]);
+    bootreason[i] = '\0';
+}
+
+void read_startupreason(char *startupreason) {
+#ifdef CONFIG_EFILINUX
+    get_uefi_startupreason(startupreason);
+    return;
+#endif
+
+#ifdef CONFIG_FDK
+    return get_fdk_startupreason(startupreason);
+#endif
+
+    get_default_bootreason(startupreason);
+}
+
+#ifdef CONFIG_EFILINUX
+int read_resetsource(char * resetsource)
+{
+    static const char *reset_source[] = {
+            "RESET_NOT_APPLICABLE",
+            "RESET_OS_INITIATED",
+            "RESET_FORCED",
+            "RESET_FW_UPDATE",
+            "RESET_KERNEL_WATCHDOG",
+            "RESET_SECURITY_WATCHDOG",
+            "RESET_SECURITY_INITIATED",
+            "RESET_PMC_WATCHDOG",
+            "RESET_EC_WATCHDOG",
+            "RESET_PLATFORM_WATCHDOG",
+    };
+
+    int ret = 0;
+    const char *var_guid_common = "4a67b082-0a4c-41cf-b6c7-440b29bb8c4f";
+    const char *var_reset_source = "ResetSource";
+    unsigned int rs;
+
+    ret = uefivar_get_int(var_reset_source, var_guid_common, &rs);
+
+    if (ret) {
+        LOGE("uefivar_get error %s-%s : %d\n",
+                var_reset_source, var_guid_common, ret);
+        return -1;
+    }
+
+    if ((rs > 0) && (rs < (sizeof(reset_source)/sizeof(char*)))) {
+        strcpy(resetsource, reset_source[rs]);
+        LOGI("reset source value (%d): %s", rs, resetsource);
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+
+int read_resettype(char * resettype)
+{
+    static const char *reset_type[] = {
+            "NOT_APPLICABLE",
+            "WARM_RESET",
+            "COLD_RESET",
+            "GLOBAL_RESET",
+    };
+
+    int ret = 0;
+    const char *var_guid_common = "4a67b082-0a4c-41cf-b6c7-440b29bb8c4f";
+    const char *var_reset_type = "ResetType";
+    unsigned int rt;
+
+    ret = uefivar_get_int(var_reset_type, var_guid_common, &rt);
+
+    if (ret) {
+        LOGE("uefivar_get error %s-%s : %d\n",
+                var_reset_type, var_guid_common, ret);
+        return -1;
+    }
+
+    if ((rt > 0) && (rt < (sizeof(reset_type)/sizeof(char*)))) {
+        strcpy(resettype, reset_type[rt]);
+        LOGI("reset type (%d): %s", rt, resettype);
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+int read_wakesource(char * wakesource)
+{
+    static const char *wake_source[] = {
+            "WAKE_NOT_APPLICABLE",
+            "WAKE_BATT_INSERT",
+            "WAKE_USB_CHRG_INSERT",
+            "WAKE_ACDC_CHGR_INSERT",
+            "WAKE_PWR_BUTTON_PRESS",
+            "WAKE_RTC_TIMER",
+            "WAKE_BATT_THRESHOLD",
+    };
+
+    int ret = 0;
+    const char *var_guid_common = "4a67b082-0a4c-41cf-b6c7-440b29bb8c4f";
+    const char *var_wake_source = "WakeSource";
+    unsigned int ws;
+
+    ret = uefivar_get_int(var_wake_source, var_guid_common, &ws);
+
+    if (ret) {
+        LOGE("uefivar_get error %s-%s : %d\n",
+                var_wake_source, var_guid_common, ret);
+        return -1;
+    }
+
+    if ((ws > 0) && (ws < (sizeof(wake_source)/sizeof(char*)))) {
+        strcpy(wakesource, wake_source[ws]);
+        LOGI("wake source (%d): %s", ws, wakesource);
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+
+int read_shutdownsource(char * shutdownsource)
+{
+    static const char *shutdown_source[] = {
+            "SHTDWN_NOT_APPLICABLE",
+            "SHTDWN_POWER_BUTTON_OVERRIDE",
+            "SHTDWN_BATTERY_REMOVAL",
+            "SHTDWN_VCRIT",
+            "SHTDWN_THERMTRIP",
+            "SHTDWN_PMICTEMP",
+            "SHTDWN_SYSTEMP",
+            "SHTDWN_BATTEMP",
+            "SHTDWN_SYSUVP",
+            "SHTDWN_SYSOVP",
+            "SHTDWN_SECURITY_WATCHDOG",
+            "SHTDWN_SECURITY_INITIATED",
+            "SHTDWN_PMC_WATCHDOG",
+            "SHTDWN_ERROR",
+    };
+
+    int ret = 0;
+    const char *var_guid_common = "4a67b082-0a4c-41cf-b6c7-440b29bb8c4f";
+    const char *var_shutdown_source = "ShutdownSource";
+    unsigned int ss;
+
+    ret = uefivar_get_int(var_shutdown_source, var_guid_common, &ss);
+
+    if (ret) {
+        LOGE("uefivar_get error %s-%s : %d\n",
+                var_shutdown_source, var_guid_common, ret);
+        return -1;
+    }
+
+    if ((ss > 0) && (ss < (sizeof(shutdown_source)/sizeof(char*)))) {
+        strcpy(shutdownsource, shutdown_source[ss]);
+        LOGI("shutdown source (%d): %s", ss, shutdownsource);
+        return 1;
+    } else {
+        return 0;
+    }
+}
+#endif // CONFIG_EFILINUX
 
 /**
  * @brief generate WDT crash event
@@ -195,13 +476,13 @@ int crashlog_check_startupreason(char *reason, char *watchdog) {
 
     /* Nothing to do if the reason :
      *  - doesn't contains "HWWDT" or "SWWDT" or "WDT" */
-    /*  - contains "HWWDT" or "SWWDT" or "WDT" but with 'FAKE' suffix */
-    if ( !( strstr(reason, "HWWDT_") || strstr(reason, "SWWDT_") || strstr(reason, "WDT_") ) || strstr(reason, "FAKE") ) {
+    /*  - contains "WDT" but with "FAKE" suffix */
+    if ( !( strstr(reason, "WDT_") ) || strstr(reason, "FAKE") || !( strstr(watchdog, "UNHANDLED") ) ) {
         /* Nothing to do */
         return 0;
     }
 
-    dir = find_new_crashlog_dir(CRASH_MODE);
+    dir = find_new_crashlog_dir(MODE_CRASH);
     if (dir < 0) {
         LOGE("%s: find_new_crashlog_dir failed\n", __FUNCTION__);
         key = raise_event(CRASHEVENT, watchdog, NULL, NULL);
@@ -212,12 +493,14 @@ int crashlog_check_startupreason(char *reason, char *watchdog) {
 
     destination[0] = '\0';
     snprintf(destination, sizeof(destination), "%s%d/", CRASH_DIR, dir);
-    key = raise_event(CRASHEVENT, watchdog, reason, destination);
+    key = raise_event_wdt(CRASHEVENT, watchdog, reason, destination);
     LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, get_current_time_long(0), "WDT", destination);
-    flush_aplog_atboot("WDT", dir, dateshort);
+    flush_aplog(APLOG_BOOT, "WDT", &dir, dateshort);
     usleep(TIMEOUT_VALUE);
     do_log_copy("WDT", dir, dateshort, APLOG_TYPE);
     do_last_kmsg_copy(dir);
+    do_last_fw_msg_copy(dir);
     free(key);
+
     return 0;
 }

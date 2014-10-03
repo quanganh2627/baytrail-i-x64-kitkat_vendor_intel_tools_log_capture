@@ -36,7 +36,7 @@ int crashlog_check_recovery() {
         return 0;
     }
 
-    dir = find_new_crashlog_dir(CRASH_MODE);
+    dir = find_new_crashlog_dir(MODE_CRASH);
     if (dir < 0) {
         LOGE("%s: Cannot get a valid new crash directory...\n", __FUNCTION__);
         key = raise_event(CRASHEVENT, RECOVERY_ERROR, NULL, NULL);

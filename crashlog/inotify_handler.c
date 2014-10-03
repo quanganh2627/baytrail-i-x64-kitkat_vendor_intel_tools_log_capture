@@ -45,6 +45,8 @@
 #include <stdio.h>
 #include <errno.h>
 
+#define LOG_PREFIX "inotify: "
+
 extern pconfig g_first_modem_config;
 
 /**
@@ -55,23 +57,22 @@ extern pconfig g_first_modem_config;
 * note: a watched directory can only have one mask value
 */
 struct watch_entry wd_array[] = {
-    /* -------------Warning: if table is updated, don't forget to update also WDCOUNT and gwdcountstart in main function--- */
+    /* -------------Warning: if table is updated, don't forget to update the  enum in privconfig.h
+     * ---          it should be ALWAYS aligned with this enum of event type   */
     {0, DROPBOX_DIR_MASK,   LOST_TYPE,      0,      LOST_EVNAME,        DROPBOX_DIR,        ".lost",                    NULL}, /* for full dropbox */
     {0, DROPBOX_DIR_MASK,   SYSSERVER_TYPE, 0,      SYSSERVER_EVNAME,   DROPBOX_DIR,        "system_server_watchdog",   NULL},
     {0, DROPBOX_DIR_MASK,   ANR_TYPE,       0,      ANR_EVNAME,         DROPBOX_DIR,        "anr",                      NULL},
     {0, TOMBSTONE_DIR_MASK, TOMBSTONE_TYPE, 0,      TOMBSTONE_EVNAME,   TOMBSTONE_DIR,      "tombstone",                NULL},
-    {0, DROPBOX_DIR_MASK,   JAVACRASH_TYPE, 0,      JAVACRASH_EVNAME,   DROPBOX_DIR,        "crash",                    NULL},
-#ifdef FULL_REPORT
+    {0, DROPBOX_DIR_MASK,   JAVATOMBSTONE_TYPE, 0,  JAVA_TOMBSTONE_EVNAME,   DROPBOX_DIR,   "native_crash",             NULL},
+    {0, DROPBOX_DIR_MASK,   JAVACRASH_TYPE, 0,      JAVACRASH_EVNAME,   DROPBOX_DIR,        "app_crash",                NULL},
+    {0, DROPBOX_DIR_MASK,   JAVACRASH_TYPE2, 0,     JAVACRASH_EVNAME,   DROPBOX_DIR,        "system_server_crash",      NULL},
     {0, CORE_DIR_MASK,      APCORE_TYPE,    0,      APCORE_EVNAME,      HISTORY_CORE_DIR,   ".core",                    NULL},
     {0, CORE_DIR_MASK,      HPROF_TYPE,     0,      HPROF_EVNAME,       HISTORY_CORE_DIR,   ".hprof",                   NULL},
     {0, STAT_DIR_MASK,      STATTRIG_TYPE,  0,      STATSTRIG_EVNAME,   STAT_DIR,           "_trigger",                 NULL},
     {0, STAT_DIR_MASK,      INFOTRIG_TYPE,  0,      STATSTRIG_EVNAME,   STAT_DIR,           "_infoevent",               NULL},
     {0, STAT_DIR_MASK,      ERRORTRIG_TYPE, 0,      STATSTRIG_EVNAME,   STAT_DIR,           "_errorevent",              NULL},
-#endif
     {0, APLOG_DIR_MASK,     APLOGTRIG_TYPE, 0,      APLOGTRIG_EVNAME,   APLOG_DIR,          "_trigger",                 NULL},
-#ifdef FULL_REPORT
     {0, APLOG_DIR_MASK,     CMDTRIG_TYPE,   0,      CMDTRIG_EVNAME,     APLOG_DIR,          "_cmd",                     NULL},
-#endif
     /* -----------------------------above is dir, below is file------------------------------------------------------------ */
     {0, UPTIME_MASK,        UPTIME_TYPE,    0,      UPTIME_EVNAME,      UPTIME_FILE,        NULL,                      NULL},
     /* -------------------------above is AP, below is modem---------------------------------------------------------------- */
@@ -83,7 +84,7 @@ struct watch_entry wd_array[] = {
 int set_watch_entry_callback(unsigned int watch_type, inotify_callback pcallback) {
 
     if ( watch_type >= DIM(wd_array) ) {
-        LOGE("%s: Cannot set the callback for type %u (max is %lu)\n",
+        LOGE(LOG_PREFIX "%s: Cannot set the callback for type %u (max is %lu)\n",
              __FUNCTION__, watch_type, (long unsigned int)DIM(wd_array));
         return -1;
     }
@@ -91,7 +92,7 @@ int set_watch_entry_callback(unsigned int watch_type, inotify_callback pcallback
     if ( CRASHLOG_MODE_EVENT_TYPE_ENABLED(g_crashlog_mode, wd_array[watch_type].eventtype) )
         wd_array[watch_type].pcallback = pcallback;
     else
-        LOGD("event type '%s' is disabled : Don't set callback function\n",
+        LOGD(LOG_PREFIX "event type '%s' is disabled : Don't set callback function\n",
              print_eventtype[watch_type] );
 
     return 0;
@@ -118,7 +119,7 @@ int init_inotify_handler() {
     fd = inotify_init1(IN_NONBLOCK);
 #endif
     if (fd < 0) {
-        LOGE("inotify_init failed, %s\n", strerror(errno));
+        LOGE(LOG_PREFIX "inotify_init failed, %s\n", strerror(errno));
         return -errno;
     }
 
@@ -126,7 +127,7 @@ int init_inotify_handler() {
         int alreadywatched = 0, j;
 
         if (!CRASHLOG_MODE_EVENT_TYPE_ENABLED(g_crashlog_mode, wd_array[i].eventtype)) {
-            LOGI("event type '%s' disabled : Don't add watch on %s\n",
+            LOGI(LOG_PREFIX "event type '%s' disabled : Don't add watch on %s\n",
                  print_eventtype[ wd_array[i].eventtype ], wd_array[i].eventpath);
             continue;
         }
@@ -136,7 +137,7 @@ int init_inotify_handler() {
             if (!strcmp(wd_array[j].eventpath, wd_array[i].eventpath) ) {
                 alreadywatched = 1;
                 wd_array[i].wd = wd_array[j].wd;
-                LOGI("Don't duplicate watch operation for %s\n", wd_array[i].eventpath);
+                LOGV(LOG_PREFIX "Don't duplicate watch operation for %s\n", wd_array[i].eventpath);
                 break;
             }
         }
@@ -147,10 +148,10 @@ int init_inotify_handler() {
                                            wd_array[i].eventmask);
         if (wd_array[i].wd < 0) {
             wd_array[i].inotify_error = errno;
-            LOGE("Can't add watch for %s - %s.\n",
+            LOGE(LOG_PREFIX "Can't add watch for %s - %s.\n",
                  wd_array[i].eventpath, strerror(wd_array[i].inotify_error));
         } else
-            LOGI("%s, wd=%d has been snooped\n", wd_array[i].eventpath, wd_array[i].wd);
+            LOGI(LOG_PREFIX "%s, wd=%d has been snooped\n", wd_array[i].eventpath, wd_array[i].wd);
     }
     //add generic watch here
     generic_add_watch(g_first_modem_config, fd);
@@ -410,7 +411,6 @@ int receive_inotify_events(int inotify_fd) {
             /* event concerns a file into a watched directory */
             entry = get_event_entry(event->wd, (event->len ? event->name : NULL));
             if ( !entry ) {
-    #ifdef FULL_REPORT
                 /* Didn't find any entry for this event, check for
                  * a dropbox final event... */
                 if (event->len > 8 && !strncmp(event->name, "dropbox-", 8)) {
@@ -421,7 +421,6 @@ int receive_inotify_events(int inotify_fd) {
                     finalize_dropbox_pending_event(event);
                     continue;
                 }
-    #endif
                 /* Stray event... */
                 LOGD("%s: Can't handle the event \"%s\", no valid entry found, drop it...\n",
                     __FUNCTION__, (event->len ? event->name : "empty event"));

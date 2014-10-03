@@ -31,9 +31,9 @@
 #include <ctype.h>
 #include <dirent.h>
 
+#ifdef FULL_REPORT
 static void compress_aplog_folder(char *folder_path)
 {
-#ifdef FULL_REPORT
     char cmd[PATHMAX];
     char spath[PATHMAX];
     DIR *d;
@@ -56,8 +56,10 @@ static void compress_aplog_folder(char *folder_path)
         }
         closedir(d);
     }
-#endif
 }
+#else
+static inline void compress_aplog_folder(char *folder_path __unused) {}
+#endif
 
 /**
 * Name          : process_log_event
@@ -81,13 +83,12 @@ int process_log_event(char *rootdir, char *triggername, int mode) {
     char destination[PATHMAX];
     char tmp[PATHMAX] = {'\0',};
     int nbPacket,aplogDepth = 0;
-    int aplogIsPresent, DepthValueRead = 0;
+    int aplogIsPresent, DepthValueRead = 0, res = 0;
     int bplogFlag = 0;
     char value[PROPERTY_VALUE_MAX];
     const char *logrootdir, *suppl_to_copy;
     char *event, *type;
     int packetidx, logidx, newdirperpacket, do_screenshot;
-    struct stat info;
 
     switch (mode) {
         case MODE_BZ:
@@ -115,17 +116,31 @@ int process_log_event(char *rootdir, char *triggername, int mode) {
     if (rootdir && triggername)
     {
         snprintf(path, sizeof(path),"%s/%s", rootdir, triggername);
-        if (file_exists(path) ) {
-            LOGI("Received trigger file %s for %s", path, ( (mode == MODE_BZ) ? "BZ" : "APLOG" ));
-            if ( !get_value_in_file(path,"APLOG=", tmp, sizeof(tmp)) && atoi(tmp) >= 0 ) {
+        if (file_exists(path)) {
+            LOGI("Received trigger file %s for %s", path, ((mode == MODE_BZ) ? "BZ" : "APLOG" ));
+
+            res = get_value_in_file(path,"APLOG=", tmp, sizeof(tmp));
+            if (res < 0) {
+                LOGE("%s : got error %s from function call \n",
+                                    __FUNCTION__, strerror(-res));
+            }
+
+            if (!res && atoi(tmp) >= 0) {
                 //if a value is specified inside trigger file, it overrides property value
                 aplogDepth = atoi(tmp);
                 nbPacket = 1;
                 DepthValueRead = 1;
             }
+
             //Read bplog flag value specified inside trigger file
-            tmp[0] = '\0';
-            if (!get_value_in_file(path,"BPLOG=", tmp, sizeof(tmp))) {
+            memset(tmp, '\0', sizeof(tmp));
+
+            res = get_value_in_file(path,"BPLOG=", tmp, sizeof(tmp));
+            if (res < 0) {
+                LOGE("%s : got %s - error %s from function call \n",
+                        __FUNCTION__, path, strerror(-res));
+            }
+            if (!res) {
                 bplogFlag = atoi(tmp);
             }
         }
@@ -148,7 +163,7 @@ int process_log_event(char *rootdir, char *triggername, int mode) {
 #ifndef FULL_REPORT
     /* Manage APLOG=0 which means bz type="enhancement"*/
     if ( aplogDepth != 0 )
-        flush_aplog();
+        flush_aplog(APLOG, NULL, NULL, NULL);
 #endif
     /* copy data file */
     for( packetidx = 0; packetidx < nbPacket ; packetidx++) {
@@ -177,7 +192,7 @@ int process_log_event(char *rootdir, char *triggername, int mode) {
 
             do_copy_tail(path, destination, 0);
         }
-	    /* When a new crashlog dir is created per packet, send an event per dir */
+        /* When a new crashlog dir is created per packet, send an event per dir */
         if( newdirperpacket && (dir != -1) ) {
             snprintf(destination,sizeof(destination),"%s%d/", logrootdir, dir);
             compress_aplog_folder(destination);
@@ -207,18 +222,8 @@ int process_log_event(char *rootdir, char *triggername, int mode) {
             do_copy_tail(path,destination,0);
 
             /* In case of bz_trigger with BPLOG=1, copy bplog file(s) */
-            if( bplogFlag == 1 ) {
-                if(stat(BPLOG_FILE_0, &info) == 0){
-                    snprintf(destination,sizeof(destination), "%s%d/%s", BZ_DIR, dir,strrchr(BPLOG_FILE_0,'/')+1);
-                    do_copy(BPLOG_FILE_0,destination, 0);
-                    if(info.st_size < 1*MB){
-                        if(stat(BPLOG_FILE_1, &info) == 0){
-                            snprintf(destination,sizeof(destination), "%s%d/%s", BZ_DIR, dir,strrchr(BPLOG_FILE_1,'/')+1);
-                            do_copy(BPLOG_FILE_1,destination, 0);
-                        }
-                    }
-                }
-            }
+            if( bplogFlag == 1 )
+                copy_bplogs(BZ_DIR, "", dir, 0);
         }
         snprintf(destination,sizeof(destination),"%s%d/", logrootdir,dir);
         if (do_screenshot) {
@@ -240,7 +245,7 @@ int process_log_event(char *rootdir, char *triggername, int mode) {
         snprintf(path, sizeof(path),"%s/%s",rootdir, triggername);
         remove(path);
     }
-    return 0;
+    return res;
 }
 
 int process_aplog_event(struct watch_entry *entry, struct inotify_event *event) {
@@ -266,7 +271,7 @@ int process_stat_event(struct watch_entry *entry, struct inotify_event *event) {
         strcpy(p, "data");
     }
 
-    dir = find_new_crashlog_dir(STATS_MODE);
+    dir = find_new_crashlog_dir(MODE_STATS);
     if (dir < 0) {
         LOGE("%s: Cannot get a valid new crash directory...\n", __FUNCTION__);
         key = raise_event(STATSEVENT, tmp, NULL, NULL);

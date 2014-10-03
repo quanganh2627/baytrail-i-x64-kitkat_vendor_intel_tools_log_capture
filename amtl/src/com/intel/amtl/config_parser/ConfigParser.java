@@ -137,7 +137,9 @@ public class ConfigParser {
                                 parser.getAttributeValue(null, "output"),
                                 parser.getAttributeValue(null, "output_type"),
                                 parser.getAttributeValue(null, "rotate_num"),
-                                parser.getAttributeValue(null, "rotate_size"));
+                                parser.getAttributeValue(null, "rotate_size"),
+                                parser.getAttributeValue(null, "interface"),
+                                parser.getAttributeValue(null, "buffer_size"));
                         mtsMode = parser.getAttributeValue(null, "mode");
                         Log.d(TAG, MODULE + ": Get mts input : "
                                 + parser.getAttributeValue(null, "input"));
@@ -149,6 +151,10 @@ public class ConfigParser {
                                 + parser.getAttributeValue(null, "rotate_num"));
                         Log.d(TAG, MODULE + ": Get mts rotate_size : "
                                 + parser.getAttributeValue(null, "rotate_size"));
+                        Log.d(TAG, MODULE + ": Get mts interface : "
+                                + parser.getAttributeValue(null, "interface"));
+                        Log.d(TAG, MODULE + ": Get mts buffer_size : "
+                                + parser.getAttributeValue(null, "buffer_size"));
                         Log.d(TAG, MODULE + ": Get mts type mode : " + mtsMode);
                     }
                 break;
@@ -188,11 +194,10 @@ public class ConfigParser {
             // This implies that flush_cmd parameter does not have effect
             // on log stop and at command error use cases.
 
-            if (parser.getAttributeValue(null, "default_flush_cmd") != null &&
-                    this.context != null) {
+            if (parser.getAttributeValue(null, "default_flush_cmd") != null
+                     && this.context != null) {
                 SharedPreferences.Editor editor =
-                        context.getSharedPreferences("AMTLPrefsData",
-                                Context.MODE_PRIVATE).edit();
+                        context.getSharedPreferences("AMTLPrefsData", Context.MODE_PRIVATE).edit();
                 editor.putString("default_flush_cmd",
                         parser.getAttributeValue(null, "default_flush_cmd"));
                 editor.commit();
@@ -212,11 +217,14 @@ public class ConfigParser {
                     parser.getAttributeValue(null, "mts_output_type"),
                     parser.getAttributeValue(null, "mts_rotate_num"),
                     parser.getAttributeValue(null, "mts_rotate_size"),
+                    parser.getAttributeValue(null, "mts_interface"),
                     parser.getAttributeValue(null, "mts_mode"),
+                    parser.getAttributeValue(null, "mts_buffer_size"),
                     parser.getAttributeValue(null, "oct"),
                     parser.getAttributeValue(null, "oct_fcs"),
                     parser.getAttributeValue(null, "pti1"),
                     parser.getAttributeValue(null, "pti2"),
+                    parser.getAttributeValue(null, "sigusr1_to_send"),
                     flcmd);
 
             Log.d(TAG, MODULE + ": index = " + index
@@ -228,11 +236,14 @@ public class ConfigParser {
                     + ", mts_output_type = " + parser.getAttributeValue(null, "mts_output_type")
                     + ", mts_rotate_num = " + parser.getAttributeValue(null, "mts_rotate_num")
                     + ", mts_rotate_size = " + parser.getAttributeValue(null, "mts_rotate_size")
+                    + ", mts_interface = " + parser.getAttributeValue(null, "mts_interface")
                     + ", mts_mode = " + parser.getAttributeValue(null, "mts_mode")
+                    + ", mts_buffer_size = " + parser.getAttributeValue(null, "mts_buffer_size")
                     + ", oct = " + parser.getAttributeValue(null, "oct")
                     + ", oct_fcs = " + parser.getAttributeValue(null, "oct_fcs")
                     + ", pti1 = "+ parser.getAttributeValue(null, "pti1")
                     + ", pti2 = "+ parser.getAttributeValue(null, "pti2")
+                    + ", sigusr1_to_send = "+ parser.getAttributeValue(null, "sigusr1_to_send")
                     + ", default_flush_cmd = "+ parser.getAttributeValue(null, "default_flush_cmd")
                     + ", flush_cmd = "+ parser.getAttributeValue(null, "flush_cmd") + ".");
 

@@ -41,11 +41,11 @@ public class GsmttyManager implements Closeable {
             this.gsmtty.openTty();
             this.file = new RandomAccessFile(this.getTtyFileName(), "rw");
         } catch (ExceptionInInitializerError ex) {
-            throw new ModemControlException("libamtl_jni library was not found.");
+            throw new ModemControlException("libamtl_jni library was not found " + ex);
         } catch (IOException ex) {
-            throw new ModemControlException(String.format("Error while opening gsmtty"));
+            throw new ModemControlException("Error while opening gsmtty " + ex);
         } catch (IllegalArgumentException ex) {
-            throw new ModemControlException(String.format("Error while opening gsmtty"));
+            throw new ModemControlException("Error while opening gsmtty" + ex);
         }
     }
 
@@ -53,10 +53,7 @@ public class GsmttyManager implements Closeable {
         return "/dev/gsmtty19";
     }
 
-    public String writeToModemControl(String atCommand) throws ModemControlException {
-
-        String atResponse = "";
-        byte[] responseBuffer = new byte[1024];
+    public void writeToModemControl(String atCommand) throws ModemControlException {
 
         try {
             this.file.writeBytes(atCommand);
@@ -65,6 +62,12 @@ public class GsmttyManager implements Closeable {
         catch (IOException ex) {
             throw new ModemControlException("Unable to send to AT command to the modem.");
         }
+    }
+
+    public String readFromModemControl() throws ModemControlException {
+
+        String atResponse = "";
+        byte[] responseBuffer = new byte[1024];
 
         try {
             int readCount = this.file.read(responseBuffer);

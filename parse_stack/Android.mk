@@ -15,18 +15,12 @@
 # limitations under the License.
 #
 
-LOCAL_PATH:= $(call my-dir)
+LOCAL_PATH := $(call my-dir)
+
 include $(CLEAR_VARS)
-
-LOCAL_SRC_FILES:= \
-	parse_stack.c
-
-LOCAL_C_INCLUDES += \
-  vendor/intel/tools/log_capture/backtrace
-
-LOCAL_MODULE_TAGS := eng debug
-LOCAL_MODULE:= parse_stack
-
-LOCAL_SHARED_LIBRARIES:= libc libcutils libparse_stack
-
+LOCAL_MODULE := parse_stack
+LOCAL_MODULE_TAGS := optional
+LOCAL_SRC_FILES := parse_stack.c
+LOCAL_C_INCLUDES := $(LOCAL_PATH)/../backtrace
+LOCAL_SHARED_LIBRARIES := libparse_stack
 include $(BUILD_EXECUTABLE)

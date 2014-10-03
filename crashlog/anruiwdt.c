@@ -32,7 +32,9 @@
 
 #include <cutils/properties.h>
 #ifdef FULL_REPORT
+#ifdef CRASHLOGD_MODULE_BACKTRACE
 #include <backtrace.h>
+#endif
 #endif
 
 #include "crashutils.h"
@@ -66,12 +68,12 @@ static void priv_prepare_anruiwdt(char *destion)
 
     if ( destion[len-3] == '.' && destion[len-2] == 'g' && destion[len-1] == 'z') {
         /* extract gzip file */
-        do_copy_tail(destion,"/logs/tmp_anr_uiwdt.gz",0);
-        system("gunzip /logs/tmp_anr_uiwdt.gz");
-        do_chown("/logs/tmp_anr_uiwdt", PERM_USER, PERM_GROUP);
+        do_copy_tail(destion, LOGS_DIR "/tmp_anr_uiwdt.gz",0);
+        system("gunzip " LOGS_DIR "/tmp_anr_uiwdt.gz");
+        do_chown(LOGS_DIR "/tmp_anr_uiwdt", PERM_USER, PERM_GROUP);
         destion[strlen(destion) - 3] = 0;
-        do_copy_tail("/logs/tmp_anr_uiwdt",destion,0);
-        remove("/logs/tmp_anr_uiwdt");
+        do_copy_tail(LOGS_DIR "/tmp_anr_uiwdt",destion,0);
+        remove(LOGS_DIR "/tmp_anr_uiwdt");
     }
 }
 #endif
@@ -132,7 +134,11 @@ static void process_anruiwdt_tracefile(char *destion, int dir, int removeunparse
                 LOGE("%s: Failed to remove tracefile %s:%s\n", __FUNCTION__, tracefile, strerror(errno));
             }
             // parse
+#ifdef CRASHLOGD_MODULE_BACKTRACE
             backtrace_parse_tombstone_file(dest_path);
+#else
+            LOGW("%s: CRASHLOGD_MODULE_BACKTRACE disabled, no tombstone backtrace parsing\n", __FUNCTION__);
+#endif
             if ( removeunparsed && unlink(dest_path)) {
                 LOGE("Failed to remove unparsed tracefile %s:%s\n", dest_path, strerror(errno));
             }
@@ -144,19 +150,41 @@ static void process_anruiwdt_tracefile(char *destion, int dir, int removeunparse
     snprintf(dest_path_symb, sizeof(dest_path_symb), "%s_symbol", dest_path);
     do_chown(dest_path_symb, PERM_USER, PERM_GROUP);
 }
-#endif
 
 static void backtrace_anruiwdt(char *dest, int dir) {
-#ifdef FULL_REPORT
     char value[PROPERTY_VALUE_MAX];
 
     property_get(PROP_ANR_USERSTACK, value, "0");
     if (strncmp(value, "1", 1)) {
         process_anruiwdt_tracefile(dest, dir, 0);
     }
-#endif
 }
+#else
+static inline void backtrace_anruiwdt(char *dest __unused, int dir __unused) {}
+#endif
 
+#define PATH_LENGTH			256
+void do_copy_pvr(char * src, char * dest) {
+   char *token = NULL;
+   char *str = NULL;
+   char buf[PATH_LENGTH] = {0, };
+   char path[PATH_LENGTH] = {0, };
+   FILE * fs = NULL;
+   FILE * fd = NULL;
+   fs = fopen(src,"r");
+   fd = fopen(dest,"w");
+   if (fs && fd) {
+		while(fgets(buf, PATH_LENGTH, fs)) {
+		    fputs(buf ,fd);
+		 }
+   }
+   if (fs)
+      fclose(fs);
+   if (fd)
+      fclose(fd);
+
+   return;
+}
 /*
 * Name          :
 * Description   :
@@ -173,7 +201,11 @@ int process_anruiwdt_event(struct watch_entry *entry, struct inotify_event *even
     if ( manage_duplicate_dropbox_events(event) )
         return 1;
 
-    dir = find_new_crashlog_dir(CRASH_MODE);
+    dir = find_new_crashlog_dir(MODE_CRASH);
+    snprintf(destion,sizeof(destion),"%s%d/%s", CRASH_DIR, dir, "pvr_debug_dump.txt");
+    do_copy_pvr("/d/pvr/debug_dump", destion);
+    snprintf(destion,sizeof(destion),"%s%d/%s", CRASH_DIR, dir, "fence_sync.txt");
+    do_copy_pvr("/d/sync", destion);
     snprintf(path, sizeof(path),"%s/%s", entry->eventpath, event->name);
     if (dir < 0 || !file_exists(path)) {
         if (dir < 0)

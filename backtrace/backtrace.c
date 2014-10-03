@@ -114,9 +114,6 @@ mapinfo *parse_map_line_64(char *line)
 	if (len < 2)
 		return 0;
 	line[--len] = 0;
-	mi = malloc(sizeof(mapinfo));
-	if (mi == NULL)
-		return 0;
 
 	token = strtok(line, " ");
 	if (token == NULL)
@@ -144,6 +141,10 @@ mapinfo *parse_map_line_64(char *line)
 	}
 	if (counter != 4)
 		return NULL;
+
+	mi = malloc(sizeof(mapinfo));
+	if (mi == NULL)
+		return 0;
 
 	//fill struct
 	mi->start = start_addr;
@@ -727,6 +728,8 @@ void backtrace_parse_tombstone_file( char *filename)
 			}
 		else {
 			farther = false;
+			fputs(data,fp_copy);
+			continue;
 		}
 		if (farther == true) //parse map info, skip write map info to new file. only read map info for farther task
 		{
@@ -738,14 +741,15 @@ void backtrace_parse_tombstone_file( char *filename)
 				if ( (str = strstr(data, "maps start")) )  // got the farther task id,
 					{
 						while(fgets(data, PATH_LENGTH, fp)) {
-							mapinfo *mi = parse_map_line(data);
+							if ( strstr(data,"maps end"))
+								goto f;
+
+							mapinfo *mi = parse_map_line_64(data);
 							if(mi) {
 								mi->next = milist;
 								milist = mi;
 								iElfCount ++;
 							}
-							if ( strstr(data,"maps end"))
-								goto f;
 						}
 					}
 
@@ -825,10 +829,17 @@ f:      	if (farther == true)  {
 						free(milist);
 						milist = next;
 					}
+					milist = 0;
 					break;
 				}
 			}
 		}
+	}
+	while(milist) {
+		mapinfo *next = milist->next;
+		symbol_tables_free(milist->symbols);
+		free(milist);
+		milist = next;
 	}
 	if (fp)
 		fclose(fp);

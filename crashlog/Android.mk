@@ -1,5 +1,5 @@
 #
-# Copyright (C) Intel 2010
+# Copyright (C) Intel 2014
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,14 +15,21 @@
 # limitations under the License.
 #
 
-LOCAL_PATH:= $(call my-dir)
+LOCAL_PATH := $(call my-dir)
+
+include $(LOCAL_PATH)/test_config.mk
+
 include $(CLEAR_VARS)
 
-LOCAL_SRC_FILES:= main.c \
+LOCAL_MODULE := crashlogd
+LOCAL_MODULE_TAGS := optional
+LOCAL_MODULE_OWNER := intel
+
+LOCAL_SRC_FILES := \
+    main.c \
     config.c \
     inotify_handler.c \
     startupreason.c \
-    mmgr_source.c \
     crashutils.c \
     usercrash.c \
     anruiwdt.c \
@@ -31,20 +38,109 @@ LOCAL_SRC_FILES:= main.c \
     trigger.c \
     dropbox.c \
     fsutils.c \
-    fabric.c \
-    modem.c \
     panic.c \
     config_handler.c \
-    ramdump.c
+    uefivar.c \
+    ingredients.c
 
-LOCAL_CFLAGS += -DFULL_REPORT=1
+LOCAL_SHARED_LIBRARIES := libcutils
 
+# sys/sha1.h has been moved out of default bionic includes
 LOCAL_C_INCLUDES += \
-  $(TARGET_OUT_HEADERS)/IFX-modem \
-  vendor/intel/tools/log_capture/backtrace
+    bionic/libc/upstream-netbsd/android/include
 
-LOCAL_MODULE_TAGS := eng debug
-LOCAL_MODULE:= crashlogd
+# Options
 
-LOCAL_SHARED_LIBRARIES:= libparse_stack libc libcutils libmmgrcli
+ifeq ($(CRASHLOGD_FULL_REPORT),true)
+LOCAL_CFLAGS += -DFULL_REPORT
+endif
+
+ifeq ($(CRASHLOGD_COREDUMP),true)
+LOCAL_CFLAGS += -DCONFIG_COREDUMP
+endif
+
+ifeq ($(CRASHLOGD_EFILINUX),true)
+LOCAL_CFLAGS += -DCONFIG_EFILINUX
+LOCAL_STATIC_LIBRARIES += \
+    libdmi \
+    libuefivar
+endif
+
+ifeq ($(CRASHLOGD_FDK),true)
+LOCAL_CFLAGS += -DCONFIG_FDK
+endif
+
+ifeq ($(CRASHLOGD_EFILINUX),true)
+ifeq ($(CRASHLOGD_FDK),true)
+$(error CRASHLOGD_EFILINUX and CRASHLOGD_FDK options are exclusive.)
+endif
+endif
+
+ifneq ($(CRASHLOGD_LOGS_PATH),)
+LOCAL_CFLAGS += -DCONFIG_LOGS_PATH='$(CRASHLOGD_LOGS_PATH)'
+endif
+
+# Modules
+
+ifeq ($(CRASHLOGD_MODULE_IPTRAK),true)
+LOCAL_CFLAGS += -DCRASHLOGD_MODULE_IPTRAK
+LOCAL_SRC_FILES += iptrak.c
+endif
+
+ifeq ($(CRASHLOGD_MODULE_SPID),true)
+LOCAL_CFLAGS += -DCRASHLOGD_MODULE_SPID
+LOCAL_SRC_FILES += spid.c
+endif
+
+ifeq ($(CRASHLOGD_MODULE_BACKTRACE),true)
+LOCAL_CFLAGS += -DCRASHLOGD_MODULE_BACKTRACE
+LOCAL_C_INCLUDES += $(LOCAL_PATH)/../backtrace
+LOCAL_SHARED_LIBRARIES += libparse_stack
+endif
+
+ifeq ($(CRASHLOGD_MODULE_KCT),true)
+LOCAL_CFLAGS += -DCRASHLOGD_MODULE_KCT
+LOCAL_SRC_FILES += \
+    ct_utils.c \
+    kct_netlink.c \
+    lct_link.c \
+    ct_eventintegrity.c
+endif
+
+ifeq ($(CRASHLOGD_MODULE_MODEM),true)
+ifeq ($(BOARD_HAVE_MODEM),true)
+LOCAL_CFLAGS += -DCRASHLOGD_MODULE_MODEM
+LOCAL_C_INCLUDES += \
+    $(TARGET_OUT_HEADERS)/IFX-modem \
+    $(TARGET_OUT_HEADERS)/libtcs
+LOCAL_SHARED_LIBRARIES += \
+    libmmgrcli \
+    libtcs
+LOCAL_SRC_FILES += \
+    modem.c \
+    tcs_wrapper.c \
+    mmgr_source.c
+endif
+endif
+
+ifeq ($(CRASHLOGD_MODULE_FABRIC),true)
+LOCAL_CFLAGS += -DCRASHLOGD_MODULE_FABRIC
+LOCAL_SRC_FILES += fabric.c
+endif
+
+ifeq ($(CRASHLOGD_MODULE_FW_UPDATE),true)
+LOCAL_CFLAGS += -DCRASHLOGD_MODULE_FW_UPDATE
+LOCAL_SRC_FILES += fw_update.c
+endif
+
+ifeq ($(CRASHLOGD_MODULE_RAMDUMP),true)
+LOCAL_CFLAGS += -DCRASHLOGD_MODULE_RAMDUMP
+LOCAL_SRC_FILES += ramdump.c
+endif
+
 include $(BUILD_EXECUTABLE)
+
+include $(CLEAR_VARS)
+LOCAL_COPY_HEADERS := lct.h
+LOCAL_COPY_HEADERS_TO := crashlog
+include $(BUILD_COPY_HEADERS)

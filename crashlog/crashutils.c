@@ -37,6 +37,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <sys/sha1.h>
+#include <sys/wait.h>
 
 #include <cutils/properties.h>
 #ifndef __TEST__
@@ -48,6 +49,13 @@
 #include <history.h>
 #include <fsutils.h>
 #include <dropbox.h>
+#include "uefivar.h"
+#include "startupreason.h"
+#include "ingredients.h"
+
+#ifdef CONFIG_EFILINUX
+#include <libuefivar.h>
+#endif
 
 char gbuildversion[PROPERTY_VALUE_MAX] = {0,};
 char gboardversion[PROPERTY_VALUE_MAX] = {0,};
@@ -156,6 +164,19 @@ void do_last_kmsg_copy(int dir) {
         snprintf(destion, sizeof(destion), "%s%d/%s", CRASH_DIR, dir, CONSOLE_RAMOOPS_FILE);
         do_copy_tail(CONSOLE_RAMOOPS, destion, MAXFILESIZE);
     }
+    if ( file_exists(FTRACE_RAMOOPS) ) {
+        snprintf(destion, sizeof(destion), "%s%d/%s", CRASH_DIR, dir, FTRACE_RAMOOPS_FILE);
+        do_copy_tail(FTRACE_RAMOOPS, destion, MAXFILESIZE);
+    }
+}
+
+void do_last_fw_msg_copy(int dir) {
+    char destion[PATHMAX];
+
+    if ( (dir >= 0) && file_exists(CURRENT_PROC_OFFLINE_SCU_LOG_NAME) ) {
+        snprintf(destion, sizeof(destion), "%s%d/%s.txt", CRASH_DIR, dir, OFFLINE_SCU_LOG_NAME);
+        do_copy_eof(CURRENT_PROC_OFFLINE_SCU_LOG_NAME, destion);
+    }
 }
 
 /* Compute key shall be checked only once at the first call to insure the
@@ -195,11 +216,9 @@ static int compute_key(char* key, char *event, char *type)
 }
 
 static void check_prop_modemid(){
-    static int propFound = -1;
     char prop[PROPERTY_VALUE_MAX];
-    if (propFound !=0){
-        propFound = read_file_prop_uid(MODEM_FIELD, MODEM_UUID, prop, "unknown");
-    }
+    if(read_file_prop_uid(MODEM_FIELD, MODEM_UUID, prop, "unknown")>0)
+        check_ingredients_file();
 }
 
 char **commachain_to_fixedarray(char *chain,
@@ -265,7 +284,116 @@ char **commachain_to_fixedarray(char *chain,
     return array;
 }
 
-static char *priv_raise_event(char *event, char *type, char *subtype, char *log, int add_uptime, int data_ready) {
+static const char *get_imei() {
+    static char imei[PROPERTY_VALUE_MAX] = { 0, };
+
+    if (imei[0] != 0) return imei;
+
+    property_get(IMEI_FIELD, imei, "");
+    return imei;
+}
+
+static const char *get_operator() {
+    static char operator[PROPERTY_VALUE_MAX] = { 0, };
+    property_get(OPERATOR_FIELD, operator, "UNKNOWN");
+    return operator;
+}
+
+//This function creates a minimal crashfile (DATA0, DATA1 and DATA2 fields)
+//Note: for Modem Panic case, DATA are set via file parsing adn parameters
+//  Data0,1,2 are ignored
+static int create_minimal_crashfile(char * event, const char* type, const char* path, char* key,
+      const char* uptime, const char* date, int data_ready, char* data0, char* data1, char* data2)
+{
+    FILE *fp;
+    char fullpath[PATHMAX];
+    char mpanicpath[PATHMAX];
+
+    snprintf(fullpath, sizeof(fullpath)-1, "%s/%s", path, CRASHFILE_NAME);
+
+    //Create crashfile
+    errno = 0;
+    fp = fopen(fullpath,"w");
+    if (fp == NULL)
+    {
+        LOGE("%s: Cannot create %s - %s\n", __FUNCTION__, fullpath, strerror(errno));
+        return -errno;
+    }
+    fclose(fp);
+    do_chown(fullpath, PERM_USER, PERM_GROUP);
+
+    fp = fopen(fullpath,"w");
+    if (fp == NULL)
+    {
+        LOGE("%s: can not open file: %s\n", __FUNCTION__, fullpath);
+        return -errno;
+    }
+
+    //Fill crashfile
+    fprintf(fp,"EVENT=%s\n", event);
+    fprintf(fp,"ID=%s\n", key);
+    fprintf(fp,"SN=%s\n", guuid);
+    fprintf(fp,"DATE=%s\n", date);
+    fprintf(fp,"UPTIME=%s\n", uptime);
+    fprintf(fp,"BUILD=%s\n", get_build_footprint());
+    fprintf(fp,"BOARD=%s\n", gboardversion);
+    fprintf(fp,"IMEI=%s\n", get_imei());
+    fprintf(fp,"TYPE=%s\n", type);
+    fprintf(fp,"DATA_READY=%d\n", data_ready);
+    fprintf(fp,"OPERATOR=%s\n", get_operator());
+    //MPANIC crash : fill DATA field and preempt data012 mechanism
+    if (!strcmp(MDMCRASH_EVNAME, type)){
+        LOGI("Modem panic detected : generating DATA0\n");
+        FILE *fd_panic;
+        DIR *d;
+        struct dirent* de;
+        d = opendir(path);
+        if(!d) {
+            LOGE("%s: Can't open dir %s\n",__FUNCTION__, path);
+            fclose(fp);
+            return -1;
+        }
+        while ((de = readdir(d))) {
+            const char *name = de->d_name;
+            int ismpanic, iscrashdata = 0;
+            ismpanic = (strstr(name, "mpanic") != NULL);
+            if (!ismpanic) iscrashdata = (strstr(name, "_crashdata") != NULL);
+            if (ismpanic || iscrashdata) {
+                snprintf(mpanicpath, sizeof(mpanicpath)-1, "%s/%s", path, name);
+                fd_panic = fopen(mpanicpath, "r");
+                if (fd_panic == NULL){
+                    LOGE("%s: can not open file: %s\n", __FUNCTION__, mpanicpath);
+                    break;
+                }
+                char value[PATHMAX] = "";
+                if (ismpanic) {
+                    fscanf(fd_panic, "%s", value);
+                    fprintf(fp,"DATA0=%s\n", value);
+                }
+                else { // iscrashdata
+                    while (fgets(value,sizeof(value),fd_panic) && !strstr(value,"_END"))
+                        fprintf(fp,"%s\n", value);
+                }
+                fclose(fd_panic);
+                break;
+            }
+        }
+        closedir(d);
+    } else {
+        if (data0)
+            fprintf(fp,"DATA0=%s\n", data0);
+        if (data1)
+            fprintf(fp,"DATA1=%s\n", data1);
+        if (data2)
+            fprintf(fp,"DATA2=%s\n", data2);
+    }
+    fprintf(fp,"_END\n");
+    fclose(fp);
+    return 0;
+}
+
+static char *priv_raise_event(char *event, char *type, char *subtype, char *log,
+        int add_uptime, int data_ready, char* data0, char* data1, char* data2) {
     struct history_entry entry;
     char key[SHA1_DIGEST_LENGTH+1];
     char newuptime[32], *puptime = NULL;
@@ -275,6 +403,7 @@ static char *priv_raise_event(char *event, char *type, char *subtype, char *log,
 
     //check property of modemid at each event
     check_prop_modemid();
+
 
     /* UPTIME      : event uptime value is get from system
      * UPTIME_BOOT : event uptime value get from history file first line
@@ -320,13 +449,16 @@ static char *priv_raise_event(char *event, char *type, char *subtype, char *log,
     }
     if (log ) {
         if (!strncmp(event, CRASHEVENT, sizeof(CRASHEVENT))) {
-            res = create_minimal_crashfile( event, subtype, log, key, puptime, datelong, data_ready);
+            res = create_minimal_crashfile( event, subtype, log, key, puptime,
+                                    datelong, data_ready, data0, data1, data2);
         }
         else if(!strncmp(event, BZEVENT, sizeof(BZEVENT))) {
-            res = create_minimal_crashfile( event, BZMANUAL, log, key, puptime, datelong, data_ready);
+            res = create_minimal_crashfile( event, BZMANUAL, log, key, puptime,
+                                    datelong, data_ready, data0, data1, data2);
         }
         else if(!strncmp(event, INFOEVENT, sizeof(INFOEVENT)) && !strncmp(type, "FIRMWARE", sizeof("FIRMWARE"))) {
-            res = create_minimal_crashfile( event, type, log, key, puptime, datelong, data_ready);
+            res = create_minimal_crashfile( event, type, log, key, puptime,
+                                datelong, data_ready, data0, data1, data2);
         }
         if ( res != 0 ) {
             LOGE("%s: Cannot create a minimal crashfile in %s - %s.\n", __FUNCTION__,
@@ -349,19 +481,28 @@ static char *priv_raise_event(char *event, char *type, char *subtype, char *log,
 }
 
 char *raise_event_nouptime(char *event, char *type, char *subtype, char *log) {
-    return priv_raise_event(event, type, subtype, log, NO_UPTIME, 1);
+    return priv_raise_event(event, type, subtype, log, NO_UPTIME, 1, NULL , NULL, NULL);
+}
+
+char *raise_event_wdt(char *event, char *type, char *subtype, char *log) {
+    return priv_raise_event(event, type, NULL, log, UPTIME, 1, subtype, NULL, NULL);
 }
 
 char *raise_event(char *event, char *type, char *subtype, char *log) {
-    return priv_raise_event(event, type, subtype, log, UPTIME, 1);
+    return priv_raise_event(event, type, subtype, log, UPTIME, 1, NULL, NULL, NULL);
 }
 
 char *raise_event_bootuptime(char *event, char *type, char *subtype, char *log) {
-    return priv_raise_event(event, type, subtype, log, UPTIME_BOOT, 1);
+    return priv_raise_event(event, type, subtype, log, UPTIME_BOOT, 1, NULL , NULL, NULL);
 }
 
 char *raise_event_dataready(char *event, char *type, char *subtype, char *log, int data_ready) {
-    return priv_raise_event(event, type, subtype, log, UPTIME, data_ready);
+    return priv_raise_event(event, type, subtype, log, UPTIME, data_ready, NULL , NULL, NULL);
+}
+
+char *raise_event_dataready012(char *event, char *type, char *subtype, char *log, int data_ready,
+                                                        char* data0, char* data1, char* data2) {
+    return priv_raise_event(event, type, subtype, log, UPTIME, data_ready, data0 , data1, data2);
 }
 
 void restart_profile_srv(int serveridx) {
@@ -495,7 +636,7 @@ int process_info_and_error(char *filename, char *name) {
     }
     snprintf(tmp,sizeof(tmp),"%s",name);
 
-    dir = find_new_crashlog_dir(STATS_MODE);
+    dir = find_new_crashlog_dir(MODE_STATS);
     if (dir < 0) {
         LOGE("%s: Cannot get a valid new crash directory...\n", __FUNCTION__);
         p = strstr(tmp,"trigger");
@@ -582,6 +723,7 @@ void create_infoevent(char* filename, char* data0, char* data1, char* data2)
 const char *get_build_footprint() {
     static char footprint[SIZE_FOOTPRINT_MAX+1] = {0,};
     char prop[PROPERTY_VALUE_MAX];
+    int mdmIdUpdate;
 
     /* footprint contains:
      * buildId
@@ -614,9 +756,13 @@ const char *get_build_footprint() {
     strncat(footprint, prop, SIZE_FOOTPRINT_MAX);
     strncat(footprint, ",", SIZE_FOOTPRINT_MAX);
 
-    read_file_prop_uid(MODEM_FIELD, MODEM_UUID, prop, "unknown");
+    mdmIdUpdate = read_file_prop_uid(MODEM_FIELD, MODEM_UUID, prop, "unknown");
     strncat(footprint, prop, SIZE_FOOTPRINT_MAX);
     strncat(footprint, ",", SIZE_FOOTPRINT_MAX);
+    if(mdmIdUpdate>0)
+    {
+        check_ingredients_file();
+    }
 
     property_get(IFWI_FIELD, prop, "");
     strncat(footprint, prop, SIZE_FOOTPRINT_MAX);
@@ -639,101 +785,9 @@ const char *get_build_footprint() {
     return footprint;
 }
 
-static const char *get_imei() {
-    static char imei[PROPERTY_VALUE_MAX] = { 0, };
-
-    if (imei[0] != 0) return imei;
-
-    property_get(IMEI_FIELD, imei, "");
-    return imei;
-}
 
 void start_daemon(const char *daemonname) {
     property_set("ctl.start", (char *)daemonname);
-}
-
-//This function creates a minimal crashfile (without DATA0, DATA1 and DATA2 fields)
-//Note:DATA0 is filled for Modem Panic case only
-int create_minimal_crashfile(char * event, const char* type, const char* path, char* key,
-                             const char* uptime, const char* date, int data_ready)
-{
-    FILE *fp;
-    char fullpath[PATHMAX];
-    char mpanicpath[PATHMAX];
-
-    snprintf(fullpath, sizeof(fullpath)-1, "%s/%s", path, CRASHFILE_NAME);
-
-    //Create crashfile
-    errno = 0;
-    fp = fopen(fullpath,"w");
-    if (fp == NULL)
-    {
-        LOGE("%s: Cannot create %s - %s\n", __FUNCTION__, fullpath, strerror(errno));
-        return -errno;
-    }
-    fclose(fp);
-    do_chown(fullpath, PERM_USER, PERM_GROUP);
-
-    fp = fopen(fullpath,"w");
-    if (fp == NULL)
-    {
-        LOGE("%s: can not open file: %s\n", __FUNCTION__, fullpath);
-        return -errno;
-    }
-
-    //Fill crashfile
-    fprintf(fp,"EVENT=%s\n", event);
-    fprintf(fp,"ID=%s\n", key);
-    fprintf(fp,"SN=%s\n", guuid);
-    fprintf(fp,"DATE=%s\n", date);
-    fprintf(fp,"UPTIME=%s\n", uptime);
-    fprintf(fp,"BUILD=%s\n", get_build_footprint());
-    fprintf(fp,"BOARD=%s\n", gboardversion);
-    fprintf(fp,"IMEI=%s\n", get_imei());
-    fprintf(fp,"TYPE=%s\n", type);
-    fprintf(fp,"DATA_READY=%d\n", data_ready);
-    //MPANIC crash : fill DATA0 field
-    if (!strcmp(MDMCRASH_EVNAME, type)){
-        LOGI("Modem panic detected : generating DATA0\n");
-        FILE *fd_panic;
-        DIR *d;
-        struct dirent* de;
-        d = opendir(path);
-        if(!d) {
-            LOGE("%s: Can't open dir %s\n",__FUNCTION__, path);
-            fclose(fp);
-            return -1;
-        }
-        while ((de = readdir(d))) {
-            const char *name = de->d_name;
-            int ismpanic, iscrashdata = 0;
-            ismpanic = (strstr(name, "mpanic") != NULL);
-            if (!ismpanic) iscrashdata = (strstr(name, "_crashdata") != NULL);
-            if (ismpanic || iscrashdata) {
-                snprintf(mpanicpath, sizeof(mpanicpath)-1, "%s/%s", path, name);
-                fd_panic = fopen(mpanicpath, "r");
-                if (fd_panic == NULL){
-                    LOGE("%s: can not open file: %s\n", __FUNCTION__, mpanicpath);
-                    break;
-                }
-                char value[PATHMAX] = "";
-                if (ismpanic) {
-                    fscanf(fd_panic, "%s", value);
-                    fprintf(fp,"DATA0=%s\n", value);
-                }
-                else { // iscrashdata
-                    while (fgets(value,sizeof(value),fd_panic) && !strstr(value,"_END"))
-                        fprintf(fp,"%s\n", value);
-                }
-                fclose(fd_panic);
-                break;
-            }
-        }
-        closedir(d);
-    }
-    fprintf(fp,"_END\n");
-    fclose(fp);
-    return 0;
 }
 
 void notify_crashreport() {
@@ -749,8 +803,53 @@ void notify_crashreport() {
         return;
 
     int status = system("am broadcast -n com.intel.crashreport/.specific.NotificationReceiver -a com.intel.crashreport.intent.CRASH_NOTIFY -c android.intent.category.ALTERNATIVE");
-    if (status != 0)
-        LOGI("notify crashreport status: %d.\n", status);
+    if (status == -1) {
+        LOGI("notify crash report failed: fork\n");
+        return;
+    }
+
+    if (WIFEXITED(status) && WEXITSTATUS(status)) {
+        LOGI("notify crash report status: %d.\n", WEXITSTATUS(status));
+        return;
+    }
+}
+
+/**
+ * @brief Notify partition error
+ *
+ * @return Notify partition error : 1 if successfull
+ */
+int notify_partition_error(enum partition_error type) {
+    char boot_state[PROPERTY_VALUE_MAX];
+    int status = 0;
+
+    property_get(PROP_BOOT_STATUS, boot_state, "-1");
+    if (strcmp(boot_state, "1"))
+        return 0;
+
+    switch(type) {
+        case ERROR_LOGS_MISSING :
+             status = system("am broadcast -a intel.intent.action.phonedoctor.REPORT_ERROR --es \"intel.intent.extra.phonedoctor.TYPE\" \"PARTITION\" --es \"intel.intent.extra.phonedoctor.DATA0\" \"LOGS MISSING\"");
+             break;
+        case ERROR_LOGS_RO :
+             status = system("am broadcast -a intel.intent.action.phonedoctor.REPORT_ERROR --es \"intel.intent.extra.phonedoctor.TYPE\" \"PARTITION\" --es \"intel.intent.extra.phonedoctor.DATA0\" \"LOGS READ ONLY\"");
+             break;
+        case ERROR_PARTITIONS_MISSING :
+             status = system("am broadcast -a intel.intent.action.phonedoctor.REPORT_ERROR --es \"intel.intent.extra.phonedoctor.TYPE\" \"PARTITION\" --es \"intel.intent.extra.phonedoctor.DATA0\" \"PARTITION MISSING\"");
+             break;
+        default :
+             break;
+    }
+    if (status == -1) {
+        LOGI("notify partition error failed: fork\n");
+        return 0;
+    }
+
+    if (WIFEXITED(status) && WEXITSTATUS(status)) {
+        LOGI("notify partition error status: %d.\n", WEXITSTATUS(status));
+        return 0;
+    }
+    return 1;
 }
 
 /**
@@ -914,13 +1013,69 @@ void clean_crashlog_in_sd(char *dir_to_search, int max) {
     gabortcleansd = (i < max);
 }
 
+#ifdef CONFIG_EFILINUX
+struct {
+    char * name;
+    char * description;
+} target_os_boot_array[] = {
+    {"", "N/A"},
+    {"main", "MOS"},
+    {"fastboot", "POS"},
+    {"recovery", "ROS"},
+    {"charging", "COS"}
+};
+
+static void trim_wchar_to_char(char *src, char * dest, int length) {
+    int src_count, dest_count;
+    for (src_count = 0, dest_count = 0; src_count < length; dest_count++, src_count += 2) {
+        dest[dest_count] = (char) src[src_count];
+    }
+}
+
+static char * check_os_boot_entry_description(const char* name, const char *guid){
+    const int max_len = 1024;
+    char target_mode[max_len];
+    int ret = 0;
+
+    int entries = sizeof(target_os_boot_array) / sizeof(target_os_boot_array[0]);
+
+    if ((ret = libuefivar_read_string(name, guid, target_mode, max_len)<=0)) {
+        LOGE("%s: Could not retrieve last target mode name or empty, returned: %d", __FUNCTION__, ret);
+        return target_os_boot_array[0].description;
+    }
+    trim_wchar_to_char(target_mode, target_mode, max_len);
+
+    while (entries--) {
+        if (!strcmp(target_mode, target_os_boot_array[entries].name))
+            break;
+    }
+    entries = (entries<0) ? 0 : entries;
+    return target_os_boot_array[entries].description;
+}
+
+static char * compute_bootmode(char* retVal, int len){
+    const char *last_target_mode_name = "LoaderEntryLast";
+    const char *previous_target_mode_name = "LoadEntryPrevious";
+    const char *guid = "4a67b082-0a4c-41cf-b6c7-440b29bb8c4f";
+
+    snprintf(retVal, len, "%s-%s",
+             check_os_boot_entry_description(previous_target_mode_name, guid),
+             check_os_boot_entry_description(last_target_mode_name, guid));
+
+    return retVal;
+}
+#endif
+
 //This function creates a reboot file(DATA0/1 set to RESETSRC0/1).
 int create_rebootfile(char* key, int data_ready)
 {
     FILE *fp;
     char fullpath[PATHMAX];
+    int ret = 0;
+    const int bootmode_len = 16;
+    char bootmode[bootmode_len];
 
-    if(!file_exists(EVENTS_DIR)) {
+    if (!file_exists(EVENTS_DIR)) {
         /* Create a fresh directory */
         errno = 0;
         if (mkdir(EVENTS_DIR, 0777) == -1) {
@@ -935,8 +1090,7 @@ int create_rebootfile(char* key, int data_ready)
     //Create crashfile
     errno = 0;
     fp = fopen(fullpath,"w");
-    if (fp == NULL)
-    {
+    if (fp == NULL) {
         LOGE("%s: Cannot create %s - %s\n", __FUNCTION__, fullpath, strerror(errno));
         return -errno;
     }
@@ -945,14 +1099,46 @@ int create_rebootfile(char* key, int data_ready)
 
     errno = 0;
     fp = fopen(fullpath,"w");
-    if (fp == NULL)
-    {
+    if (fp == NULL) {
         LOGE("%s: can not open file: %s %s\n", __FUNCTION__, fullpath, strerror(errno));
         return -errno;
     }
 
     fprintf(fp,"DATA_READY=%d\n", data_ready);
-    if (data_ready){
+
+#ifdef CONFIG_EFILINUX
+    //generating data0, data1 for edk platforms
+    char resetsource[32] = { '\0', };
+    char resettype[32] = { '\0', };
+    char wakesource[32] = { '\0', };
+    char shutdownsource[32] = { '\0', };
+
+    ret = read_resetsource(resetsource);
+    if (ret > 0) {
+        fprintf(fp,"DATA0=%s\n", resetsource);
+    }
+
+    ret = read_resettype(resettype);
+    if (ret > 0) {
+        fprintf(fp,"DATA1=%s\n", resettype);
+    }
+
+    ret = read_wakesource(wakesource);
+    if (ret > 0) {
+        fprintf(fp,"DATA2=%s\n", wakesource);
+    }
+
+    ret = read_shutdownsource(shutdownsource);
+    if (ret > 0) {
+        fprintf(fp,"DATA3=%s\n", shutdownsource);
+    }
+
+    fprintf(fp,"BOOTMODE=%s\n", compute_bootmode(bootmode, bootmode_len));
+#endif
+
+#ifdef CONFIG_FDK
+    //generating data0, data1 for other platforms
+    if (data_ready) {
         LOGI("reset source detected : generating DATA0\n");
         char tmp[PATHMAX] = "";
         if(file_exists(RESET_SOURCE_0))
@@ -967,8 +1153,9 @@ int create_rebootfile(char* key, int data_ready)
         else if(file_exists(RESET_IRQ_2))
             snprintf(tmp, sizeof(tmp), RESET_IRQ_2);
         get_data_from_boot_file(tmp,"DATA4", fp);
-
     }
+#endif
+
     fprintf(fp,"_END\n");
     fclose(fp);
     return 0;
@@ -1000,4 +1187,50 @@ void get_data_from_boot_file(char *file, char* data, FILE* fp) {
         }
         fclose(fd_source);
     }
+}
+
+void do_wdt_log_copy(int dir) {
+    const char *dateshort = get_current_time_short(1);
+    char destination[PATHMAX] = "";
+
+    destination[0] = '\0';
+    snprintf(destination, sizeof(destination), "%s%d/", CRASH_DIR, dir);
+    flush_aplog(APLOG_BOOT, "WDT", &dir, dateshort);
+    usleep(TIMEOUT_VALUE);
+    do_log_copy("WDT", dir, dateshort, APLOG_TYPE);
+    do_last_fw_msg_copy(dir);
+}
+
+int get_cmdline_bootreason(char *bootreason) {
+    FILE *fd;
+    int res;
+    char *p, *p1;
+    char cmdline[1024] = { '\0', };
+    const char key[] = "bootreason=";
+
+    fd = fopen(CURRENT_KERNEL_CMDLINE, "r");
+    if (!fd) {
+        LOGE("%s: failed to open file %s - %s\n", __FUNCTION__,
+             CURRENT_KERNEL_CMDLINE, strerror(errno));
+        return -1;
+    }
+
+    res = fread(cmdline, 1, sizeof(cmdline)-1, fd);
+    if (res <= 0) {
+        LOGE("%s: failed to read file %s - %s\n", __FUNCTION__,
+             CURRENT_KERNEL_CMDLINE, strerror(errno));
+        return -1;
+    }
+    fclose(fd);
+
+    p = strstr(cmdline, key);
+    if (!p)
+        return 0;
+    p += strlen(key);
+    p1 = strstr(p, " ");
+    if (p1)
+        *p1 = '\0';
+
+    strncpy(bootreason, p, strlen(p) + 1);
+    return strlen(bootreason);
 }

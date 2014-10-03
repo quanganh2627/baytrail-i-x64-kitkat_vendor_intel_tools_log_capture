@@ -30,9 +30,19 @@
 
 #include <sys/types.h>
 
+#ifdef CRASHLOGD_MODULE_MODEM
 int process_modem_event(struct watch_entry *entry, struct inotify_event *event);
 int crashlog_check_modem_shutdown();
 int crashlog_check_mpanic_abort();
 int process_modem_generic(struct watch_entry *entry, struct inotify_event *event, int fd);
+#else
+static inline int process_modem_event(struct watch_entry *entry __unused,
+                                      struct inotify_event *event __unused) { return 0; }
+static inline int crashlog_check_modem_shutdown() { return 0; }
+static inline int crashlog_check_mpanic_abort() { return 0; }
+static inline int process_modem_generic(struct watch_entry *entry __unused,
+                                        struct inotify_event *event __unused,
+                                        int fd __unused) { return 0; }
+#endif
 
 #endif /* __MODEM_H__ */

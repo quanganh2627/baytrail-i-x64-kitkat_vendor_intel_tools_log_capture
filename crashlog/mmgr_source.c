@@ -28,6 +28,7 @@
 #include "crashutils.h"
 #include "privconfig.h"
 #include "fsutils.h"
+#include "log.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -37,7 +38,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <errno.h>
-#include <cutils/log.h>
+#include <cutils/properties.h>
 
 /* private structure */
 struct mmgr_data {
@@ -50,6 +51,17 @@ struct mmgr_data {
 
 mmgr_cli_handle_t *mmgr_hdl = NULL;
 static int mmgr_monitor_fd[2];
+
+static bool is_mmgr_fake_event() {
+    char prop_mmgr[PROPERTY_VALUE_MAX];
+
+    if(property_get(PROP_REPORT_FAKE, prop_mmgr, NULL)){
+        if (!strcmp(prop_mmgr, "modem")) {
+            return 1;
+        }
+    }
+    return 0;
+}
 
 static void write_mmgr_monitor_with_extras(char *chain, char *extra_string, int extra_string_len, int extra_int) {
     struct mmgr_data cur_data;
@@ -206,30 +218,6 @@ int mdm_AP_RESET(mmgr_cli_event_t *ev)
     return 0;
 }
 
-int mdm_TEL_ERROR(mmgr_cli_event_t *ev)
-{
-    LOGD("Received E_MMGR_NOTIFY_ERROR");
-    char *extra_string = NULL;
-    int extra_int = 0, extra_string_len = 0;
-    mmgr_cli_error_t * err = (mmgr_cli_error_t *)ev->data;
-
-    if (err == NULL) {
-        LOGE("%s: empty data", __FUNCTION__);
-    }else{
-        extra_int = err->id;
-        if (err->len < MMGRMAXEXTRA) {
-            extra_string = err->reason;
-            extra_string_len = err->len;
-            LOGD("error {id:%d reason:\"%s\" len:%d}", err->id, extra_string, extra_string_len);
-        }else{
-            LOGE("%s: length error : %lu", __FUNCTION__, (unsigned long)err->len);
-        }
-    }
-
-    write_mmgr_monitor_with_extras("TELEPHONY", extra_string, extra_string_len, extra_int);
-    return 0;
-}
-
 int mdm_CORE_DUMP(mmgr_cli_event_t *ev)
 {
     LOGD("Received E_MMGR_NOTIFY_CORE_DUMP");
@@ -237,6 +225,49 @@ int mdm_CORE_DUMP(mmgr_cli_event_t *ev)
     strncpy(cur_data.string,"START_CD\0",sizeof(cur_data.string));
     //TO DO update with write_mmgr_monitor_with_extras
     write(mmgr_monitor_fd[1], &cur_data, sizeof( struct mmgr_data));
+    return 0;
+}
+
+int mdm_TFT_EVENT(mmgr_cli_event_t *ev)
+{
+    LOGD("Received E_MMGR_NOTIFY_TFT_EVENT");
+    struct mmgr_data cur_data;
+    mmgr_cli_tft_event_t * tft_ev = (mmgr_cli_tft_event_t *)ev->data;
+    size_t i;
+
+    // Add "TFT" in top of cur_data.string to recognize the type of event in the next
+    snprintf(cur_data.string, sizeof(cur_data.string), "TFT%s", tft_ev->name);
+
+    // cur_data.extra_int is the merge of the type and the logging rules
+    cur_data.extra_int = (tft_ev->type & 0xFF) + (tft_ev->log << 8);
+
+    if (tft_ev->num_data > 0) {
+        if (tft_ev->data[0].len > 0) {
+            LOGD("len of data 0: %d", tft_ev->data[0].len);
+            strncpy(cur_data.extra_string, tft_ev->data[0].value, sizeof(cur_data.extra_string));
+            cur_data.extra_string[MIN(tft_ev->data[0].len, sizeof(cur_data.extra_string))] = '\0';
+        } else {
+            cur_data.extra_string[0] = '\0';
+        }
+
+        for (i=0; i<tft_ev->num_data-1; i++) {
+            LOGD("len of data %d: %d", i+1, tft_ev->data[i+1].len);
+            if (tft_ev->data[i+1].len > 0) {
+                strncpy(cur_data.extra_tab_string[i], tft_ev->data[i+1].value,
+                        sizeof(cur_data.extra_tab_string[i]));
+                cur_data.extra_tab_string[i][MIN(tft_ev->data[i+1].len,
+                        sizeof(cur_data.extra_tab_string[i]))] = '\0';
+            } else {
+                cur_data.extra_tab_string[i][0] = '\0';
+            }
+        }
+
+        cur_data.extra_nb_causes = tft_ev->num_data - 1;
+    } else {
+        cur_data.extra_nb_causes = 0;
+    }
+
+    write(mmgr_monitor_fd[1], &cur_data, sizeof(struct mmgr_data));
     return 0;
 }
 
@@ -268,7 +299,7 @@ void init_mmgr_cli_source(void){
     mmgr_cli_subscribe_event(mmgr_hdl, mdm_MRESET, E_MMGR_NOTIFY_SELF_RESET);
     mmgr_cli_subscribe_event(mmgr_hdl, mdm_CORE_DUMP_COMPLETE, E_MMGR_NOTIFY_CORE_DUMP_COMPLETE);
     mmgr_cli_subscribe_event(mmgr_hdl, mdm_AP_RESET, E_MMGR_NOTIFY_AP_RESET);
-    mmgr_cli_subscribe_event(mmgr_hdl, mdm_TEL_ERROR, E_MMGR_NOTIFY_ERROR);
+    mmgr_cli_subscribe_event(mmgr_hdl, mdm_TFT_EVENT, E_MMGR_NOTIFY_TFT_EVENT);
 
     uint32_t iMaxTryConnect = MAX_WAIT_MMGR_CONNECT_SECONDS * 1000 / MMGR_CONNECT_RETRY_TIME_MS;
 
@@ -313,50 +344,44 @@ void close_mmgr_cli_source(void){
  *
  * @return 0 on success, -1 on error.
  */
-static int compute_mmgr_param(char *type, int *mode, char *name, int *aplog, int *bplog, int *log_mode) {
+static int compute_mmgr_param(char *type, e_dir_mode_t *mode, char *name, int *aplog, int *bplog, int *log_mode) {
 
     if (strstr(type, "MODEMOFF" )) {
         //CASE MODEMOFF
-        *mode = STATS_MODE;
+        *mode = MODE_STATS;
         sprintf(name, "%s", INFOEVENT);
     } else if (strstr(type, "MSHUTDOWN" )) {
         //CASE MSHUTDOWN
-        *mode = CRASH_MODE;
+        *mode = MODE_CRASH;
         sprintf(name, "%s", CRASHEVENT);
         *aplog = 1;
         *log_mode = APLOG_TYPE;
     } else if (strstr(type, "MOUTOFSERVICE" )) {
         //CASE MOUTOFSERVICE
-        *mode = CRASH_MODE;
+        *mode = MODE_CRASH;
         sprintf(name, "%s", CRASHEVENT);
         *aplog = 1;
         *log_mode = APLOG_TYPE;
     } else if (strstr(type, "MPANIC" )) {
         //CASE MPANIC
-        *mode = CRASH_MODE;
+        *mode = MODE_CRASH;
         sprintf(name, "%s",CRASHEVENT);
         *aplog = 1;
         *log_mode = APLOG_TYPE;
         *bplog = check_running_modem_trace();
     } else if (strstr(type, "APIMR" )) {
         //CASE APIMR
-        *mode = CRASH_MODE;
+        *mode = MODE_CRASH;
         sprintf(name, "%s", CRASHEVENT);
         *aplog = 1;
         *log_mode = APLOG_TYPE;
         *bplog = check_running_modem_trace();
     } else if (strstr(type, "MRESET" )) {
         //CASE MRESET
-        *mode = CRASH_MODE;
+        *mode = MODE_CRASH;
         sprintf(name, "%s",CRASHEVENT);
         *log_mode = APLOG_TYPE;
         *aplog = 1;
-    } else if (strstr(type, "TELEPHONY" )) {
-        //CASE TEL_ERROR
-        *mode = STATS_MODE;
-        sprintf(name, "%s", ERROREVENT);
-        *aplog = 1;
-        *log_mode = APLOG_STATS_TYPE;
     } else  if (!strstr(type, "START_CD" )){
         //unknown event name
         LOGE("%s: wrong type found in mmgr_get_fd : %s.\n", __FUNCTION__, type);
@@ -377,7 +402,8 @@ static int compute_mmgr_param(char *type, int *mode, char *name, int *aplog, int
  * @return 0 on success, -1 on error.
  */
 int mmgr_handle(void) {
-    int event_mode = 0, aplog_mode, dir;
+    e_dir_mode_t event_mode = MODE_CRASH;
+    int aplog_mode, bplog_mode = BPLOG_TYPE, dir;
     char *event_dir, *key;
     char event_name[MMGRMAXSTRING];
     char data0[MMGRMAXEXTRA];
@@ -422,8 +448,30 @@ int mmgr_handle(void) {
     }
     //find_dir should be done before event_dir is set
     LOGD("Received string from mmgr: %s  - %d bytes", type,nbytes);
-    if (compute_mmgr_param(type, &event_mode, event_name, &copy_aplog, &copy_bplog, &aplog_mode) < 0) {
-        return -1;
+    // For "TFT" event, parameters are given by the data themselves
+    if (strstr(type, "TFT")) {
+        switch (cur_data.extra_int & 0xFF) {
+             case E_EVENT_ERROR:
+                 sprintf(event_name, "%s", ERROREVENT);
+                 break;
+             case E_EVENT_STATS:
+                 sprintf(event_name, "%s", STATSEVENT);
+                 break;
+             case E_EVENT_INFO:
+             default:
+                 sprintf(event_name, "%s", INFOEVENT);
+        }
+        event_mode = MODE_STATS;
+        aplog_mode = APLOG_STATS_TYPE;
+        bplog_mode = BPLOG_STATS_TYPE;
+        copy_aplog = (cur_data.extra_int >> 8) & MMGR_CLI_TFT_AP_LOG_MASK;
+        copy_bplog = ((cur_data.extra_int >> 8) & MMGR_CLI_TFT_BP_LOG_MASK)
+                && check_running_modem_trace();
+    } else {
+       if (compute_mmgr_param(type, &event_mode, event_name, &copy_aplog, &copy_bplog,
+               &aplog_mode) < 0) {
+           return -1;
+       }
     }
     //set DATA0/1 value
     if (strstr(type, "MPANIC" )) {
@@ -476,12 +524,32 @@ int mmgr_handle(void) {
                 snprintf(data5,sizeof(data5),"%s", cur_data.extra_tab_string[4]);
             }
         }
-    } else if (strstr(type, "TELEPHONY" )){
-        LOGD("Extra int value : %d ",cur_data.extra_int);
-        snprintf(data0,sizeof(data0),"%d", cur_data.extra_int);
+    } else if (strstr(type, "TFT")) {
         LOGD("Extra string value : %s ",cur_data.extra_string);
-        snprintf(data1,sizeof(data1),"%s", cur_data.extra_string);
-    }else if (strstr(type, "START_CD" )){
+        snprintf(data0,sizeof(data0),"%s", cur_data.extra_string);
+        if(cur_data.extra_nb_causes > 0) {
+            LOGD("Extra tab string value 0: %s ",cur_data.extra_tab_string[0]);
+            snprintf(data1,sizeof(data1),"%s", cur_data.extra_tab_string[0]);
+            if(cur_data.extra_nb_causes > 1) {
+                LOGD("Extra tab string value 1: %s ",cur_data.extra_tab_string[1]);
+                snprintf(data2,sizeof(data2),"%s", cur_data.extra_tab_string[1]);
+            }
+            if(cur_data.extra_nb_causes > 2) {
+                LOGD("Extra tab string value 2: %s ",cur_data.extra_tab_string[2]);
+                snprintf(data3,sizeof(data3),"%s", cur_data.extra_tab_string[2]);
+            }
+            if(cur_data.extra_nb_causes > 3) {
+                LOGD("Extra tab string value 3: %s ",cur_data.extra_tab_string[3]);
+                snprintf(data4,sizeof(data4),"%s", cur_data.extra_tab_string[3]);
+            }
+            if(cur_data.extra_nb_causes > 4) {
+                LOGD("Extra tab string value 4 %s ",cur_data.extra_tab_string[4]);
+                snprintf(data5,sizeof(data5),"%s", cur_data.extra_tab_string[4]);
+            }
+        }
+        // Remove the "TFT" tag added in top of cur_data.string
+        strcpy(type, &cur_data.string[3]);
+    } else if (strstr(type, "START_CD" )){
         FILE *fp = fopen(MCD_PROCESSING,"w");
         if (fp == NULL){
             LOGE("can not create file: %s\n", MCD_PROCESSING);
@@ -500,13 +568,13 @@ int mmgr_handle(void) {
     }
 
     // update event_dir should be done after find_dir call
-    event_dir = (event_mode == STATS_MODE ? STATS_DIR : CRASH_DIR);
+    event_dir = (event_mode == MODE_STATS ? STATS_DIR : CRASH_DIR);
 
     if (copy_aplog > 0) {
         do_log_copy(type, dir, dateshort, aplog_mode);
     }
     if (copy_bplog > 0) {
-        do_log_copy(type, dir, dateshort, BPLOG_TYPE);
+        do_log_copy(type, dir, dateshort, bplog_mode);
     }
     snprintf(destion, sizeof(destion), "%s%d/", event_dir, dir);
     // copying file (if required)
@@ -527,6 +595,8 @@ int mmgr_handle(void) {
             snprintf(fullpath, sizeof(fullpath)-1, "%s/%s_errorevent", destion,type );
         }else if (strstr(event_name , INFOEVENT)) {
             snprintf(fullpath, sizeof(fullpath)-1, "%s/%s_infoevent", destion,type );
+        }else if (strstr(event_name , STATSEVENT)) {
+            snprintf(fullpath, sizeof(fullpath)-1, "%s/%s_trigger", destion,type );
         }else{
             snprintf(fullpath, sizeof(fullpath)-1, "%s/%s_crashdata", destion,type );
         }
@@ -552,6 +622,11 @@ int mmgr_handle(void) {
             fclose(fp);
             do_chown(fullpath, PERM_USER, PERM_GROUP);
         }
+    }
+    //last step : need to check if this event should be reported as FAKE
+    if (is_mmgr_fake_event()){
+        //add _FAKE suffix
+        strcat(type,"_FAKE");
     }
     key = raise_event(event_name, type, NULL, destion);
     LOGE("%-8s%-22s%-20s%s %s\n", event_name, key, get_current_time_long(0), type, destion);

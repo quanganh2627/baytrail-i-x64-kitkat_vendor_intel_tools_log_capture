@@ -22,8 +22,10 @@
 #ifndef RAMDUMP_H_
 #define RAMDUMP_H_
 
+#ifdef CRASHLOGD_MODULE_RAMDUMP
 int do_ramdump_checks(int test);
-int crashlog_check_fwdump();
-int request_global_reset();
+#else
+static inline int do_ramdump_checks(int test __unused) { return 0; }
+#endif
 
 #endif /* RAMDUMP_H_ */

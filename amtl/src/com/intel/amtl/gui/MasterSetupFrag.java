@@ -27,6 +27,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.util.Log;
@@ -71,8 +72,6 @@ public class MasterSetupFrag extends Fragment
     private Spinner spinner3gDsp;
     private Button bAppMasterConf;
 
-    // Context used for intents and to display buttons
-    private Context context;
     // Target fragment for progress popup.
     private FragmentManager gsfManager;
 
@@ -149,8 +148,7 @@ public class MasterSetupFrag extends Fragment
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        context = AMTLTabLayout.ctx;
-        context.registerReceiver(mMessageReceiver, new IntentFilter("modem-event"));
+        this.getActivity().registerReceiver(mMessageReceiver, new IntentFilter("modem-event"));
         gsfManager = getFragmentManager();
 
         ConfigApplyFrag appMasterConf
@@ -163,7 +161,7 @@ public class MasterSetupFrag extends Fragment
 
     @Override
     public void onDestroy() {
-        this.context.unregisterReceiver(mMessageReceiver);
+        this.getActivity().unregisterReceiver(mMessageReceiver);
         super.onDestroy();
     }
 
@@ -273,8 +271,8 @@ public class MasterSetupFrag extends Fragment
                 setChosenMasterValues();
                 setMasterStringToInt();
                 ModemConf sysConf = setModemConf();
-                ConfigApplyFrag progressFrag = new ConfigApplyFrag(CONFSETUP_MASTER_TAG,
-                        CONFSETUP_MASTER_TARGETFRAG, this.context);
+                ConfigApplyFrag progressFrag = ConfigApplyFrag.newInstance(CONFSETUP_MASTER_TAG,
+                        CONFSETUP_MASTER_TARGETFRAG);
                 progressFrag.launch(sysConf, this, gsfManager);
                 break;
         }
@@ -293,7 +291,10 @@ public class MasterSetupFrag extends Fragment
     }
 
     private ModemConf setModemConf() {
+        SharedPreferences prefs = this.getActivity().getSharedPreferences("AMTLPrefsData",
+                Context.MODE_PRIVATE);
         LogOutput output = new LogOutput();
+        output.setIndex(prefs.getInt("index", -2));
         if (masterArray != null) {
             for (Master m: masterArray) {
                 output.addMasterToList(m.getName(), m);

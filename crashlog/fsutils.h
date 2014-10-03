@@ -31,6 +31,7 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <dirent.h>
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
@@ -44,14 +45,19 @@ struct arg_copy {
 };
 
 /* Modes used for get_sdcard_paths */
-enum {
+typedef enum e_dir_mode {
     MODE_CRASH = 0,
     MODE_CRASH_NOSD,
     MODE_STATS,
     MODE_APLOGS,
     MODE_BZ,
     MODE_KDUMP,
-};
+} e_dir_mode_t;
+
+typedef enum e_aplog_file {
+    APLOG,
+    APLOG_BOOT,
+} e_aplog_file_t;
 
 /* Mode used to cache a file into a buffer*/
 #define CACHE_TAIL      0
@@ -66,10 +72,20 @@ enum {
 */
 int cache_file(char *filename, char **records, int maxrecords, int cachemode, int offset);
 
-static inline int file_exists(char *filename) {
+static inline int file_exists(const char *filename) {
     struct stat info;
 
     return (stat(filename, &info) == 0);
+}
+
+static inline int dir_exists(const char *dirpath) {
+    DIR * dir;
+
+    dir = opendir(dirpath);
+    if (dir != NULL)
+        return 1;
+    else
+        return 0;
 }
 
 static inline int get_file_size(char *filename) {
@@ -85,17 +101,21 @@ static inline int get_file_size(char *filename) {
 }
 
 int read_file_prop_uid(char* propsource, char *filename, char *uid, char* defaultvalue);
-int find_new_crashlog_dir(int mode);
-int get_sdcard_paths(int mode);
+int find_new_crashlog_dir(e_dir_mode_t mode);
+int get_sdcard_paths(e_dir_mode_t mode);
 void do_log_copy(char *mode, int dir, const char* ts, int type);
 long get_sd_size();
 int sdcard_allowed();
 
+int count_lines_in_file(const char *filename);
 int find_matching_file(char *dir_to_search, char *pattern, char *filename_found);
 int get_value_in_file(char *file, char *keyword, char *value, unsigned int sizemax);
-int find_str_in_file(char *filename, char *keyword, char *tail);
+int find_str_in_file(const char *filename, const char *keyword, const char *tail);
 int find_str_in_standard_file(char *filename, char *keyword, char *tail);
-int find_oneofstrings_in_file(char *file, char **keywords, int nbkeywords);
+int find_oneofstrings_in_file(const char *filename, char *const keywords[], int nbkeywords);
+int find_oneofstrings_in_file_with_keyword(char *filename, char **keywords, char *common_keyword,int nbkeywords);
+void flush_aplog(e_aplog_file_t file, const char *mode, int *dir, const char *ts);
+void reset_file(const char *filename);
 int readline(int fd, char buffer[MAXLINESIZE]);
 int freadline(FILE *fd, char buffer[MAXLINESIZE]);
 int append_file(char *filename, char *text);
@@ -105,6 +125,7 @@ int do_chmod(char *path, char *mode);
 int do_chown(const char *file, char *uid, char *gid);
 int do_copy_eof(const char *src, const char *des);
 int do_copy_tail(char *src, char *dest, int limit);
+int do_copy_utf16(const char *src, const char *des);
 int do_copy(char *src, char *dest, int limit);
 int do_mv(char *src, char *dest);
 int rmfr(char *path);
@@ -115,5 +136,28 @@ void update_logs_permission(void);
 
 int str_simple_replace(char *str, char *search, char *replace);
 int get_parent_dir( char * dir, char *parent_dir );
+
+char *compute_bp_log(const char* ext_file);
+void copy_bplogs(const char *patern, const char *extra, int dir, int limit);
+void save_startuplogs(const char *reboot_id);
+
+/**
+ * Read a one word string from file
+ *
+ * @param file path
+ * @param string to be allocated before
+ * @return string length, 0 if none, -errno code if error
+ */
+int file_read_string(const char *file, char *string);
+
+/**
+ * Search if a directory contains a file name, could be exact or partial
+ *
+ * @param dir to search in
+ * @param filename to look at
+ * @param exact macth of file name or partial
+ * @return number of matched files, -errno on errors
+ */
+int dir_contains(const char *dir, const char *filename, bool exact);
 
 #endif /* __FSUTILS_H__ */

@@ -24,6 +24,12 @@
 #ifndef __FABRIC__H__
 #define __FABRIC__H__
 
-int crashlog_check_fabric(char *reason, int test);
+#ifdef CRASHLOGD_MODULE_FABRIC
+void crashlog_check_fabric_events(char *reason, char *watchdog, int test);
+#else
+static inline void crashlog_check_fabric_events(char *reason __unused,
+                                                char *watchdog __unused,
+                                                int test __unused) {}
+#endif
 
 #endif /* __FABRIC__H__ */

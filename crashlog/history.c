@@ -25,9 +25,11 @@
  */
 
 #include "crashutils.h"
+#include "iptrak.h"
 #include "privconfig.h"
 #include "history.h"
 #include "fsutils.h"
+#include "ingredients.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -43,9 +45,11 @@
 
 static char *historycache[MAX_RECORDS];
 static int nextline = -1;
+static int fileentries = -1;
 static int loop_uptime_event = 1;
 /* last uptime value set at device boot only */
 static char lastbootuptime[24] = "0000:00:00";
+static char lastfakeprop[PROPERTY_VALUE_MAX] = "";
 extern int gabortcleansd;
 // global variable to enable dynamic change of uptime frequency
 int gcurrent_uptime_hour_frequency = UPTIME_HOUR_FREQUENCY;
@@ -125,21 +129,45 @@ static int cache_history_file() {
         fprintf(to, "%s", firstline);
         fprintf(to, HISTORY_BLANK_LINE2);
         fclose(to);
+        nextline = 0;
+        fileentries = 0;
+        return 0;
     }
-    /* Cache the history file without the 2 first lines */
-    res = cache_file(HISTORY_FILE, (char**)historycache, MAX_RECORDS, CACHE_TAIL, 2);
 
+    res = count_lines_in_file(HISTORY_FILE);
     if ( res < 0 ) {
         LOGE("%s: Cannot cache the contents of %s - %s.\n",
             __FUNCTION__, HISTORY_FILE, strerror(-res));
         return res;
     }
+
+    int offset = HIST_FILE_HEADER_SIZE;
+    if (res > (HIST_FILE_HEADER_SIZE + MAX_RECORDS)) {
+        offset = res - MAX_RECORDS;
+    }
+
+    if (res > HIST_FILE_HEADER_SIZE) {
+        fileentries = res - HIST_FILE_HEADER_SIZE;
+        /* Cache the history file without the 2 first lines */
+        res = cache_file(HISTORY_FILE, (char**)historycache, MAX_RECORDS, CACHE_TAIL, offset);
+
+        if ( res < 0 ) {
+            LOGE("%s: Cannot cache the contents of %s - %s.\n",
+                __FUNCTION__, HISTORY_FILE, strerror(-res));
+            return res;
+        }
+    } else {
+        fileentries = 0;
+        nextline = 0;
+        return 0;
+    }
+
     nextline = res % MAX_RECORDS;
     return res;
 }
 
 int reset_history_cache() {
-    if (nextline > 0) {
+    if ((nextline > 0) || (historycache[0] != NULL)) {
         int idx;
         /* delete the cache first */
         for (idx = 0 ; idx < MAX_RECORDS ; idx++)
@@ -209,15 +237,19 @@ int update_history_file(struct history_entry *entry) {
     }
 
     /* Check if the buffer is full */
-    if ( historycache[nextline] == NULL ) {
-        /* Still have some room */
-        if ( (historycache[nextline] = strdup(newline)) == NULL) {
-            newline[strlen(newline) - 1] = 0; /*Remove trailing character for display purpose*/
-            LOGE("%s: Cannot copy the line %s - %s.\n", __FUNCTION__,
-                newline, strerror(nextline));
-            return -errno;
-        }
-        nextline = (nextline + 1) % MAX_RECORDS;
+    if ( historycache[nextline] != NULL ) 
+        free(historycache[nextline]);
+
+    if ( (historycache[nextline] = strdup(newline)) == NULL) {
+        newline[strlen(newline) - 1] = 0; /*Remove trailing character for display purpose*/
+        LOGE("%s: Cannot copy the line %s - %s.\n", __FUNCTION__,
+            newline, strerror(nextline));
+        return -errno;
+    }
+
+    nextline = (nextline + 1) % MAX_RECORDS;
+    fileentries = (fileentries + 1) % MAX_RECORDS_HIST_FILE;
+    if (fileentries != 0){
         /* We can just write the new line at the end of the file */
         res = append_file(HISTORY_FILE, newline);
         if (res > 0) return 0;
@@ -227,17 +259,10 @@ int update_history_file(struct history_entry *entry) {
         return res;
     }
 
-    /* The buffer is full */
-    LOGD("%s : History cache buffer is full\n", __FUNCTION__);
+    /* The file reached MAX_RECORDS_HIST_FILE records append buffer */
+    LOGD("%s : History cache file trimmed from %d to %d records \n", __FUNCTION__, 
+        MAX_RECORDS_HIST_FILE, MAX_RECORDS);
 
-    free(historycache[nextline]);
-    if ( (historycache[nextline] = strdup(newline)) == NULL) {
-        newline[strlen(newline) - 1] = 0; /*Remove trailing character for display purpose*/
-        LOGE("%s: Cannot copy the line %s - %s.\n", __FUNCTION__,
-            newline, strerror(nextline));
-        return -errno;
-    }
-    nextline = (nextline + 1) % MAX_RECORDS;
     /* We need to recreate a new file and write the full buffer
      * costly!!!
      */
@@ -372,6 +397,38 @@ int history_has_event(char *eventdir) {
     return 0;
 }
 
+void clean_fake_property() {
+    char current_fake_prop[PROPERTY_VALUE_MAX];
+    char value[PROPERTY_VALUE_MAX];
+    int fake_prop_countdown;
+    char str[15];
+
+    if(property_get(PROP_REPORT_FAKE, current_fake_prop, NULL)){
+        if (!strcmp(current_fake_prop, "")){
+            //no fake property active, need to clean internal value
+            property_set(PROP_REPORT_COUNTDOWN, 0);
+            strcpy(lastfakeprop, "");
+        } else {
+            if (strcmp(current_fake_prop, lastfakeprop)) {
+                //new fake prop =>reset countdown
+                property_set(PROP_REPORT_COUNTDOWN, "3");
+                strcpy(lastfakeprop,current_fake_prop);
+            } else {
+                property_get(PROP_REPORT_COUNTDOWN, value, "3");
+                fake_prop_countdown = atoi(value);
+                // decrease countdown
+                fake_prop_countdown--;
+                if (fake_prop_countdown <=0){
+                    property_set(PROP_REPORT_FAKE,"");
+                    strcpy(lastfakeprop, "");
+                }
+                sprintf(str, "%d", fake_prop_countdown);
+                property_set(PROP_REPORT_COUNTDOWN, str);
+            }
+        }
+    }
+}
+
 /*
 * Name          : add_uptime_event
 * Description   : adds an uptime event to the history file and upload an event if 12hours passed
@@ -408,6 +465,13 @@ int add_uptime_event() {
         loop_uptime_event = (hours / gcurrent_uptime_hour_frequency) + 1;
         restart_profile_srv(2);
         check_running_power_service();
+        check_iptrak_file(FORCE_GENERATION);
+        check_ingredients_file();
+    } else {
+        /* We may want to update iptrak file anyway, if all data */
+        /* were not available right after boot for instance.     */
+        check_iptrak_file(ONLY_IF_REQUIRED);
+        check_ingredients_file();
     }
     return 0;
 }
@@ -464,5 +528,6 @@ int update_history_on_cmd_delete(char *events) {
 
 int process_uptime_event(struct watch_entry __attribute__((unused)) *entry, struct inotify_event __attribute__((unused)) *event) {
 
+    clean_fake_property();
     return add_uptime_event();
 }

@@ -29,15 +29,19 @@ public class MtsConf {
     private String mtsOutputType = "";
     private String mtsRotateNum = "";
     private String mtsRotateSize = "";
+    private String mtsInterface = "";
+    private String mtsBufferSize = "";
 
 
     public MtsConf(String input, String output, String outputType, String rotateNum,
-            String rotateSize) {
+            String rotateSize, String interFace, String bufferSize) {
         this.mtsInput = (input != null) ? input : this.mtsInput;
         this.mtsOutput = (output != null) ? output : this.mtsOutput;
         this.mtsOutputType = (outputType != null) ? outputType : this.mtsOutputType;
         this.mtsRotateNum = (rotateNum != null) ? rotateNum : this.mtsRotateNum;
         this.mtsRotateSize = (rotateSize != null) ? rotateSize : this.mtsRotateSize;
+        this.mtsInterface = (interFace != null) ? interFace : this.mtsInterface;
+        this.mtsBufferSize = (bufferSize != null) ? bufferSize : this.mtsBufferSize;
     }
 
     public MtsConf() {
@@ -63,6 +67,14 @@ public class MtsConf {
         return this.mtsRotateSize;
     }
 
+    public String getInterface() {
+        return this.mtsInterface;
+    }
+
+    public String getBufferSize() {
+        return this.mtsBufferSize;
+    }
+
     public void applyParameters() {
 
         SystemProperties.set(MtsProperties.MTS_INPUT_PROP, this.mtsInput);
@@ -70,5 +82,7 @@ public class MtsConf {
         SystemProperties.set(MtsProperties.MTS_OUTPUT_TYPE_PROP, this.mtsOutputType);
         SystemProperties.set(MtsProperties.MTS_ROTATE_NUM_PROP, this.mtsRotateNum);
         SystemProperties.set(MtsProperties.MTS_ROTATE_SIZE_PROP, this.mtsRotateSize);
+        SystemProperties.set(MtsProperties.MTS_INTERFACE_PROP, this.mtsInterface);
+        SystemProperties.set(MtsProperties.MTS_BUFFER_SIZE_PROP, this.mtsBufferSize);
     }
 }

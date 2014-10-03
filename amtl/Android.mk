@@ -16,7 +16,9 @@ LOCAL_JNI_SHARED_LIBRARIES := libamtl_jni
 
 LOCAL_PROGUARD_ENABLED := disabled
 
+LOCAL_REQUIRED_MODULES := amtl_cfg
+
 include $(BUILD_PACKAGE)
 
 # Use the following include to make our test apk.
-include $(call all-makefiles-under,$(LOCAL_PATH))
+include $(call first-makefiles-under,$(LOCAL_PATH))

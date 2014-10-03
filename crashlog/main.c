@@ -25,7 +25,6 @@
 
 #include "inotify_handler.h"
 #include "startupreason.h"
-#include "mmgr_source.h"
 #include "crashutils.h"
 #include "privconfig.h"
 #include "usercrash.h"
@@ -40,8 +39,17 @@
 #include "panic.h"
 #include "config_handler.h"
 #include "ramdump.h"
+#include "fw_update.h"
+#include "tcs_wrapper.h"
+#include "kct_netlink.h"
+#include "lct_link.h"
+#include "iptrak.h"
+#include "spid.h"
+#include "ingredients.h"
+#include "mmgr_source.h"
 
 #include <sys/types.h>
+#include <sys/sha1.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <pthread.h>
@@ -54,7 +62,6 @@
 #include <ctype.h>
 
 #include <cutils/properties.h>
-#include <cutils/log.h>
 
 extern char gbuildversion[PROPERTY_VALUE_MAX];
 extern char gboardversion[PROPERTY_VALUE_MAX];
@@ -74,8 +81,75 @@ char *BZ_DIR = NULL;
 
 //Variables containing paths of files triggering IPANIC & FABRICERR & WDT treatment
 char CURRENT_PANIC_CONSOLE_NAME[PATHMAX]={PANIC_CONSOLE_NAME};
+char CURRENT_PANIC_HEADER_NAME[PATHMAX]={PANIC_HEADER_NAME};
 char CURRENT_PROC_FABRIC_ERROR_NAME[PATHMAX]={PROC_FABRIC_ERROR_NAME};
+char CURRENT_PROC_OFFLINE_SCU_LOG_NAME[PATHMAX]={PROC_OFFLINE_SCU_LOG_NAME};
 char CURRENT_KERNEL_CMDLINE[PATHMAX]={KERNEL_CMDLINE};
+
+int partition_notified = 1;
+
+static const char * const mountpoints[] = {
+    "/system",
+    "/cache",
+    "/config",
+    "/logs",
+    "/factory",
+};
+
+static int check_mounted_partition(const char *partition_name)
+{
+    unsigned int i;
+    for (i=0; i < DIM(mountpoints); i++)
+         if (!strncmp(partition_name, mountpoints[i], strlen(mountpoints[i])))
+             return 1;
+    return 0;
+}
+
+// TODO: make /logs mount check an option per CONFIG_LOGS_PATH
+static int check_mounted_partitions()
+{
+    FILE *fd;
+    char mount_dev[256];
+    char mount_dir[256];
+    char mount_type[256];
+    char mount_opts[256];
+    char list_partition[256];
+    int match;
+    int mount_passno;
+    int mount_freq;
+    unsigned int nb_partition = 0;
+    /* if an error is detected, output is set to 0 */
+    int output = 1;
+
+    memset(list_partition, '\0', sizeof(list_partition));
+    fd = fopen("/proc/mounts", "r");
+    if (fd == NULL) {
+        LOGE("can not open mounts file \n");
+        return output;
+    }
+    do {
+        memset(mount_dev, '\0', sizeof(mount_dev));
+        match = fscanf(fd, "%255s %255s %255s %255s %d %d\n",
+                       mount_dev, mount_dir, mount_type,
+                       mount_opts, &mount_freq, &mount_passno);
+         if (strstr(mount_dev, "by-label") && check_mounted_partition(mount_dir)) {
+             nb_partition++;
+             strncat(list_partition, mount_dir, sizeof(list_partition) - 1);
+             if (((strncmp(mount_dir, "/logs", 5)) == 0) && strstr(mount_opts, "ro,"))
+                  output = notify_partition_error(ERROR_LOGS_RO);
+         }
+    } while (match != EOF);
+
+    if (nb_partition < DIM(mountpoints)) {
+        if (!strstr(list_partition, "/logs"))
+            output = notify_partition_error(ERROR_LOGS_MISSING);
+        else
+            output = notify_partition_error(ERROR_PARTITIONS_MISSING);
+    }
+    fclose(fd);
+
+    return output;
+}
 
 int process_command_event(struct watch_entry *entry, struct inotify_event *event) {
     char path[PATHMAX];
@@ -115,6 +189,71 @@ int process_command_event(struct watch_entry *entry, struct inotify_event *event
     LOGE("%s: Unknown action found in %s: %s %s\n", __FUNCTION__,
         path, action, args);
     return -1;
+}
+
+/**
+ * @brief Check that the modem_version file is up-to-date
+ * and (re-)writes it otherwise.
+ *
+ * @return int
+ *  - < 0: if an error occured
+ *  - = 0: if the file was up-to-date
+ *  - > 0: if the file was updated successfully
+ */
+static int update_modem_name() {
+    FILE *fd = NULL;
+    int res = 0;
+    char modem_name[PROPERTY_VALUE_MAX] = "";
+    char previous_modem_name[PROPERTY_VALUE_MAX] = "";
+
+    /*
+     * Retrieve modem name
+     */
+    res = get_modem_name(modem_name);
+    if(res < 0) {
+        LOGE("%s: Could not retrieve modem name, file %s will not be written.\n", __FUNCTION__, LOG_MODEM_VERSION);
+        return res;
+    }
+
+    /*
+     * Check the modem version file.
+     */
+    if ( (fd = fopen(LOG_MODEM_VERSION, "r")) != NULL) {
+        res = fscanf(fd, "%s", previous_modem_name);
+        fclose(fd);
+        /* Check whether there is something to do or not */
+        if ( res == 1 && !strncmp(previous_modem_name, modem_name, PROPERTY_VALUE_MAX) ) {
+            /* Modem version has not changed we can stop here */
+            return 0;
+        }
+    }
+
+    /*
+     * Update file
+     */
+    if ( (fd = fopen(LOG_MODEM_VERSION, "w")) == NULL) {
+        LOGE("%s: Could not open file %s for writing.\n",
+            __FUNCTION__,
+            LOG_MODEM_VERSION);
+        return -1;
+    }
+    fprintf(fd, "%s", modem_name);
+    fclose(fd);
+
+    /* Change file ownership and permissions */
+    if(chmod(LOG_MODEM_VERSION, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH) < 0) {
+        LOGE("%s: Cannot change %s file permissions %s\n",
+            __FUNCTION__,
+            LOG_MODEM_VERSION,
+            strerror(errno));
+        return -1;
+    }
+    do_chown(LOG_MODEM_VERSION, "root", "log");
+
+    /*
+     * Return the result
+     */
+    return res;
 }
 
 static int swupdated(char *buildname) {
@@ -165,20 +304,6 @@ static void reset_logdir(char *path, int remove_dir) {
     }
 }
 
-static void reset_file(char *filename) {
-    FILE *fd;
-
-    fd = fopen(filename, "w");
-    if (fd == NULL) {
-        LOGE("%s: Cannot reset %s - %s\n", __FUNCTION__, filename,
-            strerror(errno));
-        return;
-    }
-    fprintf(fd, "%4d", 0);
-    fclose(fd);
-    do_chown(filename, PERM_USER, PERM_GROUP);
-}
-
 static void reset_after_swupdate(void)
 {
     reset_logdir(HISTORY_CORE_DIR, 1);
@@ -189,6 +314,7 @@ static void reset_after_swupdate(void)
     reset_file(CRASH_CURRENT_LOG);
     reset_file(STATS_CURRENT_LOG);
     reset_file(APLOGS_CURRENT_LOG);
+    reset_file(HISTORY_FILE);
     reset_uptime_history();
 }
 
@@ -199,6 +325,11 @@ static void timeup_thread_mainloop()
     char logenable[PROPERTY_VALUE_MAX];
 
     while (1) {
+        /*
+         * checks the mounted partitions ...
+         */
+        if (partition_notified && !check_mounted_partitions())
+              partition_notified = 0;
         /*
          * checks the logging services are still alive...
          * restart it if necessary
@@ -225,12 +356,21 @@ static void timeup_thread_mainloop()
 static void early_check_nomain(char *boot_mode, int test) {
 
     char startupreason[32] = { '\0', };
+    char watchdog[16] = { '\0', };
     const char *datelong;
     char *key;
 
     read_startupreason(startupreason);
 
+    strcpy(watchdog,"WDT");
+
+    crashlog_check_fabric_events(startupreason, watchdog, test);
+    crashlog_check_panic_events(startupreason, watchdog, test);
+    crashlog_check_startupreason(startupreason, watchdog);
+
     key = raise_event_nouptime(SYS_REBOOT, startupreason, NULL, NULL);
+    save_startuplogs(key);
+
     datelong = get_current_time_long(0);
     LOGE("%-8s%-22s%-20s%s\n", SYS_REBOOT, key, datelong, startupreason);
     free(key);
@@ -246,6 +386,7 @@ static void early_check(char *encryptstate, int test) {
     char startupreason[32] = { '\0', };
     char flashtype[32] = { '\0', };
     char watchdog[16] = { '\0', };
+    int modem_name_check_result = 0;
     const char *datelong;
     char *key;
     struct stat info;
@@ -264,7 +405,7 @@ static void early_check(char *encryptstate, int test) {
 
     strcpy(watchdog,"WDT");
 
-    crashlog_check_fabric(startupreason, test);
+    crashlog_check_fabric_events(startupreason, watchdog, test);
     crashlog_check_panic_events(startupreason, watchdog, test);
     crashlog_check_kdump(startupreason, test);
     crashlog_check_modem_shutdown();
@@ -273,6 +414,8 @@ static void early_check(char *encryptstate, int test) {
     crashlog_check_recovery();
 
     key = raise_event_bootuptime(SYS_REBOOT, startupreason, NULL, NULL);
+    save_startuplogs(key);
+
     datelong = get_current_time_long(0);
     LOGE("%-8s%-22s%-20s%s\n", SYS_REBOOT, key, datelong, startupreason);
     free(key);
@@ -283,59 +426,60 @@ static void early_check(char *encryptstate, int test) {
         free(key);
     }
 
+    crashlog_check_fw_update_status();
+
     key = raise_event_nouptime(STATEEVENT, encryptstate, NULL, NULL);
     LOGE("%-8s%-22s%-20s%s\n", STATEEVENT, key, datelong, encryptstate);
     free(key);
-}
 
-void spid_read_concat(const char *path, char *complete_value)
-{
-    FILE *fd;
-    char temp_spid[5]="XXXX";
-
-    fd = fopen(path, "r");
-    if (fd != NULL && fscanf(fd, "%s", temp_spid) == 1)
-        fclose(fd);
-    else
-        LOGE("%s: Cannot read %s - %s\n", __FUNCTION__, path, strerror(errno));
-
-    strncat(complete_value,"-",1);
-    strncat(complete_value,temp_spid, sizeof(temp_spid));
-}
-/**
- * Read SPID data from file system, build it and write it into given file
- */
-void read_sys_spid(char *filename)
-{
-    FILE *fd;
-    char complete_spid[256];
-    char temp_spid[5]="XXXX";
-
-    if (filename == 0)
-        return;
-
-    fd = fopen(SYS_SPID_1, "r");
-    if (fd != NULL && fscanf(fd, "%s", temp_spid) == 1)
-        fclose(fd);
-    else
-        LOGE("%s: Cannot read SPID from %s - %s\n", __FUNCTION__, SYS_SPID_1, strerror(errno));
-
-    snprintf(complete_spid, sizeof(complete_spid), "%s", temp_spid);
-
-    spid_read_concat(SYS_SPID_2,complete_spid);
-    spid_read_concat(SYS_SPID_3,complete_spid);
-    spid_read_concat(SYS_SPID_4,complete_spid);
-    spid_read_concat(SYS_SPID_5,complete_spid);
-    spid_read_concat(SYS_SPID_6,complete_spid);
-
-    fd = fopen(filename, "w");
-    if (!fd) {
-        LOGE("%s: Cannot write SPID to %s - %s\n", __FUNCTION__, filename, strerror(errno));
-    } else {
-        fprintf(fd, "%s", complete_spid);
-        fclose(fd);
+#ifdef CRASHLOGD_MODULE_MODEM
+    if(cfg_check_modem_version()) {
+        modem_name_check_result = update_modem_name();
+        if(modem_name_check_result < 0) {
+            LOGI("%s: An error occurred when read/writing %s.", __FUNCTION__, LOG_MODEM_VERSION);
+        } else if (modem_name_check_result == 0) {
+            LOGI("%s: The file %s was up-to-date.", __FUNCTION__, LOG_MODEM_VERSION);
+        } else {
+            LOGI("%s: File %s updated successfully.", __FUNCTION__, LOG_MODEM_VERSION);
+        }
     }
-    do_chown(filename, PERM_USER, PERM_GROUP);
+#endif
+    /* Update the iptrak file */
+    check_iptrak_file(RETRY_ONCE);
+    check_ingredients_file();
+}
+
+/**
+ * Provide SHA1 of mmcblk0 CID (Card IDentification)
+ *
+ * @param id data returned, must be allocated,
+ *        minimum 41 bytes (2 * SHA1_DIGEST_LENGTH + 1)
+ * @return id data length, should be 40 (2 * SHA1_DIGEST_LENGTH),
+ *         otherwise -errno if errors
+ */
+static int get_mmc_id(char* id) {
+    int ret, i;
+    SHA1_CTX ctx;
+    char buf[50] = { '\0', };
+    unsigned char sha1[SHA1_DIGEST_LENGTH];
+    char *id_tmp = id;
+
+    if (!id)
+        return -EINVAL;
+
+    ret = file_read_string(SYS_BLK_MMC0_CID, buf);
+    if (ret <= 0)
+        return ret;
+
+    SHA1Init(&ctx);
+    SHA1Update(&ctx, (unsigned char*)buf, strlen(buf));
+    SHA1Final(sha1, &ctx);
+
+    for (i = 0; i < SHA1_DIGEST_LENGTH; i++, id_tmp += 2)
+        sprintf(id_tmp, "%02x", sha1[i]);
+    *id_tmp = '\0';
+
+    return strlen(id);
 }
 
 /**
@@ -356,15 +500,50 @@ void write_uuid(char* filename, char *uuid_value)
     }
 }
 
+/**
+ * Set guuid global variable and write it to uuid.txt
+ */
+static void get_device_id(void) {
+    int ret;
+
+    if (g_current_serial_device_id == 1) {
+        /* Get serial ID from properties and updates UUID file */
+        property_get("ro.serialno", guuid, "empty_serial");
+        goto write;
+    }
+
+    ret = file_read_string(PROC_UUID, guuid);
+    if ((ret < 0 && ret != -ENOENT) || !ret)
+        LOGE("%s: Could not read %s (%s)\n", __FUNCTION__,
+             PROC_UUID, strerror(-ret));
+    else if (ret > 0)
+        goto write;
+
+    ret = get_mmc_id(guuid);
+    if (ret <= 0)
+        LOGE("%s: Could not get mmc id: %d (%s)\n",
+             __FUNCTION__, ret, strerror(-ret));
+    else
+        goto write;
+
+    LOGE("%s: Could not find DeviceId, set it to '%s'\n",
+         __FUNCTION__, DEVICE_ID_UNKNOWN);
+    strncpy(guuid, DEVICE_ID_UNKNOWN, strlen(DEVICE_ID_UNKNOWN));
+
+  write:
+    write_uuid(LOG_UUID, guuid);
+}
+
 static void get_crash_env(char * boot_mode, char *crypt_state, char *encrypt_progress, char *decrypt, char *token) {
 
     char value[PROPERTY_VALUE_MAX];
-    FILE *fd;
 
     if( property_get("crashlogd.debug.proc_path", value, NULL) > 0 )
     {
         snprintf(CURRENT_PROC_FABRIC_ERROR_NAME, sizeof(CURRENT_PROC_FABRIC_ERROR_NAME), "%s/%s", value, FABRIC_ERROR_NAME);
-        snprintf(CURRENT_PANIC_CONSOLE_NAME, sizeof(CURRENT_PANIC_CONSOLE_NAME), "%s/%s", value, CONSOLE_NAME);
+        snprintf(CURRENT_PROC_OFFLINE_SCU_LOG_NAME, sizeof(CURRENT_PROC_OFFLINE_SCU_LOG_NAME), "%s/%s", value, OFFLINE_SCU_LOG_NAME);
+        snprintf(CURRENT_PANIC_CONSOLE_NAME, sizeof(CURRENT_PANIC_CONSOLE_NAME), "%s/%s", value, EMMC_CONSOLE_NAME);
+        snprintf(CURRENT_PANIC_HEADER_NAME, sizeof(CURRENT_PANIC_HEADER_NAME), "%s/%s", value, EMMC_HEADER_NAME);
         snprintf(CURRENT_KERNEL_CMDLINE, sizeof(CURRENT_KERNEL_CMDLINE), "%s/%s", value, CMDLINE_NAME);
         LOGI("Test Mode : ipanic, fabricerr and wdt trigger path is %s\n", value);
     }
@@ -384,24 +563,8 @@ static void get_crash_env(char * boot_mode, char *crypt_state, char *encrypt_pro
     property_get("vold.decrypt", decrypt, "");
     property_get("crashlogd.token", token, "");
 
-   /* Read UUID */
-    if (g_current_serial_device_id == 1) {
-        /* Get serial ID from properties and updates UUID file */
-        property_get("ro.serialno", guuid, "empty_serial");
-        write_uuid(LOG_UUID, guuid);
-    } else {
-        /* Read UUID value from /proc (emmc) and set UUID file with retrieved value.
-         * If reading fails set "Medfield" as default value */
-        fd = fopen(PROC_UUID, "r");
-        if (fd != NULL && fscanf(fd, "%s", guuid) == 1) {
-            fclose(fd);
-            write_uuid(LOG_UUID, guuid);
-        } else {
-            LOGE("%s: Cannot read uuid from %s - %s\n",
-                __FUNCTION__, PROC_UUID, strerror(errno));
-            write_uuid(LOG_UUID, "Medfield");
-        }
-    }
+    get_device_id();
+
     /* Read SPID */
     read_sys_spid(LOG_SPID);
 
@@ -446,7 +609,9 @@ int do_monitor() {
     set_watch_entry_callback(SYSSERVER_TYPE,    process_anruiwdt_event);
     set_watch_entry_callback(ANR_TYPE,          process_anruiwdt_event);
     set_watch_entry_callback(TOMBSTONE_TYPE,    process_usercrash_event);
+    set_watch_entry_callback(JAVATOMBSTONE_TYPE,    process_usercrash_event);
     set_watch_entry_callback(JAVACRASH_TYPE,    process_usercrash_event);
+    set_watch_entry_callback(JAVACRASH_TYPE2,   process_usercrash_event);
 #ifdef FULL_REPORT
     set_watch_entry_callback(HPROF_TYPE,        process_hprof_event);
     set_watch_entry_callback(STATTRIG_TYPE,     process_stat_event);
@@ -464,6 +629,10 @@ int do_monitor() {
 
     init_mmgr_cli_source();
 
+    kct_netlink_init_comm();
+
+    lct_link_init_comm();
+
     for(;;) {
         // Clear fd set
         FD_ZERO(&read_fds);
@@ -480,6 +649,20 @@ int do_monitor() {
             FD_SET(mmgr_get_fd(), &read_fds);
             if (mmgr_get_fd() > max)
                 max = mmgr_get_fd();
+        }
+
+        //kct fd setup
+        if (kct_netlink_get_fd() > 0) {
+            FD_SET(kct_netlink_get_fd(), &read_fds);
+            if (kct_netlink_get_fd() > max)
+                max = kct_netlink_get_fd();
+        }
+
+        //lct fd setup
+        if (lct_link_get_fd() > 0) {
+            FD_SET(lct_link_get_fd(), &read_fds);
+            if (lct_link_get_fd() > max)
+                max = lct_link_get_fd();
         }
 
         // Wait for events
@@ -501,9 +684,18 @@ int do_monitor() {
                 LOGD("mmgr fd set");
                 mmgr_handle();
             }
+            // kct monitor
+            if (FD_ISSET(kct_netlink_get_fd(), &read_fds)) {
+                LOGD("kct fd set");
+                kct_netlink_handle_msg();
+            }
+            // lct monitor
+            if (FD_ISSET(lct_link_get_fd(), &read_fds)) {
+                LOGD("lct fd set");
+                lct_link_handle_msg();
+            }
         }
     }
-
     close_mmgr_cli_source();
     free_config(g_first_modem_config);
     LOGE("Exiting main monitor loop\n");
@@ -518,8 +710,18 @@ int do_monitor() {
  */
 int compute_crashlogd_mode(char *boot_mode, int ramdump_flag ) {
 
-    if (!strcmp(boot_mode, "main")) {
-        g_crashlog_mode = NOMINAL_MODE;
+#define PROP_CRASHLOGD_ENABLE "persist.crashlogd.enable"
+
+    char property_value[PROPERTY_VALUE_MAX];
+    property_get(PROP_CRASHLOGD_ENABLE, property_value, "");
+
+    if (!strcmp(boot_mode, "main") || !strcmp(boot_mode, "")) {
+        // nominal strategy, only switch to minimal mode if requested
+        if (!strcmp(property_value, "0")) {
+            g_crashlog_mode = MINIMAL_MODE;
+        } else {
+            g_crashlog_mode = NOMINAL_MODE;
+        }
     } else if (!strcmp(boot_mode, "ramconsole")) {
         if (ramdump_flag)
             g_crashlog_mode = RAMDUMP_MODE;
