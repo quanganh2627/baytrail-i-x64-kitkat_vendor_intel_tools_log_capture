@@ -99,10 +99,12 @@ LOCAL_CFLAGS += -DCRASHLOGD_MODULE_SPID
 LOCAL_SRC_FILES += spid.c
 endif
 
-ifeq ($(CRASHLOGD_MODULE_BACKTRACE),true)
-LOCAL_CFLAGS += -DCRASHLOGD_MODULE_BACKTRACE
-LOCAL_C_INCLUDES += $(LOCAL_PATH)/../backtrace
-LOCAL_SHARED_LIBRARIES += libparse_stack
+# Enabled by default
+ifneq ($(CRASHLOGD_MODULE_BTDUMP),false)
+LOCAL_CFLAGS += -DCONFIG_BTDUMP
+LOCAL_STATIC_LIBRARIES += libbtdump
+LOCAL_SHARED_LIBRARIES += libbacktrace
+include external/stlport/libstlport.mk
 endif
 
 ifeq ($(CRASHLOGD_MODULE_KCT),true)
