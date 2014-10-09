@@ -832,7 +832,7 @@ int main(int argc, char **argv) {
         /* DECRYPTED by default */
         strcpy(encryptstate,"DECRYPTED");
 
-        if ( encrypt_progress[0]) {
+        if (!strcmp(crypt_state, "unencrypted") && encrypt_progress[0]) {
             /* Encrypting unencrypted device... */
             LOGI("phone enter state: encrypting.\n");
         } else if (!strcmp(crypt_state, "unencrypted") && !alreadyran) {
