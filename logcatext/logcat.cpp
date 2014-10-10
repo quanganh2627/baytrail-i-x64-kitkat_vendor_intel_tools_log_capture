@@ -1,4 +1,5 @@
 // Copyright 2006-2014 The Android Open Source Project
+// Copyright 2014      Intel
 
 #include <assert.h>
 #include <ctype.h>
@@ -22,6 +23,9 @@
 #include <log/logd.h>
 #include <log/logprint.h>
 #include <log/event_tag_map.h>
+
+#include "klogger.h"
+#include "unblocker.h"
 
 #define DEFAULT_LOG_ROTATE_SIZE_KBYTES 16
 #define DEFAULT_MAX_ROTATED_LOGS 4
@@ -323,6 +327,7 @@ int main(int argc, char **argv)
     struct logger_list *logger_list;
     unsigned int tail_lines = 0;
     log_time tail_time(log_time::EPOCH);
+    bool use_klogger = false;
 
     signal(SIGPIPE, exit);
 
@@ -439,7 +444,12 @@ int main(int argc, char **argv)
             break;
 
             case 'b': {
+                if (strcmp(optarg, "kernel") == 0) {
+                    use_klogger = true;
+                    break;
+                }
                 if (strcmp(optarg, "all") == 0) {
+                    use_klogger = true;
                     while (devices) {
                         dev = devices;
                         devices = dev->next;
@@ -622,7 +632,7 @@ int main(int argc, char **argv)
         }
     }
 
-    if (!devices) {
+    if (!devices && !use_klogger) {
         dev = devices = new log_device_t("main", false, 'm');
         android::g_devCount = 1;
         if (android_name_to_log_id("system") == LOG_ID_SYSTEM) {
@@ -814,7 +824,6 @@ int main(int argc, char **argv)
         exit(0);
     }
 
-
     if (getLogSize) {
         exit(0);
     }
@@ -829,54 +838,119 @@ int main(int argc, char **argv)
     //LOG_EVENT_LONG(11, 0x1122334455667788LL);
     //LOG_EVENT_STRING(0, "whassup, doc?");
 
+    /*If we are actually doing some reading,also open the extended source */
+    if (use_klogger)
+        use_klogger = klogger_init();
+    log_device_t kdev("kernel",false,0);
     if (needBinary)
         android::g_eventTagMap = android_openEventTagMap(EVENT_TAG_MAP_FILE);
 
+    struct log_msg log_msg, klog_msg, *selected_msg;
+    bool log_msg_ready = false, klog_msg_ready = false;
+    if (devices && use_klogger)
+        unblock_start(android_name_to_log_id(devices->device),ANDROID_LOG_UNKNOWN);
     while (1) {
-        struct log_msg log_msg;
-        int ret = android_logger_list_read(logger_list, &log_msg);
+        /*I assume that logd will return the messages in order
+         * Therefore I employ the following strategy
+         * first read the both sources kernel + logd
+         * if only one is able to return a message the send it out
+         * if we both return a message then send the oldest one and only read that source again*/
+        int ret;
 
-        if (ret == 0) {
-            fprintf(stderr, "read: Unexpected EOF!\n");
-            exit(EXIT_FAILURE);
-        }
 
-        if (ret < 0) {
-            if (ret == -EAGAIN) {
-                break;
-            }
+        if (devices && !log_msg_ready) {
+            if (use_klogger)
+                unblock_resume();
+            ret = android_logger_list_read(logger_list, &log_msg);
+            log_msg_ready = true;
+            if (use_klogger)
+                unblock_ack();
+            /* set ret to -EAGAIN if it is a sync msg*/
+            if(unblock_is_sync(&log_msg))
+                ret =  -EAGAIN;
 
-            if (ret == -EIO) {
+            if (ret == 0) {
                 fprintf(stderr, "read: Unexpected EOF!\n");
                 exit(EXIT_FAILURE);
             }
-            if (ret == -EINVAL) {
-                fprintf(stderr, "read: unexpected length.\n");
-                exit(EXIT_FAILURE);
+
+            if (ret < 0) {
+                if (ret == -EAGAIN) {
+                    log_msg_ready = false;
+                }
+
+                if (ret == -EIO) {
+                    fprintf(stderr, "read: Unexpected EOF!\n");
+                    exit(EXIT_FAILURE);
+                }
+                if (ret == -EINVAL) {
+                    fprintf(stderr, "read: unexpected length.\n");
+                    exit(EXIT_FAILURE);
+                }
+                if (log_msg_ready) {
+                    perror("logcat read failure");
+                    exit(EXIT_FAILURE);
+                }
             }
-            perror("logcat read failure");
+            if (log_msg_ready) {
+                for (dev = devices; dev; dev = dev->next) {
+                    if (android_name_to_log_id(dev->device) == log_msg.id()) {
+                        break;
+                    }
+                }
+                if (!dev) {
+                    fprintf(stderr, "read: Unexpected log ID!\n");
+                    exit(EXIT_FAILURE);
+                }
+            }
+        }
+
+        if (use_klogger && !klog_msg_ready){
+            klog_msg_ready = (klogger_read(&klog_msg) > 0);
+            unblock_kmsg_consumed();
+        }
+
+        if (klog_msg_ready && log_msg_ready) {
+            if (log_msg < klog_msg) {
+                selected_msg = &log_msg;
+            } else {
+                selected_msg = &klog_msg;
+            }
+        } else {
+            if (klog_msg_ready) {
+                selected_msg = &klog_msg;
+            } else if (log_msg_ready) {
+                selected_msg = &log_msg;
+            } else {
+                if (mode & O_NDELAY)
+                    break;
+                /*some "special sleep" could help*/
+                continue;
+            }
+        }
+
+        if (selected_msg == &log_msg) {
+            log_msg_ready = false;
+        } else if (selected_msg == &klog_msg) {
+            klog_msg_ready = false;
+            dev = &kdev;
+        } else {
+            fprintf(stderr, "read: Unable to select\n");
             exit(EXIT_FAILURE);
         }
 
-        for(dev = devices; dev; dev = dev->next) {
-            if (android_name_to_log_id(dev->device) == log_msg.id()) {
-                break;
-            }
-        }
-        if (!dev) {
-            fprintf(stderr, "read: Unexpected log ID!\n");
-            exit(EXIT_FAILURE);
-        }
+
 
         android::maybePrintStart(dev);
         if (android::g_printBinary) {
-            android::printBinary(&log_msg);
+            android::printBinary(selected_msg);
         } else {
-            android::processBuffer(dev, &log_msg);
+            android::processBuffer(dev, selected_msg);
         }
     }
 
     android_logger_list_free(logger_list);
+    klogger_destroy();
 
     return 0;
 }
