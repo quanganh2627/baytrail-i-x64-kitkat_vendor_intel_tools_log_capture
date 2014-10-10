@@ -1231,7 +1231,7 @@ void flush_aplog(e_aplog_file_t file, const char *mode, int *dir, const char *ts
 
     switch (file) {
     case APLOG:
-#ifndef FULL_REPORT
+#ifndef CONFIG_APLOG
         if (file_exists(APLOG_FILE_0)) {
             remove(APLOG_FILE_0);
         }
@@ -1319,7 +1319,7 @@ void do_log_copy(char *mode, int dir, const char* timestamp, int type) {
         case APLOG_TYPE:
         case APLOG_STATS_TYPE:
         case KDUMP_TYPE:
-#ifndef FULL_REPORT
+#ifndef CONFIG_APLOG
             flush_aplog(APLOG, NULL, NULL, NULL);
 #endif
             logfile0 = APLOG_FILE_0;
@@ -1354,7 +1354,7 @@ void do_log_copy(char *mode, int dir, const char* timestamp, int type) {
             snprintf(destination,sizeof(destination), "%s%d/%s_%s_%s%s", dir_pattern, dir, strrchr(logfile1,'/')+1, mode, timestamp, extension);
             do_copy_tail(logfile1, destination, limit);
         }
-#ifndef FULL_REPORT
+#ifndef CONFIG_APLOG
         remove(APLOG_FILE_0);
 #endif
     }
