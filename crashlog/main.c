@@ -132,7 +132,7 @@ static int check_mounted_partitions()
         match = fscanf(fd, "%255s %255s %255s %255s %d %d\n",
                        mount_dev, mount_dir, mount_type,
                        mount_opts, &mount_freq, &mount_passno);
-         if (strstr(mount_dev, "by-label") && check_mounted_partition(mount_dir)) {
+         if (strstr(mount_dev, "by-name") && check_mounted_partition(mount_dir)) {
              nb_partition++;
              strncat(list_partition, mount_dir, sizeof(list_partition) - 1);
              if (((strncmp(mount_dir, "/logs", 5)) == 0) && strstr(mount_opts, "ro,"))
