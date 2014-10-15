@@ -724,21 +724,25 @@ int do_monitor() {
             /* clean children to avoid zombie processes */
             while(waitpid(-1, NULL, WNOHANG) > 0){};
             // File monitor
-            if (FD_ISSET(file_monitor_fd, &read_fds)) {
+            if (file_monitor_fd > 0 &&
+                FD_ISSET(file_monitor_fd, &read_fds)) {
                 receive_inotify_events(file_monitor_fd);
             }
             // mmgr monitor
-            if (FD_ISSET(mmgr_get_fd(), &read_fds)) {
+            if (mmgr_get_fd() > 0 &&
+                FD_ISSET(mmgr_get_fd(), &read_fds)) {
                 LOGD("mmgr fd set");
                 mmgr_handle();
             }
             // kct monitor
-            if (FD_ISSET(kct_netlink_get_fd(), &read_fds)) {
+            if (kct_netlink_get_fd() > 0 &&
+                FD_ISSET(kct_netlink_get_fd(), &read_fds)) {
                 LOGD("kct fd set");
                 kct_netlink_handle_msg();
             }
             // lct monitor
-            if (FD_ISSET(lct_link_get_fd(), &read_fds)) {
+            if (lct_link_get_fd() > 0 &&
+                FD_ISSET(lct_link_get_fd(), &read_fds)) {
                 LOGD("lct fd set");
                 lct_link_handle_msg();
             }
