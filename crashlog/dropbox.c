@@ -29,20 +29,20 @@
 #include <errno.h>
 #include <stdio.h>
 #include <ctype.h>
-#include <sys/sha1.h>
+#include <openssl/sha.h>
 
 #include "crashutils.h"
 #include "privconfig.h"
 #include "fsutils.h"
 #include "dropbox.h"
 
-static char gcurrent_key[2][SHA1_DIGEST_LENGTH+1] = {{0,},{0,}};
+static char gcurrent_key[2][SHA_DIGEST_LENGTH+1] = {{0,},{0,}};
 static int index_prod = 0;
 static int index_cons = 0;
 static int  gfile_monitor_fd = -1;
 
 struct arg_cmd {
-    char key[SHA1_DIGEST_LENGTH+1];
+    char key[SHA_DIGEST_LENGTH+1];
 };
 
 void dropbox_set_file_monitor_fd(int file_monitor_fd) {
@@ -76,7 +76,7 @@ int start_dumpstate_srv(char* crash_dir, int crashidx, char *key) {
             dumpstate_dir, strerror(errno));
         return -1;
     }
-    strncpy(gcurrent_key[index_prod],key,SHA1_DIGEST_LENGTH+1);
+    strncpy(gcurrent_key[index_prod],key,SHA_DIGEST_LENGTH+1);
     index_prod = (index_prod + 1) % 2;
     return 1;
 }

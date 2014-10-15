@@ -37,7 +37,7 @@
 #include <string.h>
 #include <fcntl.h>
 #include <stdio.h>
-#include <sys/sha1.h>
+#include <openssl/sha.h>
 
 #define HISTORY_FIRST_LINE_FMT  "#V1.0 " UPTIME_EVNAME "   %-24s\n"
 #define HISTORY_BLANK_LINE1     "#V1.0 " UPTIME_EVNAME "   0000:00:00              \n"
@@ -490,7 +490,7 @@ int add_uptime_event() {
 *   char *events          -> chain containing events separated by comma
 **/
 int update_history_on_cmd_delete(char *events) {
-    char **events_list = NULL, crashdir[MAXLINESIZE], line[MAXLINESIZE], eventid[SHA1_DIGEST_LENGTH+1];
+    char **events_list = NULL, crashdir[MAXLINESIZE], line[MAXLINESIZE], eventid[SHA_DIGEST_LENGTH+1];
     int nbpatterns, maxpatterns = 10, maxpatternsize = 48, res, idx;
     FILE *fd;
     fd = fopen(HISTORY_FILE, "r+");

@@ -27,17 +27,17 @@
 #include <fcntl.h>
 
 /* used by calculate_checksum_directory! */
-static SHA1_CTX g_sha1_context_dir_sum;
+static SHA_CTX g_sha1_context_dir_sum;
 
 int calculate_checksum_buffer(const char *buffer, ssize_t buffer_size, unsigned char *result) {
     ssize_t nread;
     unsigned char *l_buffer = (unsigned char *)buffer;
-    SHA1_CTX sha1_context;
+    SHA_CTX sha1_context;
 
     if (!buffer || !result || buffer_size <= 0)
         return -EINVAL;
 
-    SHA1Init(&sha1_context);
+    SHA1_Init(&sha1_context);
 
     while (buffer_size) {
 
@@ -45,12 +45,12 @@ int calculate_checksum_buffer(const char *buffer, ssize_t buffer_size, unsigned 
                  CRASHLOG_CHECKSUM_SIZE : buffer_size;
         buffer_size -= nread;
 
-        SHA1Update(&sha1_context, l_buffer, nread);
+        SHA1_Update(&sha1_context, l_buffer, nread);
 
         l_buffer += nread;
     }
 
-    SHA1Final(result, &sha1_context);
+    SHA1_Final(result, &sha1_context);
 
     return 0;
 }
@@ -58,7 +58,7 @@ int calculate_checksum_buffer(const char *buffer, ssize_t buffer_size, unsigned 
 int calculate_checksum_file(const char *filename, unsigned char *result) {
     ssize_t nread;
     unsigned char buffer[CRASHLOG_CHECKSUM_SIZE];
-    SHA1_CTX sha1_context;
+    SHA_CTX sha1_context;
     int fd = -1;
 
     if (!filename || !result)
@@ -70,20 +70,20 @@ int calculate_checksum_file(const char *filename, unsigned char *result) {
     if (fd < 0)
         return -errno;
 
-    SHA1Init(&sha1_context);
+    SHA1_Init(&sha1_context);
 
     while ((nread = do_read(fd, buffer, CRASHLOG_CHECKSUM_SIZE)) != 0) {
 
         if (nread < 0)
             return -errno;
 
-        SHA1Update(&sha1_context, buffer, nread);
+        SHA1_Update(&sha1_context, buffer, nread);
 
         if (nread < CRASHLOG_CHECKSUM_SIZE)
             break;
     }
 
-    SHA1Final(result, &sha1_context);
+    SHA1_Final(result, &sha1_context);
 
     return 0;
 }
@@ -107,7 +107,7 @@ static int calculate_checksum_file_feed(const char *filename) {
         if (nread < 0)
             return -errno;
 
-        SHA1Update(&g_sha1_context_dir_sum, buffer, nread);
+        SHA1_Update(&g_sha1_context_dir_sum, buffer, nread);
 
         if (nread < CRASHLOG_CHECKSUM_SIZE)
             break;
@@ -129,7 +129,7 @@ static int calculate_checksum_buffer_feed(const char *buffer, int buffer_size) {
                  CRASHLOG_CHECKSUM_SIZE : buffer_size;
         buffer_size -= nread;
 
-        SHA1Update(&g_sha1_context_dir_sum, l_buffer, nread);
+        SHA1_Update(&g_sha1_context_dir_sum, l_buffer, nread);
 
         l_buffer += nread;
     }
@@ -156,14 +156,14 @@ int calculate_checksum_directory(const char *path, unsigned char *result) {
     static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
     pthread_mutex_lock(&lock);
-    SHA1Init(&g_sha1_context_dir_sum);
+    SHA1_Init(&g_sha1_context_dir_sum);
 
     if (nftw(path, calculate_checksum_path, CRASHLOG_CHECKSUM_SIZE, 0) == -1) {
         pthread_mutex_unlock(&lock);
         return -1;
     }
 
-    SHA1Final(result, &g_sha1_context_dir_sum);
+    SHA1_Final(result, &g_sha1_context_dir_sum);
     pthread_mutex_unlock(&lock);
 
     return 0;

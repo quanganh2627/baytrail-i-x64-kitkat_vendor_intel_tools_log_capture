@@ -27,7 +27,6 @@
 #include "fsutils.h"
 
 #include "log.h"
-#include <sys/sha1.h>
 #include <stdlib.h>
 
 typedef struct {

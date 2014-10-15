@@ -36,7 +36,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <time.h>
-#include <sys/sha1.h>
+#include <openssl/sha.h>
 #include <sys/wait.h>
 
 #include <cutils/properties.h>
@@ -189,20 +189,20 @@ void do_last_fw_msg_copy(int dir) {
   memory allocation succeeded */
 static int compute_key(char* key, char *event, char *type)
 {
-    static SHA1_CTX *sha = NULL;
+    static SHA_CTX *sha = NULL;
     char buf[256] = { '\0', };
     long long time_ns=0;
     char *tmp_key = key;
-    unsigned char results[SHA1_DIGEST_LENGTH];
+    unsigned char results[SHA_DIGEST_LENGTH];
     int i;
 
     if (sha == NULL) {
-        sha = (SHA1_CTX*)malloc(sizeof(SHA1_CTX));
+        sha = (SHA_CTX*)malloc(sizeof(SHA_CTX));
         if (sha == NULL) {
-            LOGE("%s - Cannot create SHA1_CTX memory... fails to compute the key!\n", __FUNCTION__);
+            LOGE("%s - Cannot create SHA_CTX memory... fails to compute the key!\n", __FUNCTION__);
             return -1;
         }
-        SHA1Init(sha);
+        SHA1_Init(sha);
     }
 
     if (!key || !event || !type) return -EINVAL;
@@ -210,9 +210,9 @@ static int compute_key(char* key, char *event, char *type)
     time_ns = get_uptime(1, &i);
     snprintf(buf, 256, "%s%s%s%s%lld", gbuildversion, guuid, event, type, time_ns);
 
-    SHA1Update(sha, (unsigned char*) buf, strlen(buf));
-    SHA1Final(results, sha);
-    for (i = 0; i < SHA1_DIGEST_LENGTH/2; i++)
+    SHA1_Update(sha, (unsigned char*) buf, strlen(buf));
+    SHA1_Final(results, sha);
+    for (i = 0; i < SHA_DIGEST_LENGTH/2; i++)
     {
         sprintf(tmp_key, "%02x", results[i]);
         tmp_key+=2;
@@ -401,7 +401,7 @@ static int create_minimal_crashfile(char * event, const char* type, const char* 
 static char *priv_raise_event(char *event, char *type, char *subtype, char *log,
         int add_uptime, int data_ready, char* data0, char* data1, char* data2) {
     struct history_entry entry;
-    char key[SHA1_DIGEST_LENGTH+1];
+    char key[SHA_DIGEST_LENGTH+1];
     char newuptime[32], *puptime = NULL;
     char lastbootuptime[24];
     int res, hours;
