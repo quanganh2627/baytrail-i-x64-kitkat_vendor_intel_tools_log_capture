@@ -44,11 +44,10 @@ LOCAL_SRC_FILES := \
     checksum.c \
     ingredients.c
 
-LOCAL_SHARED_LIBRARIES := libcutils
+LOCAL_SHARED_LIBRARIES := libcutils libcrypto
 
-# sys/sha1.h has been moved out of default bionic includes
 LOCAL_C_INCLUDES += \
-    bionic/libc/upstream-netbsd/android/include
+    external/openssl/include
 
 # Options
 

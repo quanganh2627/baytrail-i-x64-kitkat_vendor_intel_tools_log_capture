@@ -50,7 +50,7 @@
 #include "mmgr_source.h"
 
 #include <sys/types.h>
-#include <sys/sha1.h>
+#include <openssl/sha.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <pthread.h>
@@ -505,9 +505,9 @@ static void early_check(char *encryptstate, int test) {
  */
 static int get_mmc_id(char* id) {
     int ret, i;
-    SHA1_CTX ctx;
+    SHA_CTX ctx;
     char buf[50] = { '\0', };
-    unsigned char sha1[SHA1_DIGEST_LENGTH];
+    unsigned char sha1[SHA_DIGEST_LENGTH];
     char *id_tmp = id;
 
     if (!id)
@@ -517,11 +517,11 @@ static int get_mmc_id(char* id) {
     if (ret <= 0)
         return ret;
 
-    SHA1Init(&ctx);
-    SHA1Update(&ctx, (unsigned char*)buf, strlen(buf));
-    SHA1Final(sha1, &ctx);
+    SHA1_Init(&ctx);
+    SHA1_Update(&ctx, (unsigned char*)buf, strlen(buf));
+    SHA1_Final(sha1, &ctx);
 
-    for (i = 0; i < SHA1_DIGEST_LENGTH; i++, id_tmp += 2)
+    for (i = 0; i < SHA_DIGEST_LENGTH; i++, id_tmp += 2)
         sprintf(id_tmp, "%02x", sha1[i]);
     *id_tmp = '\0';
 

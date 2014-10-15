@@ -22,9 +22,9 @@
 
 #ifndef __CHECKSUM_H__
 #define __CHECKSUM_H__
-#include <sys/sha1.h>
+#include <openssl/sha.h>
 
-#define CRASHLOG_CHECKSUM_SIZE SHA1_DIGEST_LENGTH
+#define CRASHLOG_CHECKSUM_SIZE SHA_DIGEST_LENGTH
 
 /**
  * Computes a checksum on a buffer passed as parameter
