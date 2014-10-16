@@ -36,8 +36,8 @@ typedef struct config * pconfig;
 struct config {
     int type;  /* 0 => file 1 => directory */
     int event_class; /* 0 => CRASH 1 => ERROR  2=> INFO */
-    pchar matching_pattern; /* pattern to check when notified */
-    pchar eventname; /* event name to generate when pattern found */
+    char *matching_pattern; /* pattern to check when notified */
+    char *eventname; /* event name to generate when pattern found */
     pconfig next;
     char path[PATHMAX];
     char path_linked[PATHMAX];

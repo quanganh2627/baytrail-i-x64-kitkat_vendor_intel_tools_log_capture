@@ -72,7 +72,7 @@ typedef enum e_aplog_file {
 */
 int cache_file(char *filename, char **records, int maxrecords, int cachemode, int offset);
 
-static inline int file_exists(char *filename) {
+static inline int file_exists(const char *filename) {
     struct stat info;
 
     return (stat(filename, &info) == 0);
@@ -140,5 +140,24 @@ int get_parent_dir( char * dir, char *parent_dir );
 char *compute_bp_log(const char* ext_file);
 void copy_bplogs(const char *patern, const char *extra, int dir, int limit);
 void save_startuplogs(const char *reboot_id);
+
+/**
+ * Read a one word string from file
+ *
+ * @param file path
+ * @param string to be allocated before
+ * @return string length, 0 if none, -errno code if error
+ */
+int file_read_string(const char *file, char *string);
+
+/**
+ * Search if a directory contains a file name, could be exact or partial
+ *
+ * @param dir to search in
+ * @param filename to look at
+ * @param exact macth of file name or partial
+ * @return number of matched files, -errno on errors
+ */
+int dir_contains(const char *dir, const char *filename, bool exact);
 
 #endif /* __FSUTILS_H__ */

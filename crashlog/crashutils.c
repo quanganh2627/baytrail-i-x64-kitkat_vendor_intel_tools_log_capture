@@ -52,7 +52,8 @@
 #include "uefivar.h"
 #include "startupreason.h"
 #include "ingredients.h"
-#ifdef CONFIG_UEFI
+
+#ifdef CONFIG_EFILINUX
 #include <libuefivar.h>
 #endif
 
@@ -60,17 +61,6 @@ char gbuildversion[PROPERTY_VALUE_MAX] = {0,};
 char gboardversion[PROPERTY_VALUE_MAX] = {0,};
 char guuid[256] = {0,};
 int gabortcleansd = 0;
-
-struct {
-    char * name;
-    char * description;
-} target_os_boot_array[] = {
-    {"", "N/A"},
-    {"main", "MOS"},
-    {"fastboot", "POS"},
-    {"recovery", "ROS"},
-    {"charging", "COS"}
-};
 
 /**
  * @brief Returns the date/time under the input format.
@@ -1040,7 +1030,18 @@ void clean_crashlog_in_sd(char *dir_to_search, int max) {
     gabortcleansd = (i < max);
 }
 
-#ifdef CONFIG_UEFI
+#ifdef CONFIG_EFILINUX
+struct {
+    char * name;
+    char * description;
+} target_os_boot_array[] = {
+    {"", "N/A"},
+    {"main", "MOS"},
+    {"fastboot", "POS"},
+    {"recovery", "ROS"},
+    {"charging", "COS"}
+};
+
 static void trim_wchar_to_char(char *src, char * dest, int length) {
     int src_count, dest_count;
     for (src_count = 0, dest_count = 0; src_count < length; dest_count++, src_count += 2) {
@@ -1122,54 +1123,56 @@ int create_rebootfile(char* key, int data_ready)
 
     fprintf(fp,"DATA_READY=%d\n", data_ready);
 
-    if (device_has_uefi()) {
-        //generating data0, data1 for edk platforms
-        char resetsource[32] = { '\0', };
-        char resettype[32] = { '\0', };
-        char wakesource[32] = { '\0', };
-        char shutdownsource[32] = { '\0', };
+#ifdef CONFIG_EFILINUX
+    //generating data0, data1 for edk platforms
+    char resetsource[32] = { '\0', };
+    char resettype[32] = { '\0', };
+    char wakesource[32] = { '\0', };
+    char shutdownsource[32] = { '\0', };
 
-        ret = read_resetsource(resetsource);
-        if (ret > 0) {
-            fprintf(fp,"DATA0=%s\n", resetsource);
-        }
-
-        ret = read_resettype(resettype);
-        if (ret > 0) {
-            fprintf(fp,"DATA1=%s\n", resettype);
-        }
-
-        ret = read_wakesource(wakesource);
-        if (ret > 0) {
-            fprintf(fp,"DATA2=%s\n", wakesource);
-        }
-
-        ret = read_shutdownsource(shutdownsource);
-        if (ret > 0) {
-            fprintf(fp,"DATA3=%s\n", shutdownsource);
-        }
-    } else {
-        //generating data0, data1 for other platforms
-        if (data_ready) {
-            LOGI("reset source detected : generating DATA0\n");
-            char tmp[PATHMAX] = "";
-            if(file_exists(RESET_SOURCE_0))
-                snprintf(tmp, sizeof(tmp), RESET_SOURCE_0);
-            else if(file_exists(RESET_IRQ_1))
-                snprintf(tmp, sizeof(tmp), RESET_IRQ_1);
-            get_data_from_boot_file(tmp, "DATA3", fp);
-
-            tmp[0] = '\0';
-            if(file_exists(RESET_SOURCE_1))
-                snprintf(tmp, sizeof(tmp), RESET_SOURCE_1);
-            else if(file_exists(RESET_IRQ_2))
-                snprintf(tmp, sizeof(tmp), RESET_IRQ_2);
-            get_data_from_boot_file(tmp,"DATA4", fp);
-        }
+    ret = read_resetsource(resetsource);
+    if (ret > 0) {
+        fprintf(fp,"DATA0=%s\n", resetsource);
     }
-#ifdef CONFIG_UEFI
+
+    ret = read_resettype(resettype);
+    if (ret > 0) {
+        fprintf(fp,"DATA1=%s\n", resettype);
+    }
+
+    ret = read_wakesource(wakesource);
+    if (ret > 0) {
+        fprintf(fp,"DATA2=%s\n", wakesource);
+    }
+
+    ret = read_shutdownsource(shutdownsource);
+    if (ret > 0) {
+        fprintf(fp,"DATA3=%s\n", shutdownsource);
+    }
+
     fprintf(fp,"BOOTMODE=%s\n", compute_bootmode(bootmode, bootmode_len));
 #endif
+
+#ifdef CONFIG_FDK
+    //generating data0, data1 for other platforms
+    if (data_ready) {
+        LOGI("reset source detected : generating DATA0\n");
+        char tmp[PATHMAX] = "";
+        if(file_exists(RESET_SOURCE_0))
+            snprintf(tmp, sizeof(tmp), RESET_SOURCE_0);
+        else if(file_exists(RESET_IRQ_1))
+            snprintf(tmp, sizeof(tmp), RESET_IRQ_1);
+        get_data_from_boot_file(tmp, "DATA3", fp);
+
+        tmp[0] = '\0';
+        if(file_exists(RESET_SOURCE_1))
+            snprintf(tmp, sizeof(tmp), RESET_SOURCE_1);
+        else if(file_exists(RESET_IRQ_2))
+            snprintf(tmp, sizeof(tmp), RESET_IRQ_2);
+        get_data_from_boot_file(tmp,"DATA4", fp);
+    }
+#endif
+
     fprintf(fp,"_END\n");
     fclose(fp);
     return 0;
@@ -1213,4 +1216,38 @@ void do_wdt_log_copy(int dir) {
     usleep(TIMEOUT_VALUE);
     do_log_copy("WDT", dir, dateshort, APLOG_TYPE);
     do_last_fw_msg_copy(dir);
+}
+
+int get_cmdline_bootreason(char *bootreason) {
+    FILE *fd;
+    int res;
+    char *p, *p1;
+    char cmdline[1024] = { '\0', };
+    const char key[] = "bootreason=";
+
+    fd = fopen(CURRENT_KERNEL_CMDLINE, "r");
+    if (!fd) {
+        LOGE("%s: failed to open file %s - %s\n", __FUNCTION__,
+             CURRENT_KERNEL_CMDLINE, strerror(errno));
+        return -1;
+    }
+
+    res = fread(cmdline, 1, sizeof(cmdline)-1, fd);
+    if (res <= 0) {
+        LOGE("%s: failed to read file %s - %s\n", __FUNCTION__,
+             CURRENT_KERNEL_CMDLINE, strerror(errno));
+        return -1;
+    }
+    fclose(fd);
+
+    p = strstr(cmdline, key);
+    if (!p)
+        return 0;
+    p += strlen(key);
+    p1 = strstr(p, " ");
+    if (p1)
+        *p1 = '\0';
+
+    strncpy(bootreason, p, strlen(p) + 1);
+    return strlen(bootreason);
 }

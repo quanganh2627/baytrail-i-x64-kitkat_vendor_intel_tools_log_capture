@@ -44,13 +44,12 @@
 #include "kct_netlink.h"
 #include "lct_link.h"
 #include "iptrak.h"
+#include "spid.h"
 #include "ingredients.h"
-
-#ifdef BOARD_HAVE_MODEM
 #include "mmgr_source.h"
-#endif
 
 #include <sys/types.h>
+#include <sys/sha1.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <pthread.h>
@@ -435,7 +434,7 @@ static void early_check(char *encryptstate, int test) {
     LOGE("%-8s%-22s%-20s%s\n", STATEEVENT, key, datelong, encryptstate);
     free(key);
 
-#ifdef BOARD_HAVE_MODEM
+#ifdef CRASHLOGD_MODULE_MODEM
     if(cfg_check_modem_version()) {
         modem_name_check_result = update_modem_name();
         if(modem_name_check_result < 0) {
@@ -452,54 +451,37 @@ static void early_check(char *encryptstate, int test) {
     check_ingredients_file();
 }
 
-void spid_read_concat(const char *path, char *complete_value)
-{
-    FILE *fd;
-    char temp_spid[5]="XXXX";
-
-    fd = fopen(path, "r");
-    if (fd != NULL && fscanf(fd, "%s", temp_spid) == 1)
-        fclose(fd);
-    else
-        LOGE("%s: Cannot read %s - %s\n", __FUNCTION__, path, strerror(errno));
-
-    strncat(complete_value,"-",1);
-    strncat(complete_value,temp_spid, sizeof(temp_spid));
-}
 /**
- * Read SPID data from file system, build it and write it into given file
+ * Provide SHA1 of mmcblk0 CID (Card IDentification)
+ *
+ * @param id data returned, must be allocated,
+ *        minimum 41 bytes (2 * SHA1_DIGEST_LENGTH + 1)
+ * @return id data length, should be 40 (2 * SHA1_DIGEST_LENGTH),
+ *         otherwise -errno if errors
  */
-void read_sys_spid(char *filename)
-{
-    FILE *fd;
-    char complete_spid[256];
-    char temp_spid[5]="XXXX";
+static int get_mmc_id(char* id) {
+    int ret, i;
+    SHA1_CTX ctx;
+    char buf[50] = { '\0', };
+    unsigned char sha1[SHA1_DIGEST_LENGTH];
+    char *id_tmp = id;
 
-    if (filename == 0)
-        return;
+    if (!id)
+        return -EINVAL;
 
-    fd = fopen(SYS_SPID_1, "r");
-    if (fd != NULL && fscanf(fd, "%s", temp_spid) == 1)
-        fclose(fd);
-    else
-        LOGE("%s: Cannot read SPID from %s - %s\n", __FUNCTION__, SYS_SPID_1, strerror(errno));
+    ret = file_read_string(SYS_BLK_MMC0_CID, buf);
+    if (ret <= 0)
+        return ret;
 
-    snprintf(complete_spid, sizeof(complete_spid), "%s", temp_spid);
+    SHA1Init(&ctx);
+    SHA1Update(&ctx, (unsigned char*)buf, strlen(buf));
+    SHA1Final(sha1, &ctx);
 
-    spid_read_concat(SYS_SPID_2,complete_spid);
-    spid_read_concat(SYS_SPID_3,complete_spid);
-    spid_read_concat(SYS_SPID_4,complete_spid);
-    spid_read_concat(SYS_SPID_5,complete_spid);
-    spid_read_concat(SYS_SPID_6,complete_spid);
+    for (i = 0; i < SHA1_DIGEST_LENGTH; i++, id_tmp += 2)
+        sprintf(id_tmp, "%02x", sha1[i]);
+    *id_tmp = '\0';
 
-    fd = fopen(filename, "w");
-    if (!fd) {
-        LOGE("%s: Cannot write SPID to %s - %s\n", __FUNCTION__, filename, strerror(errno));
-    } else {
-        fprintf(fd, "%s", complete_spid);
-        fclose(fd);
-    }
-    do_chown(filename, PERM_USER, PERM_GROUP);
+    return strlen(id);
 }
 
 /**
@@ -520,16 +502,49 @@ void write_uuid(char* filename, char *uuid_value)
     }
 }
 
+/**
+ * Set guuid global variable and write it to uuid.txt
+ */
+static void get_device_id(void) {
+    int ret;
+
+    if (g_current_serial_device_id == 1) {
+        /* Get serial ID from properties and updates UUID file */
+        property_get("ro.serialno", guuid, "empty_serial");
+        goto write;
+    }
+
+    ret = file_read_string(PROC_UUID, guuid);
+    if ((ret < 0 && ret != -ENOENT) || !ret)
+        LOGE("%s: Could not read %s (%s)\n", __FUNCTION__,
+             PROC_UUID, strerror(-ret));
+    else if (ret > 0)
+        goto write;
+
+    ret = get_mmc_id(guuid);
+    if (ret <= 0)
+        LOGE("%s: Could not get mmc id: %d (%s)\n",
+             __FUNCTION__, ret, strerror(-ret));
+    else
+        goto write;
+
+    LOGE("%s: Could not find DeviceId, set it to '%s'\n",
+         __FUNCTION__, DEVICE_ID_UNKNOWN);
+    strncpy(guuid, DEVICE_ID_UNKNOWN, strlen(DEVICE_ID_UNKNOWN));
+
+  write:
+    write_uuid(LOG_UUID, guuid);
+}
+
 static void get_crash_env(char * boot_mode, char *crypt_state, char *encrypt_progress, char *decrypt, char *token) {
 
     char value[PROPERTY_VALUE_MAX];
-    FILE *fd;
 
     if( property_get("crashlogd.debug.proc_path", value, NULL) > 0 )
     {
         snprintf(CURRENT_PROC_FABRIC_ERROR_NAME, sizeof(CURRENT_PROC_FABRIC_ERROR_NAME), "%s/%s", value, FABRIC_ERROR_NAME);
         snprintf(CURRENT_PROC_OFFLINE_SCU_LOG_NAME, sizeof(CURRENT_PROC_OFFLINE_SCU_LOG_NAME), "%s/%s", value, OFFLINE_SCU_LOG_NAME);
-        snprintf(CURRENT_PANIC_CONSOLE_NAME, sizeof(CURRENT_PANIC_CONSOLE_NAME), "%s/%s", value, CONSOLE_NAME);
+        snprintf(CURRENT_PANIC_CONSOLE_NAME, sizeof(CURRENT_PANIC_CONSOLE_NAME), "%s/%s", value, EMMC_CONSOLE_NAME);
         snprintf(CURRENT_PANIC_HEADER_NAME, sizeof(CURRENT_PANIC_HEADER_NAME), "%s/%s", value, EMMC_HEADER_NAME);
         snprintf(CURRENT_KERNEL_CMDLINE, sizeof(CURRENT_KERNEL_CMDLINE), "%s/%s", value, CMDLINE_NAME);
         LOGI("Test Mode : ipanic, fabricerr and wdt trigger path is %s\n", value);
@@ -550,24 +565,8 @@ static void get_crash_env(char * boot_mode, char *crypt_state, char *encrypt_pro
     property_get("vold.decrypt", decrypt, "");
     property_get("crashlogd.token", token, "");
 
-   /* Read UUID */
-    if (g_current_serial_device_id == 1) {
-        /* Get serial ID from properties and updates UUID file */
-        property_get("ro.serialno", guuid, "empty_serial");
-        write_uuid(LOG_UUID, guuid);
-    } else {
-        /* Read UUID value from /proc (emmc) and set UUID file with retrieved value.
-         * If reading fails set "Medfield" as default value */
-        fd = fopen(PROC_UUID, "r");
-        if (fd != NULL && fscanf(fd, "%s", guuid) == 1) {
-            fclose(fd);
-            write_uuid(LOG_UUID, guuid);
-        } else {
-            LOGE("%s: Cannot read uuid from %s - %s\n",
-                __FUNCTION__, PROC_UUID, strerror(errno));
-            write_uuid(LOG_UUID, "Medfield");
-        }
-    }
+    get_device_id();
+
     /* Read SPID */
     read_sys_spid(LOG_SPID);
 
@@ -630,15 +629,11 @@ int do_monitor() {
     set_watch_entry_callback(APIMR_TYPE,        process_modem_event);
     set_watch_entry_callback(MRST_TYPE,         process_modem_event);
 
-#ifdef BOARD_HAVE_MODEM
     init_mmgr_cli_source();
-#endif
 
-#ifdef CRASHLOGD_MODULE_KCT
     kct_netlink_init_comm();
 
     lct_link_init_comm();
-#endif
 
     for(;;) {
         // Clear fd set
@@ -651,16 +646,13 @@ int do_monitor() {
                 max = file_monitor_fd;
         }
 
-#ifdef BOARD_HAVE_MODEM
         //mmgr fd setup
         if (mmgr_get_fd() > 0) {
             FD_SET(mmgr_get_fd(), &read_fds);
             if (mmgr_get_fd() > max)
                 max = mmgr_get_fd();
         }
-#endif
 
-#ifdef CRASHLOGD_MODULE_KCT
         //kct fd setup
         if (kct_netlink_get_fd() > 0) {
             FD_SET(kct_netlink_get_fd(), &read_fds);
@@ -674,7 +666,6 @@ int do_monitor() {
             if (lct_link_get_fd() > max)
                 max = lct_link_get_fd();
         }
-#endif
 
         // Wait for events
         select_result = select(max+1, &read_fds, NULL, NULL, NULL);
@@ -690,15 +681,11 @@ int do_monitor() {
             if (FD_ISSET(file_monitor_fd, &read_fds)) {
                 receive_inotify_events(file_monitor_fd);
             }
- #ifdef BOARD_HAVE_MODEM
             // mmgr monitor
             if (FD_ISSET(mmgr_get_fd(), &read_fds)) {
                 LOGD("mmgr fd set");
                 mmgr_handle();
             }
-#endif
-
-#ifdef CRASHLOGD_MODULE_KCT
             // kct monitor
             if (FD_ISSET(kct_netlink_get_fd(), &read_fds)) {
                 LOGD("kct fd set");
@@ -709,12 +696,9 @@ int do_monitor() {
                 LOGD("lct fd set");
                 lct_link_handle_msg();
             }
-#endif
         }
     }
-#ifdef BOARD_HAVE_MODEM
     close_mmgr_cli_source();
-#endif
     free_config(g_first_modem_config);
     LOGE("Exiting main monitor loop\n");
     return -1;
@@ -733,7 +717,7 @@ int compute_crashlogd_mode(char *boot_mode, int ramdump_flag ) {
     char property_value[PROPERTY_VALUE_MAX];
     property_get(PROP_CRASHLOGD_ENABLE, property_value, "");
 
-    if (!strcmp(boot_mode, "main")) {
+    if (!strcmp(boot_mode, "main") || !strcmp(boot_mode, "")) {
         // nominal strategy, only switch to minimal mode if requested
         if (!strcmp(property_value, "0")) {
             g_crashlog_mode = MINIMAL_MODE;

@@ -22,8 +22,14 @@
 #ifndef __LCT_LINK_H__
 #define __LCT_LINK_H__
 
+#ifdef CRASHLOGD_MODULE_KCT
 void lct_link_init_comm(void);
-int lct_link_get_fd();
+int lct_link_get_fd(void);
 void lct_link_handle_msg(void);
+#else
+static inline void lct_link_init_comm(void) {}
+static inline int lct_link_get_fd(void) { return 0; }
+static inline void lct_link_handle_msg(void) {}
+#endif
 
 #endif /* __LCT_LINK_H__ */

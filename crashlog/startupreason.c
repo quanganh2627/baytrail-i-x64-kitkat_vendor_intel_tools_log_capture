@@ -25,7 +25,7 @@
 #include "privconfig.h"
 #include "uefivar.h"
 
-#ifdef CONFIG_UEFI
+#ifdef CONFIG_EFILINUX
 #include <efilinux/bootlogic.h>
 #endif
 
@@ -37,9 +37,10 @@
 #include <fcntl.h>
 #include <stdio.h>
 
-#ifdef CONFIG_UEFI
-static int compute_uefi_startupreason(enum reset_sources rs, enum reset_types rt, enum wake_sources ws, enum shutdown_sources ss, char *startupreason)
-{
+#ifdef CONFIG_EFILINUX
+static int compute_uefi_startupreason(enum reset_sources rs, enum reset_types rt,
+                                      enum wake_sources ws, enum shutdown_sources ss __unused,
+                                      char *startupreason) {
     static const char *wake_source[] = {
         "WAKE_NOT_APPLICABLE",
         "WAKE_BATT_INSERT",
@@ -158,13 +159,9 @@ static int get_uefi_startupreason(char *startupreason)
 
     return compute_uefi_startupreason(rs, rt, ws, ss, startupreason);
 }
-#else
-static inline int get_uefi_startupreason(char *startupreason) {
-    LOGE("CONFIG_UEFI is not set, device do not support uefi startup reason.\n");
-    return -1;
-}
-#endif // CONFIG_UEFI
+#endif // CONFIG_EFILINUX
 
+#ifdef CONFIG_FDK
 /*
 * Name          : get_fdk_startupreason
 * Description   : This function returns the decoded startup reason by reading
@@ -287,15 +284,36 @@ void get_fdk_startupreason(char *startupreason)
             __FUNCTION__, startupreason);
     }
 }
+#endif // CONFIG_FDK
 
-void read_startupreason(char *startupreason)
-{
-    if (device_has_uefi())
-        get_uefi_startupreason(startupreason);
-    else
-        get_fdk_startupreason(startupreason);
+static void get_default_bootreason(char *bootreason) {
+    int ret;
+    unsigned int i;
+    char bootreason_prop[PROPERTY_VALUE_MAX];
+
+    ret = get_cmdline_bootreason(bootreason_prop);
+    if (ret <= 0)
+        return;
+
+    for (i = 0; i < strlen(bootreason_prop); i++)
+        bootreason[i] = toupper(bootreason_prop[i]);
+    bootreason[i] = '\0';
 }
 
+void read_startupreason(char *startupreason) {
+#ifdef CONFIG_EFILINUX
+    get_uefi_startupreason(startupreason);
+    return;
+#endif
+
+#ifdef CONFIG_FDK
+    return get_fdk_startupreason(startupreason);
+#endif
+
+    get_default_bootreason(startupreason);
+}
+
+#ifdef CONFIG_EFILINUX
 int read_resetsource(char * resetsource)
 {
     static const char *reset_source[] = {
@@ -440,7 +458,7 @@ int read_shutdownsource(char * shutdownsource)
         return 0;
     }
 }
-
+#endif // CONFIG_EFILINUX
 
 /**
  * @brief generate WDT crash event

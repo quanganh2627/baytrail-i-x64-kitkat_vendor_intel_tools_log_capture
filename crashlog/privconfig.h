@@ -23,6 +23,8 @@
 #ifndef __CRASHLOGD_H__
 #define __CRASHLOGD_H__
 
+#include <sys/param.h>
+
 #define LOG_TAG                 "CRASHLOG"
 #include "log.h"
 
@@ -108,6 +110,7 @@
 #define MPANIC_ABORT            "COREDUMP_ABORTED_BY_PLATFORM_SHUTDOWN"
 #define CRASHLOG_WATCHER_ERROR  "CRASHLOG_WATCHER"
 #define RAMCONSOLE              "RAMCONSOLE"
+#define DEVICE_ID_UNKNOWN       "UnknownId"
 
 /*
  * Take care that this enum is ALWAYS aligned with
@@ -145,7 +148,9 @@ static const char* print_eventtype[EVENT_TYPE_NUMBER] = {
     "SYSSERVER_TYPE",
     "ANR_TYPE",
     "TOMBSTONE_TYPE",
+    "JAVATOMBSTONE_TYPE",
     "JAVACRASH_TYPE",
+    "JAVACRASH_TYPE2",
     "APCORE_TYPE",
     "HPROF_TYPE",
     "STATTRIG_TYPE",
@@ -196,6 +201,12 @@ struct mode_config {
     bool mmgr_enabled:1;
 };
 
+#ifdef CONFIG_COREDUMP
+#define COREDUMP_WATCHED TRUE
+#else
+#define COREDUMP_WATCHED FALSE
+#endif
+
 /* Array defining for each crashlog mode, the associated config */
 static const struct mode_config get_mode_configs[] = {
     [ NOMINAL_MODE ] = {
@@ -203,7 +214,10 @@ static const struct mode_config get_mode_configs[] = {
         .sdcard_storage = TRUE,
         .notifs_crashreport = TRUE,
         .monitor_crashenv = TRUE,
-        .watched_event_types = {[ LOST_TYPE ... MRST_TYPE ] = TRUE, }, /* All directories are watched */
+        .watched_event_types = {
+            [ LOST_TYPE ... JAVACRASH_TYPE2 ] = TRUE,
+            [ APCORE_TYPE ... HPROF_TYPE ] = COREDUMP_WATCHED,
+            [ STATTRIG_TYPE ... MRST_TYPE ] = TRUE },
         .mmgr_enabled = TRUE,
     },
     [ RAMDUMP_MODE ] = {
@@ -252,6 +266,7 @@ extern enum crashlog_mode g_crashlog_mode;
 #define PROP_LOGS_ROOT          "persist.crashlogd.root"
 #define PROP_CRASH_MODE         "persist.sys.crashlogd.mode"
 #define PROP_PROFILE            "persist.service.profile.enable"
+#define PROP_BOOTREASON         "ro.boot.bootreason"
 #define PROP_BOOT_STATUS        "sys.boot_completed"
 #define PROP_BUILD_FIELD        "ro.build.version.incremental"
 #define PROP_BOARD_FIELD        "ro.product.model"
@@ -317,7 +332,6 @@ extern enum crashlog_mode g_crashlog_mode;
 #define APLOG_DIR               LOGS_DIR "/aplogs"
 #define DROPBOX_DIR             DATA_DIR "/system/dropbox"
 #define TOMBSTONE_DIR           DATA_DIR "/tombstones"
-#define SYS_SPID_DIR            RESDIR "/sys/spid"
 #define LOGS_MEDIA_DIR          DATA_DIR "/media/logs"
 #define KDUMP_DIR               LOGS_MEDIA_DIR "/kdump"
 #define SDSIZE_CURRENT_LOG      LOGS_DIR "/currentsdsize"
@@ -360,11 +374,12 @@ extern enum crashlog_mode g_crashlog_mode;
 #define LOG_SPID                LOGS_DIR "/spid.txt"
 #define LOG_PANICTEMP           LOGS_DIR "/panic_temp"
 #define LOG_FABRICTEMP           LOGS_DIR "/fabric_temp"
+#define CONSOLE_NAME            "console"
 #define LAST_KMSG_FILE          "last_kmsg"
 #define CONSOLE_RAMOOPS_FILE    "console-ramoops"
 #define FTRACE_RAMOOPS_FILE     "ftrace-ramoops"
 #define EMMC_HEADER_NAME        "emmc_ipanic_header"
-#define CONSOLE_NAME            "emmc_ipanic_console"
+#define EMMC_CONSOLE_NAME       "emmc_ipanic_console"
 #define CONSOLE_RAM             "ram_ipanic_console"
 #define THREAD_NAME             "emmc_ipanic_threads"
 #define LOGCAT_NAME             "emmc_ipanic_logcat"
@@ -378,7 +393,7 @@ extern enum crashlog_mode g_crashlog_mode;
 #define CONSOLE_RAMOOPS         PSTORE_DIR "/" CONSOLE_RAMOOPS_FILE
 #define FTRACE_RAMOOPS          PSTORE_DIR "/" FTRACE_RAMOOPS_FILE
 #define PANIC_HEADER_NAME       PROC_DIR "/" EMMC_HEADER_NAME
-#define PANIC_CONSOLE_NAME      PROC_DIR "/" CONSOLE_NAME
+#define PANIC_CONSOLE_NAME      PROC_DIR "/" EMMC_CONSOLE_NAME
 #define PANIC_THREAD_NAME       PROC_DIR "/" THREAD_NAME
 #define PANIC_GBUFFER_NAME      PROC_DIR "/" GBUFFER_NAME
 #define PROC_FABRIC_ERROR_NAME  PROC_DIR "/" FABRIC_ERROR_NAME
@@ -386,19 +401,14 @@ extern enum crashlog_mode g_crashlog_mode;
 #define PROC_OFFLINE_SCU_LOG_NAME PROC_DIR "/" OFFLINE_SCU_LOG_NAME
 #define KERNEL_CMDLINE          PROC_DIR "/" CMDLINE_NAME
 #define PROC_UUID               PROC_DIR "/emmc0_id_entry"
+#define SYS_BLK_MMC0_CID        SYS_DIR "/block/mmcblk0/device/cid"
 #define SAVED_HEADER_NAME       PANIC_DIR "/" EMMC_HEADER_NAME
-#define SAVED_CONSOLE_NAME      PANIC_DIR "/" CONSOLE_NAME
+#define SAVED_CONSOLE_NAME      PANIC_DIR "/" EMMC_CONSOLE_NAME
 #define SAVED_THREAD_NAME       PANIC_DIR "/" THREAD_NAME
 #define SAVED_GBUFFER_NAME      PANIC_DIR "/" GBUFFER_NAME
 #define SAVED_LOGCAT_NAME       PANIC_DIR "/" LOGCAT_NAME
 #define RECOVERY_ERROR_TRIGGER  CACHE_DIR "/recovery/recoveryfail"
 #define RECOVERY_ERROR_LOG      CACHE_DIR "/recovery/last_log"
-#define SYS_SPID_1              SYS_SPID_DIR "/vendor_id"
-#define SYS_SPID_2              SYS_SPID_DIR "/manufacturer_id"
-#define SYS_SPID_3              SYS_SPID_DIR "/customer_id"
-#define SYS_SPID_4              SYS_SPID_DIR "/platform_family_id"
-#define SYS_SPID_5              SYS_SPID_DIR "/product_line_id"
-#define SYS_SPID_6              SYS_SPID_DIR "/hardware_id"
 #define KDUMP_START_FLAG        KDUMP_DIR "/kdumphappened"
 #define KDUMP_FILE_NAME         KDUMP_DIR "/kdumpfile.core"
 #define KDUMP_FINISH_FLAG       KDUMP_DIR "/kdumpfinished"
@@ -421,10 +431,6 @@ extern enum crashlog_mode g_crashlog_mode;
 #define FW_UPDATE_STATUS_PATH   "/sys/firmware/osnib/fw_update_status"
 #define INGREDIENTS_CONFIG      SYSTEM_DIR "/etc/ingredients.conf"
 #define INGREDIENTS_FILE        LOGS_DIR "/ingredients.txt"
-
-/* MACROS */
-#define MIN(a,b)                ((a) < (b) ? (a) : (b))
-#define MAX(a,b)                ((a) > (b) ? (a) : (b))
 
 /* SYSTEM COMMANDS */
 #define SDSIZE_SYSTEM_CMD "du -sk " SDCARD_LOGS_DIR "/ > " LOGS_DIR "/currentsdsize"

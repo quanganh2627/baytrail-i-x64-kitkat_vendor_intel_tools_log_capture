@@ -38,11 +38,11 @@
 
 /*
 * Name          : config_trim
-* Description   : This function remove tabs/spaces/lf/cr at end or start of the pchar
+* Description   : This function remove tabs/spaces/lf/cr at end or start of the char*
 * Parameters    :
-*   pchar s        -> pchar to trim
+*   char *s        -> char to trim
 */
-static void config_trim(pchar s)
+static void config_trim(char *s)
 {
     /* start */
     size_t i=0,j;
@@ -73,9 +73,9 @@ static void config_trim(pchar s)
 * Name          : add_section
 * Description   : This function create a new section item
 * Parameters    :
-*   pchar config        -> pchar corresponds to the name of the new section
+*   char *config        -> char *corresponds to the name of the new section
 */
-static void add_section(pchar config, pconfig_handle  conf_handle) {
+static void add_section(char *config, pconfig_handle  conf_handle) {
     psection newsect = malloc(sizeof(struct section));
     if(!newsect) {
         LOGE("%s:malloc failed\n", __FUNCTION__);
@@ -107,11 +107,11 @@ static void add_section(pchar config, pconfig_handle  conf_handle) {
 * Name          : add_kv_pair
 * Description   : This function create a new key/value item and add it to the list
 * Parameters    :
-*   pchar config        -> pchar corresponds to the line containg the key/value couple
+*   char *config        -> char *corresponds to the line containg the key/value couple
 */
-static int add_kv_pair(pchar config,pconfig_handle  conf_handle) {
-    pchar key= NULL;
-    pchar value = NULL;
+static int add_kv_pair(char *config,pconfig_handle  conf_handle) {
+    char *key= NULL;
+    char *value = NULL;
     pkv   newkv = NULL;
     pkv   lastkv;
     size_t valuelen;
@@ -189,9 +189,9 @@ static int add_kv_pair(pchar config,pconfig_handle  conf_handle) {
 * Description   : This function generate memory structure for section and key value
 *                 depending of the string configline
 * Parameters    :
-*   pchar config_line        -> pchar corresponds to the configline to process
+*   char *config_line        -> char *corresponds to the configline to process
 */
-static void generate_section_kv(pchar  config_line, pconfig_handle  conf_handle){
+static void generate_section_kv(char * config_line, pconfig_handle  conf_handle){
     size_t i;
     i=strlen(config_line)-1;
     if (strlen(config_line)== 0){
@@ -220,9 +220,9 @@ static void generate_section_kv(pchar  config_line, pconfig_handle  conf_handle)
 * Name          : find_section
 * Description   : This function searches through all sections for matching sectionname
 * Parameters    :
-*   pchar sectionname        -> pchar corresponds to the section searched
+*   char *sectionname        -> char *corresponds to the section searched
 */
-static psection find_section(pchar section_name, pconfig_handle  conf_handle) {
+static psection find_section(char *section_name, pconfig_handle  conf_handle) {
     psection result = NULL;
     //to avoid useless search if already on the good section
     if (conf_handle->current){
@@ -242,8 +242,8 @@ static psection find_section(pchar section_name, pconfig_handle  conf_handle) {
 }
 
 
-pchar get_value (pchar section, pchar name, pconfig_handle  conf_handle) {
-    pchar result = NULL;
+char *get_value (char *section, char *name, pconfig_handle  conf_handle) {
+    char *result = NULL;
     config_trim(section);
     conf_handle->current = find_section(section,conf_handle);
     if (!conf_handle->current){
@@ -263,8 +263,8 @@ pchar get_value (pchar section, pchar name, pconfig_handle  conf_handle) {
 }
 
 
-pchar get_value_def (pchar section, pchar name, pchar def_value, pconfig_handle  conf_handle) {
-    pchar result = get_value(section,name,conf_handle);
+char *get_value_def (char *section, char *name, char *def_value, pconfig_handle  conf_handle) {
+    char *result = get_value(section,name,conf_handle);
     if (result){
         return result;
     }
@@ -273,7 +273,7 @@ pchar get_value_def (pchar section, pchar name, pchar def_value, pconfig_handle 
 }
 
 
-int sk_exists(pchar section,pchar name, pconfig_handle  conf_handle) {
+int sk_exists(char *section,char *name, pconfig_handle  conf_handle) {
     int result = 0;
     config_trim(section);
 
@@ -284,7 +284,7 @@ int sk_exists(pchar section,pchar name, pconfig_handle  conf_handle) {
 }
 
 
-int init_config_file(pchar  filename, pconfig_handle  conf_handle) {
+int init_config_file(const char *filename, pconfig_handle conf_handle) {
     LOGD("init_config_file start");
     FILE * f;
     char buff[MAXLEN];
@@ -320,7 +320,7 @@ int init_config_file(pchar  filename, pconfig_handle  conf_handle) {
  * @param conf_handle
  * @return 0 if everything is OK
  */
-int dump_config(pchar filename, pconfig_handle conf_handle) {
+int dump_config(char *filename, pconfig_handle conf_handle) {
     psection current_psection;
     pkv current_kv;
     FILE * f;
@@ -420,10 +420,10 @@ void free_config_file(pconfig_handle  conf_handle)
 * Name          : find_base_section
 * Description   : This function searches through all sections for matching sectionname
 * Parameters    :
-*   pchar sectionname        -> pchar corresponds to the section searched
+*   char *sectionname        -> char *corresponds to the section searched
 *   int find_next            -> indicates if find should switch to next section first
 */
-static psection find_base_section(pchar base_section, pconfig_handle  conf_handle, int find_next) {
+static psection find_base_section(char *base_section, pconfig_handle  conf_handle, int find_next) {
     psection result = NULL;
     if ((find_next ==1)&&(conf_handle->current)){
         conf_handle->current = conf_handle->current->next;
@@ -441,8 +441,8 @@ static psection find_base_section(pchar base_section, pconfig_handle  conf_handl
     return result;
 }
 
-pchar get_first_section_name (pchar base_section, pconfig_handle  conf_handle) {
-    pchar result = NULL;
+char *get_first_section_name (char *base_section, pconfig_handle  conf_handle) {
+    char *result = NULL;
     psection tmp_section;
 
     config_trim(base_section);
@@ -454,8 +454,8 @@ pchar get_first_section_name (pchar base_section, pconfig_handle  conf_handle) {
     return result;
 }
 
-pchar get_next_section_name (pchar base_section, pconfig_handle  conf_handle) {
-    pchar result = NULL;
+char *get_next_section_name (char *base_section, pconfig_handle  conf_handle) {
+    char *result = NULL;
     psection tmp_section;
 
     config_trim(base_section);

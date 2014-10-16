@@ -41,6 +41,10 @@ typedef enum e_iptrak_gen_policy {
     RETRY_ONCE
 } e_iptrak_gen_policy_t;
 
+#ifdef CRASHLOGD_MODULE_IPTRAK
 void check_iptrak_file(e_iptrak_gen_policy_t update);
+#else
+static inline void check_iptrak_file(e_iptrak_gen_policy_t update __unused) {}
+#endif
 
 #endif /* __IPTRAK_H__ */

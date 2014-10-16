@@ -202,7 +202,7 @@ int crashlog_check_mpanic_abort(){
 *   char *name            -> name of the file inside the watched directory that has triggered the event
 *   unsigned int files    -> nb max of logs destination directories (crashlog, aplogs, bz... )
 *   int fd                -> file descriptor referring to the inotify instance */
-int process_modem_generic(struct watch_entry *entry, struct inotify_event *event, int fd) {
+int process_modem_generic(struct watch_entry *entry, struct inotify_event *event, int fd __unused) {
 
     const char *dateshort = get_current_time_short(1);
     char *key;

@@ -428,6 +428,7 @@ int get_sdcard_paths(e_dir_mode_t mode) {
     BZ_DIR = EMMC_BZ_DIR;
 
 #ifndef FULL_REPORT
+    (void)mode; /* unused */
     return 0;
 #else
 
@@ -1203,7 +1204,7 @@ int read_file_prop_uid(char* source, char *filename, char *uid, char* defaultval
     }
 
     if (property_get(source, temp_uid, "") <= 0) {
-        LOGE("Property %s not readable\n", source);
+        LOGV("Property %s not readable\n", source);
         return -1;
     }
     strncpy(uid, temp_uid, PROPERTY_VALUE_MAX);
@@ -1215,7 +1216,7 @@ int read_file_prop_uid(char* source, char *filename, char *uid, char* defaultval
             do_chown(filename, PERM_USER, PERM_GROUP);
             fclose(fd);
         }else{
-            LOGE("Can't open file %s \n", filename);
+            LOGV("Can't open file %s \n", filename);
             return -1;
         }
         /*Success + the file was updated*/
@@ -1609,9 +1610,9 @@ int sdcard_allowed()
 /**
  * Updates rights of folders containing logs
  */
+#ifdef FULL_REPORT
 void update_logs_permission(void)
 {
-#ifdef FULL_REPORT
     char value[PROPERTY_VALUE_MAX] = "0";
 
     if (property_get(PROP_COREDUMP, value, "") <= 0) {
@@ -1621,7 +1622,81 @@ void update_logs_permission(void)
         chmod(LOGS_DIR,0777);
         chmod(HISTORY_CORE_DIR,0777);
     }
+}
 #else
-    return;
+inline void update_logs_permission(void) {}
 #endif
+
+/**
+ * Read a one word string from file
+ *
+ * @param file path
+ * @param string to be allocated before
+ * @return string length, 0 if none, -errno code if error
+ */
+int file_read_string(const char *file, char *string) {
+    FILE *fd;
+    int ret;
+
+    if (!file || !string)
+        return -EINVAL;
+
+    if (!file_exists(file))
+        return -ENOENT;
+
+    fd = fopen(file, "r");
+    if (!fd)
+        return -errno;;
+
+    ret = fscanf(fd, "%s", string);
+    if (ret == EOF && ferror(fd)) {
+        ret = -errno;
+        clearerr(fd);
+        fclose(fd);
+        return ret;
+    } else if (ret != 1) {
+        fclose(fd);
+        return 0;
+    }
+
+    fclose(fd);
+
+    return strlen(string);
+}
+
+/**
+ * Search if a directory contains a file name, could be exact or partial
+ *
+ * @param dir to search in
+ * @param filename to look at
+ * @param exact macth of file name or partial
+ * @return number of matched files, -errno on errors
+ */
+int dir_contains(const char *dir, const char *filename, bool exact) {
+    int ret, count = 0;
+    struct dirent **filelist;
+    char *name;
+
+    if (!dir || !filename)
+        return -EINVAL;
+
+    ret = scandir(dir, &filelist, 0, 0);
+    if (ret < 0)
+        return -errno;
+
+    while (ret--) {
+        name = filelist[ret]->d_name;
+        if (exact) {
+            if (!strcmp(name, filename))
+                count++;
+        } else {
+            if (strstr(name, filename))
+                count++;
+        }
+        free(filelist[ret]);
+    }
+
+    free(filelist);
+
+    return count;
 }
