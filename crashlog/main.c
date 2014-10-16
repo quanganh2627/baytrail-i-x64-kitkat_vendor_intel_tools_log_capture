@@ -837,15 +837,16 @@ int main(int argc, char **argv) {
         return do_monitor();
 
     case NOMINAL_MODE :
-        /* DECRYPTED by default */
-        strcpy(encryptstate,"DECRYPTED");
 
-        if (!strcmp(crypt_state, "unencrypted") && encrypt_progress[0]) {
+        if (encrypt_progress[0] && !strcmp(crypt_state, "unencrypted")) {
             /* Encrypting unencrypted device... */
             LOGI("phone enter state: encrypting.\n");
+            strcpy(encryptstate,"ENCRYPTING");
+            early_check(encryptstate, test_flag);
         } else if (!strcmp(crypt_state, "unencrypted") && !alreadyran) {
             /* Unencrypted device */
             LOGI("phone enter state: normal start.\n");
+            strcpy(encryptstate,"DECRYPTED");
             early_check(encryptstate, test_flag);
         } else if (!strcmp(crypt_state, "encrypted") &&
                    !strcmp(decrypt, "trigger_restart_framework") && !alreadyran) {
