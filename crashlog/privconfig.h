@@ -211,7 +211,7 @@ struct mode_config {
 static const struct mode_config get_mode_configs[] = {
     [ NOMINAL_MODE ] = {
         .name = "NOMINAL MODE",
-        .sdcard_storage = TRUE,
+        .sdcard_storage = CONFIG_USE_SD,
         .notifs_crashreport = TRUE,
         .monitor_crashenv = TRUE,
         .watched_event_types = {
@@ -230,7 +230,7 @@ static const struct mode_config get_mode_configs[] = {
     },
     [ MINIMAL_MODE ] = {
         .name = "MINIMAL MODE",
-        .sdcard_storage = TRUE,
+        .sdcard_storage = CONFIG_USE_SD,
         .notifs_crashreport = FALSE,
         .monitor_crashenv = FALSE,
         .watched_event_types = {
