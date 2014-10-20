@@ -141,10 +141,6 @@ public class ModemController implements ModemEventListener, Closeable {
         return ret;
     }
 
-    public String checkAtTraceState() throws ModemControlException {
-        return cmdParser.parseTraceResponse(sendAtCommand("at+trace?\r\n"));
-    }
-
     public String checkAtXsioState() throws ModemControlException {
         return cmdParser.parseXsioResponse(sendAtCommand("at+xsio?\r\n"));
     }
@@ -156,6 +152,10 @@ public class ModemController implements ModemEventListener, Closeable {
     public ArrayList<Master> checkAtXsystraceState(ArrayList<Master> masterList)
             throws ModemControlException {
         return cmdParser.parseXsystraceResponse(sendAtCommand("at+xsystrace=10\r\n"), masterList);
+    }
+
+    public String checkOct() throws ModemControlException {
+        return cmdParser.parseOct(sendAtCommand("at+xsystrace=11\r\n"));
     }
 
     public void close() {

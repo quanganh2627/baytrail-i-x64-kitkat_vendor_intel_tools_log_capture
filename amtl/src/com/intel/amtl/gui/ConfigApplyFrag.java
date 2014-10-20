@@ -178,7 +178,6 @@ public class ConfigApplyFrag extends DialogFragment {
                 if (modemCtrl != null) {
                     // send the three at commands
                     modemCtrl.sendAtCommand(modConfToApply.getXsio());
-                    modemCtrl.sendAtCommand(modConfToApply.getTrace());
                     modemCtrl.sendAtCommand(modConfToApply.getXsystrace());
                     // if flush command available for this configuration, let s use it.
                     if (!modConfToApply.getFlCmd().equalsIgnoreCase("")) {
@@ -214,8 +213,7 @@ public class ConfigApplyFrag extends DialogFragment {
                             mtsManager.startService(modConfToApply.getMtsMode());
                         } else {
                             // do not stop mts when applying conf from masterfrag
-                            if (!modConfToApply.getXsio().equals("")
-                                    || !modConfToApply.getTrace().equals("")) {
+                            if (!modConfToApply.getXsio().equals("")) {
                                 mtsManager.stopServices();
                                 modConfToApply.applyMtsParameters();
                             }
@@ -242,7 +240,6 @@ public class ConfigApplyFrag extends DialogFragment {
                 try {
                     mtsManager = new MtsManager();
                     mtsManager.stopServices();
-                    modemCtrl.sendAtCommand("AT+TRACE=0\r\n");
                     modemCtrl.sendAtCommand("AT+XSYSTRACE=0\r\n");
                     String flCmd = prefs.getString("default_flush_cmd", "");
                     if (!flCmd.equalsIgnoreCase("")) {

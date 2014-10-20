@@ -107,12 +107,6 @@ public class ConfigParser {
 
             switch (eventType) {
                 case XmlPullParser.START_TAG:
-                    if (isStartOf(parser, "at_trace")) {
-                        if (parser.next() == XmlPullParser.TEXT) {
-                            atTRACE = "AT+TRACE=" + parser.getText() + "\r\n";
-                        }
-                        Log.d(TAG, MODULE + ": Get element type AT+TRACE : " + atTRACE);
-                    }
                     if (isStartOf(parser, "at_xsystrace")) {
                         if (parser.next() == XmlPullParser.TEXT) {
                             atXSYSTRACE = "AT+XSYSTRACE=" + parser.getText() + "\r\n";
@@ -162,7 +156,7 @@ public class ConfigParser {
              eventType = parser.next();
          }
          Log.d(TAG, MODULE + ": Completed XML file parsing.");
-         ModemConf modConf = new ModemConf(atXSIO, atTRACE, atXSYSTRACE, flCmd);
+         ModemConf modConf = new ModemConf(atXSIO, atXSYSTRACE, flCmd, "");
          if (mtsConf != null) {
              modConf.setMtsConf(mtsConf);
          }

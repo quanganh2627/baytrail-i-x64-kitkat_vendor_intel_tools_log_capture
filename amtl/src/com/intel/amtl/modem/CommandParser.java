@@ -67,8 +67,14 @@ public class CommandParser {
         return masterArray;
     }
 
-    public String parseTraceResponse(String trace) {
-        int indexTrace = trace.indexOf("+TRACE: ");
-        return trace.substring(indexTrace + 8, indexTrace + 9);
+    public String parseOct(String xsystrace) {
+        String oct = "";
+
+        if (xsystrace != null) {
+            int indexOfOct = xsystrace.indexOf("mode");
+            String sub = xsystrace.substring(indexOfOct + 5);
+            oct = sub.substring(0, 1);
+        }
+        return oct;
     }
 }
