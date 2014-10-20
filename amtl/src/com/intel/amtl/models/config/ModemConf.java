@@ -29,7 +29,6 @@ public class ModemConf {
     private static final String TAG = "AMTL";
     private static final String MODULE = "ModemConf";
     private String atXsio = "";
-    private String atTrace = "";
     private String atXsystrace = "";
     private String mtsMode = "";
     private String flCmd = "";
@@ -38,6 +37,8 @@ public class ModemConf {
 
     private LogOutput config = null;
     private MtsConf mtsConf = null;
+
+    private String octMode = "";
 
     public ModemConf(LogOutput config) {
         this.config = config;
@@ -90,14 +91,14 @@ public class ModemConf {
         }
     }
 
-    public ModemConf(String xsio, String trace, String xsystrace, String flcmd) {
-        this.atTrace = trace;
+    public ModemConf(String xsio, String xsystrace, String flcmd, String octMode) {
         this.atXsio = xsio;
         this.atXsystrace = xsystrace;
         this.flCmd = flcmd;
         this.confIndex = -1;
-        if (!this.atTrace.equals("AT+TRACE=1\r\n")) {
-            this.mtsConf = new MtsConf();
+        this.mtsConf = new MtsConf();
+        if (!octMode.equals("")) {
+            this.octMode = octMode;
         }
     }
 
@@ -115,10 +116,6 @@ public class ModemConf {
         return this.atXsio;
     }
 
-    public String getTrace() {
-        return this.atTrace;
-    }
-
     public String getXsystrace() {
         return this.atXsystrace;
     }
@@ -129,14 +126,6 @@ public class ModemConf {
 
     public int getIndex() {
         return this.confIndex;
-    }
-
-    public void activateConf(boolean activate) {
-        if (activate) {
-            this.atTrace = "AT+TRACE=1\r\n";
-        } else {
-            this.atTrace = "AT+TRACE=0\r\n";
-        }
     }
 
     public String getMtsMode() {
@@ -162,6 +151,10 @@ public class ModemConf {
         return false;
     }
 
+    public String getOctMode() {
+        return this.octMode;
+    }
+
     public void printMtsToLog() {
         if (this.mtsConf != null) {
             Log.d(TAG, MODULE + ": ========= MTS CONFIGURATION =========");
@@ -180,8 +173,8 @@ public class ModemConf {
     public void printToLog() {
         Log.d(TAG, MODULE + ": ========= MODEM CONFIGURATION =========");
         Log.d(TAG, MODULE + ": XSIO = " + this.atXsio);
-        Log.d(TAG, MODULE + ": TRACE = " + this.atTrace);
         Log.d(TAG, MODULE + ": XSYSTRACE = " + this.atXsystrace);
+        Log.d(TAG, MODULE + ": OCT = " + this.octMode);
         Log.d(TAG, MODULE + ": =======================================");
     }
 

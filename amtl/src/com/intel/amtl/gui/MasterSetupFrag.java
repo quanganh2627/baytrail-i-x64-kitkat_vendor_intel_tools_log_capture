@@ -220,14 +220,13 @@ public class MasterSetupFrag extends Fragment
         if (ModemController.getModemStatus() == ModemStatus.UP) {
             try {
                 ModemController mdmCtrl = ModemController.get();
-                String trace = mdmCtrl.checkAtTraceState();
                 this.masterArray = new ArrayList<Master>();
                 for (String s: masterNames) {
                     this.masterArray.add(new Master(s, "", ""));
                 }
                 this.masterArray = mdmCtrl.checkAtXsystraceState(this.masterArray);
                 this.updateUi();
-                if (trace.equals("1")) {
+                if (!mdmCtrl.checkOct().equals("0")) {
                     this.setUIEnabled();
                 } else {
                     this.setUIDisabled();
@@ -348,8 +347,7 @@ public class MasterSetupFrag extends Fragment
             if (message != null && message.equals("UP")) {
                 try {
                     ModemController mdmCtrl = ModemController.get();
-                    String trace = mdmCtrl.checkAtTraceState();
-                    if (trace.equals("0")) {
+                    if (mdmCtrl.checkOct().equals("0")) {
                         setUIDisabled();
                     } else {
                         masterArray = mdmCtrl.checkAtXsystraceState(masterArray);
