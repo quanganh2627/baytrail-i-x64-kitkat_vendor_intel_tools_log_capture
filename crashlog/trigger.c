@@ -194,6 +194,10 @@ int process_log_event(char *rootdir, char *triggername, int mode) {
         }
         /* When a new crashlog dir is created per packet, send an event per dir */
         if( newdirperpacket && (dir != -1) ) {
+            snprintf(destination,sizeof(destination),"%s%d/user_comment", logrootdir, dir);
+            snprintf(path, sizeof(path),"%s/%s",rootdir, triggername);
+            do_copy_tail(path, destination, 0);
+
             snprintf(destination,sizeof(destination),"%s%d/", logrootdir, dir);
             compress_aplog_folder(destination);
             key = raise_event(event, type, NULL, destination);
@@ -225,6 +229,11 @@ int process_log_event(char *rootdir, char *triggername, int mode) {
             if( bplogFlag == 1 )
                 copy_bplogs(BZ_DIR, "", dir, 0);
         }
+
+        snprintf(destination,sizeof(destination),"%s%d/user_comment", logrootdir, dir);
+        snprintf(path, sizeof(path),"%s/%s",rootdir, triggername);
+        do_copy_tail(path, destination, 0);
+
         snprintf(destination,sizeof(destination),"%s%d/", logrootdir,dir);
         if (do_screenshot) {
             do_screenshot_copy(path, destination);
