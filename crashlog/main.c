@@ -154,7 +154,8 @@ static int check_mounted_partitions()
     return output;
 }
 
-void check_factory_partition_checksum() {
+#ifdef CONFIG_FACTORY_CHECKSUM
+static void check_factory_partition_checksum() {
     unsigned char checksum[CRASHLOG_CHECKSUM_SIZE];
 
     if (!directory_exists(FACTORY_PARTITION_DIR)) {
@@ -192,6 +193,9 @@ void check_factory_partition_checksum() {
         LOGD("%s: %s file created\n", __FUNCTION__, FACTORY_SUM_FILE);
     }
 }
+#else
+static inline void check_factory_partition_checksum() {}
+#endif
 
 int process_command_event(struct watch_entry *entry, struct inotify_event *event) {
     char path[PATHMAX];
