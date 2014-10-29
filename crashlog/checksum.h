@@ -26,6 +26,8 @@
 
 #define CRASHLOG_CHECKSUM_SIZE SHA_DIGEST_LENGTH
 
+typedef void (*calculate_checksum_callback)(const char *, mode_t);
+
 /**
  * Computes a checksum on a buffer passed as parameter
  *
@@ -41,9 +43,12 @@ int calculate_checksum_buffer(const char *buffer, ssize_t size, unsigned char *r
  *
  * @param path indicates the parent directory for which we want to compute the checksum
  * @param result represents the buffer through which the computed checksum is returned
+ * @param callback function invoked when encountering a file for which checksum is not
+ *        performed on the content of a file. Parameters passed through the callback
+ *        represent the file and reason for why it was skipped.
  * @return 0 on succes, -1 otherwise
  */
-int calculate_checksum_directory(const char *path, unsigned char *result);
+int calculate_checksum_directory(const char *path, unsigned char *result, calculate_checksum_callback callback);
 
 /**
  * Computes a checksum on a file passed as parameter
