@@ -156,6 +156,23 @@ static int check_mounted_partitions()
 }
 
 #ifdef CONFIG_FACTORY_CHECKSUM
+static void check_factory_checksum_callback(const char * file, mode_t st_mode) {
+    char *reason = NULL;
+
+    switch (st_mode & S_IFMT) {
+        case S_IFBLK:  reason = "block device";     break;
+        case S_IFCHR:  reason = "character device"; break;
+        case S_IFDIR:  reason = "directory";        break;
+        case S_IFIFO:  reason = "FIFO/pipe";        break;
+        case S_IFLNK:  reason = "symlink";          break;
+        case S_IFREG:  reason = "regular file";     break;
+        case S_IFSOCK: reason = "socket";           break;
+        default:       reason = "unknown";          break;
+    }
+
+    LOGE("%s: file skipped. encountered: %s for %s\n", __FUNCTION__, reason, file);
+}
+
 static void check_factory_partition_checksum() {
     unsigned char checksum[CRASHLOG_CHECKSUM_SIZE];
 
@@ -164,7 +181,8 @@ static void check_factory_partition_checksum() {
         return;
     }
 
-    if (calculate_checksum_directory(FACTORY_PARTITION_DIR, checksum) != 0) {
+    LOGD("%s: performing factory partition checksum calculation\n", __FUNCTION__);
+    if (calculate_checksum_directory(FACTORY_PARTITION_DIR, checksum, check_factory_checksum_callback) != 0) {
         LOGE("%s: failed to calculate factory partition checksum\n", __FUNCTION__);
         return;
     }
@@ -184,6 +202,9 @@ static void check_factory_partition_checksum() {
                 return;
             }
             LOGD("%s: %s file updated\n", __FUNCTION__, FACTORY_SUM_FILE);
+        }
+        else {
+            LOGD("%s: no changes detected\n", __FUNCTION__);
         }
     }
     else {

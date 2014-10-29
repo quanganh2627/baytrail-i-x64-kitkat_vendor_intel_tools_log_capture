@@ -28,6 +28,7 @@
 
 /* used by calculate_checksum_directory! */
 static SHA_CTX g_sha1_context_dir_sum;
+static calculate_checksum_callback callback_dir = NULL;
 
 int calculate_checksum_buffer(const char *buffer, ssize_t buffer_size, unsigned char *result) {
     ssize_t nread;
@@ -137,11 +138,16 @@ static int calculate_checksum_buffer_feed(const char *buffer, int buffer_size) {
     return 0;
 }
 
-static int calculate_checksum_path(const char *fpath, const struct stat __unused *sb, int tflag, struct FTW __unused *ftwbuf) {
+static int calculate_checksum_path(const char *fpath, const struct stat *sb, int tflag, struct FTW __unused *ftwbuf) {
 
     /* if file, calculate the checksum */
     if (tflag == FTW_F) {
-        calculate_checksum_file_feed(fpath);
+        if ((sb->st_mode & S_IFMT) == S_IFREG) {
+            calculate_checksum_file_feed(fpath);
+        } else if (callback_dir != NULL) {
+            /* return the reason why a path tagged as a file was skipped */
+            callback_dir(fpath, sb->st_mode & S_IFMT);
+        }
     }
 
     /* calculate also the checksum on the file/folder path */
@@ -151,9 +157,10 @@ static int calculate_checksum_path(const char *fpath, const struct stat __unused
     return 0;
 }
 
-int calculate_checksum_directory(const char *path, unsigned char *result) {
+int calculate_checksum_directory(const char *path, unsigned char *result, calculate_checksum_callback callback) {
     /* mutex used to protect g_sha1_context_dir_sum */
     static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+    callback_dir = callback;
 
     pthread_mutex_lock(&lock);
     SHA1_Init(&g_sha1_context_dir_sum);
