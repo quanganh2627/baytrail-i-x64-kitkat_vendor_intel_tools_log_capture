@@ -544,7 +544,7 @@ int do_monitor() {
  */
 int compute_crashlogd_mode(char *boot_mode, int ramdump_flag ) {
 
-    if (!strcmp(boot_mode, "main")) {
+    if (!strcmp(boot_mode, "normal")) {
         g_crashlog_mode = NOMINAL_MODE;
     } else if (!strcmp(boot_mode, "ramconsole")) {
         if (ramdump_flag)

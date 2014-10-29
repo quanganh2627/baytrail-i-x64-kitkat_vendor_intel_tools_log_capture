@@ -294,7 +294,7 @@ extern enum crashlog_mode g_crashlog_mode;
 #define DATA_DIR                RESDIR "/data"
 #define SYS_DIR                 RESDIR "/system"
 #define CACHE_DIR               RESDIR "/cache"
-#define PSTORE_DIR              RESDIR "/pstore"
+#define PSTORE_DIR              RESDIR "/sys/fs/pstore"
 #define DEBUGFS_DIR             RESDIR "/d"
 #define PANIC_DIR               DATA_DIR "/dontpanic"
 #define SDCARD_LOGS_DIR         SDCARD_DIR "/logs"
