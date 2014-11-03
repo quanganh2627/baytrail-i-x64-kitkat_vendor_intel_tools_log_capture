@@ -88,10 +88,16 @@ const char *  __attribute__( ( noinline ) ) get_current_system_time(int refresh,
     if (time(&t) == (time_t)-1 )
         LOGE("%s: Can't get current system time : use value previously got - error is %s", __FUNCTION__, strerror(errno));
     else {
-        for ( format_idx = 0 ; format_idx < (int)DIM(crashlog_time_array); format_idx++ )
-            PRINT_TIME( crashlog_time_array[format_idx].value ,
-                        date_time_format[format_idx].format ,
-                        localtime((const time_t *)&t));
+        struct tm * time_val = localtime((const time_t *)&t);
+        if (!time_val) {
+            LOGE("%s: Could not retrieve the local time. Returning previously computed values.", __FUNCTION__);
+        } else {
+            for ( format_idx = 0 ; format_idx < (int)DIM(crashlog_time_array); format_idx++ ) {
+                PRINT_TIME( crashlog_time_array[format_idx].value ,
+                            date_time_format[format_idx].format ,
+                            time_val);
+            }
+        }
     }
     return crashlog_time_array[format].value;
 }
@@ -319,6 +325,7 @@ static char *priv_raise_event(char *event, char *type, char *subtype, char *log,
         return NULL;
     }
     if (log ) {
+        if (puptime == NULL) puptime = "\0";
         if (!strncmp(event, CRASHEVENT, sizeof(CRASHEVENT))) {
             res = create_minimal_crashfile( event, subtype, log, key, puptime, datelong, data_ready);
         }
@@ -836,7 +843,7 @@ int do_screenshot_copy(char* bz_description, char* bzdir) {
     FILE *fd1;
     struct stat info;
     int bz_num = 0;
-    unsigned int screenshot_len;
+    int screenshot_len;
 
     if (stat(bz_description, &info) < 0)
         return -1;
@@ -852,7 +859,7 @@ int do_screenshot_copy(char* bz_description, char* bzdir) {
             if (strstr(buffer,SCREENSHOT_PATTERN)){
                 //Compute length of screenshot path
                 screenshot_len = strlen(buffer) - strlen(SCREENSHOT_PATTERN);
-                if ((screenshot_len > 0) && (screenshot_len < sizeof(screenshot))) {
+                if ((screenshot_len > 0) && ((unsigned int)screenshot_len < sizeof(screenshot))) {
                     //Copy file path
                     strncpy(screenshot, buffer+strlen(SCREENSHOT_PATTERN), screenshot_len);
                     //If last character is '\n' replace it by '\0'

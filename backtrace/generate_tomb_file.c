@@ -132,7 +132,7 @@ int read_thread_stack(FILE *f, unsigned int pid, int tid)
 {
 	char buf[PATH_LENGTH] = {0, };
 	char path[PATH_LENGTH] = {0, };
-	char str[PATH_LENGTH] = {0, };
+	char str[PATH_LENGTH+1] = {0, };
 	FILE * fp = NULL;
 
 	char comm[PATH_LENGTH] = {0,};
@@ -151,7 +151,7 @@ int read_thread_stack(FILE *f, unsigned int pid, int tid)
 		fprintf(f,"		----thread stack start: pid %d tid %d, thread name %s\n",  pid, tid,comm);
 		while(fgets(buf, PATH_LENGTH, fp)) {
 		    strcpy(str, "		");
-		    strncat(str, buf, sizeof(str)-2);
+		    strncat(str, buf, sizeof(buf)-2);
 		    fputs(str ,f);
 		 }
 		fprintf(f,"		----thread stack end: pid %d tid %d, thread name %s\n\n",  pid, tid, comm);

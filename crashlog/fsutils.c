@@ -946,7 +946,7 @@ int overwrite_file(char *filename, char *value) {
 
 int read_file_prop_uid(char* source, char *filename, char *uid, char* defaultvalue) {
     FILE *fd;
-    char buffer[MAXLINESIZE];
+    char buffer[MAXLINESIZE] = {'\0'};
     char temp_uid[PROPERTY_VALUE_MAX];
 
     if ((source && filename && uid && defaultvalue) == 0)
@@ -964,7 +964,7 @@ int read_file_prop_uid(char* source, char *filename, char *uid, char* defaultval
         return -1;
     }
     strncpy(uid, temp_uid, PROPERTY_VALUE_MAX);
-    if (strncmp(uid, buffer,PROPERTY_VALUE_MAX) != 0){
+    if (strncmp(uid, buffer, PROPERTY_VALUE_MAX) != 0){
         /*need to reopen file in w mode and write the property in the file*/
         fd = fopen(filename, "w");
         if (fd!=NULL){
@@ -1129,6 +1129,7 @@ int get_parent_dir( char * dir, char *parent_dir )
         return -EINVAL;
 
     strncpy(path, dir, PATHMAX-1);
+	path[PATHMAX-1] = '\0';
     ptr = strrchr(path, '/');
 
     if ( !ptr || strlen(path) <= 1 )
@@ -1139,8 +1140,9 @@ int get_parent_dir( char * dir, char *parent_dir )
         *(ptr) = '\0';
         ptr = strrchr(path, '/');
     }
-    *(ptr + 1) = '\0';
-
+	if(ptr){
+        *(ptr + 1) = '\0';
+	}
     if ( strlen(path) == 0 )
         return -1;
 

@@ -142,7 +142,7 @@ int convert_dropbox_timestamp(char* dropboxname, char *timestamp) {
 long extract_dropbox_timestamp(char* filename)
 {
     char *ptr_timestamp_start,*ptr_timestamp_end;
-    char timestamp[TIMESTAMP_MAX_SIZE+1] = { '\0', };
+    char timestamp[TIMESTAMP_MAX_SIZE];
     unsigned int i;
     ALOGD("%s\n", __FUNCTION__);
     //DropBox log filename format is : 'error/log type' + '@' + 'timestamp' + '.' + 'file suffix'
@@ -155,12 +155,13 @@ long extract_dropbox_timestamp(char* filename)
         ptr_timestamp_start++;
         ptr_timestamp_end = strchr(ptr_timestamp_start, '.');
         if (ptr_timestamp_end) {
+            int size_timestamp = ptr_timestamp_end - ptr_timestamp_start - 3;
             //checks timestamp size
-            if ( ((ptr_timestamp_end - ptr_timestamp_start - 3) <= TIMESTAMP_MAX_SIZE ) && ((ptr_timestamp_end - ptr_timestamp_start - 3) >= 0 )) {
-                strncpy(timestamp, ptr_timestamp_start, ptr_timestamp_end - ptr_timestamp_start - 3);
+            if ( (size_timestamp <= TIMESTAMP_MAX_SIZE ) && (size_timestamp > 0 )) {
+                strncpy(timestamp, ptr_timestamp_start, size_timestamp);
                 //checks timestamp consistency
-                for(i=0; i <strlen(timestamp); i++) {
-                    if (!isdigit(timestamp[i]))
+                while(size_timestamp--) {
+                    if (!isdigit(timestamp[size_timestamp]))
                         return -1;
                 }
                 //checks timestamp value compatibility with 'long' type
@@ -252,7 +253,11 @@ int manage_duplicate_dropbox_events(struct inotify_event *event)
             struct tm *time;
             memset(&time, 0, sizeof(time));
             time = localtime(&timestamp_value);
-            PRINT_TIME(human_readable_date, DUPLICATE_TIME_FORMAT , time);
+            if (time) {
+                PRINT_TIME(human_readable_date, DUPLICATE_TIME_FORMAT , time);
+            } else {
+                LOGE("%s Could not print human readable timestamp\n", __FUNCTION__);
+            }
         }
         /*
          * Generates the INFO event with the previous and the new

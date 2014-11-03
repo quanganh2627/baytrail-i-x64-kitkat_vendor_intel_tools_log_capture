@@ -347,7 +347,7 @@ int crashlog_check_kdump(char *reason, int test) {
     if ((curr_stat == 3) || (test == 1)) {
 
         dir = find_new_crashlog_dir(MODE_KDUMP);
-        if (dir < 0) {
+        if (dir < 0 && crashtype != NULL) {
             LOGE("%s: Cannot get a valid new crash directory...\n", __FUNCTION__);
             key = raise_event(CRASHEVENT, crashtype, NULL, NULL);
             LOGE("%-8s%-22s%-20s%s\n", CRASHEVENT, key, get_current_time_long(0), crashtype);
@@ -361,15 +361,17 @@ int crashlog_check_kdump(char *reason, int test) {
                     KDUMP_CRASH_DIR, dir, "kdumpfile", dateshort);
             do_mv(KDUMP_FILE_NAME, destination);
         }
-
-        /* Copy aplogs to KDUMP crash directory */
-        do_log_copy(crashtype, dir, dateshort, KDUMP_TYPE);
-
+        if(crashtype != NULL){
+            /* Copy aplogs to KDUMP crash directory */
+            do_log_copy(crashtype, dir, dateshort, KDUMP_TYPE);
+        }
         destination[0] = '\0';
         snprintf(destination, sizeof(destination), "%s%d/", KDUMP_CRASH_DIR, dir);
-        key = raise_event(CRASHEVENT, crashtype, NULL, destination);
-        LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, get_current_time_long(0), crashtype, destination);
-        free(key);
+		if(crashtype != NULL){
+            key = raise_event(CRASHEVENT, crashtype, NULL, destination);
+            LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, get_current_time_long(0), crashtype, destination);
+            free(key);
+		}
 
         remove(KDUMP_START_FLAG);
         remove(KDUMP_FILE_NAME);

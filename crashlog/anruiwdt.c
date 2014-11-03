@@ -81,7 +81,7 @@ static void process_anruiwdt_tracefile(char *destion, int dir, int removeunparse
 {
     char cmd[PATHMAX];
     int src, dest;
-    char dest_path[PATHMAX];
+    char dest_path[PATHMAX] = {'\0'};
     char dest_path_symb[PATHMAX];
     struct stat stat_buf;
     char *tracefile;
@@ -97,6 +97,10 @@ static void process_anruiwdt_tracefile(char *destion, int dir, int removeunparse
     for (i = 0; i < 100; i++) {
         if ( fgets(cmd, sizeof(cmd), fp) && !strncmp("Trace file:", cmd, 11) ) {
             tracefile = cmd + 11;
+            if (!strlen(tracefile)) {
+                LOGE("%s: Found lookup pattern, but without tracefile\n", __FUNCTION__);
+                break;
+            }
             tracefile[strlen(tracefile) - 1] = 0; /* eliminate trailing \n */
             if ( !file_exists(tracefile) ) {
                 LOGE("%s: %s lists a trace file (%s) but it does not exist...\n", __FUNCTION__, destion, tracefile);
@@ -140,6 +144,11 @@ static void process_anruiwdt_tracefile(char *destion, int dir, int removeunparse
         }
     }
     fclose(fp);
+
+    if (dest_path[0] == '\0') {
+        LOGE("%s: Destination path not set\n", __FUNCTION__);
+        return;
+    }
     do_chown(dest_path, PERM_USER, PERM_GROUP);
     snprintf(dest_path_symb, sizeof(dest_path_symb), "%s_symbol", dest_path);
     do_chown(dest_path_symb, PERM_USER, PERM_GROUP);
