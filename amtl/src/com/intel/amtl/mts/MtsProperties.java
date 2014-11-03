@@ -19,16 +19,45 @@
 
 package com.intel.amtl.mts;
 
+import com.intel.amtl.AMTLApplication;
+import com.intel.amtl.R;
+
 public class MtsProperties {
+    private static AMTLApplication mApp = AMTLApplication.getAMTLApp();
 
-    public static final String MTS_INPUT_PROP = "persist.service.mts.input";
-    public static final String MTS_OUTPUT_PROP = "persist.service.mts.output";
-    public static final String MTS_OUTPUT_TYPE_PROP = "persist.service.mts.output_type";
-    public static final String MTS_ROTATE_NUM_PROP = "persist.service.mts.rotate_num";
-    public static final String MTS_ROTATE_SIZE_PROP = "persist.service.mts.rotate_size";
-    public static final String MTS_INTERFACE_PROP = "persist.service.mts.interface";
-    public static final String MTS_BUFFER_SIZE_PROP = "persist.service.mts.buffer_size";
-    public static final String MTS_SERVICE = "persist.service.mtsp.enable";
-    public static final String MTS_STATUS_PROP = "init.svc.mtsp";
+    public static String getInput() {
+        return mApp.getString(R.string.mts_input_prop);
+    }
 
+    public static String getOutput() {
+        return mApp.getString(R.string.mts_output_prop);
+    }
+
+    public static String getOutputType() {
+        return mApp.getString(R.string.mts_output_type_prop);
+    }
+
+    public static String getRotateNum() {
+        return mApp.getString(R.string.mts_rotate_num_prop);
+    }
+
+    public static String getRotateSize() {
+        return mApp.getString(R.string.mts_rotate_size_prop);
+    }
+
+    public static String getInterface() {
+        return mApp.getString(R.string.mts_interface_prop);
+    }
+
+    public static String getBufferSize() {
+        return mApp.getString(R.string.mts_buffer_size_prop);
+    }
+
+    public static String getService() {
+        return mApp.getString(R.string.mts_service);
+    }
+
+    public static String getStatus() {
+        return mApp.getString(R.string.mts_status_prop);
+    }
 }

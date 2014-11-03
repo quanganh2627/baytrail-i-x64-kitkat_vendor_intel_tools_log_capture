@@ -46,6 +46,7 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.intel.amtl.AMTLApplication;
 import com.intel.amtl.R;
 import com.intel.amtl.config_parser.ConfigParser;
 import com.intel.amtl.gui.UIHelper;
@@ -61,7 +62,7 @@ import org.xmlpull.v1.XmlPullParserException;
 
 public class ExpertSetupFrag extends Fragment implements OnClickListener {
 
-    private final String TAG = "AMTL";
+    private final String TAG = AMTLApplication.getAMTLApp().getLogTag();
     private final String MODULE = "ExpertSetupFrag";
 
     private String confPath = "/etc/amtl/catalog/default_expert.cfg";

@@ -40,38 +40,59 @@ import com.intel.internal.telephony.ModemStatusManager;
 import java.io.Closeable;
 import java.io.IOException;
 import java.lang.Object;
+import java.lang.reflect.Constructor;
 import java.util.ArrayList;
 
 
-public class ModemController implements ModemEventListener, Closeable {
+public abstract class ModemController implements ModemEventListener, Closeable {
 
-    private final String TAG = "AMTL";
+    private final String TAG = AMTLApplication.getAMTLApp().getLogTag();
     private final String MODULE = "ModemController";
 
     private GsmttyManager ttyManager;
     private ModemStatusManager modemStatusManager;
     private static ModemStatus currentModemStatus = ModemStatus.NONE;
-    private static ModemController mdmCtrl;
+    private static ModemController mdmCtrl = null;
     private static boolean modemAcquired = false;
     private CommandParser cmdParser;
     private ArrayList<Master> masterArray;
     private boolean firstAcquire = true;
 
+    public abstract boolean queryTraceState() throws ModemControlException;
+    public abstract String switchTrace(ModemConf mdmconf)throws ModemControlException;
+    public abstract String flush(ModemConf mdmconf)throws ModemControlException;
+    public abstract String switchOffTrace()throws ModemControlException;
+    public abstract String confTraceAndModemInfo(ModemConf mdmconf) throws ModemControlException;
+    public abstract void confApplyFinalize()throws ModemControlException;
+    public abstract String checkOct() throws ModemControlException;
+
     public ModemController() throws ModemControlException {
 
         try {
-            this.modemStatusManager = ModemStatusManager.getInstance();
+            this.modemStatusManager = AMTLApplication.getAMTLApp().getModemStatusManager();
             cmdParser = new CommandParser();
         } catch (InstantiationException ex) {
             throw new ModemControlException("Cannot instantiate Modem Status Manager");
         }
     }
 
-    /* Get a reference of ModemController: singleton design pattern */
-    public static ModemController get() throws ModemControlException {
-        if (mdmCtrl == null) {
-            mdmCtrl = new ModemController();
+    public synchronized static ModemController getInstance()
+            throws ModemControlException{
+        if (mdmCtrl != null) {
+            return mdmCtrl;
         }
+
+        String className = AMTLApplication.getAMTLApp()
+                .getModemCtlClassName();
+
+        try {
+            Class<?> c = Class.forName(className);
+            final Constructor<?> constructor = c.getConstructor();
+            mdmCtrl = (ModemController)constructor.newInstance();
+        } catch(Exception e) {
+            throw new ModemControlException("Cannot create the class successfully");
+        }
+
         return mdmCtrl;
     }
 
@@ -86,7 +107,8 @@ public class ModemController implements ModemEventListener, Closeable {
             }
             try {
                 Log.d(TAG, MODULE + ": Connecting to Modem Status Manager");
-                this.modemStatusManager.connect("AMTL");
+                this.modemStatusManager.connect(AMTLApplication.getAMTLApp()
+                       .getAppName());
             } catch (MmgrClientException ex) {
                 throw new ModemControlException("Cannot connect to Modem Status Manager " + ex);
             }
@@ -128,8 +150,10 @@ public class ModemController implements ModemEventListener, Closeable {
                 }
                 this.ttyManager.writeToModemControl(command);
 
+                ret = "";
                 do {
-                    ret = this.ttyManager.readFromModemControl();
+                    //Response may return in two lines.
+                    ret += this.ttyManager.readFromModemControl();
                 } while (!ret.contains("OK") && !ret.contains("ERROR"));
 
                 if (ret.contains("ERROR")) {
@@ -156,6 +180,10 @@ public class ModemController implements ModemEventListener, Closeable {
     public ArrayList<Master> checkAtXsystraceState(ArrayList<Master> masterList)
             throws ModemControlException {
         return cmdParser.parseXsystraceResponse(sendAtCommand("at+xsystrace=10\r\n"), masterList);
+    }
+
+    public CommandParser getCmdParser() {
+        return cmdParser;
     }
 
     public void close() {
@@ -211,8 +239,9 @@ public class ModemController implements ModemEventListener, Closeable {
         this.mdmCtrl = null;
     }
 
-    private void sendMessage(String msg) {
-        Intent intent = new Intent("modem-event");
+    public void sendMessage(String msg) {
+        String event = AMTLApplication.getAMTLApp().getModemEvent();
+        Intent intent = new Intent(event);
         intent.putExtra("message", msg);
         AMTLApplication.getContext().sendBroadcast(intent);
     }

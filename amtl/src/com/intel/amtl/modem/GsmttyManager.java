@@ -19,6 +19,7 @@
 
 package com.intel.amtl.modem;
 
+import com.intel.amtl.AMTLApplication;
 import com.intel.amtl.exceptions.ModemControlException;
 
 import java.io.Closeable;
@@ -29,7 +30,7 @@ import android.util.Log;
 
 public class GsmttyManager implements Closeable {
 
-    private final String TAG = "AMTL";
+    private final String TAG = AMTLApplication.getAMTLApp().getLogTag();
     private final String MODULE = "GsmttyManager";
     private RandomAccessFile file = null;
     private Gsmtty gsmtty = null;
@@ -50,7 +51,7 @@ public class GsmttyManager implements Closeable {
     }
 
     private String getTtyFileName() {
-        return "/dev/gsmtty19";
+        return AMTLApplication.getAMTLApp().getTtyFileName();
     }
 
     public void writeToModemControl(String atCommand) throws ModemControlException {

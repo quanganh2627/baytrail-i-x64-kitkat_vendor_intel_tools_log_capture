@@ -287,7 +287,7 @@ static int update_iptrak_file() {
             __FUNCTION__,
             vendor,
             stepping);
-        sprintf(pmic_version, "%s:%s", vendor, stepping);
+        snprintf(pmic_version, sizeof(pmic_version), "%s:%s", vendor, stepping);
     } else {
         /* Keep the previous value */
         strncpy(pmic_version, current_pmic, PROPERTY_VALUE_MAX);

@@ -49,6 +49,7 @@ import android.widget.EditText;
 
 import com.intel.amtl.AMTLApplication;
 import com.intel.amtl.R;
+import com.intel.amtl.exceptions.ModemConfException;
 import com.intel.amtl.exceptions.ModemControlException;
 import com.intel.amtl.helper.LogManager;
 import com.intel.amtl.models.config.ModemConf;
@@ -66,7 +67,7 @@ import java.util.ArrayList;
 
 public class GeneralSetupFrag extends Fragment implements OnClickListener, OnCheckedChangeListener {
 
-    private final String TAG = "AMTL";
+    private final String TAG = AMTLApplication.getAMTLApp().getLogTag();
     private final String MODULE = "GeneralSetupFrag";
     private final String EXPERT_PROPERTY = "persist.service.amtl.expert";
     private final String CONFSETUP_TAG = "AMTL_modem_configuration_setup";
@@ -85,6 +86,7 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnChe
     private Button bLogTag;
     private TextView tvModemStatus;
     private TextView tvMtsStatus;
+    private TextView tvOctStatus;
 
     private LinearLayout ll;
 
@@ -208,25 +210,24 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnChe
         int id = prefs.getInt("index", -2);
         Log.d(TAG, MODULE + ": Current index = " + id);
         if (id >= 0) {
-            if (curModConf.getTrace().equals("0")) {
+            if (!curModConf.confTraceEnable()) {
                 if (mtsMgr.getMtsState().equals("running")) {
                     Log.e(TAG, MODULE + ": stopping mts running wrongly");
                     mtsMgr.stopServices();
                 }
                 Log.d(TAG, MODULE + ": reinit switches");
                 this.setSwitchesChecked(false);
-            }
-            else {
+            } else {
                 for (LogOutput o: configArray) {
                     o.getConfSwitch().setChecked(configArray.indexOf(o) == id);
                 }
             }
         } else {
-            if (curModConf.getTrace().equals("0") && mtsMgr.getMtsState().equals("running")) {
+            if ((!curModConf.confTraceEnable()) && mtsMgr.getMtsState().equals("running")) {
                 mtsMgr.stopServices();
             }
             this.updateText(this.mtsMgr.getMtsState(), tvMtsStatus);
-            if (this.isExpertModeEnabled() && !curModConf.getTrace().equals("0")) {
+            if (this.isExpertModeEnabled() && (curModConf.confTraceEnable())) {
                 if (curModConf.isMtsRequired() && mtsMgr.getMtsState().equals("running")) {
                     this.sExpertMode.setChecked(true);
                 } else if (!curModConf.isMtsRequired()) {
@@ -235,8 +236,9 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnChe
             } else {
                 SystemProperties.set(EXPERT_PROPERTY, "0");
                 this.sExpertMode.setChecked(false);
-                // if traces are not enabled or mts not started ,uncheck all the conf switches
-                if (curModConf.getTrace().equals("0") || (!mtsMgr.getMtsState().equals("running")
+                // if traces are not enabled or mts not started, uncheck all the conf switches
+                if ((!curModConf.confTraceEnable()) ||
+                        (!mtsMgr.getMtsState().equals("running")
                         && curModConf.isMtsRequired())) {
                     this.setSwitchesChecked(false);
                 // if traces are enabled, check the corresponding conf switch
@@ -261,6 +263,8 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnChe
                 }
             }
         }
+        this.updateText(curModConf.getOctMode(), tvOctStatus);
+        this.updateText(this.mtsMgr.getMtsState(), tvMtsStatus);
     }
 
     public void setFirstCreated(boolean created) {
@@ -325,7 +329,8 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnChe
             savLog.setTargetFragment(this, SAVELOG_TARGETFRAG);
         }
 
-        this.getActivity().registerReceiver(mMessageReceiver, new IntentFilter("modem-event"));
+        String event = AMTLApplication.getAMTLApp().getModemEvent();
+        this.getActivity().registerReceiver(mMessageReceiver, new IntentFilter(event));
         mtsMgr = new MtsManager();
     }
 
@@ -336,7 +341,7 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnChe
             // update modem status when returning from another fragment
             if (ModemController.getModemStatus() == ModemStatus.UP) {
                 try {
-                    ModemController mdmCtrl = ModemController.get();
+                    ModemController mdmCtrl = ModemController.getInstance();
                     this.currentModemConf = checkModemConfig(mdmCtrl);
                     this.mtsMgr.printMtsProperties();
                     this.updateUi(this.currentModemConf);
@@ -367,6 +372,7 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnChe
             this.sExpertMode = (Switch) view.findViewById(R.id.switchExpertMode);
             this.tvModemStatus = (TextView) view.findViewById(R.id.modemStatusValueTxt);
             this.tvMtsStatus = (TextView) view.findViewById(R.id.mtsStatusValueTxt);
+            this.tvOctStatus = (TextView) view.findViewById(R.id.octStatusValueTxt);
             this.ll = (LinearLayout) view.findViewById(R.id.generalsetupfraglayout);
 
             // definition of switch listeners
@@ -427,7 +433,7 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnChe
             if (message != null) {
                 if (message.equals("UP")) {
                     try {
-                        ModemController mdmCtrl = ModemController.get();
+                        ModemController mdmCtrl = ModemController.getInstance();
                         currentModemConf = checkModemConfig(mdmCtrl);
                         mtsMgr.printMtsProperties();
                         updateUi(currentModemConf);
@@ -450,16 +456,29 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnChe
 
     private ModemConf checkModemConfig(ModemController mdmCtrl) throws ModemControlException {
         String atXsioResponse;
-        String atTraceResponse;
         String atXsystraceResponse;
+        String octMode;
+        String atTraceResponse = "";
         ModemConf retModemConf = null;
         CommandParser cmdParser = new CommandParser();
 
         atXsioResponse = mdmCtrl.sendAtCommand("at+xsio?\r\n");
         atTraceResponse = mdmCtrl.sendAtCommand("at+trace?\r\n");
         atXsystraceResponse = mdmCtrl.sendAtCommand("at+xsystrace=10\r\n");
-        retModemConf = new ModemConf(cmdParser.parseXsioResponse(atXsioResponse),
-                cmdParser.parseTraceResponse(atTraceResponse), atXsystraceResponse, "");
+
+        octMode = mdmCtrl.checkOct();
+        Bundle bundle = new Bundle();
+        bundle.putString(ModemConf.KEY_XSIO, cmdParser.parseXsioResponse(atXsioResponse));
+        bundle.putString(ModemConf.KEY_TRACE, cmdParser.parseTraceResponse(atTraceResponse));
+        bundle.putString(ModemConf.KEY_XSYSTRACE, atXsystraceResponse);
+        bundle.putString(ModemConf.KEY_FLCMD, "");
+        bundle.putString(ModemConf.KEY_OCTMODE, octMode);
+
+        try {
+            retModemConf = ModemConf.getInstance(bundle);
+        } catch (ModemConfException e) {
+            Log.e(TAG, MODULE + ":Create the modconf error.");
+        }
         return retModemConf;
     }
 
@@ -543,14 +562,27 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnChe
                 boolean buttonChecked = false;
                 for (LogOutput o: configArray) {
                     if (o.getConfSwitch().isChecked()) {
-                        modemConfToApply = new ModemConf(o);
+                        try {
+                            modemConfToApply = ModemConf.getInstance(o);
+                        } catch (ModemConfException e){
+                            Log.e(TAG, MODULE + ":Create the modemConfToApply error.");
+                        }
                         modemConfToApply.activateConf(true);
                         buttonChecked = true;
                     }
                 }
                 if (!buttonChecked) {
-                    modemConfToApply = new ModemConf("", "AT+TRACE=0\r\n",
-                            "AT+XSYSTRACE=0\r\n", "");
+                    Bundle bundle = new Bundle();
+                    bundle.putString(ModemConf.KEY_XSIO, "");
+                    bundle.putString(ModemConf.KEY_TRACE, "AT+TRACE=0\r\n");
+                    bundle.putString(ModemConf.KEY_XSYSTRACE, "AT+XSYSTRACE=0\r\n");
+                    bundle.putString(ModemConf.KEY_OCTMODE, "");
+                    bundle.putString(ModemConf.KEY_FLCMD, "");
+                    try {
+                        modemConfToApply = ModemConf.getInstance(bundle);
+                    } catch (ModemConfException e) {
+                        Log.e(TAG, MODULE + ":Create the modemConfToApply error.");
+                    }
                 }
             }
         } else {

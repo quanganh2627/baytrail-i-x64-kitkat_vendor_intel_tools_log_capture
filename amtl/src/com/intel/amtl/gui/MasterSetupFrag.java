@@ -40,7 +40,9 @@ import android.widget.AdapterView;
 import android.widget.Button;
 import android.widget.Spinner;
 
+import com.intel.amtl.AMTLApplication;
 import com.intel.amtl.R;
+import com.intel.amtl.exceptions.ModemConfException;
 import com.intel.amtl.exceptions.ModemControlException;
 import com.intel.amtl.models.config.Master;
 import com.intel.amtl.models.config.ModemConf;
@@ -54,7 +56,7 @@ import java.util.ArrayList;
 public class MasterSetupFrag extends Fragment
         implements OnClickListener, AdapterView.OnItemSelectedListener {
 
-    private final String TAG = "AMTL";
+    private final String TAG = AMTLApplication.getAMTLApp().getLogTag();
     private final String MODULE = "MasterSetupFrag";
 
     static final int CONFSETUP_MASTER_TARGETFRAG = 1;
@@ -148,7 +150,8 @@ public class MasterSetupFrag extends Fragment
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        this.getActivity().registerReceiver(mMessageReceiver, new IntentFilter("modem-event"));
+        String event = AMTLApplication.getAMTLApp().getModemEvent();
+        this.getActivity().registerReceiver(mMessageReceiver, new IntentFilter(event));
         gsfManager = getFragmentManager();
 
         ConfigApplyFrag appMasterConf
@@ -219,15 +222,14 @@ public class MasterSetupFrag extends Fragment
         // update modem status when returning from another fragment
         if (ModemController.getModemStatus() == ModemStatus.UP) {
             try {
-                ModemController mdmCtrl = ModemController.get();
-                String trace = mdmCtrl.checkAtTraceState();
+                ModemController mdmCtrl = ModemController.getInstance();
                 this.masterArray = new ArrayList<Master>();
                 for (String s: masterNames) {
                     this.masterArray.add(new Master(s, "", ""));
                 }
                 this.masterArray = mdmCtrl.checkAtXsystraceState(this.masterArray);
                 this.updateUi();
-                if (trace.equals("1")) {
+                if (mdmCtrl.queryTraceState()) {
                     this.setUIEnabled();
                 } else {
                     this.setUIDisabled();
@@ -300,7 +302,12 @@ public class MasterSetupFrag extends Fragment
                 output.addMasterToList(m.getName(), m);
             }
         }
-        ModemConf modConf = new ModemConf(output);
+        ModemConf modConf = null;
+        try {
+            modConf = ModemConf.getInstance(output);
+        } catch (ModemConfException e) {
+            Log.e(TAG, MODULE + ":Create the modConf error.");
+        }
         return modConf;
     }
 
@@ -347,9 +354,8 @@ public class MasterSetupFrag extends Fragment
             String message = intent.getStringExtra("message");
             if (message != null && message.equals("UP")) {
                 try {
-                    ModemController mdmCtrl = ModemController.get();
-                    String trace = mdmCtrl.checkAtTraceState();
-                    if (trace.equals("0")) {
+                    ModemController mdmCtrl = ModemController.getInstance();
+                    if (!mdmCtrl.queryTraceState()) {
                         setUIDisabled();
                     } else {
                         masterArray = mdmCtrl.checkAtXsystraceState(masterArray);

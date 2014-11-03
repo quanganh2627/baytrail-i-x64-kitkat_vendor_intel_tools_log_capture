@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <string name="app_name">amtl</string>
+    <string name="app_name" product="amtl">AMTL</string>
+    <string name="app_name" product="amtl2">AMTL2</string>
     <string name="menu_name">Settings</string>
     <string name="label_unknown">UNKNOWN</string>
     <string name="label_modem_status">Modem status:</string>
-    <string name="label_mts_status">Offline logging status:</string>
+    <string name="label_mts_status">Modem Trace Server state:</string>
+    <string name="label_oct_status">Modem internal logging:</string>
     <string name="expert_mode">Expert Mode</string>
     <string name="apply_conf_text">Execute configuration</string>
     <string name="save_log_text">Save logs</string>

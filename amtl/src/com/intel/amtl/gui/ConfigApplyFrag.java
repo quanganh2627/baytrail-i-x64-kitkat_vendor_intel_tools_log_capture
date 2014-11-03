@@ -47,7 +47,7 @@ import com.intel.amtl.mts.MtsManager;
 // Embedded class to handle delayed configuration setup (Dialog part).
 public class ConfigApplyFrag extends DialogFragment {
 
-    private final String TAG = "AMTL";
+    private final String TAG = AMTLApplication.getAMTLApp().getLogTag();
     private final String MODULE = "ConfigApplyFrag";
 
     private static String EXTRA_TAG = null;
@@ -148,7 +148,7 @@ public class ConfigApplyFrag extends DialogFragment {
 
     // embedded class to handle delayed configuration setup (thread part).
     public static class ApplyConfTask extends AsyncTask<Void, Void, Void> {
-        private final String TAG = "AMTL";
+        private final String TAG = AMTLApplication.getAMTLApp().getLogTag();
         private final String MODULE = "ApplyConfTask";
         private ConfigApplyFrag confSetupFrag;
         private ModemController modemCtrl;
@@ -174,16 +174,14 @@ public class ConfigApplyFrag extends DialogFragment {
                     AMTLApplication.getContext().getSharedPreferences("AMTLPrefsData",
                     Context.MODE_PRIVATE).edit();
             try {
-                modemCtrl = ModemController.get();
+                modemCtrl = ModemController.getInstance();
                 if (modemCtrl != null) {
-                    // send the three at commands
-                    modemCtrl.sendAtCommand(modConfToApply.getXsio());
-                    modemCtrl.sendAtCommand(modConfToApply.getTrace());
-                    modemCtrl.sendAtCommand(modConfToApply.getXsystrace());
+                    modemCtrl.confTraceAndModemInfo(modConfToApply);
+                    modemCtrl.switchTrace(modConfToApply);
                     // if flush command available for this configuration, let s use it.
                     if (!modConfToApply.getFlCmd().equalsIgnoreCase("")) {
                         Log.d(TAG, MODULE + ": Config has flush_cmd defined.");
-                        modemCtrl.sendAtCommand(modConfToApply.getFlCmd());
+                        modemCtrl.flush(modConfToApply);
                         // give time to the modem to sync - 1 second
                         SystemClock.sleep(1000);
                     } else {
@@ -214,15 +212,13 @@ public class ConfigApplyFrag extends DialogFragment {
                             mtsManager.startService(modConfToApply.getMtsMode());
                         } else {
                             // do not stop mts when applying conf from masterfrag
-                            if (!modConfToApply.getXsio().equals("")
-                                    || !modConfToApply.getTrace().equals("")) {
+                            if (modConfToApply.confTraceOutput()){
                                 mtsManager.stopServices();
                                 modConfToApply.applyMtsParameters();
                             }
                         }
                         modConfToApply = null;
-                        // restart modem by a cold reset
-                        modemCtrl.restartModem();
+                        modemCtrl.confApplyFinalize();
                         // give time to the modem to be up again
                         SystemClock.sleep(2000);
                     } else {
@@ -242,8 +238,7 @@ public class ConfigApplyFrag extends DialogFragment {
                 try {
                     mtsManager = new MtsManager();
                     mtsManager.stopServices();
-                    modemCtrl.sendAtCommand("AT+TRACE=0\r\n");
-                    modemCtrl.sendAtCommand("AT+XSYSTRACE=0\r\n");
+                    modemCtrl.switchOffTrace();
                     String flCmd = prefs.getString("default_flush_cmd", "");
                     if (!flCmd.equalsIgnoreCase("")) {
                         modemCtrl.sendAtCommand(flCmd + "\r\n");

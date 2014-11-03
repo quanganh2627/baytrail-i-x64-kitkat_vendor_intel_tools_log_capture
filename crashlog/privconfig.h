@@ -219,7 +219,7 @@ struct mode_config {
 static const struct mode_config get_mode_configs[] = {
     [ NOMINAL_MODE ] = {
         .name = "NOMINAL MODE",
-        .sdcard_storage = TRUE,
+        .sdcard_storage = CONFIG_USE_SD,
         .notifs_crashreport = TRUE,
         .monitor_crashenv = TRUE,
         .watched_event_types = {
@@ -238,7 +238,7 @@ static const struct mode_config get_mode_configs[] = {
     },
     [ MINIMAL_MODE ] = {
         .name = "MINIMAL MODE",
-        .sdcard_storage = TRUE,
+        .sdcard_storage = CONFIG_USE_SD,
         .notifs_crashreport = FALSE,
         .monitor_crashenv = FALSE,
         .watched_event_types = {
@@ -271,6 +271,7 @@ extern enum crashlog_mode g_crashlog_mode;
 #define DIM(array)              ( sizeof(array) / sizeof(array[0]) )
 
 /* PROPERTIES */
+#define PROP_LOGS_ROOT          "persist.crashlogd.root"
 #define PROP_CRASH_MODE         "persist.sys.crashlogd.mode"
 #define PROP_PROFILE            "persist.service.profile.enable"
 #define PROP_BOOTREASON         "ro.boot.bootreason"
@@ -346,6 +347,7 @@ extern enum crashlog_mode g_crashlog_mode;
 #define EVENTS_DIR              LOGS_DIR "/events"
 #define EFI_DIR                 SYS_DIR "/firmware/efi"
 #define EFIVARS_DIR             EFI_DIR "/efivars"
+#define FACTORY_PARTITION_DIR   RESDIR "/factory"
 
 /* FILES */
 #define SYS_PROP                SYSTEM_DIR "/build.prop"
@@ -438,6 +440,7 @@ extern enum crashlog_mode g_crashlog_mode;
 #define FW_UPDATE_STATUS_PATH   "/sys/firmware/osnib/fw_update_status"
 #define INGREDIENTS_CONFIG      SYSTEM_DIR "/etc/ingredients.conf"
 #define INGREDIENTS_FILE        LOGS_DIR "/ingredients.txt"
+#define FACTORY_SUM_FILE        LOGS_DIR "/factory_sum"
 
 /* SYSTEM COMMANDS */
 #define SDSIZE_SYSTEM_CMD "du -sk " SDCARD_LOGS_DIR "/ > " LOGS_DIR "/currentsdsize"

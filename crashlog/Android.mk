@@ -41,6 +41,7 @@ LOCAL_SRC_FILES := \
     panic.c \
     config_handler.c \
     uefivar.c \
+    checksum.c \
     ingredients.c
 
 LOCAL_SHARED_LIBRARIES := libcutils
@@ -55,8 +56,18 @@ ifeq ($(CRASHLOGD_FULL_REPORT),true)
 LOCAL_CFLAGS += -DFULL_REPORT
 endif
 
+ifeq ($(CRASHLOGD_FACTORY_CHECKSUM),true)
+LOCAL_CFLAGS += -DCONFIG_FACTORY_CHECKSUM
+endif
+
 ifeq ($(CRASHLOGD_COREDUMP),true)
 LOCAL_CFLAGS += -DCONFIG_COREDUMP
+endif
+
+ifeq ($(CRASHLOGD_USE_SD),false)
+LOCAL_CFLAGS += -DCONFIG_USE_SD=FALSE
+else
+LOCAL_CFLAGS += -DCONFIG_USE_SD=TRUE
 endif
 
 ifeq ($(CRASHLOGD_EFILINUX),true)
@@ -92,10 +103,12 @@ LOCAL_CFLAGS += -DCRASHLOGD_MODULE_SPID
 LOCAL_SRC_FILES += spid.c
 endif
 
-ifeq ($(CRASHLOGD_MODULE_BACKTRACE),true)
-LOCAL_CFLAGS += -DCRASHLOGD_MODULE_BACKTRACE
-LOCAL_C_INCLUDES += $(LOCAL_PATH)/../backtrace
-LOCAL_SHARED_LIBRARIES += libparse_stack
+# Enabled by default
+ifneq ($(CRASHLOGD_MODULE_BTDUMP),false)
+LOCAL_CFLAGS += -DCONFIG_BTDUMP
+LOCAL_STATIC_LIBRARIES += libbtdump
+LOCAL_SHARED_LIBRARIES += libbacktrace
+include external/stlport/libstlport.mk
 endif
 
 ifeq ($(CRASHLOGD_MODULE_KCT),true)
@@ -136,6 +149,10 @@ endif
 ifeq ($(CRASHLOGD_MODULE_RAMDUMP),true)
 LOCAL_CFLAGS += -DCRASHLOGD_MODULE_RAMDUMP
 LOCAL_SRC_FILES += ramdump.c
+endif
+
+ifneq ($(CRASHLOGD_LOGS_PATH),)
+LOCAL_CFLAGS += -DCONFIG_LOGS_PATH='$(CRASHLOGD_LOGS_PATH)'
 endif
 
 include $(BUILD_EXECUTABLE)

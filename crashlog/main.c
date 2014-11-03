@@ -46,6 +46,7 @@
 #include "iptrak.h"
 #include "spid.h"
 #include "ingredients.h"
+#include "checksum.h"
 #include "mmgr_source.h"
 
 #include <sys/types.h>
@@ -132,9 +133,11 @@ static int check_mounted_partitions()
         match = fscanf(fd, "%255s %255s %255s %255s %d %d\n",
                        mount_dev, mount_dir, mount_type,
                        mount_opts, &mount_freq, &mount_passno);
-         if (strstr(mount_dev, "by-label") && check_mounted_partition(mount_dir)) {
+         if (strstr(mount_dev, "by-name") && check_mounted_partition(mount_dir)) {
+             int max_append_size = sizeof(list_partition) - strlen(list_partition) - 1;
              nb_partition++;
-             strncat(list_partition, mount_dir, sizeof(list_partition) - 1);
+             if (max_append_size > 0)
+                 strncat(list_partition, mount_dir, max_append_size);
              if (((strncmp(mount_dir, "/logs", 5)) == 0) && strstr(mount_opts, "ro,"))
                   output = notify_partition_error(ERROR_LOGS_RO);
          }
@@ -150,6 +153,49 @@ static int check_mounted_partitions()
 
     return output;
 }
+
+#ifdef CONFIG_FACTORY_CHECKSUM
+static void check_factory_partition_checksum() {
+    unsigned char checksum[CRASHLOG_CHECKSUM_SIZE];
+
+    if (!directory_exists(FACTORY_PARTITION_DIR)) {
+        LOGD("%s: Factory partition not present on current build. Skipping checksum verification\n", __FUNCTION__);
+        return;
+    }
+
+    if (calculate_checksum_directory(FACTORY_PARTITION_DIR, checksum) != 0) {
+        LOGE("%s: failed to calculate factory partition checksum\n", __FUNCTION__);
+        return;
+    }
+
+    if (file_exists(FACTORY_SUM_FILE)) {
+        unsigned char old_checksum[CRASHLOG_CHECKSUM_SIZE+1];
+        if (read_binary_file(FACTORY_SUM_FILE, old_checksum, CRASHLOG_CHECKSUM_SIZE) < 0) {
+            LOGE("%s: failed in reading checksum from file: %s\n", __FUNCTION__, FACTORY_SUM_FILE);
+        }
+
+        if (memcmp(checksum, old_checksum, CRASHLOG_CHECKSUM_SIZE) != 0) {
+            /* send event that something has changed */
+            char *key = raise_event(INFOEVENT, "FACTORY_SUM", NULL, FACTORY_SUM_FILE);
+            free(key);
+            if (write_binary_file(FACTORY_SUM_FILE, checksum, CRASHLOG_CHECKSUM_SIZE) < 0) {
+                LOGE("%s: failed in writing checksum to file: %s\n", __FUNCTION__, FACTORY_SUM_FILE);
+                return;
+            }
+            LOGD("%s: %s file updated\n", __FUNCTION__, FACTORY_SUM_FILE);
+        }
+    }
+    else {
+        if (write_binary_file(FACTORY_SUM_FILE, checksum, CRASHLOG_CHECKSUM_SIZE) < 0) {
+            LOGE("%s: failed in writing checksum to file: %s\n", __FUNCTION__, FACTORY_SUM_FILE);
+            return;
+        }
+        LOGD("%s: %s file created\n", __FUNCTION__, FACTORY_SUM_FILE);
+    }
+}
+#else
+static inline void check_factory_partition_checksum() {}
+#endif
 
 int process_command_event(struct watch_entry *entry, struct inotify_event *event) {
     char path[PATHMAX];
@@ -590,6 +636,8 @@ int get_inotify_fd() {
 }
 
 int do_monitor() {
+    check_factory_partition_checksum();
+
     fd_set read_fds; /**< file descriptor set watching data availability from sources */
     int max = 0; /**< select max fd value +1 {@see man select(2) nfds} */
     int select_result; /**< select result */
@@ -776,6 +824,12 @@ int main(int argc, char **argv) {
 
     crashlogd_wait_for_user();
 
+#ifdef CONFIG_LOGS_PATH
+    /* let others know the new root directory for logs */
+    property_set(PROP_LOGS_ROOT, LOGS_DIR);
+    LOGI("Logs root property set: [%s]: [%s]\n", PROP_LOGS_ROOT, LOGS_DIR);
+#endif
+
     /* Check the args */
     if (argc > 2) {
         LOGE("USAGE: %s [-test|-ramdump|<max_nb_files>] \n", argv[0]);
@@ -829,15 +883,16 @@ int main(int argc, char **argv) {
         return do_monitor();
 
     case NOMINAL_MODE :
-        /* DECRYPTED by default */
-        strcpy(encryptstate,"DECRYPTED");
 
-        if ( encrypt_progress[0]) {
+        if (encrypt_progress[0] && !strcmp(crypt_state, "unencrypted")) {
             /* Encrypting unencrypted device... */
             LOGI("phone enter state: encrypting.\n");
+            strcpy(encryptstate,"ENCRYPTING");
+            early_check(encryptstate, test_flag);
         } else if (!strcmp(crypt_state, "unencrypted") && !alreadyran) {
             /* Unencrypted device */
             LOGI("phone enter state: normal start.\n");
+            strcpy(encryptstate,"DECRYPTED");
             early_check(encryptstate, test_flag);
         } else if (!strcmp(crypt_state, "encrypted") &&
                    !strcmp(decrypt, "trigger_restart_framework") && !alreadyran) {

@@ -29,6 +29,8 @@ import android.app.FragmentTransaction;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.AsyncTask;
+import android.os.Handler;
+import android.os.Message;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -75,7 +77,7 @@ public class AMTLTabLayout extends Activity implements GeneralSetupFrag.GSFCallB
         ExpertSetupFrag.OnExpertModeApplied, ExpertSetupFrag.OnModeChanged,
         MasterSetupFrag.OnModeChanged, GeneralSetupFrag.OnModeChanged {
 
-    private final String TAG = "AMTL";
+    private final String TAG = AMTLApplication.getAMTLApp().getLogTag();
     private final String MODULE = "AMTLTabLayout";
     private final String MDM_CONNECTION_TAG = "AMTL_modem_connection";
 
@@ -267,7 +269,7 @@ public class AMTLTabLayout extends Activity implements GeneralSetupFrag.GSFCallB
 
             try {
                 // instantiation of mdmCtrl to be able to connect and disconnect when exiting AMTL
-                this.mdmCtrl = ModemController.get();
+                this.mdmCtrl = ModemController.getInstance();
             } catch (ModemControlException ex) {
                 Log.e(TAG, MODULE + ": connection to Modem Status Manager failed");
                 UIHelper.exitDialog(this,
@@ -276,7 +278,7 @@ public class AMTLTabLayout extends Activity implements GeneralSetupFrag.GSFCallB
 
             // launch connection to modem with a progress dialog
             if (mdmConnectFrag != null) {
-                mdmConnectFrag.handlerConn(new ConnectModemTask());
+                mdmConnectFrag.handlerConn();
                 mdmConnectFrag.show(fragManager, MDM_CONNECTION_TAG);
             }
         }
@@ -360,15 +362,16 @@ public class AMTLTabLayout extends Activity implements GeneralSetupFrag.GSFCallB
     }
 
     // Embedded class to handle connection to modem (Dialog part).
-    public static class ModemConnectionFrag extends DialogFragment {
+    public static class ModemConnectionFrag extends DialogFragment implements Handler.Callback {
+        final static int MSG_CONNECTION_SUCCESS = 0;
+        final static int MSG_CONNECTION_FAIL = 1;
         ProgressBar connectProgNot;
         // thread executed while Dialog Box is displayed.
         ConnectModemTask connectMdm;
 
-        public void handlerConn(ConnectModemTask connectTask) {
+        public void handlerConn() {
             // This allows to get ModemConnectTerminated on the specified Fragment.
-            connectMdm = connectTask;
-            connectMdm.setFragment(this);
+            connectMdm = new ConnectModemTask(this);
         }
 
         public void ModemConnectTerminated(String exceptReason) {
@@ -379,7 +382,7 @@ public class AMTLTabLayout extends Activity implements GeneralSetupFrag.GSFCallB
             }
 
             // if the modem connection thread has returned an exception, AMTL exits
-            if (!exceptReason.equals("")) {
+            if (exceptReason != null) {
                 UIHelper.exitDialog(getActivity(),
                         "Modem connection failed ", "AMTL will exit: " + exceptReason);
             }
@@ -393,7 +396,7 @@ public class AMTLTabLayout extends Activity implements GeneralSetupFrag.GSFCallB
             setRetainInstance(true);
             // Spawn the thread to connect to modem.
             if (connectMdm != null) {
-                connectMdm.execute();
+                connectMdm.start();
             }
         }
 
@@ -428,42 +431,88 @@ public class AMTLTabLayout extends Activity implements GeneralSetupFrag.GSFCallB
                 dismiss();
             }
         }
+
+        @Override
+        public boolean handleMessage(Message msg) {
+            switch (msg.what) {
+                case MSG_CONNECTION_SUCCESS:
+                    ModemConnectTerminated(null);
+                    break;
+                case MSG_CONNECTION_FAIL:
+                    String message = (String)msg.obj;
+                    ModemConnectTerminated(message);
+                    break;
+            }
+            return true;
+        }
     }
 
     // embedded class to handle modem connection (thread part).
-    public static class ConnectModemTask extends AsyncTask<Void, Void, Void> {
+    public static class ConnectModemTask implements Runnable {
         private final String TAG = "AMTL";
         private final String MODULE = "ConnectModemTask";
-        private String exceptReason = "";
-        private ModemConnectionFrag modemConnectFrag;
+        private static final long RETRY_DELAY_MS = 20000;
+        private static final int NUM_RETRIES = 3;
+        private Handler mHandler;
         private ModemController mdmCtrl;
+        private Thread mThread;
 
-        void setFragment(ModemConnectionFrag modConnFrag) {
-            modemConnectFrag = modConnFrag;
+        public ConnectModemTask(ModemConnectionFrag modConnFrag) {
+            mHandler = new Handler(modConnFrag);
+        }
+
+        public void start() {
+            mThread = new Thread(this);
+            mThread.setName("AMTL Modem connection");
+            mThread.start();
         }
 
         // Function overrides for modem connection thread.
-        @Override
-        protected Void doInBackground(Void... params) {
+        public void run() {
+            String exceptReason = null;
             try {
-                mdmCtrl = ModemController.get();
-                if (mdmCtrl != null) {
-                    mdmCtrl.connectToModem();
-                }
+                mdmCtrl = ModemController.getInstance();
             } catch (ModemControlException ex) {
+                mdmCtrl = null;
                 exceptReason = ex.getMessage();
-                Log.e(TAG, MODULE + ": connection to modem failed: " + exceptReason);
-            }
-            return null;
-        }
-
-        @Override
-        protected void onPostExecute(Void unused) {
-            mdmCtrl = null;
-            if (modemConnectFrag == null) {
+                Log.e(TAG, MODULE + ": Connection to modem failed: "
+                        + exceptReason);
+                if (mHandler != null)
+                    mHandler.obtainMessage(ModemConnectionFrag.MSG_CONNECTION_FAIL,
+                            exceptReason).sendToTarget();
                 return;
             }
-            modemConnectFrag.ModemConnectTerminated(exceptReason);
+
+            int retry = 0;
+            boolean connected = false;
+            while (!connected && retry < NUM_RETRIES) {
+                try {
+                    retry++;
+                    mdmCtrl.connectToModem();
+                    connected = true;
+                } catch (ModemControlException ex) {
+                    exceptReason = ex.getMessage();
+                    Log.e(TAG, MODULE + ": Connection to modem, try "
+                            + retry + " failed: " + exceptReason);
+                    try {
+                        Thread.currentThread().sleep(RETRY_DELAY_MS);
+                    } catch (InterruptedException ie) {
+                        Log.d(TAG, MODULE + ": Sleep interrupted: "
+                                + ie.getMessage());
+                    }
+                }
+            }
+
+            if (mHandler != null) {
+                if (connected) {
+                    mHandler.obtainMessage(ModemConnectionFrag.MSG_CONNECTION_SUCCESS)
+                            .sendToTarget();
+                } else {
+                    mdmCtrl = null;
+                    mHandler.obtainMessage(ModemConnectionFrag.MSG_CONNECTION_FAIL,
+                            exceptReason).sendToTarget();
+                }
+            }
         }
     }
 }
