@@ -457,7 +457,7 @@ int add_uptime_event() {
 
     /* Update history file first line (uptime line) */
     errno = 0;
-    fprintf(fd, firstline);
+    fputs(firstline, fd);
     fclose(fd);
     if (errno != 0) {
         return -errno;
