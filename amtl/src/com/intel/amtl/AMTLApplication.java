@@ -41,6 +41,7 @@ public class AMTLApplication extends Application {
     private String mdmConfClassName = "";
     private String mdmctlClassName = "";
     private String mLogTag = "";
+    private String mShowAppLabel = "";
 
     @Override
     public void onCreate() {
@@ -66,6 +67,7 @@ public class AMTLApplication extends Application {
         mdmConfClassName = app.getString(R.string.modem_conf_class_name);
         mdmctlClassName = app.getString(R.string.modem_control_class_name);
         mLogTag = app.getString(R.string.log_tag);
+        mShowAppLabel = app.getString(R.string.show_app_label);
         mdmStatusManager = ModemStatusManager.getInstance(mAppId);
     }
 
@@ -91,6 +93,10 @@ public class AMTLApplication extends Application {
 
     public String getLogTag() {
         return mLogTag;
+    }
+
+    public String getShowAppLabel() {
+        return mShowAppLabel;
     }
 
     public ModemStatusManager getModemStatusManager() throws InstantiationException {

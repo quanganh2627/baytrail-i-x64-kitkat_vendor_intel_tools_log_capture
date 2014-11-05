@@ -2,7 +2,7 @@
 <resources>
 
     <string name="app_name" product="amtl">AMTL</string>
-    <string name="app_name" product="amtl2">AMTL2</string>
+    <string name="app_name" product="amtl2">AMTL_2230</string>
     <string name="menu_name">Settings</string>
     <string name="label_unknown">UNKNOWN</string>
     <string name="label_modem_status">Modem status:</string>

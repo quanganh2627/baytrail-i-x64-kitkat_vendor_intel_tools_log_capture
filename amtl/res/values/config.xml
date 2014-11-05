@@ -17,6 +17,7 @@
     <string name="log_tag" product="amtl">AMTL</string>
     <string name="modem_conf_class_name" product="amtl">"com.intel.amtl.models.config.ModemConfV2"</string>
     <string name="modem_control_class_name" product="amtl">"com.intel.amtl.modem.ModemControllerV2"</string>
+    <string name="show_app_label" product="amtl">1</string>
 
     <integer name="application_id" product="amtl2">2</integer>
     <string name="property" product="amtl2">"service.amtl2.cfg"</string>
@@ -34,5 +35,7 @@
     <string name="log_tag" product="amtl2">AMTL2</string>
     <string name="modem_conf_class_name" product="amtl2">"com.intel.amtl.models.config.ModemConfV1"</string>
     <string name="modem_control_class_name" product="amtl2">"com.intel.amtl.modem.ModemControllerV1"</string>
+    <string name="show_app_label" product="amtl2">2</string>
+
 
 </resources>
