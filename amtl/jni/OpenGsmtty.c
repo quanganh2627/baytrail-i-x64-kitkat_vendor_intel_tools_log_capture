@@ -26,44 +26,76 @@
 
 #include "OpenGsmtty.h"
 
-#ifdef LOG_TAG
-#undef LOG_TAG
-#endif
-
-#define LOG_TAG "AMTL"
+#define TYPE_JAVA "Ljava/lang/String;"
+#define VAR_JAVA "mNativeTag"
 
 #define TTY_CLOSED -1
 #define UNUSED __attribute__((__unused__))
+
+#ifndef AMTLLOGI
+#define AMTLLOGI(tag, ...) \
+        android_printLog(ANDROID_LOG_INFO, tag, __VA_ARGS__)
+#endif
+
+#ifndef AMTLLOGV
+#define AMTLLOGV(tag, ...) \
+        android_printLog(ANDROID_LOG_VERBOSE, tag, __VA_ARGS__)
+#endif
+
+#ifndef AMTLLOGE
+#define AMTLLOGE(tag, ...) \
+        android_printLog(ANDROID_LOG_ERROR, tag, __VA_ARGS__)
+#endif
+
+#ifndef AMTLLOGD
+#define AMTLLOGD(tag, ...) \
+        android_printLog(ANDROID_LOG_DEBUG, tag, __VA_ARGS__)
+#endif
+
+static void getLogTag(JNIEnv *env, UNUSED jobject obj, jstring *valueString, char **tag)
+{
+    jfieldID fieldID
+        = (*env)->GetFieldID(env, (*env)->GetObjectClass(env, obj), VAR_JAVA, TYPE_JAVA);
+    *valueString = (jstring) (*env)->GetObjectField(env, obj, fieldID);
+    *tag = (char*) (*env)->GetStringUTFChars(env, *valueString, NULL);
+}
+
+static void freeLogTag(JNIEnv *env, jstring valueString, char *tag)
+{
+    (*env)->ReleaseStringUTFChars(env, valueString, tag);
+}
 
 JNIEXPORT jint JNICALL Java_com_intel_amtl_modem_Gsmtty_OpenSerial(JNIEnv *env, UNUSED jobject obj,
         jstring jtty_name, jint baudrate)
 {
     int fd = TTY_CLOSED;
+    jstring valueString = NULL;
+    char *tag = NULL;
     const char *tty_name = (*env)->GetStringUTFChars(env, jtty_name, 0);
-
+    getLogTag(env, obj, &valueString, &tag);
     struct termios tio;
-    ALOGI("OpenSerial: opening %s", tty_name);
+    AMTLLOGI(tag, "OpenSerial: opening %s", tty_name);
 
     fd = open(tty_name, O_RDWR | CLOCAL | O_NOCTTY);
     if (fd < 0) {
-        ALOGE("OpenSerial: %s (%d)", strerror(errno), errno);
+        AMTLLOGE(tag, "OpenSerial: %s (%d)", strerror(errno), errno);
         goto open_serial_failure;
     }
 
     struct termios terminalParameters;
     if (tcgetattr(fd, &terminalParameters)) {
-        ALOGE("OpenSerial: %s (%d)", strerror(errno), errno);
+        AMTLLOGE(tag, "OpenSerial: %s (%d)", strerror(errno), errno);
         goto open_serial_failure;
     }
 
     cfmakeraw(&terminalParameters);
     if (tcsetattr(fd, TCSANOW, &terminalParameters)) {
-        ALOGE("OpenSerial: %s (%d)", strerror(errno), errno);
+        AMTLLOGE(tag, "OpenSerial: %s (%d)", strerror(errno), errno);
         goto open_serial_failure;
     }
 
     if (fcntl(fd, F_SETFL, O_NONBLOCK) < 0 ) {
-        ALOGE("OpenSerial: %s (%d)", strerror(errno), errno);
+        AMTLLOGE(tag, "OpenSerial: %s (%d)", strerror(errno), errno);
         goto open_serial_failure;
     }
 
@@ -89,22 +121,27 @@ open_serial_failure:
 
 open_serial_success:
     if (fd != TTY_CLOSED)
-        ALOGI("OpenSerial: %s opened (%d)", tty_name, fd);
+        AMTLLOGI(tag, "OpenSerial: %s opened (%d)", tty_name, fd);
     (*env)->ReleaseStringUTFChars(env, jtty_name, tty_name);
+    freeLogTag(env, valueString, tag);
     return fd;
 }
 
 JNIEXPORT jint JNICALL Java_com_intel_amtl_modem_Gsmtty_CloseSerial(UNUSED JNIEnv *env,
         UNUSED jobject obj, jint fd)
 {
-    ALOGI("CloseSerial: closing file descriptor (%d)", fd);
+    jstring valueString = NULL;
+    char *tag = NULL;
+    getLogTag(env, obj, &valueString, &tag);
+    AMTLLOGI(tag, "CloseSerial: closing file descriptor (%d)", fd);
     if (fd >= 0) {
         close(fd);
         fd = TTY_CLOSED;
-        ALOGD("CloseSerial: closed");
+        AMTLLOGD(tag, "CloseSerial: closed");
     }
     else {
-        ALOGD("CloseSerial: already closed");
+        AMTLLOGD(tag, "CloseSerial: already closed");
     }
+    freeLogTag(env, valueString, tag);
     return 0;
 }

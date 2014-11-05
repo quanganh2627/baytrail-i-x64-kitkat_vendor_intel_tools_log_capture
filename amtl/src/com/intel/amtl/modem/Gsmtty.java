@@ -30,6 +30,7 @@ public class Gsmtty {
     private int ttySerialFd = -1;
     private int baudrate = 115200;
     private String ttyName = "";
+    private String mNativeTag = TAG;
 
     /* Load Amtl JNI library */
     static {
