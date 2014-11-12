@@ -714,8 +714,13 @@ int do_monitor() {
                 max = lct_link_get_fd();
         }
 
+        /*Allow reboot if not doing anything on main thread */
+        property_set(PROP_PROC_ONGOING, "0");
+
         // Wait for events
         select_result = select(max+1, &read_fds, NULL, NULL, NULL);
+
+        property_set(PROP_PROC_ONGOING, "1");
 
         if (select_result == -1 && errno == EINTR) // Interrupted, need to recycle
             continue;
@@ -861,6 +866,8 @@ int main(int argc, char **argv) {
             }
         }
     }
+
+    property_set(PROP_PROC_ONGOING, "1");
 
     /* first thing to do : load configuration */
     load_config();
