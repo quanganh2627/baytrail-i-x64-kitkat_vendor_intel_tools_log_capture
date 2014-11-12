@@ -145,6 +145,19 @@ static int do_additionl_steps(struct ct_event* ev, const char * destination) {
     return 0;
 }
 
+/*
+* Replace all occurrences of 'from' char with
+* 'to' within the given null terminated 'buff'
+*/
+static void strrplc(char *buff, char from, char to) {
+    char *ptr = buff;
+    while (*ptr) {
+        if (*ptr == from)
+            *ptr = to;
+        ptr++;
+    }
+}
+
 int event_pass_filter(struct ct_event *ev) {
 
     char submitter[PROPERTY_KEY_MAX];
@@ -217,6 +230,8 @@ void process_msg(struct ct_event *ev)
         return;
     }
 
+    strrplc(ev->submitter_name, ' ', '_');
+    strrplc(ev->ev_name, ' ', '_');
     /* Compute name */
     snprintf(name, sizeof(name), "%s_%s", ev->submitter_name, ev->ev_name);
     /* Convert lower-case name into upper-case name */
