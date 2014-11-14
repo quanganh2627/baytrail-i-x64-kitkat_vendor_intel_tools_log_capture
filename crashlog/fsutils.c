@@ -595,8 +595,7 @@ int rmfr_specific(char *path, int remove_dir) {
 }
 
 
-#ifndef USE_SYSTEM_CMDS
-static mode_t get_mode(const char *s)
+mode_t get_mode(const char *s)
 {
     mode_t mode = 0;
     while (*s) {
@@ -609,7 +608,6 @@ static mode_t get_mode(const char *s)
     }
     return mode;
 }
-#endif
 
 int do_chmod(char *path, char *mode)
 {

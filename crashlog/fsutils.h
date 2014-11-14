@@ -127,6 +127,7 @@ int freadline(FILE *fd, char buffer[MAXLINESIZE]);
 int append_file(char *filename, char *text);
 int overwrite_file(char *filename, char *value);
 
+mode_t get_mode(const char *s);
 int do_chmod(char *path, char *mode);
 int do_chown(const char *file, char *uid, char *gid);
 int do_copy_eof(const char *src, const char *des);
