@@ -42,6 +42,7 @@
 #define HISTORY_FIRST_LINE_FMT  "#V1.0 " UPTIME_EVNAME "   %-24s\n"
 #define HISTORY_BLANK_LINE1     "#V1.0 " UPTIME_EVNAME "   0000:00:00              \n"
 #define HISTORY_BLANK_LINE2     "#EVENT  ID                    DATE                 TYPE\n"
+#define HISTORY_PERMISSION      "640"
 
 static char *historycache[MAX_RECORDS];
 static int nextline = -1;
@@ -123,7 +124,7 @@ static int cache_history_file() {
         FILE *to = fopen(HISTORY_FILE, "w");
         if (to == NULL) return -errno;
 
-        do_chmod(HISTORY_FILE, "644");
+        do_chmod(HISTORY_FILE, HISTORY_PERMISSION);
         do_chown(HISTORY_FILE, PERM_USER, PERM_GROUP);
         get_timed_firstline(firstline, &tmp, lastuptime, 1);
         fprintf(to, "%s", firstline);
@@ -269,7 +270,7 @@ int update_history_file(struct history_entry *entry) {
     /* We need to recreate a new file and write the full buffer
      * costly!!!
      */
-    fd = open(HISTORY_FILE, O_RDWR | O_TRUNC | O_CREAT, S_IRUSR | S_IWUSR);
+    fd = open(HISTORY_FILE, O_RDWR | O_TRUNC | O_CREAT, get_mode(HISTORY_PERMISSION));
     if (fd < 0) {
         LOGE("%s: Cannot create %s\n", HISTORY_FILE, strerror(errno));
         return -errno;
@@ -360,6 +361,9 @@ int reset_uptime_history() {
             HISTORY_FILE, strerror(errno));
         return -errno;
     }
+    // if we start from an empty file, need to ensure the permission
+    do_chmod(HISTORY_FILE, HISTORY_PERMISSION);
+    do_chown(HISTORY_FILE, PERM_USER, PERM_GROUP);
 
     to = fopen(HISTORY_FILE, "w");
     if (to == NULL) {
