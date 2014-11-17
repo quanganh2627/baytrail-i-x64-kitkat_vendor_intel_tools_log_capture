@@ -23,7 +23,9 @@
 #include <cstdio>
 #include <vector>
 #include <time.h>
-
+#if defined(USE_LIBUNWIND) || defined (USE_LIBBACKTRACE)
+#include <signal.h>
+#endif
 class CFrameInfo;
 class CProcInfo;
 typedef std::vector<CFrameInfo *> VpFrameInfo;
@@ -60,6 +62,7 @@ class CThreadInfo {
     void readKstack();
 #if defined(USE_LIBUNWIND) || defined (USE_LIBBACKTRACE)
     bool canAttach();
+    siginfo_t si;
 #endif
 
   public:
