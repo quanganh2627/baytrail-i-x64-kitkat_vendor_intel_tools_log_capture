@@ -160,7 +160,11 @@ void CThreadInfo::readUserStack()
 #ifdef USE_LIBBACKTRACE
     UniquePtr <Backtrace>
         backtrace(Backtrace::Create(tid, BACKTRACE_CURRENT_THREAD));
-    if (backtrace->Unwind(0)) {
+    if (!backtrace.get()) {
+        uframes.push_back(new CFrameInfo("ERROR: Cannot get backtrace context"));
+    } else if (!backtrace->GetMap()) {
+        uframes.push_back(new CFrameInfo("ERROR: Cannot get backtrace map context"));
+    } else if (backtrace->Unwind(0)) {
         for (size_t i = 0; i < backtrace.get()->NumFrames(); i++) {
             uframes.push_back(new CFrameInfo(backtrace->FormatFrameData(i).c_str()));
         }
@@ -226,7 +230,6 @@ void CThreadInfo::ptraceAttach()
 
 bool CThreadInfo::ptraceWaitSig()
 {
-    siginfo_t si;
     if (attach != ATT_WAIT_SIG)
         return false;
     if ((ptrace(PTRACE_GETSIGINFO, tid, 0, &si) < 0)
