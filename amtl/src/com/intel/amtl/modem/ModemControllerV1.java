@@ -62,4 +62,8 @@ public class ModemControllerV1 extends ModemController{
     public String checkOct() throws ModemControlException {
         return "";
     }
+
+    public String checkAtTraceState() throws ModemControlException {
+        return getCmdParser().parseTraceResponse(sendAtCommand("at+trace?\r\n"));
+    }
 }
