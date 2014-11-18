@@ -462,14 +462,14 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnChe
         ModemConf retModemConf = null;
         CommandParser cmdParser = new CommandParser();
 
-        atXsioResponse = mdmCtrl.sendAtCommand("at+xsio?\r\n");
-        atTraceResponse = mdmCtrl.sendAtCommand("at+trace?\r\n");
-        atXsystraceResponse = mdmCtrl.sendAtCommand("at+xsystrace=10\r\n");
+        atXsioResponse = mdmCtrl.checkAtXsioState();
+        atTraceResponse = mdmCtrl.checkAtTraceState();
+        atXsystraceResponse = mdmCtrl.checkAtXsystraceState();
 
         octMode = mdmCtrl.checkOct();
         Bundle bundle = new Bundle();
-        bundle.putString(ModemConf.KEY_XSIO, cmdParser.parseXsioResponse(atXsioResponse));
-        bundle.putString(ModemConf.KEY_TRACE, cmdParser.parseTraceResponse(atTraceResponse));
+        bundle.putString(ModemConf.KEY_XSIO, atXsioResponse);
+        bundle.putString(ModemConf.KEY_TRACE, atTraceResponse);
         bundle.putString(ModemConf.KEY_XSYSTRACE, atXsystraceResponse);
         bundle.putString(ModemConf.KEY_FLCMD, "");
         bundle.putString(ModemConf.KEY_OCTMODE, octMode);
@@ -477,7 +477,7 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnChe
         try {
             retModemConf = ModemConf.getInstance(bundle);
         } catch (ModemConfException e) {
-            Log.e(TAG, MODULE + ":Create the modconf error.");
+            Log.e(TAG, MODULE + ": Create the modconf error.");
         }
         return retModemConf;
     }

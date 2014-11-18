@@ -65,6 +65,7 @@ public abstract class ModemController implements ModemEventListener, Closeable {
     public abstract String confTraceAndModemInfo(ModemConf mdmconf) throws ModemControlException;
     public abstract void confApplyFinalize()throws ModemControlException;
     public abstract String checkOct() throws ModemControlException;
+    public abstract String checkAtTraceState() throws ModemControlException;
 
     public ModemController() throws ModemControlException {
 
@@ -163,10 +164,6 @@ public abstract class ModemController implements ModemEventListener, Closeable {
             }
         }
         return ret;
-    }
-
-    public String checkAtTraceState() throws ModemControlException {
-        return cmdParser.parseTraceResponse(sendAtCommand("at+trace?\r\n"));
     }
 
     public String checkAtXsioState() throws ModemControlException {
