@@ -61,6 +61,7 @@ static int compute_uefi_startupreason(enum reset_sources rs, enum reset_types rt
         "RESET_PMC_WATCHDOG",
         "RESET_EC_WATCHDOG",
         "RESET_PLATFORM_WATCHDOG",
+        "RESET_KERNEL_PANIC",
     };
     static const char *reset_type[] = {
         "NOT_APPLICABLE",
@@ -124,8 +125,6 @@ static int get_uefi_startupreason(char *startupreason)
     enum wake_sources ws;
     enum shutdown_sources ss;
 
-    strcpy(startupreason, "UNKNOWN");
-
     ret = uefivar_get_int(var_reset_source, var_guid_common, (unsigned int *)&rs);
     if (ret) {
         LOGE("uefivar_get error %s-%s : %d\n",
@@ -156,6 +155,9 @@ static int get_uefi_startupreason(char *startupreason)
 
     LOGI("%s: %s:%d, %s:%d, %s:%d, %s:%d\n", __func__, var_reset_source, rs,
          var_reset_type, rt, var_wake_source, ws, var_shutdown_source, ss);
+
+    if (strstr(startupreason, "SWWDT_RESET"))
+        return 0;
 
     return compute_uefi_startupreason(rs, rt, ws, ss, startupreason);
 }
@@ -226,8 +228,10 @@ void get_fdk_startupreason(char *startupreason)
         "HWWDT_RESET_PLATFORM",
         "HWWDT_RESET_SC"};
 
-    strcpy(startupreason, "UNKNOWN");
-    fd = fopen(CURRENT_KERNEL_CMDLINE, "r");
+   if (strstr(startupreason, "SWWDT_RESET"))
+        return;
+
+   fd = fopen(CURRENT_KERNEL_CMDLINE, "r");
     if ( fd == NULL ) {
         LOGE("%s: Cannot open file %s - %s\n", __FUNCTION__,
             CURRENT_KERNEL_CMDLINE, strerror(errno));
@@ -298,9 +302,18 @@ static void get_default_bootreason(char *bootreason) {
     for (i = 0; i < strlen(bootreason_prop); i++)
         bootreason[i] = toupper(bootreason_prop[i]);
     bootreason[i] = '\0';
+
+    if (!strncmp(bootreason, "KERNEL_PANIC", 12))
+        strcpy(bootreason, "SWWDT_RESET");
+    else if (!strncmp(bootreason, "WATCHDOG", 8))
+        strcpy(bootreason, "HWWDT_RESET");
 }
 
 void read_startupreason(char *startupreason) {
+    strcpy(startupreason, "UNKNOWN");
+
+    get_default_bootreason(startupreason);
+
 #ifdef CONFIG_EFILINUX
     get_uefi_startupreason(startupreason);
     return;
@@ -309,8 +322,6 @@ void read_startupreason(char *startupreason) {
 #ifdef CONFIG_FDK
     return get_fdk_startupreason(startupreason);
 #endif
-
-    get_default_bootreason(startupreason);
 }
 
 #ifdef CONFIG_EFILINUX
