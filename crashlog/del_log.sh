@@ -19,7 +19,10 @@
 
 if [ $# -eq 1 ] ; then
 
-  diremmc="/logs"
+  diremmc=$(getprop persist.crashlogd.root)
+  if [ -z $diremmc ]; then
+    diremmc="/logs"
+  fi
   dirsd="/mnt/sdcard/logs"
   num=$1
 
