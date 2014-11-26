@@ -25,7 +25,11 @@ if [ $# -le 1 ] ; then
   fi
   tmp=$filename".tmp"
 
-  cd /logs
+  logs_root=$(getprop persist.crashlogd.root)
+  if [ -z $logs_root ]; then
+    logs_root="/logs"
+  fi
+  cd $logs_root
   if [ -f $filename ]; then
           read line < $filename
           echo $line > $tmp
