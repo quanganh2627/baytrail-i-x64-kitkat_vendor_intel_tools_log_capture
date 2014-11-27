@@ -24,6 +24,17 @@
 #ifndef __TCS_WRAPPER_H__
 #define __TCS_WRAPPER_H__
 
-int get_modem_name(char* modem_name);
+#ifdef CRASHLOGD_MODULE_MODEM
+int get_modem_name(char *modem_name, unsigned int modem_id);
+int get_modem_count();
+#else
+static inline int get_modem_name(char __attribute((unused)) * modem_name,
+                                 unsigned int __attribute((unused)) modem_id) {
+    return 0;
+}
+static inline int get_modem_count() {
+    return 0;
+}
+#endif
 
 #endif /* __TCS_WRAPPER_H__ */

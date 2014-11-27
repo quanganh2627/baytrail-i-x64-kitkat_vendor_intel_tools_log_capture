@@ -29,6 +29,8 @@
 #include "privconfig.h"
 #include "fsutils.h"
 #include "log.h"
+#include "tcs_wrapper.h"
+#include "ingredients.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -40,6 +42,10 @@
 #include <errno.h>
 #include <cutils/properties.h>
 
+/*Constants*/
+#define MODEMVERSION_CHK_FREQUENCY_MS (500)
+#define MODEMVERSION_CHK_TIMEOUT_SECONDS (3 * 60 * (1000 / MODEMVERSION_CHK_FREQUENCY_MS))
+
 /* private structure */
 struct mmgr_data {
     char string[MMGRMAXSTRING];     /* main string representing mmgr data content */
@@ -49,8 +55,21 @@ struct mmgr_data {
     char extra_tab_string[5][MMGRMAXEXTRA];/* optional string that could be used to store data1 to data5 */
 };
 
-mmgr_cli_handle_t *mmgr_hdl = NULL;
-static int mmgr_monitor_fd[2];
+struct mmgr_ct_context {
+    unsigned char instance;
+    mmgr_cli_handle_t *mmgr_hdl;
+    int mmgr_monitor_fd[2];
+};
+
+static struct mmgr_ct_context mmgr_ctx[MAX_MMGR_INST];
+
+struct {
+    const char* field;
+    const char* path;
+} modem_prop[] = {
+    {MODEM_FIELD, MODEM_UUID},
+    {MODEM_FIELD2, MODEM_UUID2}
+};
 
 static bool is_mmgr_fake_event() {
     char prop_mmgr[PROPERTY_VALUE_MAX];
@@ -63,7 +82,9 @@ static bool is_mmgr_fake_event() {
     return 0;
 }
 
-static void write_mmgr_monitor_with_extras(char *chain, char *extra_string, int extra_string_len, int extra_int) {
+static void write_mmgr_monitor_with_extras(char *chain, char *extra_string,
+                                           int extra_string_len, int extra_int,
+                                           struct mmgr_ct_context *ctx) {
     struct mmgr_data cur_data;
     strncpy(cur_data.string, chain, sizeof(cur_data.string));
     if (extra_string_len > 0) {
@@ -73,12 +94,16 @@ static void write_mmgr_monitor_with_extras(char *chain, char *extra_string, int 
     }
     else cur_data.extra_string[0] = 0;
     cur_data.extra_int = extra_int;
-    write(mmgr_monitor_fd[1], &cur_data, sizeof( struct mmgr_data));
+    write(ctx->mmgr_monitor_fd[1], &cur_data, sizeof(struct mmgr_data));
 }
 
-static void write_mmgr_monitor_with_extras_apimr(char *chain, char *extra_string[6], int nb_values,  int extra_string_len[6]) {
+static void write_mmgr_monitor_with_extras_apimr(char *chain,
+                                                 char *extra_string[6],
+                                                 int nb_values,
+                                                 int extra_string_len[6],
+                                                 struct mmgr_ct_context *ctx) {
     struct mmgr_data cur_data;
-    int i,size;
+    int i, size;
     strncpy(cur_data.string, chain, sizeof(cur_data.string));
 
     if (nb_values > 0) {
@@ -93,45 +118,110 @@ static void write_mmgr_monitor_with_extras_apimr(char *chain, char *extra_string
 
     }
     cur_data.extra_nb_causes = nb_values - 1;
-    write(mmgr_monitor_fd[1], &cur_data, sizeof( struct mmgr_data));
+    write(ctx->mmgr_monitor_fd[1], &cur_data, sizeof(struct mmgr_data));
 }
 
-int mdm_SHUTDOWN(mmgr_cli_event_t __attribute__((unused))*ev) {
-    LOGD("Received E_MMGR_NOTIFY_MODEM_SHUTDOWN");
-    write_mmgr_monitor_with_extras("MMODEMOFF", NULL, 0, 0);
+void *monitor_modem_version(void *arguments) {
+    unsigned char *args = (unsigned char *)arguments;
+    static unsigned int running[MAX_MMGR_INST];
+    static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+    char prop[PROPERTY_VALUE_MAX];
+    // decreased by one, because telephony counts from 1 the instance.
+    unsigned char instance = *args - 1;
+    free(args);
+
+    /*if no description is available for the requested modem */
+    if (instance >= (sizeof(modem_prop) / sizeof(modem_prop[0]))) {
+        LOGW("No specific modem prop/path for instance %d, abort version detection", instance);
+        return NULL;
+    }
+    pthread_mutex_lock(&lock);
+    if (running[instance]) {
+        pthread_mutex_unlock(&lock);
+        LOGD("monitor_modem_version[%d] - already running: %d loops left",
+             instance, running[instance]);
+        return NULL;
+    }
+
+    running[instance] = MODEMVERSION_CHK_TIMEOUT_SECONDS;
+    pthread_mutex_unlock(&lock);
+
+    while (running[instance]) {
+        if (read_file_prop_uid
+            (modem_prop[instance].field, modem_prop[instance].path, prop,
+             "unknown") >= 0) {
+            check_ingredients_file();
+            pthread_mutex_lock(&lock);
+            running[instance] = 0;
+            pthread_mutex_unlock(&lock);
+            LOGD("monitor_modem_version[%d] modem version set to %s", instance,
+                 prop);
+            return NULL;
+        }
+
+        /* Wait */
+        usleep(MODEMVERSION_CHK_FREQUENCY_MS * 1000);
+        --running[instance];
+    }
+    LOGE("monitor_modem_version[%d] modem version could not be set %s, %s",
+         instance, modem_prop[instance].field, modem_prop[instance].path);
+    return NULL;
+}
+
+int mdm_UP(mmgr_cli_event_t * ev) {
+    LOGD("Received E_MMGR_EVENT_MODEM_UP[%d]", ((struct mmgr_ct_context *)ev->context)->instance);
+    pthread_t thread;
+    int ret;
+    unsigned char * instance =  malloc(sizeof(unsigned char));
+    if (!instance) {
+        LOGE("Cannot allocate thread data");
+        return -1;
+    }
+    *instance = ((struct mmgr_ct_context *)ev->context)->instance;
+    ret = pthread_create(&thread, NULL, monitor_modem_version, (void *)instance);
+    if (ret < 0) {
+        LOGE("pthread_create error");
+        return -1;
+    }
     return 0;
 }
 
-int mdm_REBOOT(mmgr_cli_event_t __attribute__((unused))*ev)
-{
-    LOGD("Received E_MMGR_NOTIFY_PLATFORM_REBOOT");
-    write_mmgr_monitor_with_extras("MSHUTDOWN", NULL, 0, 0);
+int mdm_SHUTDOWN(mmgr_cli_event_t * ev) {
+    LOGD("Received E_MMGR_NOTIFY_MODEM_SHUTDOWN[%d]", ((struct mmgr_ct_context *)ev->context)->instance);
+    write_mmgr_monitor_with_extras("MMODEMOFF", NULL, 0, 0,
+                                   (struct mmgr_ct_context *)ev->context);
+    return 0;
+}
+
+int mdm_REBOOT(mmgr_cli_event_t * ev) {
+    LOGD("Received E_MMGR_NOTIFY_PLATFORM_REBOOT[%d]", ((struct mmgr_ct_context *)ev->context)->instance);
+    write_mmgr_monitor_with_extras("MSHUTDOWN", NULL, 0, 0,
+                                   (struct mmgr_ct_context *)ev->context);
     return 0;
 }
 
 
-int mdm_OUT_OF_SERVICE(mmgr_cli_event_t __attribute__((unused))*ev)
-{
-    LOGD("Received E_MMGR_EVENT_MODEM_OUT_OF_SERVICE");
-    write_mmgr_monitor_with_extras("MOUTOFSERVICE", NULL, 0, 0);
+int mdm_OUT_OF_SERVICE(mmgr_cli_event_t * ev) {
+    LOGD("Received E_MMGR_EVENT_MODEM_OUT_OF_SERVICE[%d]", ((struct mmgr_ct_context *)ev->context)->instance);
+    write_mmgr_monitor_with_extras("MOUTOFSERVICE", NULL, 0, 0,
+                                   (struct mmgr_ct_context *)ev->context);
     return 0;
 }
 
-int mdm_MRESET(mmgr_cli_event_t __attribute__((unused))*ev)
-{
-    LOGD("Received E_MMGR_NOTIFY_SELF_RESET");
-    write_mmgr_monitor_with_extras("MRESET", NULL, 0, 0);
+int mdm_MRESET(mmgr_cli_event_t * ev) {
+    LOGD("Received E_MMGR_NOTIFY_SELF_RESET[%d]", ((struct mmgr_ct_context *)ev->context)->instance);
+    write_mmgr_monitor_with_extras("MRESET", NULL, 0, 0,
+                                   (struct mmgr_ct_context *)ev->context);
     return 0;
 }
 
-int mdm_CORE_DUMP_COMPLETE(mmgr_cli_event_t *ev)
-{
-    LOGD("Received E_MMGR_NOTIFY_CORE_DUMP_COMPLETE");
+int mdm_CORE_DUMP_COMPLETE(mmgr_cli_event_t * ev) {
+    LOGD("Received E_MMGR_NOTIFY_CORE_DUMP_COMPLETE[%d]", ((struct mmgr_ct_context *)ev->context)->instance);
     int extra_int = 0, extra_string_len = 0;
     char *extra_string = NULL;
     int copy_cd = 0;
 
-    mmgr_cli_core_dump_t *cd = (mmgr_cli_core_dump_t *)ev->data;
+    mmgr_cli_core_dump_t *cd = (mmgr_cli_core_dump_t *) ev->data;
     if (cd == NULL) {
         LOGE("%s: empty data", __FUNCTION__);
         return -1;
@@ -180,13 +270,14 @@ int mdm_CORE_DUMP_COMPLETE(mmgr_cli_event_t *ev)
         }
     }
 
-    write_mmgr_monitor_with_extras("MPANIC", extra_string, extra_string_len, extra_int);
+    write_mmgr_monitor_with_extras("MPANIC", extra_string, extra_string_len,
+                                   extra_int,
+                                   (struct mmgr_ct_context *)ev->context);
     return 0;
 }
 
-int mdm_AP_RESET(mmgr_cli_event_t *ev)
-{
-    LOGD("Received E_MMGR_NOTIFY_AP_RESET");
+int mdm_AP_RESET(mmgr_cli_event_t * ev) {
+    LOGD("Received E_MMGR_NOTIFY_AP_RESET[%d]", ((struct mmgr_ct_context *)ev->context)->instance);
     char *extra_string[6];
     int extra_string_len[6] = {0,};
     int i;
@@ -214,25 +305,28 @@ int mdm_AP_RESET(mmgr_cli_event_t *ev)
             LOGE("%s: length error : %lu", __FUNCTION__, (unsigned long)ap->len);
         }
     }
-    write_mmgr_monitor_with_extras_apimr("APIMR", extra_string, ap->num_causes + 1,extra_string_len);
+    write_mmgr_monitor_with_extras_apimr("APIMR", extra_string,
+                                         ap->num_causes + 1, extra_string_len,
+                                         (struct mmgr_ct_context *)ev->context);
     return 0;
 }
 
-int mdm_CORE_DUMP(mmgr_cli_event_t *ev)
-{
-    LOGD("Received E_MMGR_NOTIFY_CORE_DUMP");
+int mdm_CORE_DUMP(mmgr_cli_event_t * ev) {
+    LOGD("Received E_MMGR_NOTIFY_CORE_DUMP[%d]", ((struct mmgr_ct_context *)ev->context)->instance);
     struct mmgr_data cur_data;
-    strncpy(cur_data.string,"START_CD\0",sizeof(cur_data.string));
+    struct mmgr_ct_context *ctx = (struct mmgr_ct_context *)ev->context;
+    strncpy(cur_data.string, "START_CD\0", sizeof(cur_data.string));
     //TO DO update with write_mmgr_monitor_with_extras
-    write(mmgr_monitor_fd[1], &cur_data, sizeof( struct mmgr_data));
+
+    write(ctx->mmgr_monitor_fd[1], &cur_data, sizeof(struct mmgr_data));
     return 0;
 }
 
-int mdm_TFT_EVENT(mmgr_cli_event_t *ev)
-{
-    LOGD("Received E_MMGR_NOTIFY_TFT_EVENT");
+int mdm_TFT_EVENT(mmgr_cli_event_t * ev) {
+    LOGD("Received E_MMGR_NOTIFY_TFT_EVENT[%d]", ((struct mmgr_ct_context *)ev->context)->instance);
     struct mmgr_data cur_data;
-    mmgr_cli_tft_event_t * tft_ev = (mmgr_cli_tft_event_t *)ev->data;
+    mmgr_cli_tft_event_t *tft_ev = (mmgr_cli_tft_event_t *) ev->data;
+    struct mmgr_ct_context *ctx = (struct mmgr_ct_context *)ev->context;
     size_t i;
 
     // Add "TFT" in top of cur_data.string to recognize the type of event in the next
@@ -267,72 +361,95 @@ int mdm_TFT_EVENT(mmgr_cli_event_t *ev)
         cur_data.extra_nb_causes = 0;
     }
 
-    write(mmgr_monitor_fd[1], &cur_data, sizeof(struct mmgr_data));
+    write(ctx->mmgr_monitor_fd[1], &cur_data, sizeof(struct mmgr_data));
     return 0;
 }
 
-
-int mmgr_get_fd()
-{
-    return mmgr_monitor_fd[0];
+int mmgr_get_fd(unsigned int mdm_inst) {
+    return mmgr_ctx[mdm_inst].mmgr_monitor_fd[0];
 }
 
-void init_mmgr_cli_source(void){
+void init_mmgr_cli_source(unsigned int mdm_inst) {
     int ret = 0;
+    char clientname[25];
+    char v_detect_prop[PROPERTY_VALUE_MAX];
+
+    property_get(PROP_FORCE_MDM_V_DET, v_detect_prop, "0");
+
     if (!CRASHLOG_MODE_MMGR_ENABLED(g_crashlog_mode)) {
         LOGI("%s: MMGR source state is disabled", __FUNCTION__);
-        mmgr_monitor_fd[0] = 0;
-        mmgr_monitor_fd[1] = 0;
+        mmgr_ctx[mdm_inst].mmgr_monitor_fd[0] = 0;
+        mmgr_ctx[mdm_inst].mmgr_monitor_fd[1] = 0;
         return;
     }
 
-    LOGD("%s : initializing MMGR source...", __FUNCTION__);
-    if (mmgr_hdl){
-        close_mmgr_cli_source();
+    LOGD("%s : initializing MMGR[%d] source...", __FUNCTION__, mdm_inst);
+    if (mmgr_ctx[mdm_inst].mmgr_hdl) {
+        close_mmgr_cli_source(mdm_inst);
     }
-    mmgr_hdl = NULL;
-    mmgr_cli_create_handle(&mmgr_hdl, "crashlogd", NULL);
-    mmgr_cli_subscribe_event(mmgr_hdl, mdm_CORE_DUMP, E_MMGR_NOTIFY_CORE_DUMP);
-    mmgr_cli_subscribe_event(mmgr_hdl, mdm_SHUTDOWN, E_MMGR_NOTIFY_MODEM_SHUTDOWN);
-    mmgr_cli_subscribe_event(mmgr_hdl, mdm_REBOOT, E_MMGR_NOTIFY_PLATFORM_REBOOT);
-    mmgr_cli_subscribe_event(mmgr_hdl, mdm_OUT_OF_SERVICE, E_MMGR_EVENT_MODEM_OUT_OF_SERVICE);
-    mmgr_cli_subscribe_event(mmgr_hdl, mdm_MRESET, E_MMGR_NOTIFY_SELF_RESET);
-    mmgr_cli_subscribe_event(mmgr_hdl, mdm_CORE_DUMP_COMPLETE, E_MMGR_NOTIFY_CORE_DUMP_COMPLETE);
-    mmgr_cli_subscribe_event(mmgr_hdl, mdm_AP_RESET, E_MMGR_NOTIFY_AP_RESET);
-    mmgr_cli_subscribe_event(mmgr_hdl, mdm_TFT_EVENT, E_MMGR_NOTIFY_TFT_EVENT);
+    sprintf(clientname, "crashlogd_%d", mdm_inst);
 
-    uint32_t iMaxTryConnect = MAX_WAIT_MMGR_CONNECT_SECONDS * 1000 / MMGR_CONNECT_RETRY_TIME_MS;
+    mmgr_ctx[mdm_inst].mmgr_hdl = NULL;
+    // telephony chooses to count from 1 rather than 0,
+    // while our structures are starting from 0.
+    mmgr_ctx[mdm_inst].instance = mdm_inst + 1;
+
+    mmgr_cli_create_handle(&mmgr_ctx[mdm_inst].mmgr_hdl, clientname,
+                           (void *)&mmgr_ctx[mdm_inst]);
+    mmgr_cli_set_instance(mmgr_ctx[mdm_inst].mmgr_hdl, mmgr_ctx[mdm_inst].instance);
+    if(v_detect_prop[0]=='1')
+        mmgr_cli_subscribe_event(mmgr_ctx[mdm_inst].mmgr_hdl, mdm_UP,
+                                 E_MMGR_EVENT_MODEM_UP);
+    mmgr_cli_subscribe_event(mmgr_ctx[mdm_inst].mmgr_hdl, mdm_CORE_DUMP,
+                             E_MMGR_NOTIFY_CORE_DUMP);
+    mmgr_cli_subscribe_event(mmgr_ctx[mdm_inst].mmgr_hdl, mdm_SHUTDOWN,
+                             E_MMGR_NOTIFY_MODEM_SHUTDOWN);
+    mmgr_cli_subscribe_event(mmgr_ctx[mdm_inst].mmgr_hdl, mdm_REBOOT,
+                             E_MMGR_NOTIFY_PLATFORM_REBOOT);
+    mmgr_cli_subscribe_event(mmgr_ctx[mdm_inst].mmgr_hdl, mdm_OUT_OF_SERVICE,
+                             E_MMGR_EVENT_MODEM_OUT_OF_SERVICE);
+    mmgr_cli_subscribe_event(mmgr_ctx[mdm_inst].mmgr_hdl, mdm_MRESET,
+                             E_MMGR_NOTIFY_SELF_RESET);
+    mmgr_cli_subscribe_event(mmgr_ctx[mdm_inst].mmgr_hdl,
+                             mdm_CORE_DUMP_COMPLETE,
+                             E_MMGR_NOTIFY_CORE_DUMP_COMPLETE);
+    mmgr_cli_subscribe_event(mmgr_ctx[mdm_inst].mmgr_hdl, mdm_AP_RESET,
+                             E_MMGR_NOTIFY_AP_RESET);
+    mmgr_cli_subscribe_event(mmgr_ctx[mdm_inst].mmgr_hdl, mdm_TFT_EVENT,
+                             E_MMGR_NOTIFY_TFT_EVENT);
+
+    uint32_t iMaxTryConnect =
+        MAX_WAIT_MMGR_CONNECT_SECONDS * 1000 / MMGR_CONNECT_RETRY_TIME_MS;
 
     while (iMaxTryConnect-- != 0) {
 
         /* Try to connect */
-        ret = mmgr_cli_connect (mmgr_hdl);
+        ret = mmgr_cli_connect(mmgr_ctx[mdm_inst].mmgr_hdl);
 
         if (ret == E_ERR_CLI_SUCCEED) {
 
             break;
         }
 
-        LOGE("%s: Delaying mmgr_cli_connect %d", __FUNCTION__, ret);
+        LOGE("%s: Delaying mmgr_cli_connect[%d] %d", __FUNCTION__, mdm_inst, ret);
 
         /* Wait */
         usleep(MMGR_CONNECT_RETRY_TIME_MS * 1000);
     }
     // pipe init
-    if (pipe(mmgr_monitor_fd) == -1) {
-        LOGE("%s: MMGR source init failed : Can't create the pipe - error is %s\n",
-             __FUNCTION__, strerror(errno));
-        mmgr_monitor_fd[0] = 0;
-        mmgr_monitor_fd[1] = 0;
+    if (pipe(mmgr_ctx[mdm_inst].mmgr_monitor_fd) == -1) {
+        LOGE("%s: MMGR[%d] source init failed : Can't create the pipe - error is %s\n", __FUNCTION__, mdm_inst, strerror(errno));
+        mmgr_ctx[mdm_inst].mmgr_monitor_fd[0] = 0;
+        mmgr_ctx[mdm_inst].mmgr_monitor_fd[1] = 0;
     }
 }
 
-void close_mmgr_cli_source(void){
+void close_mmgr_cli_source(unsigned int mdm_inst) {
     if (!CRASHLOG_MODE_MMGR_ENABLED(g_crashlog_mode))
         return;
 
-    mmgr_cli_disconnect(mmgr_hdl);
-    mmgr_cli_delete_handle(mmgr_hdl);
+    mmgr_cli_disconnect(mmgr_ctx[mdm_inst].mmgr_hdl);
+    mmgr_cli_delete_handle(mmgr_ctx[mdm_inst].mmgr_hdl);
 }
 
 /**
@@ -390,6 +507,24 @@ static int compute_mmgr_param(char *type, e_dir_mode_t *mode, char *name, int *a
     return 0;
 }
 
+void get_modem_version(unsigned int instance, char * version){
+
+    if (instance >= (int)(sizeof(modem_prop)/sizeof(modem_prop[0]))) {
+        sprintf(version, "wrong instace[%d]",instance);
+        return;
+    }
+
+    strcpy(version, "unknown");
+    read_file_prop_uid(modem_prop[instance].field, modem_prop[instance].path, version, "unknown");
+    if (!strcmp(version, "unknown")) {
+        LOGE("%s: Could not retrieve modem[%d] name", __FUNCTION__, instance);
+        if(get_modem_name(version, instance) < 0) {
+            LOGE("%s: Could not retrieve modem[%d] name", __FUNCTION__, instance);
+            sprintf(version, "Instance[%d]",instance);
+        }
+    }
+}
+
 /**
  * @brief Handle mmgr call back
  *
@@ -401,9 +536,10 @@ static int compute_mmgr_param(char *type, e_dir_mode_t *mode, char *name, int *a
  *
  * @return 0 on success, -1 on error.
  */
-int mmgr_handle(void) {
+int mmgr_handle(unsigned int mdm_inst) {
     e_dir_mode_t event_mode = MODE_CRASH;
-    int aplog_mode, bplog_mode = BPLOG_TYPE, dir;
+    int aplog_mode, dir;
+    int bplog_mode = BPLOG_TYPE | (mdm_inst << 8);
     char *event_dir, *key;
     char event_name[MMGRMAXSTRING];
     char data0[MMGRMAXEXTRA];
@@ -412,6 +548,7 @@ int mmgr_handle(void) {
     char data3[MMGRMAXEXTRA];
     char data4[MMGRMAXEXTRA];
     char data5[MMGRMAXEXTRA];
+    char modem_version[MMGRMAXEXTRA];
     char cd_path[MMGRMAXEXTRA];
     char destion[PATHMAX];
     char destion2[PATHMAX];
@@ -428,26 +565,27 @@ int mmgr_handle(void) {
     data3[0] = 0;
     data4[0] = 0;
     data5[0] = 0;
+    modem_version[0] = 0;
     cd_path[0] = 0;
     destion[0] = 0;
     destion2[0] = 0;
     type[0] = 0;
 
     // get data from mmgr pipe
-    nbytes = read(mmgr_get_fd(), &cur_data, sizeof( struct mmgr_data));
-    strcpy(type,cur_data.string);
+    nbytes = read(mmgr_get_fd(mdm_inst), &cur_data, sizeof(struct mmgr_data));
+    strcpy(type, cur_data.string);
 
     if (nbytes == 0) {
-        LOGW("No data found in mmgr_get_fd.\n");
+        LOGW("No data found in mmgr_get_fd[%d].\n", mdm_inst);
         return 0;
     }
     if (nbytes < 0) {
         nbytes = -errno;
-        LOGE("%s: Error while reading mmgr_get_fd - %s.\n", __FUNCTION__, strerror(errno));
+        LOGE("%s: Error while reading mmgr_get_fd[%d] - %s.\n", __FUNCTION__, mdm_inst, strerror(errno));
         return nbytes;
     }
     //find_dir should be done before event_dir is set
-    LOGD("Received string from mmgr: %s  - %d bytes", type,nbytes);
+    LOGD("Received string from mmgr[%d]: %s  - %d bytes", mdm_inst , type,nbytes);
     // For "TFT" event, parameters are given by the data themselves
     if (strstr(type, "TFT")) {
         switch (cur_data.extra_int & 0xFF) {
@@ -463,7 +601,7 @@ int mmgr_handle(void) {
         }
         event_mode = MODE_STATS;
         aplog_mode = APLOG_STATS_TYPE;
-        bplog_mode = BPLOG_STATS_TYPE;
+        bplog_mode = BPLOG_STATS_TYPE | (mdm_inst << 8);
         copy_aplog = (cur_data.extra_int >> 8) & MMGR_CLI_TFT_AP_LOG_MASK;
         copy_bplog = ((cur_data.extra_int >> 8) & MMGR_CLI_TFT_BP_LOG_MASK)
                 && check_running_modem_trace();
@@ -557,6 +695,7 @@ int mmgr_handle(void) {
         else fclose(fp);
         return 0;
     }
+    get_modem_version(mdm_inst, modem_version);
 
     dir = find_new_crashlog_dir(event_mode);
     if (dir < 0) {
@@ -588,7 +727,7 @@ int mmgr_handle(void) {
         rmfr(cd_path);
     }
     // generating extra DATA (if required)
-    if ((strlen(data0) > 0) || (strlen(data1) > 0) || (strlen(data2) > 0) || (strlen(data3) > 0)){
+    if ((strlen(data0) > 0) || (strlen(data1) > 0) || (strlen(data2) > 0) || (strlen(data3) > 0) || (strlen(modem_version) > 0)){
         FILE *fp;
         char fullpath[PATHMAX];
         if (strstr(event_name , ERROREVENT)) {
@@ -618,6 +757,8 @@ int mmgr_handle(void) {
                 fprintf(fp,"DATA4=%s\n", data4);
             if (strlen(data5) > 0)
                 fprintf(fp,"DATA5=%s\n", data5);
+            if (strlen(modem_version) > 0)
+                fprintf(fp,"MODEMVERSIONUSED=%s\n", modem_version);
             fprintf(fp,"_END\n");
             fclose(fp);
             do_chown(fullpath, PERM_USER, PERM_GROUP);

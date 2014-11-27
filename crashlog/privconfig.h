@@ -304,6 +304,7 @@ extern enum crashlog_mode g_crashlog_mode;
 #define PROP_SOC_VERSION        "ro.board.platform"
 #define PROP_REPORT_FAKE        "crashreport.events.fake"
 #define PROP_REPORT_COUNTDOWN   "crashreport.events.countdown"
+#define PROP_FORCE_MDM_V_DET    "persist.crashlogd.modem.ver.detect"
 
 /* DIRECTORIES */
 #ifndef __LINUX__
@@ -360,7 +361,7 @@ extern enum crashlog_mode g_crashlog_mode;
 #define APLOGS_CURRENT_LOG      LOGS_DIR "/currentaplogslog"
 #define LOG_UUID                LOGS_DIR "/uuid.txt"
 #define LOG_BUILDID             LOGS_DIR "/buildid.txt"
-#define LOG_MODEM_VERSION       LOGS_DIR "/modem_version.txt"
+#define LOG_MODEM_VERSION_BASE  LOGS_DIR "/modem_version"
 #define MODEM_UUID              LOGS_DIR "/modemid.txt"
 #define MODEM_UUID2             LOGS_DIR "/modemid2.txt"
 #define APLOG_FILE_0            LOGS_DIR "/aplog"
@@ -447,6 +448,12 @@ extern enum crashlog_mode g_crashlog_mode;
 
 /* SYSTEM COMMANDS */
 #define SDSIZE_SYSTEM_CMD "du -sk " SDCARD_LOGS_DIR "/ > " LOGS_DIR "/currentsdsize"
+
+#ifndef CONFIG_NUM_MODEMS
+#define MAX_MMGR_INST     (1)
+#else
+#define MAX_MMGR_INST     (CONFIG_NUM_MODEMS)
+#endif
 
 extern char *CRASH_DIR;
 extern char *STATS_DIR;

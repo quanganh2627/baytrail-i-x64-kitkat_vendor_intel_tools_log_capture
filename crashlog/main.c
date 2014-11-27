@@ -268,25 +268,29 @@ int process_command_event(struct watch_entry *entry, struct inotify_event *event
  *  - = 0: if the file was up-to-date
  *  - > 0: if the file was updated successfully
  */
-static int update_modem_name() {
+static int update_modem_name(int instance) {
     FILE *fd = NULL;
     int res = 0;
     char modem_name[PROPERTY_VALUE_MAX] = "";
     char previous_modem_name[PROPERTY_VALUE_MAX] = "";
+    char *modem_version_file;
 
+    modem_version_file =
+        malloc((strlen(LOG_MODEM_VERSION_BASE) + 10) * sizeof(char));
+    sprintf(modem_version_file, "%s%d.txt", LOG_MODEM_VERSION_BASE, instance);
     /*
      * Retrieve modem name
      */
-    res = get_modem_name(modem_name);
+    res = get_modem_name(modem_name,instance);
     if(res < 0) {
-        LOGE("%s: Could not retrieve modem name, file %s will not be written.\n", __FUNCTION__, LOG_MODEM_VERSION);
+        LOGE("%s: Could not retrieve modem name, file %s will not be written.\n", __FUNCTION__, modem_version_file);
         return res;
     }
 
     /*
      * Check the modem version file.
      */
-    if ( (fd = fopen(LOG_MODEM_VERSION, "r")) != NULL) {
+    if ( (fd = fopen(modem_version_file, "r")) != NULL) {
         res = fscanf(fd, "%s", previous_modem_name);
         fclose(fd);
         /* Check whether there is something to do or not */
@@ -299,28 +303,29 @@ static int update_modem_name() {
     /*
      * Update file
      */
-    if ( (fd = fopen(LOG_MODEM_VERSION, "w")) == NULL) {
+    if ( (fd = fopen(modem_version_file, "w")) == NULL) {
         LOGE("%s: Could not open file %s for writing.\n",
             __FUNCTION__,
-            LOG_MODEM_VERSION);
+            modem_version_file);
         return -1;
     }
     fprintf(fd, "%s", modem_name);
     fclose(fd);
 
     /* Change file ownership and permissions */
-    if(chmod(LOG_MODEM_VERSION, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH) < 0) {
+    if(chmod(modem_version_file, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH) < 0) {
         LOGE("%s: Cannot change %s file permissions %s\n",
             __FUNCTION__,
-            LOG_MODEM_VERSION,
+            modem_version_file,
             strerror(errno));
         return -1;
     }
-    do_chown(LOG_MODEM_VERSION, "root", "log");
+    do_chown(modem_version_file, "root", "log");
 
     /*
      * Return the result
      */
+    free(modem_version_file);
     return res;
 }
 
@@ -458,6 +463,7 @@ static void early_check(char *encryptstate, int test) {
     const char *datelong;
     char *key;
     struct stat info;
+    int i, num_modems;
 
     if (swupdated(gbuildversion) == 1) {
         strcpy(startupreason,"SWUPDATE");
@@ -501,14 +507,20 @@ static void early_check(char *encryptstate, int test) {
     free(key);
 
 #ifdef CRASHLOGD_MODULE_MODEM
-    if(cfg_check_modem_version()) {
-        modem_name_check_result = update_modem_name();
-        if(modem_name_check_result < 0) {
-            LOGI("%s: An error occurred when read/writing %s.", __FUNCTION__, LOG_MODEM_VERSION);
-        } else if (modem_name_check_result == 0) {
-            LOGI("%s: The file %s was up-to-date.", __FUNCTION__, LOG_MODEM_VERSION);
-        } else {
-            LOGI("%s: File %s updated successfully.", __FUNCTION__, LOG_MODEM_VERSION);
+    num_modems = get_modem_count();
+    for (i = 0; i < num_modems; i++) {
+        if (cfg_check_modem_version(i)) {
+            modem_name_check_result = update_modem_name(i);
+            if (modem_name_check_result < 0) {
+                LOGI("%s: An error occurred when read/writing %s%d.txt.",
+                     __FUNCTION__, LOG_MODEM_VERSION_BASE, i);
+            } else if (modem_name_check_result == 0) {
+                LOGI("%s: The file %s%d.txt was up-to-date.", __FUNCTION__,
+                     LOG_MODEM_VERSION_BASE, i);
+            } else {
+                LOGI("%s: File %s%d.txt updated successfully.", __FUNCTION__,
+                     LOG_MODEM_VERSION_BASE, i);
+            }
         }
     }
 #endif
@@ -665,6 +677,7 @@ int do_monitor() {
     int select_result; /**< select result */
     int file_monitor_fd = get_inotify_fd();
     dropbox_set_file_monitor_fd(file_monitor_fd);
+    int i,num_modems;
 
     if ( file_monitor_fd < 0 ) {
         LOGE("%s: failed to initialize the inotify handler - %s\n",
@@ -697,7 +710,9 @@ int do_monitor() {
     set_watch_entry_callback(APIMR_TYPE,        process_modem_event);
     set_watch_entry_callback(MRST_TYPE,         process_modem_event);
 
-    init_mmgr_cli_source();
+    num_modems = get_modem_count();
+    for (i = 0; i < num_modems; i++)
+        init_mmgr_cli_source(i);
 
     kct_netlink_init_comm();
 
@@ -715,10 +730,12 @@ int do_monitor() {
         }
 
         //mmgr fd setup
-        if (mmgr_get_fd() > 0) {
-            FD_SET(mmgr_get_fd(), &read_fds);
-            if (mmgr_get_fd() > max)
-                max = mmgr_get_fd();
+        for (i = 0; i < num_modems; i++) {
+            if (mmgr_get_fd(i) > 0) {
+                FD_SET(mmgr_get_fd(i), &read_fds);
+                if (mmgr_get_fd(i) > max)
+                    max = mmgr_get_fd(i);
+            }
         }
 
         //kct fd setup
@@ -756,10 +773,12 @@ int do_monitor() {
                 receive_inotify_events(file_monitor_fd);
             }
             // mmgr monitor
-            if (mmgr_get_fd() > 0 &&
-                FD_ISSET(mmgr_get_fd(), &read_fds)) {
-                LOGD("mmgr fd set");
-                mmgr_handle();
+            for (i = 0; i < num_modems; i++) {
+                if (mmgr_get_fd(i) > 0 &&
+                    FD_ISSET(mmgr_get_fd(i), &read_fds)) {
+                    LOGD("mmgr fd instance %i set", i);
+                    mmgr_handle(i);
+                }
             }
             // kct monitor
             if (kct_netlink_get_fd() > 0 &&
@@ -775,7 +794,10 @@ int do_monitor() {
             }
         }
     }
-    close_mmgr_cli_source();
+
+    for (i = 0; i < num_modems; i++)
+        close_mmgr_cli_source(i);
+
     free_config(g_first_modem_config);
     LOGE("Exiting main monitor loop\n");
     return -1;

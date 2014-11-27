@@ -42,6 +42,7 @@ extern int  gcurrent_uptime_hour_frequency;
 extern long current_sd_size_limit;
 int g_current_serial_device_id = 0; /* Specifies where serial ID should be retrieved (from emmc or from properties )*/
 static int check_modem_version = 0;
+static int collection_mode_modem = 0;
 
 //to get pconfig if it exists
 pconfig get_generic_config(char* event_name, pconfig config_to_match) {
@@ -314,6 +315,18 @@ void load_config(){
                     LOGI("Check modem version: %d", check_modem_version);
                 }
             }
+            if (sk_exists(GENERAL_CONF_PATTERN,"collection_mode_modem",&my_conf_handle)){
+                char *tmp = get_value(GENERAL_CONF_PATTERN,"collection_mode_modem",&my_conf_handle);
+                if (tmp){
+                    i_tmp = atoi(tmp);
+                    if ( i_tmp<COLLECT_BPLOG_COUNT && i_tmp>=0 )
+                         collection_mode_modem = i_tmp;
+                    else
+                         LOGI("Error reading modem logs collection mode");
+                    LOGI("BPLOG collection set to: %d", collection_mode_modem);
+                }
+            }
+
             load_config_by_pattern(NOTIFY_CONF_PATTERN,"matching_pattern",my_conf_handle);
             //ADD other config pattern HERE
             free_config_file(&my_conf_handle);
@@ -330,4 +343,13 @@ void load_config(){
  */
 int cfg_check_modem_version() {
     return check_modem_version;
+}
+
+/*
+ * Return the value of the property
+ *  collection_mode_modem
+ * This function avoids the use of global variables.
+ */
+int cfg_collection_mode_modem() {
+    return collection_mode_modem;
 }
