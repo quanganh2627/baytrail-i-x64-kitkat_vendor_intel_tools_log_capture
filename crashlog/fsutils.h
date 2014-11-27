@@ -106,7 +106,7 @@ static inline int get_file_size(char *filename) {
     return info.st_size;
 }
 
-int read_file_prop_uid(char* propsource, char *filename, char *uid, char* defaultvalue);
+int read_file_prop_uid(const char* propsource, const char *filename, char *uid, char* defaultvalue);
 int find_new_crashlog_dir(e_dir_mode_t mode);
 int get_sdcard_paths(e_dir_mode_t mode);
 void do_log_copy(char *mode, int dir, const char* ts, int type);
@@ -145,8 +145,8 @@ void update_logs_permission(void);
 int str_simple_replace(char *str, char *search, char *replace);
 int get_parent_dir( char * dir, char *parent_dir );
 
-char *compute_bp_log(const char* ext_file);
-void copy_bplogs(const char *patern, const char *extra, int dir, int limit);
+char *compute_bp_log(const char* ext_file, int instance);
+void copy_bplogs(const char *patern, const char *extra, int dir, int limit, int instance);
 void save_startuplogs(const char *reboot_id);
 
 /**

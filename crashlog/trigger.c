@@ -24,6 +24,7 @@
 #include "crashutils.h"
 #include "fsutils.h"
 #include "privconfig.h"
+#include "tcs_wrapper.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -226,8 +227,11 @@ int process_log_event(char *rootdir, char *triggername, int mode) {
             do_copy_tail(path,destination,0);
 
             /* In case of bz_trigger with BPLOG=1, copy bplog file(s) */
-            if( bplogFlag == 1 )
-                copy_bplogs(BZ_DIR, "", dir, 0);
+            if( bplogFlag == 1 ) {
+                int instance = get_modem_count();
+                while (instance--)
+                    copy_bplogs(BZ_DIR, "", dir, 0, instance);
+            }
         }
 
         snprintf(destination,sizeof(destination),"%s%d/user_comment", logrootdir, dir);

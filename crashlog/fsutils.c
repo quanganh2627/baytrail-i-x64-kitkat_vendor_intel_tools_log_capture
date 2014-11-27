@@ -25,6 +25,8 @@
 #include "fsutils.h"
 #include "privconfig.h"
 #include "crashutils.h"
+#include "config_handler.h"
+#include "tcs_wrapper.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -1186,7 +1188,7 @@ int overwrite_file(char *filename, char *value) {
     return 0;
 }
 
-int read_file_prop_uid(char* source, char *filename, char *uid, char* defaultvalue) {
+int read_file_prop_uid(const char* source, const char *filename, char *uid, char* defaultvalue) {
     FILE *fd;
     char buffer[MAXLINESIZE] = {'\0'};
     char temp_uid[PROPERTY_VALUE_MAX];
@@ -1268,30 +1270,41 @@ void flush_aplog(e_aplog_file_t file, const char *mode, int *dir, const char *ts
 }
 
 // return of compute_bp_log needs to be freed after use
-char *compute_bp_log(const char* ext_file) {
+char *compute_bp_log(const char* ext_file, int instance) {
     char destination[PATHMAX];
-    char dir_pattern_base[PATHMAX];
     char temp_path_log[PROPERTY_VALUE_MAX];
+    char property_name[PATHMAX];
 
-    if (property_get("persist.service.mts.output", temp_path_log, BPLOG_FILE_0) > 0) {
-        strncpy(dir_pattern_base, temp_path_log, PATHMAX);
-    }else{
+    if (instance == 0)
+        snprintf(property_name, sizeof(property_name), "persist.service.mts.output");
+    else
+        snprintf(property_name, sizeof(property_name), "persist.sys.mts%d.output", instance+1);
+
+    if (property_get(property_name, temp_path_log, NULL)) {
+        snprintf(destination,sizeof(destination), "%s%s", temp_path_log, ext_file);
+    } else {
         //default value
-        LOGI("Property persist.service.mts.output not readable\n");
-        strncpy(dir_pattern_base, BPLOG_FILE_0, PATHMAX);
+        LOGE("Property %s not readable, Trying default path: %s\n", property_name, BPLOG_FILE_0);
+        snprintf(destination,sizeof(destination), "%s%s", BPLOG_FILE_0, ext_file);
     }
-    snprintf(destination,sizeof(destination), "%s%s", dir_pattern_base, ext_file);
 
     return strdup(destination);
 }
 
-void copy_bplogs(const char *patern, const char *extra, int dir, int limit) {
+void copy_bplogs(const char *patern, const char *extra, int dir, int limit, int instance) {
     char src[PATHMAX], dst[PATHMAX], prop[PROPERTY_VALUE_MAX];
     struct stat info;
+    char property_name[PATHMAX];
+
+    if (instance == 0)
+        snprintf(property_name, sizeof(property_name), "persist.service.mts.output");
+    else
+        snprintf(property_name, sizeof(property_name), "persist.sys.mts%d.output", instance+1);
+
     /*first bplog is ethed "persist.service.mts.output" or "persist.service.mts.output".istp
      * and will be copied in bplog.istp*/
-    property_get("persist.service.mts.output", prop, BPLOG_FILE_0);
-    if(file_exists(prop)) {
+    property_get(property_name, prop, BPLOG_FILE_0);
+    if (file_exists(prop)) {
         strncpy(src, prop, PROPERTY_VALUE_MAX);
     } else {
         snprintf(src, PATHMAX, "%s%s", prop, BPLOG_FILE_0_EXT);
@@ -1307,69 +1320,89 @@ void copy_bplogs(const char *patern, const char *extra, int dir, int limit) {
     }
 }
 
+static void move_logfile(char *mode, const char *logfile0, const char *logfile1,
+                         const char *timestamp, const char *extension,
+                         int limit, char *dir_pattern, int dir) {
+    struct stat info;
+    char destination[PATHMAX];
+
+    if (stat(logfile0, &info) == 0) {
+        snprintf(destination, sizeof(destination), "%s%d/%s_%s_%s%s",
+                 dir_pattern, dir, strrchr(logfile0, '/') + 1, mode, timestamp,
+                 extension);
+        do_copy_tail((char *)logfile0, destination, limit);
+        if (info.st_size < 1 * MB) {
+            snprintf(destination, sizeof(destination), "%s%d/%s_%s_%s%s",
+                     dir_pattern, dir, strrchr(logfile1, '/') + 1, mode,
+                     timestamp, extension);
+            do_copy_tail((char *)logfile1, destination, limit);
+        }
+    }
+}
+
 void do_log_copy(char *mode, int dir, const char* timestamp, int type) {
     char destination[PATHMAX], bp_extra[PATHMAX], *logfile0, *logfile1, *extension;
-    struct stat info;
     char *dir_pattern = CRASH_DIR;
     int limit = MAXFILESIZE;
+    int mdm_instance;
 
-    switch (type) {
-        case APLOG_TYPE:
-        case APLOG_STATS_TYPE:
-        case KDUMP_TYPE:
+    switch (type & 0xFF) {
+    case APLOG_TYPE:
+    case APLOG_STATS_TYPE:
+    case KDUMP_TYPE:
 #ifndef CONFIG_APLOG
-            flush_aplog(APLOG, NULL, NULL, NULL);
+        flush_aplog(APLOG, NULL, NULL, NULL);
 #endif
-            logfile0 = APLOG_FILE_0;
-            logfile1 = APLOG_FILE_1;
-            extension = "";
-            if (type == APLOG_STATS_TYPE)
-                dir_pattern = STATS_DIR;
-            else if (type == KDUMP_TYPE)
-                dir_pattern = KDUMP_CRASH_DIR;
-            break;
-        case BPLOG_TYPE:
-        case BPLOG_STATS_TYPE:
-            if (type == BPLOG_STATS_TYPE)
-                dir_pattern = STATS_DIR;
-            snprintf(bp_extra, sizeof(bp_extra), "_%s_%s", mode, timestamp);
-            copy_bplogs(dir_pattern, bp_extra, dir, limit);
-            return;
-        case BPLOG_TYPE_OLD:
-            logfile0 = compute_bp_log(BPLOG_FILE_1_OLD_EXT); // BPLOG_FILE_1_OLD;
-            logfile1 = compute_bp_log(BPLOG_FILE_2_OLD_EXT); // BPLOG_FILE_2_OLD;
-            extension = ".istp";
-            /* limit size remains for old bplogs*/
-            break;
-        default:
-            /* Ignore unknown type, just return */
-            return;
-    }
-    if(logfile0 && stat(logfile0, &info) == 0) {
-        snprintf(destination,sizeof(destination), "%s%d/%s_%s_%s%s", dir_pattern, dir, strrchr(logfile0,'/')+1, mode, timestamp, extension);
-        do_copy_tail(logfile0, destination, limit);
-        if(logfile1 && info.st_size < 1*MB) {
-            snprintf(destination,sizeof(destination), "%s%d/%s_%s_%s%s", dir_pattern, dir, strrchr(logfile1,'/')+1, mode, timestamp, extension);
-            do_copy_tail(logfile1, destination, limit);
-        }
+        logfile0 = APLOG_FILE_0;
+        logfile1 = APLOG_FILE_1;
+        extension = "";
+        if (type == APLOG_STATS_TYPE)
+            dir_pattern = STATS_DIR;
+        else if (type == KDUMP_TYPE)
+            dir_pattern = KDUMP_CRASH_DIR;
+
+        move_logfile(mode, logfile0, logfile1, timestamp, extension, limit,
+                     dir_pattern, dir);
 #ifndef CONFIG_APLOG
         remove(APLOG_FILE_0);
 #endif
-    }
+        break;
 
-    switch (type) {
-        case APLOG_TYPE:
-        case APLOG_STATS_TYPE:
-        case KDUMP_TYPE:
-            //nothing to do
+    case BPLOG_TYPE:
+    case BPLOG_STATS_TYPE:
+        if (type == BPLOG_STATS_TYPE)
+            dir_pattern = STATS_DIR;
+        snprintf(bp_extra, sizeof(bp_extra), "_%s_%s", mode, timestamp);
+        switch (cfg_collection_mode_modem()) {
+        case COLLECT_BPLOG_CRASHING_MODEM:
+            copy_bplogs(dir_pattern, bp_extra, dir, limit, (type >> 8) & 0xff);
             break;
-        case BPLOG_TYPE_OLD:
-            free(logfile0);
-            free(logfile1);
+        case COLLECT_BPLOG_CRASHING_ALL:
+            mdm_instance = get_modem_count();
+            while (mdm_instance--)
+                copy_bplogs(dir_pattern, bp_extra, dir, limit, mdm_instance);
             break;
         default:
-            /* Ignore unknown type, just return */
-            return;
+            break;
+        }
+        break;
+    case BPLOG_TYPE_OLD:
+        mdm_instance = get_modem_count();
+        while (mdm_instance--) {
+            logfile0 = compute_bp_log(BPLOG_FILE_1_OLD_EXT, mdm_instance); // BPLOG_FILE_1_OLD;
+            logfile1 = compute_bp_log(BPLOG_FILE_2_OLD_EXT, mdm_instance); // BPLOG_FILE_2_OLD;
+            extension = ".istp";
+            /* limit size remains for old bplogs */
+            move_logfile(mode, logfile0, logfile1, timestamp, extension, limit,
+                         dir_pattern, dir);
+            free(logfile0);
+            free(logfile1);
+        }
+        break;
+
+    default:
+        /* Ignore unknown type, just return */
+        return;
     }
 }
 
