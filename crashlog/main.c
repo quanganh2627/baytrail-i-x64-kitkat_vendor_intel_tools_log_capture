@@ -195,7 +195,7 @@ static void check_factory_partition_checksum() {
 
         if (memcmp(checksum, old_checksum, CRASHLOG_CHECKSUM_SIZE) != 0) {
             /* send event that something has changed */
-            char *key = raise_event(INFOEVENT, "FACTORY_SUM", NULL, FACTORY_SUM_FILE);
+            char *key = raise_event(INFOEVENT, "FACTORY_SUM", NULL, NULL);
             free(key);
             if (write_binary_file(FACTORY_SUM_FILE, checksum, CRASHLOG_CHECKSUM_SIZE) < 0) {
                 LOGE("%s: failed in writing checksum to file: %s\n", __FUNCTION__, FACTORY_SUM_FILE);
