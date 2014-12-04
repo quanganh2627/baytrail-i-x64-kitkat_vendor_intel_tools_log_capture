@@ -280,7 +280,7 @@ int crashlog_check_panic(char *reason, int test) {
     char crash_console_name[PATHMAX] = {'\0'};
     char crashtype[32] = {'\0'};
     int dir;
-    int copy_to_crash = 0, copy_to_panic = 0;
+    int copy_to_crash = 0;
     const char *dateshort = get_current_time_short(1);
     char *key;
 
@@ -291,7 +291,6 @@ int crashlog_check_panic(char *reason, int test) {
 
     dir = find_new_crashlog_dir(MODE_CRASH);
     copy_to_crash = (dir >= 0);
-    copy_to_panic = dir_exists(PANIC_DIR);
 
     if (copy_to_crash) {
         // use crash file directly
@@ -322,31 +321,6 @@ int crashlog_check_panic(char *reason, int test) {
         do_last_kmsg_copy(dir);
     } else {
         LOGE("%s: Cannot get a valid new crash directory...\n", __FUNCTION__);
-    }
-
-    // not exclusive with copy_to_crash
-    if (copy_to_panic) {
-        // copy to panic folder
-        do_copy_eof(PANIC_HEADER_NAME, SAVED_HEADER_NAME);
-        do_copy_eof(PANIC_CONSOLE_NAME, SAVED_CONSOLE_NAME);
-        do_copy_eof(PANIC_THREAD_NAME, SAVED_THREAD_NAME);
-        do_copy_eof(PANIC_GBUFFER_NAME, SAVED_GBUFFER_NAME);
-
-        // Ram console (if available)
-        snprintf(destination_tmp_name, sizeof(destination_tmp_name),
-            "%s/%s.txt", PANIC_DIR, CONSOLE_RAMOOPS_FILE);
-        if (file_exists(LAST_KMSG)) {
-            do_copy_tail(LAST_KMSG, destination_tmp_name, MAXFILESIZE);
-        } else if (file_exists(CONSOLE_RAMOOPS)) {
-            do_copy_tail(CONSOLE_RAMOOPS, destination_tmp_name, MAXFILESIZE);
-        }
-
-        // saved file to use for processing
-        snprintf(crash_console_name, sizeof(crash_console_name),
-                    "%s", SAVED_CONSOLE_NAME);
-    }
-
-    if (!copy_to_crash && !copy_to_panic) {
         // use temp file
         snprintf(crash_console_name, sizeof(crash_console_name),
                     "%s", LOG_PANICTEMP);
@@ -422,11 +396,10 @@ int crashlog_check_ram_panic(char *reason, const char *extrastring) {
                               "BUG: unable to handle kernel"};
     char crash_path[PATHMAX] = {'\0'};
     char crash_ramconsole_name[PATHMAX] = {'\0'};
-    char crash_header_name[PATHMAX] = {'\0'};
     char ram_console[PATHMAX] = {'\0'};
     char crashtype[32] = {'\0'};
     int dir, ret;
-    int copy_to_crash = 0, copy_to_panic = 0;
+    int copy_to_crash = 0;
     const char *dateshort = get_current_time_short(1);
     char *key;
 
@@ -450,15 +423,10 @@ int crashlog_check_ram_panic(char *reason, const char *extrastring) {
     dir = find_new_crashlog_dir(MODE_CRASH);
 
     copy_to_crash = (dir >= 0);
-    copy_to_panic = dir_exists(PANIC_DIR);
 
     if (copy_to_crash) {
         // use crash file directly
         snprintf(crash_path, sizeof(crash_path), "%s%d/", CRASH_DIR, dir);
-
-        snprintf(crash_header_name, sizeof(crash_header_name),
-                    "%s%s_%s.txt", crash_path, EMMC_HEADER_NAME, dateshort);
-        do_copy_eof(PANIC_HEADER_NAME, crash_header_name);
 
         snprintf(crash_ramconsole_name, sizeof(crash_ramconsole_name),
             "%s%s_%s.txt", crash_path, CONSOLE_RAMOOPS_FILE, dateshort);
@@ -466,23 +434,6 @@ int crashlog_check_ram_panic(char *reason, const char *extrastring) {
         do_copy_tail(ram_console, crash_ramconsole_name, MAXFILESIZE);
     } else {
         LOGE("%s: Cannot get a valid new crash directory...\n", __FUNCTION__);
-    }
-
-    // NOT exclusive with copy_to_crash
-    if (copy_to_panic) {
-        snprintf(crash_header_name, sizeof(crash_header_name),
-                    "%s", SAVED_HEADER_NAME);
-        do_copy_eof(PANIC_HEADER_NAME, crash_header_name);
-
-        // saved file to use for processing
-        snprintf(crash_ramconsole_name, sizeof(crash_ramconsole_name),
-            "%s/%s.txt", PANIC_DIR, CONSOLE_RAMOOPS_FILE);
-        // to be homogeneous with do_last_kmsg_copy, we use do_copy_tail
-        do_copy_tail(ram_console, crash_ramconsole_name, MAXFILESIZE);
-    }
-
-    // exclusive
-    if (!copy_to_crash && !copy_to_panic) {
         // use temp file
         snprintf(crash_ramconsole_name, sizeof(crash_ramconsole_name),
                     "%s", LOG_PANICTEMP);
@@ -532,7 +483,7 @@ int crashlog_check_panic_header(char *reason) {
     char destination_tmp_name[PATHMAX] = {'\0'};
     char crashtype[32] = {'\0'};
     int dir;
-    int copy_to_crash = 0, copy_to_panic = 0;
+    int copy_to_crash = 0;
     const char *dateshort = get_current_time_short(1);
     char *key;
 
@@ -544,7 +495,6 @@ int crashlog_check_panic_header(char *reason) {
     dir = find_new_crashlog_dir(MODE_CRASH);
 
     copy_to_crash = (dir >= 0);
-    copy_to_panic = dir_exists(PANIC_DIR);
 
     if (copy_to_crash) {
         // use crash file directly
@@ -555,27 +505,7 @@ int crashlog_check_panic_header(char *reason) {
         do_copy_eof(PANIC_HEADER_NAME, crash_header_name);
 
         do_last_kmsg_copy(dir);
-    }
-
-    // NOT exclusive with copy_to_crash
-    if (copy_to_panic) {
-        // Ram console (if available, even if no panic-pattern)
-        snprintf(destination_tmp_name, sizeof(destination_tmp_name),
-            "%s/%s.txt", PANIC_DIR, CONSOLE_RAMOOPS_FILE);
-        if (file_exists(LAST_KMSG)) {
-            do_copy_tail(LAST_KMSG, destination_tmp_name, MAXFILESIZE);
-        } else if (file_exists(CONSOLE_RAMOOPS)) {
-            do_copy_tail(CONSOLE_RAMOOPS, destination_tmp_name, MAXFILESIZE);
-        }
-
-        // saved file to use for processing
-        snprintf(crash_header_name, sizeof(crash_header_name),
-                    "%s", SAVED_HEADER_NAME);
-        do_copy_eof(PANIC_HEADER_NAME, crash_header_name);
-    }
-
-    // exclusive
-    if (!copy_to_crash && !copy_to_panic) {
+    } else {
         // use temp file
         snprintf(crash_header_name, sizeof(crash_header_name),
                     "%s", LOG_PANICTEMP);
