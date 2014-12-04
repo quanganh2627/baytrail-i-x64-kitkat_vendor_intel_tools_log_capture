@@ -82,7 +82,6 @@
 #define IPANIC_CORRUPTED        "IPANIC_CORRUPTED"
 #define KDUMP_CRASH             "KDUMP"
 #define RAMDUMP_EVENT           "RAMDUMP"
-#define MODEM_SHUTDOWN          "MSHUTDOWN"
 #define BZTRIGGER               "bz_trigger"
 #define SCREENSHOT_PATTERN      "SCREENSHOT="
 #define APLOG_DEPTH_DEF         "5"
@@ -110,8 +109,6 @@
 #define CMDTRIG_EVNAME          "CMDTRIG"
 #define UPTIME_EVNAME           "CURRENTUPTIME"
 #define MDMCRASH_EVNAME         "MPANIC"
-#define APIMR_EVNAME            "APIMR"
-#define MRST_EVNAME             "MRESET"
 #define EXTRA_NAME              "EXTRA"
 #define NOTIFY_CONF_PATTERN     "INOTIFY"
 #define GENERAL_CONF_PATTERN    "GENERAL"
@@ -141,9 +138,6 @@ enum {
     APLOGTRIG_TYPE,
     CMDTRIG_TYPE,
     UPTIME_TYPE,
-    MDMCRASH_TYPE,
-    APIMR_TYPE,
-    MRST_TYPE,
     EVENT_TYPE_NUMBER, /* !!! Take care this enum item is always the last one */
 };
 
@@ -166,10 +160,7 @@ static const char* print_eventtype[EVENT_TYPE_NUMBER] = {
     "ERRORTRIG_TYPE",
     "APLOGTRIG_TYPE",
     "CMDTRIG_TYPE",
-    "UPTIME_TYPE",
-    "MDMCRASH_TYPE",
-    "APIMR_TYPE",
-    "MRST_TYPE"
+    "UPTIME_TYPE"
 };
 
 enum {
@@ -225,7 +216,7 @@ static const struct mode_config get_mode_configs[] = {
         .watched_event_types = {
             [ LOST_TYPE ... JAVACRASH_TYPE2 ] = TRUE,
             [ APCORE_TYPE ... HPROF_TYPE ] = COREDUMP_WATCHED,
-            [ STATTRIG_TYPE ... MRST_TYPE ] = TRUE },
+            [ STATTRIG_TYPE ... UPTIME_TYPE ] = TRUE },
         .mmgr_enabled = TRUE,
     },
     [ RAMDUMP_MODE ] = {
@@ -233,7 +224,7 @@ static const struct mode_config get_mode_configs[] = {
         .sdcard_storage = FALSE,
         .notifs_crashreport = FALSE,
         .monitor_crashenv = FALSE,
-        .watched_event_types = { [ LOST_TYPE ... MRST_TYPE ] = FALSE, }, /* No directories are watched */
+        .watched_event_types = { [ LOST_TYPE ... UPTIME_TYPE ] = FALSE, }, /* No directories are watched */
         .mmgr_enabled = FALSE,
     },
     [ MINIMAL_MODE ] = {
@@ -244,7 +235,7 @@ static const struct mode_config get_mode_configs[] = {
         .watched_event_types = {
             [ LOST_TYPE ... HPROF_TYPE ] = FALSE, /* Watch only stat directory */
             [ STATTRIG_TYPE  ] = TRUE,
-            [ INFOTRIG_TYPE ... MRST_TYPE ] = FALSE },
+            [ INFOTRIG_TYPE ... UPTIME_TYPE ] = FALSE },
         .mmgr_enabled = FALSE,
     },
 };
@@ -259,7 +250,7 @@ static const struct mode_config get_mode_configs[] = {
 #define CRASHLOG_MODE_MONITOR_CRASHENV(mode) \
     ((mode > MINIMAL_MODE) ? 0 : get_mode_configs[mode].monitor_crashenv)
 #define CRASHLOG_MODE_EVENT_TYPE_ENABLED(mode, type) \
-    ((mode > MINIMAL_MODE || type > MRST_TYPE) ? \
+    ((mode > MINIMAL_MODE || type > UPTIME_TYPE) ? \
      0 : get_mode_configs[mode].watched_event_types[type])
 #define CRASHLOG_MODE_MMGR_ENABLED(mode) \
     ((mode > MINIMAL_MODE) ? 0 : get_mode_configs[mode].mmgr_enabled)
@@ -381,7 +372,6 @@ extern enum crashlog_mode g_crashlog_mode;
 #define LOGS_GPS_DIR            LOGS_DIR "/gps"
 #define APLOG_FILE_BOOT         LOGS_DIR "/aplog_boot"
 #define BLANKPHONE_FILE         LOGS_DIR "/flashing/blankphone_file"
-#define MODEM_SHUTDOWN_TRIGGER  LOGS_DIR "/modemcrash/mshutdown.txt"
 #define LOG_SPID                LOGS_DIR "/spid.txt"
 #define LOG_PANICTEMP           LOGS_DIR "/panic_temp"
 #define LOG_FABRICTEMP           LOGS_DIR "/fabric_temp"

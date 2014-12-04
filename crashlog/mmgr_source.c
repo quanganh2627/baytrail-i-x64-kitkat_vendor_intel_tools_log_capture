@@ -539,7 +539,7 @@ void get_modem_version(unsigned int instance, char * version){
 int mmgr_handle(unsigned int mdm_inst) {
     e_dir_mode_t event_mode = MODE_CRASH;
     int aplog_mode, dir;
-    int bplog_mode = BPLOG_TYPE | (mdm_inst << 8);
+    int bplog_mode = BPLOG_TYPE;
     char *event_dir, *key;
     char event_name[MMGRMAXSTRING];
     char data0[MMGRMAXEXTRA];
@@ -601,7 +601,7 @@ int mmgr_handle(unsigned int mdm_inst) {
         }
         event_mode = MODE_STATS;
         aplog_mode = APLOG_STATS_TYPE;
-        bplog_mode = BPLOG_STATS_TYPE | (mdm_inst << 8);
+        bplog_mode = BPLOG_STATS_TYPE;
         copy_aplog = (cur_data.extra_int >> 8) & MMGR_CLI_TFT_AP_LOG_MASK;
         copy_bplog = ((cur_data.extra_int >> 8) & MMGR_CLI_TFT_BP_LOG_MASK)
                 && check_running_modem_trace();
@@ -632,8 +632,9 @@ int mmgr_handle(unsigned int mdm_inst) {
             snprintf(data1,sizeof(data1),"%s", cur_data.extra_string);
         }
         LOGD("Extra string value : %s ",cur_data.extra_string);
-        if (file_exists(MCD_PROCESSING))
-            remove(MCD_PROCESSING);
+        snprintf(destion, sizeof(destion), "%s-%d", MCD_PROCESSING, mdm_inst);
+        if (file_exists(destion))
+            remove(destion);
     } else if (strstr(type, "APIMR" )){
         if(!cur_data.extra_nb_causes) {
             LOGD("Extra string value : %s ",cur_data.extra_string);
@@ -688,11 +689,10 @@ int mmgr_handle(unsigned int mdm_inst) {
         // Remove the "TFT" tag added in top of cur_data.string
         strcpy(type, &cur_data.string[3]);
     } else if (strstr(type, "START_CD" )){
-        FILE *fp = fopen(MCD_PROCESSING,"w");
-        if (fp == NULL){
-            LOGE("can not create file: %s\n", MCD_PROCESSING);
+        snprintf(destion, sizeof(destion), "%s-%d", MCD_PROCESSING, mdm_inst);
+        if (write_binary_file(destion, (const unsigned char*)&mdm_inst, sizeof(mdm_inst))) {
+            LOGE("can not create file: %s\n", destion);
         }
-        else fclose(fp);
         return 0;
     }
     get_modem_version(mdm_inst, modem_version);
@@ -713,7 +713,7 @@ int mmgr_handle(unsigned int mdm_inst) {
         do_log_copy(type, dir, dateshort, aplog_mode);
     }
     if (copy_bplog > 0) {
-        do_log_copy(type, dir, dateshort, bplog_mode);
+        do_bplog_copy(type, dir, dateshort, bplog_mode, mdm_inst);
     }
     snprintf(destion, sizeof(destion), "%s%d/", event_dir, dir);
     // copying file (if required)

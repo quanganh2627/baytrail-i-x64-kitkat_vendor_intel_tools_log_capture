@@ -44,7 +44,6 @@
 #define STAT_DIR_MASK       (BASE_DIR_MASK)
 #define APLOG_DIR_MASK      (BASE_DIR_MASK)
 #define UPTIME_MASK         IN_CLOSE_WRITE
-#define MDMCRASH_DIR_MASK   (BASE_DIR_MASK)
 #define VBCRASH_DIR_MASK    (BASE_DIR_MASK|IN_CREATE)
 
 struct watch_entry;

@@ -75,10 +75,6 @@ struct watch_entry wd_array[] = {
     {0, APLOG_DIR_MASK,     CMDTRIG_TYPE,   0,      CMDTRIG_EVNAME,     APLOG_DIR,          "_cmd",                     NULL},
     /* -----------------------------above is dir, below is file------------------------------------------------------------ */
     {0, UPTIME_MASK,        UPTIME_TYPE,    0,      UPTIME_EVNAME,      UPTIME_FILE,        NULL,                      NULL},
-    /* -------------------------above is AP, below is modem---------------------------------------------------------------- */
-    {0, MDMCRASH_DIR_MASK,  MDMCRASH_TYPE,  0,      MDMCRASH_EVNAME,    LOGS_MODEM_DIR,     "mpanic.txt",               NULL},/*for modem crash */
-    {0, MDMCRASH_DIR_MASK,  APIMR_TYPE,     0,      APIMR_EVNAME,       LOGS_MODEM_DIR,     "apimr.txt",                NULL},
-    {0, MDMCRASH_DIR_MASK,  MRST_TYPE,      0,      MRST_EVNAME,        LOGS_MODEM_DIR,     "mreset.txt",               NULL},
 };
 
 int set_watch_entry_callback(unsigned int watch_type, inotify_callback pcallback) {

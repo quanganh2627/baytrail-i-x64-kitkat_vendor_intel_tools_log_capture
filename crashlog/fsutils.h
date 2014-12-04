@@ -110,6 +110,7 @@ int read_file_prop_uid(const char* propsource, const char *filename, char *uid, 
 int find_new_crashlog_dir(e_dir_mode_t mode);
 int get_sdcard_paths(e_dir_mode_t mode);
 void do_log_copy(char *mode, int dir, const char* ts, int type);
+void do_bplog_copy(char *mode, int dir, const char* ts, int type, int instance);
 long get_sd_size();
 int sdcard_allowed();
 

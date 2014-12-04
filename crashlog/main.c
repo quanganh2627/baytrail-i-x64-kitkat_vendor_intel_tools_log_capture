@@ -482,7 +482,6 @@ static void early_check(char *encryptstate, int test) {
     crashlog_check_fabric_events(startupreason, watchdog, test);
     crashlog_check_panic_events(startupreason, watchdog, test);
     crashlog_check_kdump(startupreason, test);
-    crashlog_check_modem_shutdown();
     crashlog_check_mpanic_abort();
     crashlog_check_startupreason(startupreason, watchdog);
     crashlog_check_recovery();
@@ -706,9 +705,6 @@ int do_monitor() {
     set_watch_entry_callback(APLOGTRIG_TYPE,    process_aplog_event);
     set_watch_entry_callback(LOST_TYPE,         process_lost_event);
     set_watch_entry_callback(UPTIME_TYPE,       process_uptime_event);
-    set_watch_entry_callback(MDMCRASH_TYPE,     process_modem_event);
-    set_watch_entry_callback(APIMR_TYPE,        process_modem_event);
-    set_watch_entry_callback(MRST_TYPE,         process_modem_event);
 
     num_modems = get_modem_count();
     for (i = 0; i < num_modems; i++)

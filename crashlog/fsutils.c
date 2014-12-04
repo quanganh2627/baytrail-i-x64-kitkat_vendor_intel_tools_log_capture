@@ -1346,7 +1346,7 @@ void do_log_copy(char *mode, int dir, const char* timestamp, int type) {
     int limit = MAXFILESIZE;
     int mdm_instance;
 
-    switch (type & 0xFF) {
+    switch (type) {
     case APLOG_TYPE:
     case APLOG_STATS_TYPE:
     case KDUMP_TYPE:
@@ -1368,6 +1368,34 @@ void do_log_copy(char *mode, int dir, const char* timestamp, int type) {
 #endif
         break;
 
+    default:
+        /* Ignore unknown type, just return */
+        return;
+    }
+}
+
+static void copy_bplogs_old(char *mode, char *dir_pattern,
+                            const char* timestamp, int dir, int limit, int instance) {
+    char destination[PATHMAX], bp_extra[PATHMAX], *logfile0, *logfile1, *extension;
+
+    logfile0 = compute_bp_log(BPLOG_FILE_1_OLD_EXT, instance); // BPLOG_FILE_1_OLD;
+    logfile1 = compute_bp_log(BPLOG_FILE_2_OLD_EXT, instance); // BPLOG_FILE_2_OLD;
+    extension = ".istp";
+    /* limit size remains for old bplogs */
+    move_logfile(mode, logfile0, logfile1, timestamp, extension, limit,
+                 dir_pattern, dir);
+    free(logfile0);
+    free(logfile1);
+}
+
+void do_bplog_copy(char *mode, int dir, const char* timestamp, int type, int instance) {
+    char destination[PATHMAX], bp_extra[PATHMAX], *logfile0, *logfile1, *extension;
+    char *dir_pattern = CRASH_DIR;
+    int limit = MAXFILESIZE;
+    int mdm_instance;
+
+    switch (type) {
+
     case BPLOG_TYPE:
     case BPLOG_STATS_TYPE:
         if (type == BPLOG_STATS_TYPE)
@@ -1375,7 +1403,7 @@ void do_log_copy(char *mode, int dir, const char* timestamp, int type) {
         snprintf(bp_extra, sizeof(bp_extra), "_%s_%s", mode, timestamp);
         switch (cfg_collection_mode_modem()) {
         case COLLECT_BPLOG_CRASHING_MODEM:
-            copy_bplogs(dir_pattern, bp_extra, dir, limit, (type >> 8) & 0xff);
+            copy_bplogs(dir_pattern, bp_extra, dir, limit, instance);
             break;
         case COLLECT_BPLOG_CRASHING_ALL:
             mdm_instance = get_modem_count();
@@ -1387,16 +1415,18 @@ void do_log_copy(char *mode, int dir, const char* timestamp, int type) {
         }
         break;
     case BPLOG_TYPE_OLD:
-        mdm_instance = get_modem_count();
-        while (mdm_instance--) {
-            logfile0 = compute_bp_log(BPLOG_FILE_1_OLD_EXT, mdm_instance); // BPLOG_FILE_1_OLD;
-            logfile1 = compute_bp_log(BPLOG_FILE_2_OLD_EXT, mdm_instance); // BPLOG_FILE_2_OLD;
-            extension = ".istp";
-            /* limit size remains for old bplogs */
-            move_logfile(mode, logfile0, logfile1, timestamp, extension, limit,
-                         dir_pattern, dir);
-            free(logfile0);
-            free(logfile1);
+
+        switch (cfg_collection_mode_modem()) {
+        case COLLECT_BPLOG_CRASHING_MODEM:
+            copy_bplogs_old(mode, dir_pattern, timestamp, dir, limit, instance);
+            break;
+        case COLLECT_BPLOG_CRASHING_ALL:
+            mdm_instance = get_modem_count();
+            while (mdm_instance--)
+                copy_bplogs_old(mode, dir_pattern, timestamp, dir, limit, mdm_instance);
+            break;
+        default:
+            break;
         }
         break;
 
