@@ -50,8 +50,8 @@ public class ConfigApplyFrag extends DialogFragment {
     private final String TAG = AMTLApplication.getAMTLApp().getLogTag();
     private final String MODULE = "ConfigApplyFrag";
 
-    private static String EXTRA_TAG = null;
-    private static String EXTRA_FRAG = null;
+    private static String EXTRA_TAG = "extra_tag";
+    private static String EXTRA_FRAG = "extra_frag";
 
     int targetFrag;
     String tag;
