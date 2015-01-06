@@ -293,6 +293,14 @@ int process_anruiwdt_event(struct watch_entry *entry, struct inotify_event *even
     do_log_copy(entry->eventname, dir, dateshort, APLOG_TYPE);
     backtrace_anruiwdt(destion, dir);
     restart_profile_srv(1);
+    /*add binder transactions*/
+    snprintf(destion,sizeof(destion),"%s%d/%s", CRASH_DIR, dir, "binder_transactions.txt");
+    do_copy_pvr(BINDER_TRANSACTIONS, destion);
+    snprintf(destion,sizeof(destion),"%s%d/%s", CRASH_DIR, dir, "binder_transaction_log.txt");
+    do_copy_pvr(BINDER_TRANSACTION_LOG, destion);
+    snprintf(destion,sizeof(destion),"%s%d/%s", CRASH_DIR, dir, "binder_failed_transaction_log.txt");
+    do_copy_pvr(BINDER_FAILED_TRANSACTION_LOG, destion);
+
     snprintf(destion, sizeof(destion), "%s%d", CRASH_DIR, dir);
 #ifdef CONFIG_BTDUMP
     property_get(PROP_ANR_USERSTACK, bt_dis_prop, "0");

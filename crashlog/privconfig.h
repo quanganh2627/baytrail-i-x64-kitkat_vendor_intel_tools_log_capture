@@ -435,6 +435,9 @@ extern enum crashlog_mode g_crashlog_mode;
 #define INGREDIENTS_CONFIG      SYSTEM_DIR "/etc/ingredients.conf"
 #define INGREDIENTS_FILE        LOGS_DIR "/ingredients.txt"
 #define FACTORY_SUM_FILE        LOGS_DIR "/factory_sum"
+#define BINDER_TRANSACTIONS     DEBUGFS_DIR "/binder/transactions"
+#define BINDER_TRANSACTION_LOG  DEBUGFS_DIR "/binder/transaction_log"
+#define BINDER_FAILED_TRANSACTION_LOG   DEBUGFS_DIR "/binder/failed_transaction_log"
 
 /* SYSTEM COMMANDS */
 #define SDSIZE_SYSTEM_CMD "du -sk " SDCARD_LOGS_DIR "/ > " LOGS_DIR "/currentsdsize"
