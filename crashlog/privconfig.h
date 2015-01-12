@@ -60,6 +60,9 @@
 #define KCT_MAX_CONNECT_TRY      10
 #define KCT_CONNECT_RETRY_TIME_S 2
 #define UPTIME_MAX_LENGTH       11
+/* crashlog wd timeout in seconds */
+#define CRASHLOG_WD_TIMEOUT     120
+#define CRASHLOG_SELECT_TIMEOUT 60
 
 /* FIELDS DEFINITIONS */
 #define PERM_USER               "system"

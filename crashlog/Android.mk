@@ -42,6 +42,7 @@ LOCAL_SRC_FILES := \
     config_handler.c \
     uefivar.c \
     checksum.c \
+    watchdog.c \
     ingredients.c
 
 LOCAL_SHARED_LIBRARIES := libcutils libcrypto

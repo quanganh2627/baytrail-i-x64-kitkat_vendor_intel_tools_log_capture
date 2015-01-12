@@ -48,6 +48,7 @@
 #include "ingredients.h"
 #include "checksum.h"
 #include "mmgr_source.h"
+#include "watchdog.h"
 
 #include <sys/types.h>
 #include <openssl/sha.h>
@@ -677,6 +678,7 @@ int do_monitor() {
     fd_set read_fds; /**< file descriptor set watching data availability from sources */
     int max = 0; /**< select max fd value +1 {@see man select(2) nfds} */
     int select_result; /**< select result */
+    struct timeval select_timeout;
     int file_monitor_fd = get_inotify_fd();
     dropbox_set_file_monitor_fd(file_monitor_fd);
     int i,num_modems;
@@ -717,7 +719,11 @@ int do_monitor() {
 
     lct_link_init_comm();
 
+    enable_watchdog(CRASHLOG_WD_TIMEOUT);
+
     for(;;) {
+        kick_watchdog();
+
         // Clear fd set
         FD_ZERO(&read_fds);
 
@@ -754,8 +760,11 @@ int do_monitor() {
         /*Allow reboot if not doing anything on main thread */
         property_set(PROP_PROC_ONGOING, "0");
 
+        select_timeout.tv_sec = CRASHLOG_SELECT_TIMEOUT;
+        select_timeout.tv_usec = 0;
+
         // Wait for events
-        select_result = select(max+1, &read_fds, NULL, NULL, NULL);
+        select_result = select(max+1, &read_fds, NULL, NULL, &select_timeout);
 
         property_set(PROP_PROC_ONGOING, "1");
 
