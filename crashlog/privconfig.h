@@ -280,8 +280,9 @@ extern enum crashlog_mode g_crashlog_mode;
 #define VALHOOKS_VERSION        "sys.valhooks.version"
 #define FINGERPRINT_FIELD       "ro.build.fingerprint"
 #define MODEM_FIELD             "gsm.version.baseband"
-#define MODEM_FIELD2            "gsm.version.baseband2"
+#define MODEM_FIELD2            "gsm.version.baseband1"
 #define IMEI_FIELD              "persist.radio.device.imei"
+#define MODEM_SCENARIO          "persist.radio.multisim.config"
 #define OPERATOR_FIELD          "gsm.operator.alpha"
 #define PROP_COREDUMP           "persist.core.enabled"
 #define PROP_CRASH_MODE         "persist.sys.crashlogd.mode"
@@ -443,7 +444,7 @@ extern enum crashlog_mode g_crashlog_mode;
 #define SDSIZE_SYSTEM_CMD "du -sk " SDCARD_LOGS_DIR "/ > " LOGS_DIR "/currentsdsize"
 
 #ifndef CONFIG_NUM_MODEMS
-#define MAX_MMGR_INST     (1)
+#define MAX_MMGR_INST     (2)
 #else
 #define MAX_MMGR_INST     (CONFIG_NUM_MODEMS)
 #endif
