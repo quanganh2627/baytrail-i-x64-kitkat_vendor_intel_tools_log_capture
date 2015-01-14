@@ -90,6 +90,9 @@ char CURRENT_KERNEL_CMDLINE[PATHMAX]={KERNEL_CMDLINE};
 
 int partition_notified = 1;
 
+/* to store if the pytimechart-record file is present */
+bool pytimechartrecord_filepresent;
+
 static const char * const mountpoints[] = {
     "/system",
     "/cache",
@@ -913,6 +916,8 @@ int main(int argc, char **argv) {
 
     /* Get the properties and read the local files to set properly the env variables */
     get_crash_env(boot_mode, crypt_state, encrypt_progress, decrypt, token);
+
+    pytimechartrecord_filepresent = file_exists(PYTIMECHART_FILE);
 
     alreadyran = (token[0] != 0);
 

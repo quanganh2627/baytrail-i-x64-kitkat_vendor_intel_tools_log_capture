@@ -439,6 +439,7 @@ extern enum crashlog_mode g_crashlog_mode;
 #define BINDER_TRANSACTIONS     DEBUGFS_DIR "/binder/transactions"
 #define BINDER_TRANSACTION_LOG  DEBUGFS_DIR "/binder/transaction_log"
 #define BINDER_FAILED_TRANSACTION_LOG   DEBUGFS_DIR "/binder/failed_transaction_log"
+#define PYTIMECHART_FILE        SYSTEM_DIR "/bin/pytimechart-record"
 
 /* SYSTEM COMMANDS */
 #define SDSIZE_SYSTEM_CMD "du -sk " SDCARD_LOGS_DIR "/ > " LOGS_DIR "/currentsdsize"
@@ -460,6 +461,7 @@ extern char CURRENT_PROC_OFFLINE_SCU_LOG_NAME[PATHMAX];
 extern char CURRENT_PROC_ONLINE_SCU_LOG_NAME[PATHMAX];
 extern char CURRENT_KERNEL_CMDLINE[PATHMAX];
 extern int gmaxfiles;
+extern bool pytimechartrecord_filepresent;
 
 #endif /* __CRASHLOGD_H__ */
 
