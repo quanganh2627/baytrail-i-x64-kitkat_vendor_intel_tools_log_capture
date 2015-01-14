@@ -350,7 +350,7 @@ static char *priv_raise_event(char *event, char *type, char *subtype, char *log,
 
     /* Notify CrashReport except for UIWDT events */
     if (strncmp(type, SYSSERVER_EVNAME, sizeof(SYSSERVER_EVNAME))) {
-            notify_crashreport();
+		//notify_crashreport();
     }
     return strdup(key);
 }
