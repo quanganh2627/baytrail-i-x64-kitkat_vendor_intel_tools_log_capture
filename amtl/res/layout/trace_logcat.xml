@@ -1,0 +1,76 @@
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="fill_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="10dp" >
+
+    <TextView
+        android:id="@+id/textViewEnterPath"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:textSize="20sp"
+        android:text="@string/text_section_general" />
+
+    <Switch
+        android:id="@+id/logcatKernel"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:paddingLeft="10dp"
+        android:text="@string/text_switch_kernel"
+        android:textSize="18sp"
+        android:textColor="#000000"
+        android:textOff="OFF"
+        android:textOn="ON"
+        android:checked="false" />
+
+    <Switch
+        android:id="@+id/logcatMain"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:paddingLeft="10dp"
+        android:text="@string/text_switch_main"
+        android:textSize="18sp"
+        android:textColor="#000000"
+        android:textOff="OFF"
+        android:textOn="ON"
+        android:checked="false" />
+
+    <Switch
+        android:id="@+id/logcatRadio"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:paddingLeft="10dp"
+        android:text="@string/text_switch_radio"
+        android:textSize="18sp"
+        android:textColor="#000000"
+        android:textOff="OFF"
+        android:textOn="ON"
+        android:checked="false" />
+
+    <Switch
+        android:id="@+id/logcatEvent"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:paddingLeft="10dp"
+        android:text="@string/text_switch_event"
+        android:textSize="18sp"
+        android:textColor="#000000"
+        android:textOff="OFF"
+        android:textOn="ON"
+        android:checked="false" />
+
+    <Switch
+        android:id="@+id/logcatSystem"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:paddingLeft="10dp"
+        android:text="@string/text_switch_system"
+        android:textSize="18sp"
+        android:textColor="#000000"
+        android:textOff="OFF"
+        android:textOn="ON"
+        android:checked="false" />
+
+</LinearLayout>

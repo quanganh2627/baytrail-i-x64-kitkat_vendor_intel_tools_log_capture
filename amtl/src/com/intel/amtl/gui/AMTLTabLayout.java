@@ -21,20 +21,26 @@
 package com.intel.amtl.gui;
 
 import android.app.Activity;
+import android.app.AlarmManager;
 import android.app.Application;
 import android.app.DialogFragment;
 import android.app.Fragment;
 import android.app.FragmentManager;
 import android.app.FragmentTransaction;
+import android.app.PendingIntent;
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.AsyncTask;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
-import android.os.Bundle;
+import android.os.SystemProperties;
+import android.preference.PreferenceManager;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ProgressBar;
@@ -48,8 +54,10 @@ import com.intel.amtl.config_parser.ConfigParser;
 import com.intel.amtl.exceptions.ModemControlException;
 import com.intel.amtl.exceptions.ParsingException;
 import com.intel.amtl.helper.TelephonyStack;
-import com.intel.amtl.models.config.ModemConf;
+import com.intel.amtl.models.config.ExpertConfig;
 import com.intel.amtl.models.config.LogOutput;
+import com.intel.amtl.models.config.ModemConf;
+import com.intel.amtl.models.config.ModemLogOutput;
 import com.intel.amtl.modem.Gsmtty;
 import com.intel.amtl.modem.GsmttyManager;
 import com.intel.amtl.modem.ModemController;
@@ -61,6 +69,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.List;
 
 import org.xmlpull.v1.XmlPullParserException;
 
@@ -68,23 +77,21 @@ import org.xmlpull.v1.XmlPullParserException;
 // As this is spread through the classes, here the summary of the
 // stored data:
 // @index (int) the current executed configuration
-// @log_active (boolean) indicates if logging is active
-// @cpuName (string) the platform CPU name
-// @modemName (string) the platform modem name
 // @default_flush_cmd (string) if populated, the command to execute to flush to NVM
 
 public class AMTLTabLayout extends Activity implements GeneralSetupFrag.GSFCallBack,
-        ExpertSetupFrag.OnExpertModeApplied, ExpertSetupFrag.OnModeChanged,
-        MasterSetupFrag.OnModeChanged, GeneralSetupFrag.OnModeChanged {
+        MasterSetupFrag.OnModeChanged, LogcatTraces.OnLogcatTraceModeApplied,
+        SystemStatsTraces.OnSystemStatsTraceModeApplied {
 
-    private final String TAG = AMTLApplication.getAMTLApp().getLogTag();
+    private final String TAG = "AMTL";
     private final String MODULE = "AMTLTabLayout";
     private final String MDM_CONNECTION_TAG = "AMTL_modem_connection";
+    private final static String EXPERT_PROPERTY = "persist.service.amtl.expert";
 
     // Tab list
-    private final String TAB1_FRAG_NAME = "General setup";
+    private final String TAB1_FRAG_NAME = "Modem setup";
     private final String TAB2_FRAG_NAME = "Advanced options";
-    private final String TAB3_FRAG_NAME = "Expert options";
+    private final String TAB3_FRAG_NAME = "Android Log";
 
     private String currentCatalogPath = null;
 
@@ -95,11 +102,20 @@ public class AMTLTabLayout extends Activity implements GeneralSetupFrag.GSFCallB
 
     private GeneralSetupFrag tab1_frag;
     private MasterSetupFrag tab2_frag;
-    private ExpertSetupFrag tab3_frag;
+    private LogcatTraceFrag tab3_frag;
+    private ActionMenu actionMenu;
 
     private ConfigParser configParser = null;
     private ArrayList<LogOutput> configOutputs = null;
-    private ModemConf expertModemConf = null;
+    private ArrayList<ModemLogOutput> modemConfigOutputs = null;
+    private static ArrayList<String> modemNames;
+    private static ExpertConfig expConf;
+    private static ModemConf generalModemConf = null;
+    private static GeneralTracing logcatTraces = null;
+    private static GeneralTracing modemTraces = null;
+    private static GeneralTracing systemStatsTraces = null;
+
+    private MenuItem settingsMenu;
 
     // Fragment to display progress dialog during modem connection
     private ModemConnectionFrag mdmConnectFrag = null;
@@ -110,8 +126,9 @@ public class AMTLTabLayout extends Activity implements GeneralSetupFrag.GSFCallB
     private Platform platform = null;
 
     private Boolean buttonChanged = false;
-
     private Boolean firstCreated = true;
+
+    private static int currentLoggingModem = 0;
 
     // Telephony stack check - in order to enable it if disabled
     private TelephonyStack telStackSetter;
@@ -120,30 +137,49 @@ public class AMTLTabLayout extends Activity implements GeneralSetupFrag.GSFCallB
         FileInputStream fin = null;
         SharedPreferences.Editor editor = this.getSharedPreferences("AMTLPrefsData",
                 Context.MODE_PRIVATE).edit();
+        SharedPreferences prefs = this.getSharedPreferences("AMTLPrefsData", Context.MODE_PRIVATE);
         Log.d(TAG, MODULE + ": Will remove default_flush_cmd entry.");
         editor.remove("default_flush_cmd");
         editor.commit();
 
         try {
             // Use of getXmlPlatform
+            AMTLApplication.setModemChanged(false);
             this.platform = new Platform();
             this.currentCatalogPath = this.platform.getPlatformConf();
 
-            Log.d(TAG, MODULE + ": Will load " + this.currentCatalogPath +
-                    " configuration file");
+            Log.d(TAG, MODULE + ": Will load " + this.currentCatalogPath + " configuration file");
             fin = new FileInputStream(this.currentCatalogPath);
+
             if (fin != null) {
-                this.configOutputs = this.configParser.parseConfig(fin);
-                Log.d(TAG, MODULE + ": Configuration loaded:");
-                Log.d(TAG, MODULE + ": =======================================");
-                for (LogOutput o: configOutputs) {
-                    o.printToLog();
-                    Log.d(TAG, MODULE + ": ---------------------------------------");
+                this.modemConfigOutputs
+                        = new ArrayList<ModemLogOutput>(this.configParser.parseConfig(fin));
+                String curModem = PreferenceManager.getDefaultSharedPreferences(this)
+                        .getString(this.getString(R.string.settings_modem_name_key), "0");
+                currentLoggingModem = Integer.parseInt(curModem);
+                modemNames = new ArrayList<String>();
+
+                for (ModemLogOutput m: modemConfigOutputs) {
+                    modemNames.add(modemConfigOutputs.indexOf(m), m.getName());
                 }
-                Log.d(TAG, MODULE +  ": =======================================");
+
+                AMTLApplication.setModemNameList(modemNames);
+
+                ModemLogOutput currModemLogOut = new ModemLogOutput();
+                currModemLogOut = modemConfigOutputs.get(currentLoggingModem);
+                if (currModemLogOut != null) {
+                    currModemLogOut.printToLog();
+                    configOutputs = new ArrayList<LogOutput>();
+                    configOutputs.addAll(currModemLogOut.getOutputList());
+                    setModemParameters(currModemLogOut);
+                }
             }
-        } catch (Exception ex) {
-             throw new ParsingException("Cannot load config file " + ex.getMessage());
+        } catch (FileNotFoundException ex) {
+            throw new ParsingException("Cannot load config file " + ex.getMessage());
+        } catch (XmlPullParserException ex) {
+            throw new ParsingException("Cannot load config file " + ex.getMessage());
+        } catch (IOException ex) {
+            throw new ParsingException("Cannot load config file " + ex.getMessage());
         } finally {
             if (fin != null) {
                 try {
@@ -155,8 +191,25 @@ public class AMTLTabLayout extends Activity implements GeneralSetupFrag.GSFCallB
         }
     }
 
+    private void setModemParameters(ModemLogOutput mdmLogOutput) {
+        AMTLApplication.setModemConnectionId(mdmLogOutput.getConnectionId());
+        AMTLApplication.setDefaultConf(mdmLogOutput.getDefaultConfig());
+        AMTLApplication.setModemInterface(mdmLogOutput.getModemInterface());
+        AMTLApplication.setTraceLegacy(mdmLogOutput.getAtLegacyCmd());
+        AMTLApplication.setServiceToStart(mdmLogOutput.getServiceToStart());
+    }
+
     public void initializeTab() {
-        TabHost.TabSpec spec = mTabHost.newTabSpec(TAB1_FRAG_NAME);
+        TabHost.TabSpec spec = mTabHost.newTabSpec(TAB3_FRAG_NAME);
+        spec.setContent(new TabHost.TabContentFactory() {
+            public View createTabContent(String tag) {
+                return findViewById(android.R.id.tabcontent);
+            }
+        });
+        spec.setIndicator(createTabView(TAB3_FRAG_NAME));
+        mTabHost.addTab(spec);
+
+        spec = mTabHost.newTabSpec(TAB1_FRAG_NAME);
         spec.setContent(new TabHost.TabContentFactory() {
             public View createTabContent(String tag) {
                 return findViewById(android.R.id.tabcontent);
@@ -174,25 +227,17 @@ public class AMTLTabLayout extends Activity implements GeneralSetupFrag.GSFCallB
         spec.setIndicator(createTabView(TAB2_FRAG_NAME));
         mTabHost.addTab(spec);
 
-        spec = mTabHost.newTabSpec(TAB3_FRAG_NAME);
-        spec.setContent(new TabHost.TabContentFactory() {
-            public View createTabContent(String tag) {
-                return findViewById(android.R.id.tabcontent);
-            }
-        });
-        spec.setIndicator(createTabView(TAB3_FRAG_NAME));
-        mTabHost.addTab(spec);
-
         // Focus on first tab
-        mTabHost.setCurrentTab(0);
+        mTabHost.setCurrentTab(1);
     }
 
     TabHost.OnTabChangeListener listener = new TabHost.OnTabChangeListener() {
         public void onTabChanged(String tabId) {
+            if (AMTLApplication.getModemChanged()) {
+                firstCreated = true;
+            }
             if (tabId.equals(TAB1_FRAG_NAME)) {
                 pushFragments(tabId, tab1_frag);
-                tab1_frag.setExpertConf(expertModemConf);
-                tab1_frag.setButtonChanged(buttonChanged);
                 tab1_frag.setFirstCreated(firstCreated);
             } else if (tabId.equals(TAB2_FRAG_NAME)) {
                 pushFragments(tabId, tab2_frag);
@@ -200,6 +245,7 @@ public class AMTLTabLayout extends Activity implements GeneralSetupFrag.GSFCallB
             } else if(tabId.equals(TAB3_FRAG_NAME)) {
                 pushFragments(tabId, tab3_frag);
             }
+
             firstCreated = false;
         }
     };
@@ -245,14 +291,25 @@ public class AMTLTabLayout extends Activity implements GeneralSetupFrag.GSFCallB
                 this.loadConfiguration();
 
             } catch (ParsingException ex) {
-                UIHelper.exitDialog(this,
-                        "Error during XML configuration file parsing ", "AMTL will exit: "
+                Log.e(TAG, MODULE + "Error during XML configuration file parsing: "
                         + ex.getMessage());
             }
             this.firstCreated = true;
-            tab1_frag = new GeneralSetupFrag(this.configOutputs);
+            expConf = new ExpertConfig(this);
+            tab1_frag = new GeneralSetupFrag(this.configOutputs, expConf,
+                    modemNames.get(currentLoggingModem));
             tab2_frag = new MasterSetupFrag();
-            tab3_frag = new ExpertSetupFrag();
+            tab3_frag = new LogcatTraceFrag();
+            actionMenu = new ActionMenu(this);
+            modemTraces = new ModemTraces(this, tab1_frag);
+            logcatTraces = new LogcatTraces(this);
+
+            ViewGroup inclusionViewGroup = (ViewGroup) this.findViewById(android.R.id.content)
+                    .findViewById(R.id.actionmenubar);
+            View child = getLayoutInflater().inflate(actionMenu.getViewID(), null);
+            inclusionViewGroup.addView(child);
+            actionMenu.attachReferences(this.findViewById(android.R.id.content));
+            actionMenu.attachListeners();
 
             mTabHost = (TabHost)findViewById(android.R.id.tabhost);
             if (mTabHost != null) {
@@ -299,20 +356,41 @@ public class AMTLTabLayout extends Activity implements GeneralSetupFrag.GSFCallB
         super.onResume();
         AMTLApplication.setPauseState(false);
         try {
-            if (this.mdmCtrl != null) {
-                this.mdmCtrl.acquireResource();
-                if (this.mdmCtrl.isModemAcquired()) {
-                    this.mdmCtrl.openTty();
+            String curModem = PreferenceManager.getDefaultSharedPreferences(this)
+                    .getString(this.getString(R.string.settings_modem_name_key), "0");
+            int readModem = Integer.parseInt(curModem);
+            if (readModem != currentLoggingModem) {
+                currentLoggingModem = readModem;
+                AMTLApplication.setModemChanged(true);
+
+                if (this.mdmCtrl != null) {
+                    this.mdmCtrl.cleanBeforeExit();
+                    this.mdmCtrl = null;
+                }
+
+                // If the modem has changed, exit and start AMTL again
+                Intent startActivity = getIntent();
+                int pendingIntentId = 123456;
+                PendingIntent pendingIntent = PendingIntent.getActivity(this, pendingIntentId,
+                        startActivity, PendingIntent.FLAG_CANCEL_CURRENT);
+                AlarmManager mgr = (AlarmManager) this.getSystemService(Context.ALARM_SERVICE);
+                mgr.set(AlarmManager.RTC, System.currentTimeMillis() + 1, pendingIntent);
+                finish();
+
+            } else {
+                if (this.mdmCtrl != null) {
+                    this.mdmCtrl.acquireResource();
+                    if (this.mdmCtrl.isModemAcquired() && this.mdmCtrl.isModemUp()) {
+                        this.mdmCtrl.openTty();
+                    }
                 }
             }
         } catch (MmgrClientException ex) {
             Log.e(TAG, MODULE + ": Cannot acquire modem resource " + ex);
-            UIHelper.exitDialog(this,
-                    "Cannot acquire modem resource ", "AMTL will exit: " + ex);
+            UIHelper.exitDialog(this,"Cannot acquire modem resource", "AMTL will exit: " + ex);
         } catch (ModemControlException ex) {
             Log.e(TAG, MODULE + ex);
-            UIHelper.exitDialog(this,
-                    "Cannot open tty ", "AMTL will exit: " + ex);
+            UIHelper.exitDialog(this, "Cannot open tty", "AMTL will exit: " + ex);
         }
     }
 
@@ -331,33 +409,46 @@ public class AMTLTabLayout extends Activity implements GeneralSetupFrag.GSFCallB
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
-        getMenuInflater().inflate(R.menu.main, menu);
+        settingsMenu = menu.add(R.string.settings_menu);
+        super.onCreateOptionsMenu(menu);
         return true;
     }
 
     @Override
-    public void onConfigurationApplied(int resultCode) {
-
-        if (resultCode == Activity.RESULT_OK) {
-            Toast.makeText(this, "Configuration applied to modem.", Toast.LENGTH_LONG).show();
+    public boolean onOptionsItemSelected(MenuItem item) {
+        if (item.equals(settingsMenu)) {
+            Intent intent = new Intent(getApplicationContext(), AMTLSettings.class);
+            intent.putStringArrayListExtra("modem", modemNames);
+            startActivity(intent);
+            return true;
         }
-        if (resultCode == Activity.RESULT_CANCELED) {
-            Toast.makeText(this, "Configuration failure, please check logs.",
-                    Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "Clicked on something", Toast.LENGTH_LONG).show();
+        return super.onOptionsItemSelected(item);
+    }
+
+    @Override
+    public void onLogcatTraceConfApplied(GeneralTracing conf) {
+        if (conf != null) {
+            this.logcatTraces = conf;
         }
     }
 
     @Override
-    public void onExpertConfApplied(ModemConf conf) {
-        if (conf != null) {
-            this.expertModemConf = conf;
-        }
+    public void onGeneralConfApplied(ModemConf conf) {
+        this.generalModemConf = conf;
     }
 
     @Override
     public void onModeChanged(Boolean changed) {
         if (changed != null) {
             this.buttonChanged = changed;
+        }
+    }
+
+    @Override
+    public void onSystemStatsTraceConfApplied(GeneralTracing conf) {
+        if (conf != null) {
+            this.systemStatsTraces = conf;
         }
     }
 
@@ -514,5 +605,21 @@ public class AMTLTabLayout extends Activity implements GeneralSetupFrag.GSFCallB
                 }
             }
         }
+    }
+
+    public static ModemConf getModemConfiguration() {
+        if (expConf.getExpertConf() != null && expConf.isConfigSet()) {
+            SystemProperties.set(EXPERT_PROPERTY + modemNames.get(currentLoggingModem), "1");
+            return expConf.getExpertConf();
+        } else {
+            return generalModemConf;
+        }
+    }
+
+    public static List < GeneralTracing > getActiveTraces() {
+        List < GeneralTracing > tracers = new ArrayList < GeneralTracing > ();
+        tracers.add(logcatTraces);
+        tracers.add(modemTraces);
+        return tracers;
     }
 }

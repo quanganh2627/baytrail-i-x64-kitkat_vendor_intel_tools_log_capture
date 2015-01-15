@@ -1,6 +1,6 @@
 /* Android AMTL
  *
- * Copyright (C) Intel 2014
+ * Copyright (C) Intel 2015
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,14 +21,14 @@ package com.intel.amtl.modem;
 import com.intel.amtl.exceptions.ModemControlException;
 import com.intel.amtl.models.config.ModemConf;
 
-public class ModemControllerV1 extends ModemController{
+public class TraceLegacyController extends ModemController {
 
-    public ModemControllerV1() throws ModemControlException {
+    public TraceLegacyController() throws ModemControlException {
         super();
     }
 
     @Override
-    public boolean queryTraceState() throws ModemControlException {
+    public boolean queryTraceState()throws ModemControlException {
         return checkAtTraceState().equals("1");
     }
 
@@ -37,33 +37,23 @@ public class ModemControllerV1 extends ModemController{
         return sendAtCommand("AT+TRACE=0\r\n");
     }
 
-
     @Override
-    public void confApplyFinalize() throws ModemControlException {
-        restartModem();
-    }
-
-    @Override
-    public String switchTrace(ModemConf mdmConf)
-            throws ModemControlException {
-        return sendAtCommand(mdmConf.getTrace());
+    public void switchTrace(ModemConf mdmConf) throws ModemControlException {
+        sendAtCommand(mdmConf.getTrace());
+        sendAtCommand(mdmConf.getXsystrace());
     }
 
     @Override
-    public String flush(ModemConf mdmConf) throws ModemControlException {
-        return sendAtCommand(mdmConf.getFlCmd());
-    }
-
-    @Override
-    public String confTraceAndModemInfo(ModemConf mdmconf) throws ModemControlException {
-        return "";
-    }
-
-    public String checkOct() throws ModemControlException {
-        return "";
-    }
-
     public String checkAtTraceState() throws ModemControlException {
         return getCmdParser().parseTraceResponse(sendAtCommand("at+trace?\r\n"));
+    }
+
+    @Override
+    public ModemConf getNoLoggingConf() {
+        ModemConf noLoggingConf = ModemConf.getInstance("", "AT+TRACE=0\r\n", "AT+XSYSTRACE=0\r\n",
+                "", "");
+        noLoggingConf.setIndex(-1);
+
+        return noLoggingConf;
     }
 }

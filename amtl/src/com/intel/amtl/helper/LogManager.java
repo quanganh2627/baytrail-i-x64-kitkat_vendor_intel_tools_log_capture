@@ -20,8 +20,6 @@
 
 package com.intel.amtl.helper;
 
-import com.intel.amtl.AMTLApplication;
-
 import android.os.FileObserver;
 import android.util.Log;
 
@@ -39,7 +37,7 @@ import java.util.Date;
 
 public class LogManager extends FileObserver {
 
-    private final String TAG = AMTLApplication.getAMTLApp().getLogTag();
+    private final String TAG = "AMTL";
     private final String MODULE = "LogManager";
     private final String APTRIGGER = "/logs/aplogs/aplog_trigger";
     private final String NBAPFILE = "10";
@@ -145,11 +143,11 @@ public class LogManager extends FileObserver {
         }
     }
 
-    public synchronized boolean makeBackup() {
-        // Create tagged snapshot folder
-        SimpleDateFormat df = new SimpleDateFormat("yyyyMMdd_HHmmss");
-        String fdf = df.format(new Date());
-        this.snapPath = backupPath + this.tag + "_" + fdf + "/";
+    public synchronized boolean makeBackup(String path, boolean requestApplogs) {
+        if (path == null || path.length() == 0)
+            return false;
+
+        this.snapPath = path;
         File file = new File(snapPath);
         if ((!file.exists()) && (!file.mkdirs())) {
             return false;
@@ -158,6 +156,9 @@ public class LogManager extends FileObserver {
         // Do bplog copy
         this.doLogCopy("bplog", this.bplogPath);
 
+        if (!requestApplogs) {
+            return true;
+        }
         // Activate the watcher, this allow us to get the created aplog folder by crashlogger.
         this.startWatching();
 
@@ -167,6 +168,14 @@ public class LogManager extends FileObserver {
         }
 
         return true;
+    }
+
+    public synchronized boolean makeBackup() {
+        // Create tagged snapshot folder
+        SimpleDateFormat df = new SimpleDateFormat("yyyyMMdd_HHmmss");
+        String fdf = df.format(new Date());
+
+        return (makeBackup(backupPath + this.tag + "_" + fdf + "/", true));
     }
 
     @Override

@@ -71,15 +71,15 @@
                 android:layout_height="fill_parent">
 
                 <TextView
-                    android:id="@+id/master_digrf"
+                    android:id="@+id/master_digrfx"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginRight="50dp"
-                    android:text="@string/master_digrf_txt"
+                    android:layout_marginRight="38dp"
+                    android:text="@string/master_digrfx_txt"
                     android:textAppearance="?android:attr/textAppearanceMedium" />
 
                 <Spinner
-                    android:id="@+id/spinner_digrf"
+                    android:id="@+id/spinner_digrfx"
                     android:enabled="false"
                     android:layout_width="fill_parent"
                     android:layout_height="wrap_content" />
@@ -91,15 +91,15 @@
                 android:layout_height="fill_parent">
 
                 <TextView
-                    android:id="@+id/master_digrfx"
+                    android:id="@+id/master_digrfx2"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginRight="40dp"
-                    android:text="@string/master_digrfx_txt"
+                    android:layout_marginRight="28dp"
+                    android:text="@string/master_digrfx2_txt"
                     android:textAppearance="?android:attr/textAppearanceMedium" />
 
                 <Spinner
-                    android:id="@+id/spinner_digrfx"
+                    android:id="@+id/spinner_digrfx2"
                     android:enabled="false"
                     android:layout_width="fill_parent"
                     android:layout_height="wrap_content" />
@@ -134,7 +134,7 @@
                     android:id="@+id/master_3g_dsp"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginRight="35dp"
+                    android:layout_marginRight="38dp"
                     android:text="@string/master_3g_dsp_txt"
                     android:textAppearance="?android:attr/textAppearanceMedium" />
 
@@ -145,11 +145,51 @@
                     android:layout_height="wrap_content" />
             </TableRow>
 
+            <TableRow
+                android:layout_marginTop="20dp"
+                android:layout_width="fill_parent"
+                android:layout_height="fill_parent">
+
+                <TextView
+                    android:id="@+id/master_tdscdma_l1_sw"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginRight="10dp"
+                    android:text="@string/master_tdscdma_l1_sw_txt"
+                    android:textAppearance="?android:attr/textAppearanceMedium" />
+
+                <Spinner
+                    android:id="@+id/spinner_tdscdma_l1_sw"
+                    android:enabled="false"
+                    android:layout_width="fill_parent"
+                    android:layout_height="wrap_content" />
+            </TableRow>
+
+            <TableRow
+                android:layout_marginTop="20dp"
+                android:layout_width="fill_parent"
+                android:layout_height="fill_parent">
+
+                <TextView
+                    android:id="@+id/master_sig_mon"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginRight="28dp"
+                    android:text="@string/master_sig_mon_txt"
+                    android:textAppearance="?android:attr/textAppearanceMedium" />
+
+                <Spinner
+                    android:id="@+id/spinner_sig_mon"
+                    android:enabled="false"
+                    android:layout_width="fill_parent"
+                    android:layout_height="wrap_content" />
+            </TableRow>
+
             <Button
                 android:id="@+id/applyMasterConfButton"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:layout_marginTop="25dp"
+                android:layout_marginTop="28dp"
                 android:layout_gravity="center_horizontal"
                 android:enabled="false"
                 android:text="@string/apply_conf_text" />

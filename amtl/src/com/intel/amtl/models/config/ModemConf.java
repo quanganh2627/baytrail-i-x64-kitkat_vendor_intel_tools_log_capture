@@ -20,80 +20,44 @@
 
 package com.intel.amtl.models.config;
 
-import java.lang.reflect.Constructor;
-
-import android.os.Bundle;
 import android.util.Log;
 
 import com.intel.amtl.AMTLApplication;
-import com.intel.amtl.exceptions.ModemConfException;
 import com.intel.amtl.mts.MtsConf;
 
 public abstract class ModemConf {
 
-    private static final String TAG = AMTLApplication.getAMTLApp().getLogTag();
+    private static final String TAG = "AMTL";
     private static final String MODULE = "ModemConf";
-
-    public static final String KEY_XSIO = "xsio";
-    public static final String KEY_TRACE = "trace";
-    public static final String KEY_XSYSTRACE = "xsystrace";
-    public static final String KEY_MTSMODE = "mtsmode";
-    public static final String KEY_FLCMD = "flcmd";
-    public static final String KEY_OCTMODE = "octmode";
-    public static final int INIT_TRACE_OFF = 0;
-
     private String atXsio = "";
-    private String atTrace = "";
     private String atXsystrace = "";
     private String mtsMode = "";
     private String flCmd = "";
+    private String octMode = "";
     private boolean mtsRequired = false;
     private int confIndex = -1;
 
     private LogOutput config = null;
     private MtsConf mtsConf = null;
 
-    private String octMode = "";
+    protected String atTrace = "";
 
-    public abstract boolean confTraceOutput();
-    public abstract boolean confTraceEnable();
+    public abstract boolean confTraceEnabled();
+    public abstract void activateConf(boolean activate);
 
-    public synchronized static ModemConf getInstance(LogOutput config)
-                throws ModemConfException{
-        ModemConf mdmConf = null;
-        String className = AMTLApplication.getAMTLApp()
-                .getModemConClassName();
-
-        try {
-            Class <?> c = Class.forName(className);
-            final Constructor<?> constructor = c.getConstructor(LogOutput.class);
-            mdmConf = (ModemConf)constructor.newInstance(config);
-        } catch(Exception e) {
-            throw new ModemConfException("Cannot create the class successfully");
-        }
-
-        return mdmConf;
+    public synchronized static ModemConf getInstance(LogOutput config) {
+        return (AMTLApplication.getTraceLegacy())
+                ? new TraceLegacyModemConf(config) : new OctModemConf(config);
     }
 
-    public synchronized static ModemConf getInstance(Bundle bundle)
-            throws ModemConfException{
-        ModemConf mdmConf = null;
-        String className = AMTLApplication.getAMTLApp()
-                .getModemConClassName();
-
-        try {
-            Class <?> c = Class.forName(className);
-            final Constructor<?> constructor = c.getConstructor(Bundle.class);
-            mdmConf = (ModemConf)constructor.newInstance(bundle);
-        } catch(Exception e) {
-            throw new ModemConfException("Cannot create the class successfully");
-        }
-
-        return mdmConf;
+    public synchronized static ModemConf getInstance(String xsio, String trace, String xsystrace,
+            String flcmd, String octMode) {
+        return (AMTLApplication.getTraceLegacy())
+                ? new TraceLegacyModemConf(xsio, trace, xsystrace, flcmd, octMode)
+                : new OctModemConf(xsio, trace, xsystrace, flcmd, octMode);
     }
 
-
-    protected ModemConf(LogOutput config) {
+    public ModemConf(LogOutput config) {
         this.config = config;
         this.confIndex = this.config.getIndex();
         this.atXsystrace = "AT+XSYSTRACE=1," + this.config.concatMasterPort();
@@ -135,24 +99,25 @@ public abstract class ModemConf {
         this.atXsystrace += "\r\n";
         if (!this.atXsio.equals("")) {
             this.mtsMode = this.config.getMtsMode();
-            this.mtsConf = new MtsConf(this.config.getMtsInput(),
-                    this.config.getMtsOutput(), this.config.getMtsOutputType(),
-                    this.config.getMtsRotateNum(),
-                    this.config.getMtsRotateSize(),
-                    this.config.getMtsInterface(),
+            this.mtsConf = new MtsConf(this.config.getMtsInput(), this.config.getMtsOutput(),
+                    this.config.getMtsOutputType(), this.config.getMtsRotateNum(),
+                    this.config.getMtsRotateSize(), this.config.getMtsInterface(),
                     this.config.getMtsBufferSize());
         } else {
             this.mtsConf = new MtsConf();
         }
     }
 
-    public ModemConf(Bundle bundle) {
-        this.octMode = "";
-        this.atTrace = "";
-        this.atXsio = bundle.getString(ModemConf.KEY_XSIO);
-        this.atXsystrace = bundle.getString(ModemConf.KEY_XSYSTRACE);
-        this.flCmd = bundle.getString(ModemConf.KEY_FLCMD);
+    public ModemConf(String xsio, String trace, String xsystrace, String flcmd, String octMode) {
+        this.atTrace = trace;
+        this.atXsio = xsio;
+        this.atXsystrace = xsystrace;
+        this.flCmd = flcmd;
         this.confIndex = -1;
+        this.mtsConf = new MtsConf();
+        if (!octMode.equals("")) {
+            this.octMode = octMode;
+        }
     }
 
     public void setMtsConf (MtsConf conf) {
@@ -165,56 +130,28 @@ public abstract class ModemConf {
         return this.mtsConf;
     }
 
-    public void setXsio(String xsio) {
-        this.atXsio = xsio;
-    }
-
     public String getXsio() {
         return this.atXsio;
-    }
-
-    public void setTrace(String trace) {
-        this.atTrace = trace;
     }
 
     public String getTrace() {
         return this.atTrace;
     }
 
-    public void setXsystrace(String xsystrace) {
-        this.atXsystrace = xsystrace;
-    }
-
     public String getXsystrace() {
         return this.atXsystrace;
-    }
-
-    public void setFlcmd(String flcmd) {
-        if (flcmd == null) {
-            this.flCmd = "";
-        } else {
-            this.flCmd = flcmd;
-        }
     }
 
     public String getFlCmd() {
         return this.flCmd;
     }
 
-    public void setIndex(int index) {
-        this.confIndex = index;
-    }
-
     public int getIndex() {
         return this.confIndex;
     }
 
-    public void activateConf(boolean activate) {
-        if (activate) {
-            this.atTrace = "AT+TRACE=1\r\n";
-        } else {
-            this.atTrace = "AT+TRACE=0\r\n";
-        }
+    public void setIndex(int index) {
+        this.confIndex = index;
     }
 
     public String getMtsMode() {

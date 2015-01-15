@@ -19,18 +19,15 @@
 
 package com.intel.amtl.modem;
 
-import com.intel.amtl.AMTLApplication;
-
 import android.util.Log;
 
 public class Gsmtty {
 
-    private final String TAG = AMTLApplication.getAMTLApp().getLogTag();
+    private final String TAG = "AMTL";
     private final String MODULE = "Gsmtty";
     private int ttySerialFd = -1;
     private int baudrate = 115200;
     private String ttyName = "";
-    private String mNativeTag = TAG;
 
     /* Load Amtl JNI library */
     static {

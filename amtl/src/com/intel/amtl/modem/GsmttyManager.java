@@ -19,6 +19,8 @@
 
 package com.intel.amtl.modem;
 
+import android.util.Log;
+
 import com.intel.amtl.AMTLApplication;
 import com.intel.amtl.exceptions.ModemControlException;
 
@@ -26,11 +28,9 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 
-import android.util.Log;
-
 public class GsmttyManager implements Closeable {
 
-    private final String TAG = AMTLApplication.getAMTLApp().getLogTag();
+    private final String TAG = "AMTL";
     private final String MODULE = "GsmttyManager";
     private RandomAccessFile file = null;
     private Gsmtty gsmtty = null;
@@ -51,7 +51,7 @@ public class GsmttyManager implements Closeable {
     }
 
     private String getTtyFileName() {
-        return AMTLApplication.getAMTLApp().getTtyFileName();
+        return AMTLApplication.getModemInterface();
     }
 
     public void writeToModemControl(String atCommand) throws ModemControlException {
@@ -61,7 +61,7 @@ public class GsmttyManager implements Closeable {
             Log.i(TAG, MODULE + ": sending to modem " + atCommand);
         }
         catch (IOException ex) {
-            throw new ModemControlException("Unable to send to AT command to the modem.");
+            throw new ModemControlException("Unable to send to AT command to the modem. " + ex);
         }
     }
 

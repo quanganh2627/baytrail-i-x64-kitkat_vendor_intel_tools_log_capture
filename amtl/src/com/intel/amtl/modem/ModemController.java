@@ -40,60 +40,48 @@ import com.intel.internal.telephony.ModemStatusManager;
 import java.io.Closeable;
 import java.io.IOException;
 import java.lang.Object;
-import java.lang.reflect.Constructor;
 import java.util.ArrayList;
 
 
 public abstract class ModemController implements ModemEventListener, Closeable {
 
-    private final String TAG = AMTLApplication.getAMTLApp().getLogTag();
+    private final String TAG = "AMTL";
     private final String MODULE = "ModemController";
 
     private GsmttyManager ttyManager;
     private ModemStatusManager modemStatusManager;
     private static ModemStatus currentModemStatus = ModemStatus.NONE;
-    private static ModemController mdmCtrl = null;
+    private static ModemController mdmCtrl;
     private static boolean modemAcquired = false;
     private CommandParser cmdParser;
     private ArrayList<Master> masterArray;
     private boolean firstAcquire = true;
+    private ModemConf noLoggingConf = null;
 
     public abstract boolean queryTraceState() throws ModemControlException;
-    public abstract String switchTrace(ModemConf mdmconf)throws ModemControlException;
-    public abstract String flush(ModemConf mdmconf)throws ModemControlException;
     public abstract String switchOffTrace()throws ModemControlException;
-    public abstract String confTraceAndModemInfo(ModemConf mdmconf) throws ModemControlException;
-    public abstract void confApplyFinalize()throws ModemControlException;
-    public abstract String checkOct() throws ModemControlException;
+    public abstract void switchTrace(ModemConf mdmconf)throws ModemControlException;
     public abstract String checkAtTraceState() throws ModemControlException;
+    public abstract ModemConf getNoLoggingConf();
 
     public ModemController() throws ModemControlException {
 
         try {
-            this.modemStatusManager = AMTLApplication.getAMTLApp().getModemStatusManager();
+            this.modemStatusManager = ModemStatusManager
+                    .getInstance(AMTLApplication.getModemConnectionId());
             cmdParser = new CommandParser();
         } catch (InstantiationException ex) {
             throw new ModemControlException("Cannot instantiate Modem Status Manager");
         }
     }
 
-    public synchronized static ModemController getInstance()
-            throws ModemControlException{
-        if (mdmCtrl != null) {
-            return mdmCtrl;
+    /* Get a reference of ModemController: singleton design pattern */
+    public static ModemController getInstance() throws ModemControlException {
+
+        if (null == mdmCtrl) {
+            mdmCtrl = (AMTLApplication.getTraceLegacy())
+                    ? new TraceLegacyController() : new OctController();
         }
-
-        String className = AMTLApplication.getAMTLApp()
-                .getModemCtlClassName();
-
-        try {
-            Class<?> c = Class.forName(className);
-            final Constructor<?> constructor = c.getConstructor();
-            mdmCtrl = (ModemController)constructor.newInstance();
-        } catch(Exception e) {
-            throw new ModemControlException("Cannot create the class successfully");
-        }
-
         return mdmCtrl;
     }
 
@@ -108,8 +96,7 @@ public abstract class ModemController implements ModemEventListener, Closeable {
             }
             try {
                 Log.d(TAG, MODULE + ": Connecting to Modem Status Manager");
-                this.modemStatusManager.connect(AMTLApplication.getAMTLApp()
-                       .getAppName());
+                this.modemStatusManager.connect("AMTL");
             } catch (MmgrClientException ex) {
                 throw new ModemControlException("Cannot connect to Modem Status Manager " + ex);
             }
@@ -151,6 +138,10 @@ public abstract class ModemController implements ModemEventListener, Closeable {
                 }
                 this.ttyManager.writeToModemControl(command);
 
+              // the AT command AT+XLOG=4 doesn't return anything
+                if (command.equals("AT+XLOG=4\r\n")) {
+                    return "OK";
+                }
                 ret = "";
                 do {
                     //Response may return in two lines.
@@ -166,6 +157,14 @@ public abstract class ModemController implements ModemEventListener, Closeable {
         return ret;
     }
 
+    public String flush(ModemConf mdmConf) throws ModemControlException {
+        return sendAtCommand(mdmConf.getFlCmd());
+    }
+
+    public String confTraceAndModemInfo(ModemConf mdmConf) throws ModemControlException {
+        return sendAtCommand(mdmConf.getXsio());
+    }
+
     public String checkAtXsioState() throws ModemControlException {
         return cmdParser.parseXsioResponse(sendAtCommand("at+xsio?\r\n"));
     }
@@ -177,6 +176,14 @@ public abstract class ModemController implements ModemEventListener, Closeable {
     public ArrayList<Master> checkAtXsystraceState(ArrayList<Master> masterList)
             throws ModemControlException {
         return cmdParser.parseXsystraceResponse(sendAtCommand("at+xsystrace=10\r\n"), masterList);
+    }
+
+    public String checkOct() throws ModemControlException {
+        return cmdParser.parseOct(sendAtCommand("at+xsystrace=11\r\n"));
+    }
+
+    public String generateModemCoreDump() throws ModemControlException {
+        return sendAtCommand("AT+XLOG=4\r\n");
     }
 
     public CommandParser getCmdParser() {
@@ -236,11 +243,20 @@ public abstract class ModemController implements ModemEventListener, Closeable {
         this.mdmCtrl = null;
     }
 
-    public void sendMessage(String msg) {
-        String event = AMTLApplication.getAMTLApp().getModemEvent();
-        Intent intent = new Intent(event);
+    private void sendMessage(String msg) {
+        Intent intent = new Intent("modem-event");
         intent.putExtra("message", msg);
         AMTLApplication.getContext().sendBroadcast(intent);
+    }
+
+    public static boolean isModemUp() {
+        boolean bStatus = false;
+
+        if (currentModemStatus == ModemStatus.UP) {
+            bStatus = true;
+        }
+
+        return bStatus;
     }
 
     @Override

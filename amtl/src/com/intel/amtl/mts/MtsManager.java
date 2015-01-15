@@ -19,8 +19,6 @@
 
 package com.intel.amtl.mts;
 
-import com.intel.amtl.AMTLApplication;
-
 import android.os.SystemProperties;
 import android.util.Log;
 
@@ -29,7 +27,7 @@ import java.lang.RuntimeException;
 
 public class MtsManager {
 
-    private final String TAG = AMTLApplication.getAMTLApp().getLogTag();
+    private final String TAG = "AMTL";
     private final String MODULE = "MtsManager";
 
     public final Runtime rtm = java.lang.Runtime.getRuntime();
@@ -92,17 +90,19 @@ public class MtsManager {
 
     /* Start mts persistent */
     private void startMtsPersistent() {
-        Log.d(TAG, MODULE + ": starting mts persistent");
-        SystemProperties.set(MtsProperties.getService(), "1");
+        String persService = MtsProperties.getPersistentService();
+        Log.d(TAG, MODULE + ": starting " + persService + " persistent");
+        SystemProperties.set(persService, "1");
     }
 
     /* Start mts oneshot */
     private void startMtsOneshot() {
-        Log.d(TAG, MODULE + ": starting mts oneshot");
+        String oneshotService = MtsProperties.getOneshotService();
+        Log.d(TAG, MODULE + ": starting " + oneshotService + " oneshot");
         try {
-            rtm.exec("start mtso");
+            rtm.exec("start " + oneshotService);
         } catch (IOException ex) {
-            Log.e(TAG, MODULE + ": cannot start mts oneshot");
+            Log.e(TAG, MODULE + ": cannot start " + oneshotService + " oneshot");
         }
     }
 
@@ -116,17 +116,19 @@ public class MtsManager {
 
     /* Stop mts persistent */
     private void stopMtsPersistent() {
-        Log.d(TAG, MODULE + ": stopping mts persistent");
-        SystemProperties.set(MtsProperties.getService(), "0");
+        String persService = MtsProperties.getPersistentService();
+        Log.d(TAG, MODULE + ": stopping " + persService + " persistent");
+        SystemProperties.set(persService, "0");
     }
 
     /* Stop mts oneshot */
     private void stopMtsOneshot() {
+        String oneshotService = MtsProperties.getOneshotService();
         try {
-            Log.d(TAG, MODULE + ": stopping mts oneshot");
-            rtm.exec("stop mtso");
+            Log.d(TAG, MODULE + ": stopping " + oneshotService + " oneshot");
+            rtm.exec("stop " + oneshotService);
         } catch (IOException ex) {
-            Log.e(TAG, MODULE + ": can't stop current running mts oneshot");
+            Log.e(TAG, MODULE + ": can't stop current running " + oneshotService + " oneshot");
         }
     }
 }

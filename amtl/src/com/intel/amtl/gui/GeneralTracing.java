@@ -1,6 +1,6 @@
-/* Android Modem Traces and Logs
+/* Android AMTL
  *
- * Copyright (C) Intel 2014
+ * Copyright (C) Intel 2015
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,13 +14,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
+ * Author: Nicolae Natea <nicolaex.natea@intel.com>
  */
 
-package com.intel.amtl.exceptions;
+package com.intel.amtl.gui;
 
-public class ModemConfException extends Exception{
+import android.view.View;
 
-    public ModemConfException(String s) {
-        super(s);
-    }
+public interface GeneralTracing {
+    public boolean start();
+    public void stop();
+    public void cleanTemp();
+    public void saveTemp(String path);
+    public boolean isRunning();
+    public int getViewID();
+    public void attachReferences(View view);
+    public void attachListeners();
+    public void updateConfiguration();
+    public String getLastStatus();
+    public String getTracerName();
 }

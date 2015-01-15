@@ -22,7 +22,6 @@ package com.intel.amtl.gui;
 
 import android.app.Activity;
 import android.app.Fragment;
-import android.app.FragmentManager;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -42,11 +41,10 @@ import android.widget.Spinner;
 
 import com.intel.amtl.AMTLApplication;
 import com.intel.amtl.R;
-import com.intel.amtl.exceptions.ModemConfException;
 import com.intel.amtl.exceptions.ModemControlException;
+import com.intel.amtl.models.config.LogOutput;
 import com.intel.amtl.models.config.Master;
 import com.intel.amtl.models.config.ModemConf;
-import com.intel.amtl.models.config.LogOutput;
 import com.intel.amtl.modem.ModemController;
 import com.intel.internal.telephony.ModemStatus;
 
@@ -56,38 +54,38 @@ import java.util.ArrayList;
 public class MasterSetupFrag extends Fragment
         implements OnClickListener, AdapterView.OnItemSelectedListener {
 
-    private final String TAG = AMTLApplication.getAMTLApp().getLogTag();
+    private final String TAG = "AMTL";
     private final String MODULE = "MasterSetupFrag";
 
     static final int CONFSETUP_MASTER_TARGETFRAG = 1;
     static final String CONFSETUP_MASTER_TAG = "AMTL_master_modem_configuration_setup";
 
     private String[] masterValues = {"OFF", "OCT", "MIPI2"};
-    private String[] masterNames = {"bb_sw", "3g_sw", "digrf", "digrfx", "lte_l1_sw", "3g_dsp"};
+    private String[] masterNames = {"bb_sw", "3g_sw", "digrfx", "digrfx2", "lte_l1_sw", "3g_dsp",
+            "tdscdma_l1_sw", "sig_mon"};
 
     // Graphical objects for onClick handling.
     private Spinner spinnerBbSw;
     private Spinner spinner3gSw;
-    private Spinner spinnerDigrf;
     private Spinner spinnerDigrfx;
+    private Spinner spinnerDigrfx2;
     private Spinner spinnerLteL1Sw;
     private Spinner spinner3gDsp;
+    private Spinner spinnerTdscdmaL1Sw;
+    private Spinner spinnerSigMon;
     private Button bAppMasterConf;
-
-    // Target fragment for progress popup.
-    private FragmentManager gsfManager;
 
     private ArrayList<Master> masterArray = null;
     private ArrayList<Spinner> spinnerArray = null;
 
-    private Boolean buttonChanged;
+    private Boolean buttonChanged = false;
 
     private OnModeChanged modeChangedCallBack = nullModeCb;
 
-    //this counts how many spinners are on the UI
-    private int spinnerCount = 6;
+    // this counts how many spinners are on the UI
+    private int spinnerCount = 8;
 
-    //this counts how many spinners have been initialized
+    // this counts how many spinners have been initialized
     private int spinnerInitializedCount = 0;
 
     // Callback interface to detect if a button has been pressed
@@ -107,10 +105,12 @@ public class MasterSetupFrag extends Fragment
     private void setUIEnabled() {
         this.spinnerBbSw.setEnabled(true);
         this.spinner3gSw.setEnabled(true);
-        this.spinnerDigrf.setEnabled(true);
         this.spinnerDigrfx.setEnabled(true);
+        this.spinnerDigrfx2.setEnabled(true);
         this.spinnerLteL1Sw.setEnabled(true);
         this.spinner3gDsp.setEnabled(true);
+        this.spinnerTdscdmaL1Sw.setEnabled(true);
+        this.spinnerSigMon.setEnabled(true);
         this.bAppMasterConf.setEnabled(true);
         this.changeButtonColor(this.buttonChanged);
     }
@@ -118,10 +118,12 @@ public class MasterSetupFrag extends Fragment
     private void setUIDisabled() {
         this.spinnerBbSw.setEnabled(false);
         this.spinner3gSw.setEnabled(false);
-        this.spinnerDigrf.setEnabled(false);
         this.spinnerDigrfx.setEnabled(false);
+        this.spinnerDigrfx2.setEnabled(false);
         this.spinnerLteL1Sw.setEnabled(false);
         this.spinner3gDsp.setEnabled(false);
+        this.spinnerTdscdmaL1Sw.setEnabled(false);
+        this.spinnerSigMon.setEnabled(false);
         this.bAppMasterConf.setEnabled(false);
         this.changeButtonColor(false);
     }
@@ -150,16 +152,7 @@ public class MasterSetupFrag extends Fragment
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        String event = AMTLApplication.getAMTLApp().getModemEvent();
-        this.getActivity().registerReceiver(mMessageReceiver, new IntentFilter(event));
-        gsfManager = getFragmentManager();
-
-        ConfigApplyFrag appMasterConf
-                = (ConfigApplyFrag)gsfManager.findFragmentByTag(CONFSETUP_MASTER_TAG);
-
-        if (appMasterConf != null) {
-            appMasterConf.setTargetFragment(this, CONFSETUP_MASTER_TARGETFRAG);
-        }
+        this.getActivity().registerReceiver(mMessageReceiver, new IntentFilter("modem-event"));
     }
 
     @Override
@@ -177,18 +170,22 @@ public class MasterSetupFrag extends Fragment
         bAppMasterConf = (Button) view.findViewById(R.id.applyMasterConfButton);
         spinnerBbSw = (Spinner) view.findViewById(R.id.spinner_bb_sw);
         spinner3gSw = (Spinner) view.findViewById(R.id.spinner_3g_sw);
-        spinnerDigrf = (Spinner) view.findViewById(R.id.spinner_digrf);
         spinnerDigrfx = (Spinner) view.findViewById(R.id.spinner_digrfx);
+        spinnerDigrfx2 = (Spinner) view.findViewById(R.id.spinner_digrfx2);
         spinnerLteL1Sw = (Spinner) view.findViewById(R.id.spinner_lte_l1_sw);
         spinner3gDsp = (Spinner) view.findViewById(R.id.spinner_3g_dsp);
+        spinnerTdscdmaL1Sw = (Spinner) view.findViewById(R.id.spinner_tdscdma_l1_sw);
+        spinnerSigMon = (Spinner) view.findViewById(R.id.spinner_sig_mon);
 
         this.spinnerArray = new ArrayList<Spinner>();
         this.spinnerArray.add(spinnerBbSw);
         this.spinnerArray.add(spinner3gSw);
-        this.spinnerArray.add(spinnerDigrf);
         this.spinnerArray.add(spinnerDigrfx);
+        this.spinnerArray.add(spinnerDigrfx2);
         this.spinnerArray.add(spinnerLteL1Sw);
         this.spinnerArray.add(spinner3gDsp);
+        this.spinnerArray.add(spinnerTdscdmaL1Sw);
+        this.spinnerArray.add(spinnerSigMon);
 
         ArrayAdapter<String> masterAdapter = new ArrayAdapter<String>(this.getActivity(),
                 android.R.layout.simple_spinner_item, masterValues);
@@ -219,33 +216,36 @@ public class MasterSetupFrag extends Fragment
     @Override
     public void onResume() {
         super.onResume();
-        // update modem status when returning from another fragment
-        if (ModemController.getModemStatus() == ModemStatus.UP) {
-            try {
-                ModemController mdmCtrl = ModemController.getInstance();
-                this.masterArray = new ArrayList<Master>();
-                for (String s: masterNames) {
-                    this.masterArray.add(new Master(s, "", ""));
+        if (!AMTLApplication.getModemChanged()) {
+            // update modem status when returning from another fragment
+            if (ModemController.isModemUp()) {
+                try {
+                    ModemController mdmCtrl = ModemController.getInstance();
+                    String trace = mdmCtrl.checkAtTraceState();
+                    this.masterArray = new ArrayList<Master>();
+                    for (String s: masterNames) {
+                        this.masterArray.add(new Master(s, "", ""));
+                    }
+                    this.masterArray = mdmCtrl.checkAtXsystraceState(this.masterArray);
+                    this.updateUi();
+                    if (mdmCtrl.queryTraceState()) {
+                        this.setUIEnabled();
+                    } else {
+                        this.setUIDisabled();
+                    }
+                    mdmCtrl = null;
+                } catch (ModemControlException ex) {
+                    Log.e(TAG, MODULE + ": cannot send command to the modem");
                 }
-                this.masterArray = mdmCtrl.checkAtXsystraceState(this.masterArray);
-                this.updateUi();
-                if (mdmCtrl.queryTraceState()) {
-                    this.setUIEnabled();
-                } else {
-                    this.setUIDisabled();
-                }
-                mdmCtrl = null;
-            } catch (ModemControlException ex) {
-                Log.e(TAG, MODULE + ": cannot send command to the modem");
+            } else if (ModemController.getModemStatus() == ModemStatus.DOWN) {
+                this.setUIDisabled();
             }
-        } else if (ModemController.getModemStatus() == ModemStatus.DOWN) {
-             this.setUIDisabled();
         }
     }
 
     @Override
     public void onPause() {
-        this.spinnerCount = 8;
+        this.spinnerCount = 10;
         this.spinnerInitializedCount = 0;
         super.onPause();
     }
@@ -273,9 +273,13 @@ public class MasterSetupFrag extends Fragment
                 setChosenMasterValues();
                 setMasterStringToInt();
                 ModemConf sysConf = setModemConf();
-                ConfigApplyFrag progressFrag = ConfigApplyFrag.newInstance(CONFSETUP_MASTER_TAG,
-                        CONFSETUP_MASTER_TARGETFRAG);
-                progressFrag.launch(sysConf, this, gsfManager);
+                try {
+                    ModemController mdmCtrl = ModemController.getInstance();
+                    mdmCtrl.sendAtCommand(sysConf.getXsystrace());
+                    mdmCtrl = null;
+                } catch (ModemControlException ex) {
+                    Log.e(TAG, MODULE + ": fail to send command to the modem " + ex);
+                }
                 break;
         }
     }
@@ -302,12 +306,7 @@ public class MasterSetupFrag extends Fragment
                 output.addMasterToList(m.getName(), m);
             }
         }
-        ModemConf modConf = null;
-        try {
-            modConf = ModemConf.getInstance(output);
-        } catch (ModemConfException e) {
-            Log.e(TAG, MODULE + ":Create the modConf error.");
-        }
+        ModemConf modConf = ModemConf.getInstance(output);
         return modConf;
     }
 
@@ -355,6 +354,7 @@ public class MasterSetupFrag extends Fragment
             if (message != null && message.equals("UP")) {
                 try {
                     ModemController mdmCtrl = ModemController.getInstance();
+                    String trace = mdmCtrl.checkAtTraceState();
                     if (!mdmCtrl.queryTraceState()) {
                         setUIDisabled();
                     } else {

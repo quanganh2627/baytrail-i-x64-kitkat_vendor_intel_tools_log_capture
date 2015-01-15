@@ -33,14 +33,13 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ProgressBar;
 
-import com.intel.amtl.AMTLApplication;
 import com.intel.amtl.helper.LogManager;
 import com.intel.amtl.R;
 
 // Embedded class to handle delayed configuration setup (Dialog part).
 public class SaveLogFrag extends DialogFragment {
 
-    private final String TAG = AMTLApplication.getAMTLApp().getLogTag();
+    private final String TAG = "AMTL";
     private final String MODULE = "SaveLogFrag";
     private FragmentManager fm;
 

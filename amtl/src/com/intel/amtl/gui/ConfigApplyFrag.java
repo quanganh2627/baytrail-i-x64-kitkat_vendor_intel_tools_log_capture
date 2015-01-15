@@ -30,6 +30,7 @@ import android.content.SharedPreferences;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.SystemClock;
+import android.preference.PreferenceManager;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -39,19 +40,22 @@ import android.widget.ProgressBar;
 import com.intel.amtl.AMTLApplication;
 import com.intel.amtl.R;
 import com.intel.amtl.exceptions.ModemControlException;
+import com.intel.amtl.models.config.LogOutput;
 import com.intel.amtl.models.config.ModemConf;
 import com.intel.amtl.modem.ModemController;
 import com.intel.amtl.mts.MtsManager;
+
+import java.util.ArrayList;
 
 
 // Embedded class to handle delayed configuration setup (Dialog part).
 public class ConfigApplyFrag extends DialogFragment {
 
-    private final String TAG = AMTLApplication.getAMTLApp().getLogTag();
+    private final String TAG = "AMTL";
     private final String MODULE = "ConfigApplyFrag";
 
-    private static String EXTRA_TAG = "extra_tag";
-    private static String EXTRA_FRAG = "extra_frag";
+    private static final String EXTRA_TAG = "extra_tag";
+    private static final String EXTRA_FRAG = "extra_frag";
 
     int targetFrag;
     String tag;
@@ -90,8 +94,7 @@ public class ConfigApplyFrag extends DialogFragment {
         }
 
         if (getTargetFragment() != null) {
-            getTargetFragment()
-                    .onActivityResult(targetFrag, Activity.RESULT_OK, null);
+            getTargetFragment().onActivityResult(targetFrag, Activity.RESULT_OK, null);
         }
     }
 
@@ -110,7 +113,7 @@ public class ConfigApplyFrag extends DialogFragment {
         this.targetFrag = getArguments().getInt(EXTRA_FRAG);
         // Spawn the thread to execute modem configuration.
         if (this.exeSetup != null) {
-            this.exeSetup.execute();
+            this.exeSetup.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
         }
     }
 
@@ -148,20 +151,73 @@ public class ConfigApplyFrag extends DialogFragment {
 
     // embedded class to handle delayed configuration setup (thread part).
     public static class ApplyConfTask extends AsyncTask<Void, Void, Void> {
-        private final String TAG = AMTLApplication.getAMTLApp().getLogTag();
+        private final String TAG = "AMTL";
         private final String MODULE = "ApplyConfTask";
         private ConfigApplyFrag confSetupFrag;
         private ModemController modemCtrl;
         private MtsManager mtsManager;
         private ModemConf modConfToApply;
         private String exceptReason = "";
+        private ArrayList<String> modemNames;
+        private String modName;
 
         public ApplyConfTask (ModemConf confToApply) {
             this.modConfToApply = confToApply;
+            modemNames = new ArrayList<String>();
         }
 
         void setFragment(ConfigApplyFrag confAppFrag) {
             confSetupFrag = confAppFrag;
+        }
+
+        private void applyConf(SharedPreferences prefs, SharedPreferences.Editor editor,
+                ModemConf mdmConf) throws ModemControlException {
+            if (modemCtrl != null) {
+                // send the three at commands
+                modemCtrl.confTraceAndModemInfo(mdmConf);
+                modemCtrl.switchTrace(mdmConf);
+                // if flush command available for this configuration, let s use it.
+                if (!mdmConf.getFlCmd().equalsIgnoreCase("")) {
+                    Log.d(TAG, MODULE + ": Config has flush_cmd defined.");
+                    modemCtrl.flush(mdmConf);
+                    // give time to the modem to sync - 1 second
+                    SystemClock.sleep(1000);
+                } else {
+                    // fall back - check if a default flush cmd is set
+                    Log.d(TAG, MODULE + ": Fall back - check default_flush_cmd");
+                    String flCmd = prefs.getString("default_flush_cmd", "");
+                    if (!flCmd.equalsIgnoreCase("")) {
+                        modemCtrl.sendAtCommand(flCmd + "\r\n");
+                        // give time to the modem to sync - 1 second
+                        SystemClock.sleep(1000);
+                    }
+                }
+
+                // Success to apply conf, it s time to record it.
+                Log.d(TAG, MODULE + ": Configuration index to save: " + mdmConf.getIndex());
+
+                editor.putInt("index" + modName, mdmConf.getIndex());
+
+                // check if the configuration requires mts
+                mtsManager = new MtsManager();
+                if (mdmConf != null) {
+                    // set mts parameters through mts properties
+                    mtsManager.stopServices();
+                    mdmConf.applyMtsParameters();
+                    if (mdmConf.isMtsRequired()) {
+                        // start mts in the chosen mode: persistent or oneshot
+                        mtsManager.startService(mdmConf.getMtsMode());
+                    }
+                    // restart modem by a cold reset
+                    modemCtrl.restartModem();
+                    // give time to the modem to be up again
+                    SystemClock.sleep(10000);
+                } else {
+                    exceptReason = "no configuration to apply";
+                }
+            } else {
+                exceptReason = "cannot apply configuration: modemCtrl is null";
+            }
         }
 
         // Function overrides for Apply configuration thread.
@@ -174,93 +230,48 @@ public class ConfigApplyFrag extends DialogFragment {
                     AMTLApplication.getContext().getSharedPreferences("AMTLPrefsData",
                     Context.MODE_PRIVATE).edit();
             try {
+                modemNames = AMTLApplication.getModemNameList();
+                String curModemIndex = PreferenceManager
+                        .getDefaultSharedPreferences(AMTLApplication.getContext())
+                        .getString(AMTLApplication.getContext()
+                        .getString(R.string.settings_modem_name_key), "0");
+                int readModemIndex = Integer.parseInt(curModemIndex);
+                modName = modemNames.get(readModemIndex);
                 modemCtrl = ModemController.getInstance();
-                if (modemCtrl != null) {
-                    modemCtrl.confTraceAndModemInfo(modConfToApply);
-                    modemCtrl.switchTrace(modConfToApply);
-                    // if flush command available for this configuration, let s use it.
-                    if (!modConfToApply.getFlCmd().equalsIgnoreCase("")) {
-                        Log.d(TAG, MODULE + ": Config has flush_cmd defined.");
-                        modemCtrl.flush(modConfToApply);
-                        // give time to the modem to sync - 1 second
-                        SystemClock.sleep(1000);
-                    } else {
-                        // fall back - check if a default flush cmd is set
-                        Log.d(TAG, MODULE + ": Fall back - check default_flush_cmd");
-                        String flCmd = prefs.getString("default_flush_cmd", "");
-                        if (!flCmd.equalsIgnoreCase("")) {
-                            modemCtrl.sendAtCommand(flCmd + "\r\n");
-                            // give time to the modem to sync - 1 second
-                            SystemClock.sleep(1000);
-                        }
-                    }
-
-                    // Success to apply conf, it s time to record it.
-                    Log.d(TAG, MODULE + ": Configuration index to save: "
-                            + modConfToApply.getIndex());
-
-                    editor.putInt("index", modConfToApply.getIndex());
-
-                    // check if the configuration requires mts
-                    mtsManager = new MtsManager();
-                    if (modConfToApply != null) {
-                        if (modConfToApply.isMtsRequired()) {
-                            // set mts parameters through mts properties
-                            mtsManager.stopServices();
-                            modConfToApply.applyMtsParameters();
-                            // start mts in the chosen mode: persistent or oneshot
-                            mtsManager.startService(modConfToApply.getMtsMode());
-                        } else {
-                            // do not stop mts when applying conf from masterfrag
-                            if (modConfToApply.confTraceOutput()){
-                                mtsManager.stopServices();
-                                modConfToApply.applyMtsParameters();
-                            }
-                        }
-                        modConfToApply = null;
-                        modemCtrl.confApplyFinalize();
-                        // give time to the modem to be up again
-                        SystemClock.sleep(2000);
-                    } else {
-                        exceptReason = "no configuration to apply";
-                    }
-                } else {
-                    exceptReason = "cannot apply configuration: modemCtrl is null";
-                }
+                applyConf(prefs, editor, modConfToApply);
                 // Everything went right, so let s commit trace configuration.
                 editor.commit();
             } catch (ModemControlException ex) {
                 exceptReason = ex.getMessage();
                 Log.e(TAG, MODULE + ": cannot change modem configuration " + ex);
-                // if config change failed, logging is stopped
-                editor.remove("index");
+                // if config change failed, apply modem default conf if defined or else deactivate
+                // logging
+                editor.remove("index" + modName);
                 editor.commit();
                 try {
-                    mtsManager = new MtsManager();
-                    mtsManager.stopServices();
-                    modemCtrl.switchOffTrace();
-                    String flCmd = prefs.getString("default_flush_cmd", "");
-                    if (!flCmd.equalsIgnoreCase("")) {
-                        modemCtrl.sendAtCommand(flCmd + "\r\n");
-                        // give time to the modem to sync - 1 second
-                        SystemClock.sleep(1000);
+                    LogOutput defaultOutput = AMTLApplication.getDefaultConf();
+                    if (defaultOutput != null) {
+                        modConfToApply = ModemConf.getInstance(AMTLApplication.getDefaultConf());
+                        Log.d(TAG, MODULE + ": applying default conf");
+                    } else {
+                        modConfToApply = modemCtrl.getNoLoggingConf();
+                        Log.d(TAG, MODULE + ": stopping logging");
                     }
-                    modemCtrl.restartModem();
-                    Log.e(TAG, MODULE + ": logging has been stopped");
-                    editor.putBoolean("log_active", false);
+                    applyConf(prefs, editor, modConfToApply);
+                    // Everything went right, so let s commit trace configuration.
                     editor.commit();
                 } catch (ModemControlException mcex) {
-                    Log.e(TAG, MODULE + ": failed to stop logging " + mcex);
-                    editor.putBoolean("log_active", true);
-                    editor.commit();
+                    Log.e(TAG, MODULE + ": failed to apply config " + mcex);
                 }
+            } finally {
+               modemCtrl = null;
+               modConfToApply = null;
             }
             return null;
         }
 
         @Override
         protected void onPostExecute(Void exception) {
-            modemCtrl = null;
             if (confSetupFrag == null) {
                 return;
             }

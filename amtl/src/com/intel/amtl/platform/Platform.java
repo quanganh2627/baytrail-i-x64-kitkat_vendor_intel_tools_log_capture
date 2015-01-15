@@ -24,8 +24,6 @@ import android.content.SharedPreferences;
 import android.os.SystemProperties;
 import android.util.Log;
 
-import com.intel.amtl.AMTLApplication;
-
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -35,11 +33,17 @@ import java.io.FileInputStream;
 
 public class Platform {
 
-    private final String TAG = AMTLApplication.getAMTLApp().getLogTag();
+    private final String TAG = "AMTL";
     private String catalogPath = "/system/etc/telephony/";
 
     public String getPlatformConf() {
-        String property = AMTLApplication.getAMTLApp().getProperty();
-        return catalogPath + "amtl_" + SystemProperties.get(property, "") + ".cfg";
+        int inst_id = 1;
+        String key = "service.amtl" + inst_id + ".cfg";
+        String nameExtension = "";
+        String multiSim = SystemProperties.get("persist.radio.multisim.config", "");
+        if (multiSim.equals("dsda")) {
+            nameExtension = "_DSDA";
+        }
+        return catalogPath + "amtl_" + SystemProperties.get(key, "") + nameExtension + ".cfg";
     }
 }

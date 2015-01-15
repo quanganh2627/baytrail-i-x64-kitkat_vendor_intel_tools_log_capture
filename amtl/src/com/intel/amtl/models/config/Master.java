@@ -20,13 +20,11 @@
 
 package com.intel.amtl.models.config;
 
-import com.intel.amtl.AMTLApplication;
-
 import android.util.Log;
 
 public class Master {
 
-    private final String TAG = AMTLApplication.getAMTLApp().getLogTag();
+    private final String TAG = "AMTL";
     private final String MODULE = "Master";
     private String name = "";
     private String defaultPort = "";

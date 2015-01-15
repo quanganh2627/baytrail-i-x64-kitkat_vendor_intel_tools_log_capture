@@ -23,15 +23,14 @@ package com.intel.amtl.config_parser;
 
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.os.Bundle;
 import android.util.Log;
 import android.util.Xml;
 
 import com.intel.amtl.AMTLApplication;
-import com.intel.amtl.exceptions.ModemConfException;
 import com.intel.amtl.models.config.LogOutput;
 import com.intel.amtl.models.config.Master;
 import com.intel.amtl.models.config.ModemConf;
+import com.intel.amtl.models.config.ModemLogOutput;
 import com.intel.amtl.mts.MtsConf;
 
 import java.io.File;
@@ -47,8 +46,9 @@ import org.xmlpull.v1.XmlPullParserException;
 
 public class ConfigParser {
 
-    private final String TAG = AMTLApplication.getAMTLApp().getLogTag();
+    private final String TAG = "AMTL";
     private final String MODULE = "ConfigParser";
+    private boolean isDefaultConf = false;
     private Context context = null;
 
     public ConfigParser() {
@@ -58,11 +58,11 @@ public class ConfigParser {
         this.context = context;
     }
 
-    public ArrayList<LogOutput> parseConfig(InputStream inputStream)
+    public ArrayList<ModemLogOutput> parseConfig(InputStream inputStream)
             throws XmlPullParserException, IOException {
         int index = -1;
 
-        ArrayList<LogOutput> configOutputs = new ArrayList<LogOutput>();
+        ArrayList<ModemLogOutput> configOutputs = new ArrayList<ModemLogOutput>();
 
         XmlPullParser parser = Xml.newPullParser();
         int eventType = 0;
@@ -78,7 +78,7 @@ public class ConfigParser {
             switch (eventType) {
                 case XmlPullParser.START_TAG:
                     index++;
-                    configOutputs.add(this.handleOutputElement(index, parser));
+                    configOutputs.add(this.handleModemElement(index, parser));
                     break;
             }
             eventType = parser.next();
@@ -91,23 +91,22 @@ public class ConfigParser {
     public ModemConf parseShortConfig(InputStream inputStream)
             throws XmlPullParserException, IOException {
 
-         String atXSIO = "";
-         String atTRACE = "";
-         String atXSYSTRACE = "";
-         String flCmd = "";
-         String mtsMode = null;
-         MtsConf mtsConf = null;
-         XmlPullParser parser = Xml.newPullParser();
-         int eventType = 0;
-         ModemConf modConf = null;
+        String atXSIO = "";
+        String atTRACE = "";
+        String atXSYSTRACE = "";
+        String flCmd = "";
+        String mtsMode = null;
+        MtsConf mtsConf = null;
+        XmlPullParser parser = Xml.newPullParser();
+        int eventType = 0;
 
-         parser.setInput(inputStream, null);
+        parser.setInput(inputStream, null);
 
-         eventType = parser.getEventType();
+        eventType = parser.getEventType();
 
-         Log.d(TAG, MODULE + ": Get XML file to parse.");
+        Log.d(TAG, MODULE + ": Get XML file to parse.");
 
-         while (eventType != XmlPullParser.END_DOCUMENT) {
+        while (eventType != XmlPullParser.END_DOCUMENT) {
 
             switch (eventType) {
                 case XmlPullParser.START_TAG:
@@ -162,39 +161,26 @@ public class ConfigParser {
                         Log.d(TAG, MODULE + ": Get mts type mode : " + mtsMode);
                     }
                 break;
-             }
-             eventType = parser.next();
-         }
-         Log.d(TAG, MODULE + ": Completed XML file parsing.");
-
-         Bundle bundle = new Bundle();
-         bundle.putString(ModemConf.KEY_XSIO, atXSIO);
-         bundle.putString(ModemConf.KEY_TRACE, atTRACE);
-         bundle.putString(ModemConf.KEY_XSYSTRACE, atXSYSTRACE);
-         bundle.putString(ModemConf.KEY_FLCMD, flCmd);
-         bundle.putString(ModemConf.KEY_OCTMODE, "");
-         try {
-             modConf = ModemConf.getInstance(bundle);
-         } catch (ModemConfException e){
-             Log.e(TAG, MODULE + ":Create the modconf error.");
-         }
-
-         if (mtsConf != null) {
-             modConf.setMtsConf(mtsConf);
-         }
-         if (mtsMode != null) {
-             modConf.setMtsMode(mtsMode);
-         }
-         return (modConf);
+            }
+            eventType = parser.next();
+        }
+        Log.d(TAG, MODULE + ": Completed XML file parsing.");
+        ModemConf modConf = ModemConf.getInstance(atXSIO, atTRACE, atXSYSTRACE, flCmd, "");
+        if (mtsConf != null) {
+            modConf.setMtsConf(mtsConf);
+        }
+        if (mtsMode != null) {
+            modConf.setMtsMode(mtsMode);
+        }
+        return (modConf);
     }
 
-    private LogOutput handleOutputElement(int index, XmlPullParser parser)
+    private ModemLogOutput handleModemElement(int index, XmlPullParser parser)
             throws XmlPullParserException, IOException {
-        LogOutput ret = null;
-        String flcmd = null;
-
-        if (isStartOf(parser, "output")) {
-            Log.d(TAG, MODULE + ": Get element type OUTPUT, index: " + index
+        ModemLogOutput ret = null;
+        int outIndex = -1;
+        if (isStartOf(parser, "modem")) {
+            Log.d(TAG, MODULE + ": Get element type MODEM, index: " + index
                     + ", -> WILL PARSE IT.");
 
             // default_flush_cmd is the flush ops that will be performed
@@ -210,63 +196,121 @@ public class ConfigParser {
             // This implies that flush_cmd parameter does not have effect
             // on log stop and at command error use cases.
 
+            // TODO default flush cmd per modem
             if (parser.getAttributeValue(null, "default_flush_cmd") != null
-                     && this.context != null) {
+                    && this.context != null) {
                 SharedPreferences.Editor editor =
                         context.getSharedPreferences("AMTLPrefsData", Context.MODE_PRIVATE).edit();
                 editor.putString("default_flush_cmd",
                         parser.getAttributeValue(null, "default_flush_cmd"));
                 editor.commit();
-                flcmd = parser.getAttributeValue(null, "default_flush_cmd");
             }
 
-            if (parser.getAttributeValue(null, "flush_cmd") != null) {
-                flcmd = parser.getAttributeValue(null, "flush_cmd");
-            }
-
-            ret = new LogOutput(index,
+            ret = new ModemLogOutput(index,
                     parser.getAttributeValue(null, "name"),
-                    parser.getAttributeValue(null, "value"),
-                    parser.getAttributeValue(null, "color"),
-                    parser.getAttributeValue(null, "mts_input"),
-                    parser.getAttributeValue(null, "mts_output"),
-                    parser.getAttributeValue(null, "mts_output_type"),
-                    parser.getAttributeValue(null, "mts_rotate_num"),
-                    parser.getAttributeValue(null, "mts_rotate_size"),
-                    parser.getAttributeValue(null, "mts_interface"),
-                    parser.getAttributeValue(null, "mts_mode"),
-                    parser.getAttributeValue(null, "mts_buffer_size"),
-                    parser.getAttributeValue(null, "oct"),
-                    parser.getAttributeValue(null, "oct_fcs"),
-                    parser.getAttributeValue(null, "pti1"),
-                    parser.getAttributeValue(null, "pti2"),
-                    parser.getAttributeValue(null, "sigusr1_to_send"),
-                    flcmd);
+                    parser.getAttributeValue(null, "connection_id"),
+                    parser.getAttributeValue(null, "service_to_start"),
+                    parser.getAttributeValue(null, "default_flush_cmd"),
+                    parser.getAttributeValue(null, "at_legacy_cmd"),
+                    parser.getAttributeValue(null, "use_mmgr"),
+                    parser.getAttributeValue(null, "full_stop_cmd"),
+                    parser.getAttributeValue(null, "dft_cfg_onstop"),
+                    parser.getAttributeValue(null, "modem_interface"));
 
             Log.d(TAG, MODULE + ": index = " + index
                     + ", name = " + parser.getAttributeValue(null, "name")
-                    + ", value = " + parser.getAttributeValue(null, "value")
-                    + ", color = " + parser.getAttributeValue(null, "color")
-                    + ", mts_input = " + parser.getAttributeValue(null, "mts_input")
-                    + ", mts_output = " + parser.getAttributeValue(null, "mts_output")
-                    + ", mts_output_type = " + parser.getAttributeValue(null, "mts_output_type")
-                    + ", mts_rotate_num = " + parser.getAttributeValue(null, "mts_rotate_num")
-                    + ", mts_rotate_size = " + parser.getAttributeValue(null, "mts_rotate_size")
-                    + ", mts_interface = " + parser.getAttributeValue(null, "mts_interface")
-                    + ", mts_mode = " + parser.getAttributeValue(null, "mts_mode")
-                    + ", mts_buffer_size = " + parser.getAttributeValue(null, "mts_buffer_size")
-                    + ", oct = " + parser.getAttributeValue(null, "oct")
-                    + ", oct_fcs = " + parser.getAttributeValue(null, "oct_fcs")
-                    + ", pti1 = "+ parser.getAttributeValue(null, "pti1")
-                    + ", pti2 = "+ parser.getAttributeValue(null, "pti2")
-                    + ", sigusr1_to_send = "+ parser.getAttributeValue(null, "sigusr1_to_send")
-                    + ", default_flush_cmd = "+ parser.getAttributeValue(null, "default_flush_cmd")
-                    + ", flush_cmd = "+ parser.getAttributeValue(null, "flush_cmd") + ".");
+                    + ", connection_id = " + parser.getAttributeValue(null, "connection_id")
+                    + ", service_to_start = " + parser.getAttributeValue(null, "service_to_start")
+                    + ", default_flush_cmd = " + parser.getAttributeValue(null, "default_flush_cmd")
+                    + ", at_legacy_cmd = " + parser.getAttributeValue(null, "at_legacy_cmd")
+                    + ", use_mmgr = " + parser.getAttributeValue(null, "use_mmgr")
+                    + ", full_stop_cmd = " + parser.getAttributeValue(null, "full_stop_cmd")
+                    + ", dft_cfg_onstop = " + parser.getAttributeValue(null, "dft_cfg_onstop")
+                    + ", modem_interface = " + parser.getAttributeValue(null, "modem_interface")
+                    + ".");
 
-            while (!isEndOf(parser, "output")) {
-                this.handleMasterElements(parser, ret);
+            while (!isEndOf(parser, "modem")) {
+                LogOutput out = this.handleOutputElement(outIndex + 1, parser);
+                if (out != null) {
+                    if (isDefaultConf) {
+                        ret.setDefaultConfig(out);
+                    }
+                    ret.addOutputToList(out);
+                    outIndex++;
+                }
                 parser.next();
             }
+            Log.d(TAG, MODULE + ": Completed element type MODEM parsing.");
+        }
+
+        return ret;
+    }
+
+    private LogOutput handleOutputElement(int index, XmlPullParser parser)
+            throws XmlPullParserException, IOException {
+        LogOutput ret = null;
+        String flcmd = null;
+
+        this.isDefaultConf = false;
+
+        if (isStartOf(parser, "output")) {
+            Log.d(TAG, MODULE + ": Get element type OUTPUT, index: " + index
+                    + ", -> WILL PARSE IT.");
+        } else if (isStartOf(parser, "defaultconf")) {
+            Log.d(TAG, MODULE + ": Get element type DEFAULTCONF, index: " + index
+                    + ", -> WILL PARSE IT.");
+            this.isDefaultConf = true;
+        } else {
+            return null;
+        }
+
+        ret = new LogOutput(index,
+                parser.getAttributeValue(null, "name"),
+                parser.getAttributeValue(null, "value"),
+                parser.getAttributeValue(null, "color"),
+                parser.getAttributeValue(null, "mts_input"),
+                parser.getAttributeValue(null, "mts_output"),
+                parser.getAttributeValue(null, "mts_output_type"),
+                parser.getAttributeValue(null, "mts_rotate_num"),
+                parser.getAttributeValue(null, "mts_rotate_size"),
+                parser.getAttributeValue(null, "mts_interface"),
+                parser.getAttributeValue(null, "mts_mode"),
+                parser.getAttributeValue(null, "mts_buffer_size"),
+                parser.getAttributeValue(null, "oct"),
+                parser.getAttributeValue(null, "oct_fcs"),
+                parser.getAttributeValue(null, "pti1"),
+                parser.getAttributeValue(null, "pti2"),
+                parser.getAttributeValue(null, "sigusr1_to_send"),
+                parser.getAttributeValue(null, "flush_cmd"));
+
+        Log.d(TAG, MODULE + ": index = " + index
+                + ", name = " + parser.getAttributeValue(null, "name")
+                + ", value = " + parser.getAttributeValue(null, "value")
+                + ", color = " + parser.getAttributeValue(null, "color")
+                + ", mts_input = " + parser.getAttributeValue(null, "mts_input")
+                + ", mts_output = " + parser.getAttributeValue(null, "mts_output")
+                + ", mts_output_type = " + parser.getAttributeValue(null, "mts_output_type")
+                + ", mts_rotate_num = " + parser.getAttributeValue(null, "mts_rotate_num")
+                + ", mts_rotate_size = " + parser.getAttributeValue(null, "mts_rotate_size")
+                + ", mts_interface = " + parser.getAttributeValue(null, "mts_interface")
+                + ", mts_mode = " + parser.getAttributeValue(null, "mts_mode")
+                + ", mts_buffer_size = " + parser.getAttributeValue(null, "mts_buffer_size")
+                + ", oct = " + parser.getAttributeValue(null, "oct")
+                + ", oct_fcs = " + parser.getAttributeValue(null, "oct_fcs")
+                + ", pti1 = " + parser.getAttributeValue(null, "pti1")
+                + ", pti2 = " + parser.getAttributeValue(null, "pti2")
+                + ", sigusr1_to_send = " + parser.getAttributeValue(null, "sigusr1_to_send")
+                + ", default_flush_cmd = " + parser.getAttributeValue(null, "default_flush_cmd")
+                + ", flush_cmd = " + parser.getAttributeValue(null, "flush_cmd") + ".");
+
+        while (!isEndOf(parser, "output") && !isEndOf(parser, "defaultconf")) {
+            this.handleMasterElements(parser, ret);
+            parser.next();
+        }
+
+        if (isEndOf(parser, "defaultconf")) {
+            Log.d(TAG, MODULE + ": Completed element type DEFAULTCONF parsing.");
+        } else {
             Log.d(TAG, MODULE + ": Completed element type OUTPUT parsing.");
         }
 

@@ -1,6 +1,6 @@
 /* Android AMTL
  *
- * Copyright (C) Intel 2014
+ * Copyright (C) Intel 2015
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,31 +18,21 @@
 
 package com.intel.amtl.models.config;
 
-import android.os.Bundle;
+public class OctModemConf extends ModemConf {
 
-import com.intel.amtl.mts.MtsConf;
-
-public class ModemConfV1 extends ModemConf{
-
-    public ModemConfV1(LogOutput config) {
+    public OctModemConf(LogOutput config) {
         super(config);
     }
 
-    public ModemConfV1(Bundle bundle) {
-        super(bundle);
-        super.setTrace(bundle.getString(ModemConf.KEY_TRACE));
-        if (!bundle.getString(ModemConf.KEY_TRACE).equals("AT+TRACE=1\r\n")) {
-            super.setMtsConf(new MtsConf());
-        }
+    public OctModemConf(String xsio, String trace, String xsystrace, String flcmd, String octMode) {
+        super(xsio, trace, xsystrace, flcmd, octMode);
     }
 
     @Override
-    public boolean confTraceEnable() {
-        return !getTrace().equals("0");
+    public boolean confTraceEnabled() {
+        return !getOctMode().equals("0");
     }
 
     @Override
-    public boolean confTraceOutput() {
-        return !getTrace().equals("");
-    }
+    public void activateConf(boolean activate) {}
 }

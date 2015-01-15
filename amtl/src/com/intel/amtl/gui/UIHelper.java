@@ -24,21 +24,24 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.content.Context;
+import android.content.SharedPreferences;
+import android.content.SharedPreferences.Editor;
 import android.graphics.Color;
+import android.preference.PreferenceManager;
 import android.text.InputType;
 import android.util.Log;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
+import android.widget.Switch;
 import android.widget.TextView;
 
-import com.intel.amtl.AMTLApplication;
 import com.intel.amtl.helper.LogManager;
 import com.intel.amtl.helper.TelephonyStack;
+import com.intel.amtl.models.config.ExpertConfig;
+import com.intel.amtl.R;
 
 
 public class UIHelper {
-
-    private final static String TAG = AMTLApplication.getAMTLApp().getLogTag();
 
     /* Print pop-up message with ok and cancel buttons */
     public static void warningDialog(final Activity A, String title, String message,
@@ -69,6 +72,62 @@ public class UIHelper {
                     public void onClick(DialogInterface dialog, int whichButton) {
                         /* Exit application */
                         A.finish();
+                    }
+                })
+                .show();
+    }
+
+    /* Print pop-up message with ok and cancel buttons to save */
+    public static void chooseExpertFile(final Activity A, String title, String message,
+            final Context context, final ExpertConfig expConf, final Switch expSwitch) {
+        final EditText saveInput = new EditText(context);
+        saveInput.setText(expConf.getPath(), TextView.BufferType.EDITABLE);
+        saveInput.setTextColor(Color.parseColor("#66ccff"));
+        saveInput.setInputType(InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        new AlertDialog.Builder(A)
+                .setView(saveInput)
+                .setTitle(title)
+                .setMessage(message)
+                .setCancelable(false)
+                .setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int whichButton) {
+                        String confFilePath = saveInput.getText().toString();
+                        InputMethodManager imm = (InputMethodManager)
+                                A.getSystemService(context.INPUT_METHOD_SERVICE);
+                        if (imm != null) {
+                            imm.hideSoftInputFromWindow(saveInput.getWindowToken(), 0);
+                        }
+                        // if im is null, no specific issue, virtual keyboard will not be cleared
+                        // parse file
+                        expConf.setPath(confFilePath);
+                        expConf.validateFile();
+                        expConf.setConfigSet(true);
+                    }
+                })
+                .setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int whichButton) {
+                        expConf.setConfigSet(false);
+                        expSwitch.performClick();
+                    }
+                })
+                .setNeutralButton("Show", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int whichButton) {
+                        String confFilePath = saveInput.getText().toString();
+                        InputMethodManager imm = (InputMethodManager)
+                                A.getSystemService(context.INPUT_METHOD_SERVICE);
+                        if (imm != null) {
+                            imm.hideSoftInputFromWindow(saveInput.getWindowToken(), 0);
+                        }
+                        // if im is null, no specific issue, virtual keyboard will not be cleared
+                        // parse file
+                        expConf.setPath(confFilePath);
+                        expConf.validateFile();
+                        if (!expConf.displayConf().equals("")) {
+                            okCancelDialog(A, "Expert Config File", expConf, expSwitch);
+                        }
                     }
                 })
                 .show();
@@ -110,6 +169,78 @@ public class UIHelper {
     }
 
     /* Print pop-up message with ok and cancel buttons to save */
+    public static void savePopupDialog(final Activity A, String title, String message,
+            final String savepath, final Context context, final Runnable onOK,
+            final Runnable onCancel) {
+        final EditText saveInput = new EditText(context);
+        saveInput.setText(savepath, TextView.BufferType.EDITABLE);
+        saveInput.setTextColor(Color.parseColor("#66ccff"));
+        saveInput.setInputType(InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        new AlertDialog.Builder(A)
+                .setView(saveInput)
+                .setTitle(title)
+                .setMessage(message)
+                .setCancelable(false)
+                .setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int whichButton) {
+                        String snapshotTag = saveInput.getText().toString();
+                        InputMethodManager imm = (InputMethodManager)
+                            A.getSystemService(context.INPUT_METHOD_SERVICE);
+                        if (imm != null) {
+                            imm.hideSoftInputFromWindow(saveInput.getWindowToken(), 0);
+                        }
+
+                        SharedPreferences sharedPrefs = PreferenceManager
+                                .getDefaultSharedPreferences(context);
+                        Editor sharedPrefsEdit = sharedPrefs.edit();
+                        sharedPrefsEdit.putString(context.getString(
+                                R.string.settings_user_save_path_key),
+                                saveInput.getText().toString());
+                        sharedPrefsEdit.commit();
+
+                        onOK.run();
+                    }
+                })
+                .setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int whichButton) {
+                        SharedPreferences sharedPrefs = PreferenceManager
+                                .getDefaultSharedPreferences(context);
+                        Editor sharedPrefsEdit = sharedPrefs.edit();
+                        sharedPrefsEdit.putString(context.getString(
+                                R.string.settings_user_save_path_key), savepath);
+                        sharedPrefsEdit.commit();
+
+                        onCancel.run();
+                    }
+                })
+                .show();
+    }
+
+    /* Print pop-up message with ok and cancel buttons to save */
+    public static void cleanPopupDialog(final Activity A, String title, String message,
+            final Runnable onOK, final Runnable onCancel) {
+        new AlertDialog.Builder(A)
+                .setTitle(title)
+                .setMessage(message)
+                .setCancelable(false)
+                .setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int whichButton) {
+                        onOK.run();
+                    }
+                })
+                .setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int whichButton) {
+                        onCancel.run();
+                    }
+                })
+                .show();
+    }
+
+    /* Print pop-up message with ok and cancel buttons to save */
     public static void logTagDialog(final Activity A, String title, String message,
             final Context context) {
         final EditText saveInput = new EditText(context);
@@ -131,7 +262,7 @@ public class UIHelper {
                             imm.hideSoftInputFromWindow(saveInput.getWindowToken(), 0);
                         }
                         // if im is null, no specific issue, virtual keyboard will not be cleared
-                        Log.d(TAG, "UIHelper: " + logTag);
+                        Log.d("AMTL", "UIHelper: " + logTag);
                     }
                 })
                 .setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
@@ -153,6 +284,32 @@ public class UIHelper {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
                         /* Nothing to do, waiting for user to press OK button */
+                    }
+                })
+                .show();
+    }
+
+    /* Print pop-up message with ok and cancel buttons */
+    public static void okCancelDialog(Activity A, String title, final ExpertConfig conf,
+            final Switch expSwitch) {
+        String message = conf.displayConf();
+        new AlertDialog.Builder(A)
+                .setTitle(title)
+                .setMessage(message)
+                .setCancelable(false)
+                .setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int whichButton) {
+                        // validate conf
+                        conf.setConfigSet(true);
+                    }
+                })
+                .setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int whichButton) {
+                        // uncheck expert switch
+                        conf.setConfigSet(false);
+                        expSwitch.performClick();
                     }
                 })
                 .show();

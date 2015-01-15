@@ -1,6 +1,6 @@
 /* Android AMTL
  *
- * Copyright (C) Intel 2014
+ * Copyright (C) Intel 2015
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,25 +21,15 @@ package com.intel.amtl.modem;
 import com.intel.amtl.exceptions.ModemControlException;
 import com.intel.amtl.models.config.ModemConf;
 
-public class ModemControllerV2 extends ModemController{
+public class OctController extends ModemController {
 
-    public ModemControllerV2() throws ModemControlException {
+    public OctController() throws ModemControlException {
         super();
     }
 
-    public boolean queryTraceState() throws ModemControlException {
+    @Override
+    public boolean queryTraceState()throws ModemControlException {
         return !checkOct().equals("0");
-    }
-
-    @Override
-    public String confTraceAndModemInfo(ModemConf mdmConf) throws ModemControlException {
-        return sendAtCommand(mdmConf.getXsio());
-    }
-
-    @Override
-    public String switchTrace(ModemConf mdmConf)
-            throws ModemControlException {
-        return sendAtCommand(mdmConf.getXsystrace());
     }
 
     @Override
@@ -48,20 +38,20 @@ public class ModemControllerV2 extends ModemController{
     }
 
     @Override
-    public String flush(ModemConf mdmConf) throws ModemControlException {
-        return sendAtCommand(mdmConf.getFlCmd());
+    public void switchTrace(ModemConf mdmConf) throws ModemControlException {
+        sendAtCommand(mdmConf.getXsystrace());
     }
 
     @Override
-    public void confApplyFinalize() throws ModemControlException {
-        restartModem();
-    }
-
-    public String checkOct() throws ModemControlException {
-        return getCmdParser().parseOct(sendAtCommand("at+xsystrace=11\r\n"));
-    }
-
     public String checkAtTraceState() throws ModemControlException {
         return "";
+    }
+
+    @Override
+    public ModemConf getNoLoggingConf() {
+        ModemConf noLoggingConf = ModemConf.getInstance("", "", "AT+XSYSTRACE=0\r\n", "", "");
+        noLoggingConf.setIndex(-1);
+
+        return noLoggingConf;
     }
 }
