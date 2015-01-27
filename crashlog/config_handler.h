@@ -33,6 +33,13 @@
 
 typedef struct config * pconfig;
 
+enum {
+    COLLECT_BPLOG_CRASHING_MODEM = 0,
+    COLLECT_BPLOG_CRASHING_ALL,
+    COLLECT_NO_BPLOG,
+    COLLECT_BPLOG_COUNT
+};
+
 struct config {
     int type;  /* 0 => file 1 => directory */
     int event_class; /* 0 => CRASH 1 => ERROR  2=> INFO */
@@ -55,5 +62,6 @@ void load_config_by_pattern(char *section_pattern, char *key_pattern, struct con
 void load_config();
 
 int cfg_check_modem_version();
+int cfg_collection_mode_modem();
 
 #endif /* CONFIG_HANDLER_H_ */

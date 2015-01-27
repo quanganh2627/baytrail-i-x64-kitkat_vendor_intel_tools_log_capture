@@ -36,7 +36,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <time.h>
-#include <sys/sha1.h>
+#include <openssl/sha.h>
 #include <sys/wait.h>
 
 #include <cutils/properties.h>
@@ -96,10 +96,16 @@ const char *  __attribute__( ( noinline ) ) get_current_system_time(int refresh,
     if (time(&t) == (time_t)-1 )
         LOGE("%s: Can't get current system time : use value previously got - error is %s", __FUNCTION__, strerror(errno));
     else {
-        for ( format_idx = 0 ; format_idx < (int)DIM(crashlog_time_array); format_idx++ )
-            PRINT_TIME( crashlog_time_array[format_idx].value ,
-                        date_time_format[format_idx].format ,
-                        localtime((const time_t *)&t));
+        struct tm * time_val = localtime((const time_t *)&t);
+        if (!time_val) {
+            LOGE("%s: Could not retrieve the local time. Returning previously computed values.", __FUNCTION__);
+        } else {
+            for ( format_idx = 0 ; format_idx < (int)DIM(crashlog_time_array); format_idx++ ) {
+                PRINT_TIME( crashlog_time_array[format_idx].value ,
+                            date_time_format[format_idx].format ,
+                            time_val);
+            }
+        }
     }
     return crashlog_time_array[format].value;
 }
@@ -183,20 +189,20 @@ void do_last_fw_msg_copy(int dir) {
   memory allocation succeeded */
 static int compute_key(char* key, char *event, char *type)
 {
-    static SHA1_CTX *sha = NULL;
+    static SHA_CTX *sha = NULL;
     char buf[256] = { '\0', };
     long long time_ns=0;
     char *tmp_key = key;
-    unsigned char results[SHA1_DIGEST_LENGTH];
+    unsigned char results[SHA_DIGEST_LENGTH];
     int i;
 
     if (sha == NULL) {
-        sha = (SHA1_CTX*)malloc(sizeof(SHA1_CTX));
+        sha = (SHA_CTX*)malloc(sizeof(SHA_CTX));
         if (sha == NULL) {
-            LOGE("%s - Cannot create SHA1_CTX memory... fails to compute the key!\n", __FUNCTION__);
+            LOGE("%s - Cannot create SHA_CTX memory... fails to compute the key!\n", __FUNCTION__);
             return -1;
         }
-        SHA1Init(sha);
+        SHA1_Init(sha);
     }
 
     if (!key || !event || !type) return -EINVAL;
@@ -204,9 +210,9 @@ static int compute_key(char* key, char *event, char *type)
     time_ns = get_uptime(1, &i);
     snprintf(buf, 256, "%s%s%s%s%lld", gbuildversion, guuid, event, type, time_ns);
 
-    SHA1Update(sha, (unsigned char*) buf, strlen(buf));
-    SHA1Final(results, sha);
-    for (i = 0; i < SHA1_DIGEST_LENGTH/2; i++)
+    SHA1_Update(sha, (unsigned char*) buf, strlen(buf));
+    SHA1_Final(results, sha);
+    for (i = 0; i < SHA_DIGEST_LENGTH/2; i++)
     {
         sprintf(tmp_key, "%02x", results[i]);
         tmp_key+=2;
@@ -395,7 +401,7 @@ static int create_minimal_crashfile(char * event, const char* type, const char* 
 static char *priv_raise_event(char *event, char *type, char *subtype, char *log,
         int add_uptime, int data_ready, char* data0, char* data1, char* data2) {
     struct history_entry entry;
-    char key[SHA1_DIGEST_LENGTH+1];
+    char key[SHA_DIGEST_LENGTH+1];
     char newuptime[32], *puptime = NULL;
     char lastbootuptime[24];
     int res, hours;
@@ -448,6 +454,7 @@ static char *priv_raise_event(char *event, char *type, char *subtype, char *log,
         return NULL;
     }
     if (log ) {
+        if (puptime == NULL) puptime = "\0";
         if (!strncmp(event, CRASHEVENT, sizeof(CRASHEVENT))) {
             res = create_minimal_crashfile( event, subtype, log, key, puptime,
                                     datelong, data_ready, data0, data1, data2);
@@ -475,7 +482,7 @@ static char *priv_raise_event(char *event, char *type, char *subtype, char *log,
 
     /* Notify CrashReport except for UIWDT events */
     if (strncmp(type, SYSSERVER_EVNAME, sizeof(SYSSERVER_EVNAME))) {
-            notify_crashreport();
+        notify_crashreport();
     }
     return strdup(key);
 }
@@ -790,7 +797,7 @@ void start_daemon(const char *daemonname) {
     property_set("ctl.start", (char *)daemonname);
 }
 
-void notify_crashreport() {
+void notify_crashreport_thread() {
     char boot_state[PROPERTY_VALUE_MAX];
 
     /* Does current crashlog mode allow notifs to crashreport ?*/
@@ -811,6 +818,16 @@ void notify_crashreport() {
     if (WIFEXITED(status) && WEXITSTATUS(status)) {
         LOGI("notify crash report status: %d.\n", WEXITSTATUS(status));
         return;
+    }
+}
+
+void notify_crashreport() {
+    int ret = 0;
+    pthread_t thread;
+
+    ret = pthread_create(&thread, NULL, (void *)notify_crashreport_thread, NULL);
+    if (ret < 0) {
+        LOGE("%s: notify_crashreport thread error", __FUNCTION__);
     }
 }
 
@@ -935,7 +952,7 @@ int do_screenshot_copy(char* bz_description, char* bzdir) {
     FILE *fd1;
     struct stat info;
     int bz_num = 0;
-    unsigned int screenshot_len;
+    int screenshot_len;
 
     if (stat(bz_description, &info) < 0)
         return -1;
@@ -951,7 +968,7 @@ int do_screenshot_copy(char* bz_description, char* bzdir) {
             if (strstr(buffer,SCREENSHOT_PATTERN)){
                 //Compute length of screenshot path
                 screenshot_len = strlen(buffer) - strlen(SCREENSHOT_PATTERN);
-                if ((screenshot_len > 0) && (screenshot_len < sizeof(screenshot))) {
+                if ((screenshot_len > 0) && ((unsigned int)screenshot_len < sizeof(screenshot))) {
                     //Copy file path
                     strncpy(screenshot, buffer+strlen(SCREENSHOT_PATTERN), screenshot_len);
                     //If last character is '\n' replace it by '\0'

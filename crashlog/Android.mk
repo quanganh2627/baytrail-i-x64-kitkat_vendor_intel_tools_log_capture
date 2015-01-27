@@ -41,18 +41,22 @@ LOCAL_SRC_FILES := \
     panic.c \
     config_handler.c \
     uefivar.c \
+    checksum.c \
     ingredients.c
 
-LOCAL_SHARED_LIBRARIES := libcutils
+LOCAL_SHARED_LIBRARIES := libcutils libcrypto
 
-# sys/sha1.h has been moved out of default bionic includes
 LOCAL_C_INCLUDES += \
-    bionic/libc/upstream-netbsd/android/include
+    external/openssl/include
 
 # Options
 
 ifeq ($(CRASHLOGD_FULL_REPORT),true)
 LOCAL_CFLAGS += -DFULL_REPORT
+endif
+
+ifeq ($(CRASHLOGD_FACTORY_CHECKSUM),true)
+LOCAL_CFLAGS += -DCONFIG_FACTORY_CHECKSUM
 endif
 
 ifeq ($(CRASHLOGD_APLOG),true)
@@ -61,6 +65,12 @@ endif
 
 ifeq ($(CRASHLOGD_COREDUMP),true)
 LOCAL_CFLAGS += -DCONFIG_COREDUMP
+endif
+
+ifeq ($(CRASHLOGD_USE_SD),false)
+LOCAL_CFLAGS += -DCONFIG_USE_SD=FALSE
+else
+LOCAL_CFLAGS += -DCONFIG_USE_SD=TRUE
 endif
 
 ifeq ($(CRASHLOGD_EFILINUX),true)
@@ -84,6 +94,10 @@ ifneq ($(CRASHLOGD_LOGS_PATH),)
 LOCAL_CFLAGS += -DCONFIG_LOGS_PATH='$(CRASHLOGD_LOGS_PATH)'
 endif
 
+ifneq ($(CRASHLOGD_NUM_MODEMS),)
+LOCAL_CFLAGS += -DCONFIG_NUM_MODEMS=$(CRASHLOGD_NUM_MODEMS)
+endif
+
 # Modules
 
 ifeq ($(CRASHLOGD_MODULE_IPTRAK),true)
@@ -96,10 +110,11 @@ LOCAL_CFLAGS += -DCRASHLOGD_MODULE_SPID
 LOCAL_SRC_FILES += spid.c
 endif
 
-ifeq ($(CRASHLOGD_MODULE_BACKTRACE),true)
-LOCAL_CFLAGS += -DCRASHLOGD_MODULE_BACKTRACE
-LOCAL_C_INCLUDES += $(LOCAL_PATH)/../backtrace
-LOCAL_SHARED_LIBRARIES += libparse_stack
+ifeq ($(CRASHLOGD_MODULE_BTDUMP),true)
+LOCAL_CFLAGS += -DCONFIG_BTDUMP
+LOCAL_STATIC_LIBRARIES += libbtdump
+LOCAL_SHARED_LIBRARIES += libbacktrace
+include external/stlport/libstlport.mk
 endif
 
 ifeq ($(CRASHLOGD_MODULE_KCT),true)

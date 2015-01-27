@@ -78,6 +78,12 @@ static inline int file_exists(const char *filename) {
     return (stat(filename, &info) == 0);
 }
 
+static inline int directory_exists(char *path) {
+    struct stat info;
+
+    return (stat(path, &info) == 0 && S_ISDIR(info.st_mode));
+}
+
 static inline int dir_exists(const char *dirpath) {
     DIR * dir;
 
@@ -100,10 +106,11 @@ static inline int get_file_size(char *filename) {
     return info.st_size;
 }
 
-int read_file_prop_uid(char* propsource, char *filename, char *uid, char* defaultvalue);
+int read_file_prop_uid(const char* propsource, const char *filename, char *uid, char* defaultvalue);
 int find_new_crashlog_dir(e_dir_mode_t mode);
 int get_sdcard_paths(e_dir_mode_t mode);
 void do_log_copy(char *mode, int dir, const char* ts, int type);
+void do_bplog_copy(char *mode, int dir, const char* ts, int type, int instance);
 long get_sd_size();
 int sdcard_allowed();
 
@@ -121,6 +128,7 @@ int freadline(FILE *fd, char buffer[MAXLINESIZE]);
 int append_file(char *filename, char *text);
 int overwrite_file(char *filename, char *value);
 
+mode_t get_mode(const char *s);
 int do_chmod(char *path, char *mode);
 int do_chown(const char *file, char *uid, char *gid);
 int do_copy_eof(const char *src, const char *des);
@@ -128,6 +136,7 @@ int do_copy_tail(char *src, char *dest, int limit);
 int do_copy_utf16(const char *src, const char *des);
 int do_copy(char *src, char *dest, int limit);
 int do_mv(char *src, char *dest);
+ssize_t do_read(int fd, void *buf, size_t len);
 int rmfr(char *path);
 int rmfr_specific(char *path, int remove_dir);
 
@@ -137,8 +146,8 @@ void update_logs_permission(void);
 int str_simple_replace(char *str, char *search, char *replace);
 int get_parent_dir( char * dir, char *parent_dir );
 
-char *compute_bp_log(const char* ext_file);
-void copy_bplogs(const char *patern, const char *extra, int dir, int limit);
+char *compute_bp_log(const char* ext_file, int instance);
+void copy_bplogs(const char *patern, const char *extra, int dir, int limit, int instance);
 void save_startuplogs(const char *reboot_id);
 
 /**
@@ -159,5 +168,24 @@ int file_read_string(const char *file, char *string);
  * @return number of matched files, -errno on errors
  */
 int dir_contains(const char *dir, const char *filename, bool exact);
+
+/**
+ * Reads the content of a file passed as parameter into a buffer
+ *
+ * @param path to the file from which we are supposed to read
+ * @param buffer in which to write the read data
+ * @param buffer_size indicates the maximum data to be read, in bytes
+ * @return 0 on success, -errno on errors
+ */
+int read_binary_file(const char *path, unsigned char *buffer, unsigned int buffer_size);
+/**
+ * Writes the content of a buffer to file
+ *
+ * @param path to the file to write to
+ * @param buffer from which it should try to write the data
+ * @param buffer_size indicates how many bytes starting from 'buffer' are to be writen
+ * @return number of written bytes, -errno on errors
+ */
+int write_binary_file(const char *path, const unsigned char *buffer, unsigned int buffer_size);
 
 #endif /* __FSUTILS_H__ */

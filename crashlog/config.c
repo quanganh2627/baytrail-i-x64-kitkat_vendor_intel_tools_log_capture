@@ -213,16 +213,7 @@ static void generate_section_kv(char * config_line, pconfig_handle  conf_handle)
     }
 }
 
-
-
-
-/*
-* Name          : find_section
-* Description   : This function searches through all sections for matching sectionname
-* Parameters    :
-*   char *sectionname        -> char *corresponds to the section searched
-*/
-static psection find_section(char *section_name, pconfig_handle  conf_handle) {
+psection find_section(char *section_name, pconfig_handle  conf_handle) {
     psection result = NULL;
     //to avoid useless search if already on the good section
     if (conf_handle->current){

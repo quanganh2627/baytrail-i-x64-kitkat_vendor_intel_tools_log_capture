@@ -25,6 +25,8 @@
 #include "privconfig.h"
 #include "fsutils.h"
 #include "config.h"
+#include <ctype.h>
+#include <cutils/properties.h>
 
 #ifdef CONFIG_EFILINUX
 #include <libdmi.h>
@@ -138,11 +140,12 @@ static int get_modem_property(char *property_name, char *value) {
 }
 
 static int fetch_modem_properties(psection section) {
-    char buffer[INGREDIENT_VALUE_MAX_SIZE];
+    char buffer[INGREDIENT_VALUE_MAX_SIZE+1];
     pkv kv = section->kvlist;
     LOGW("[INGR]: modem Props ");
     while (kv) {
         get_modem_property(kv->key, buffer);
+        buffer[INGREDIENT_VALUE_MAX_SIZE] = 0;
         free(kv->value);
         kv->value = strdup(buffer);
 
@@ -151,21 +154,43 @@ static int fetch_modem_properties(psection section) {
     return 1;
 }
 
+static void get_modem_section_name(char *name, pconfig_handle handle) {
+    char value[PROPERTY_VALUE_MAX];
+    unsigned int index;
+
+    property_get(MODEM_SCENARIO, value, "UNKNOWN");
+    if (strcmp(value, "UNKNOWN") == 0) {
+        sprintf(name, "MODEM");
+        return;
+    }
+
+    for(index = 0; index < strlen(value); index++)
+        value[index] = toupper(value[index]);
+
+    snprintf(name, PROPERTY_VALUE_MAX, "MODEM.%s", value);
+    if (find_section(name, handle) != NULL)
+        return;
+
+    sprintf(name, "MODEM");
+}
+
 static int fetch_ingredients(pconfig_handle handle) {
     psection c_psection;
+    char modem_section_name[PROPERTY_VALUE_MAX];
     int fetch_result = 1;
 
+    get_modem_section_name(modem_section_name, handle);
     c_psection = handle->first;
     while (c_psection) {
-        if (!strncmp(c_psection->name, "LIBDMI", strlen("LIBDMI"))
+        if (!strncmp(c_psection->name, "LIBDMI", sizeof("LIBDMI"))
             && fetch_dmi_properties(c_psection))
             fetch_result = 0;
 
-        if (!strncmp(c_psection->name, "GETPROP", strlen("GETPROP"))
+        if (!strncmp(c_psection->name, "GETPROP", sizeof("GETPROP"))
             && fetch_android_properties(c_psection) <= 0)
             fetch_result = 0;
 
-        if (!strncmp(c_psection->name, "MODEM", strlen("MODEM"))
+        if (!strncmp(c_psection->name, modem_section_name, strlen(modem_section_name)+1)
             && fetch_modem_properties(c_psection) <= 0)
             fetch_result = 0;
 
