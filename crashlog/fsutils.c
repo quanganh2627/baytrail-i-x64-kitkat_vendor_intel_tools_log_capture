@@ -36,6 +36,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <fcntl.h>
+#include <sys/statfs.h>
 
 #ifndef __TEST__
 #include <private/android_filesystem_config.h>
@@ -133,6 +134,25 @@ static int update_file(const char *filename, unsigned int current) {
 
     /* Close file */
     return (close_file(filename, fd));
+}
+
+static int checkMemAvailable(const char* path, unsigned int req )
+{
+    struct statfs st;
+    unsigned long long reserved;
+
+    if (statfs(path, &st) < 0) {
+        LOGE("%s: warn: statfs failed on %s, err:%s!!!", __FUNCTION__, path, strerror(errno));
+        return 0;
+    }
+
+    reserved = st.f_blocks / 100 * req;
+    if( st.f_bavail < reserved) {
+        LOGE("%s: warn: no space avail in %s,  only %llu of %llu free!", __FUNCTION__, path, st.f_bavail, st.f_blocks);
+        return -1;
+    }
+
+   return 0;
 }
 
 void reset_file(const char *filename) {
@@ -421,6 +441,7 @@ int get_value_in_file(char *file, char *keyword, char *value, unsigned int sizem
 int get_sdcard_paths(e_dir_mode_t mode) {
     char value[PROPERTY_VALUE_MAX];
     DIR *d;
+    struct statfs st;
 
     CRASH_DIR = EMMC_CRASH_DIR;
     STATS_DIR = EMMC_STATS_DIR;
@@ -435,6 +456,10 @@ int get_sdcard_paths(e_dir_mode_t mode) {
     property_get(PROP_CRASH_MODE, value, "");
     if ((!strncmp(value, "lowmemory", 9)) || (mode == MODE_CRASH_NOSD) || !sdcard_allowed())
         return 0;
+    /* check whether there's extra available space for new logs in the SD card */
+    if (checkMemAvailable(SDCARD_LOGS_DIR, SDCARD_MINIMUN_FREEMEM_PERCENT) < 0) {
+        return 0;
+     }
 
     errno = 0;
     if (!file_exists(SDCARD_LOGS_DIR))
@@ -486,6 +511,13 @@ int find_new_crashlog_dir(e_dir_mode_t mode) {
             return -1;
     }
 
+    /* check whether there's extra available space for new logs */
+    if (!strncmp(dir, LOGS_DIR, strlen(LOGS_DIR))) {
+        if( checkMemAvailable(LOGS_DIR, EMMC_MINIMUN_FREEMEM_PERCENT) < 0){
+            return -1;
+         }
+     }
+
     /* Read current value in file */
     res = read_file(path, &current);
     if (res < 0)
@@ -501,6 +533,7 @@ int find_new_crashlog_dir(e_dir_mode_t mode) {
      * but doesn't matter as we create it afterwards
      */
     rmfr(path);
+
 
     /* Create a fresh directory */
     if (mkdir(path, 0777) == -1) {

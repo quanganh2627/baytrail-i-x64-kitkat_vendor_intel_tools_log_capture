@@ -61,6 +61,12 @@
 #define KCT_CONNECT_RETRY_TIME_S 2
 #define UPTIME_MAX_LENGTH       11
 
+/* Percentage of guaranteed available space checked by crashlogd
+ * to determine whether to generate new crash logs
+ */
+#define EMMC_MINIMUN_FREEMEM_PERCENT        20
+#define SDCARD_MINIMUN_FREEMEM_PERCENT      20
+
 /* FIELDS DEFINITIONS */
 #define PERM_USER               "system"
 #define PERM_GROUP              "log"
