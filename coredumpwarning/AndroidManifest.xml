@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.intel.internal.telephony.TelephonyEventsNotifier"
+    android:versionCode="2"
+    android:versionName="1.0" 
+    android:sharedUserId="android.uid.system" >
+
+    <!-- To update user default values, increment the versionCode field -->
+
+    <uses-sdk android:minSdkVersion="11" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+	<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.CHANGE_CONFIGURATION" />
+    <uses-permission android:name="android.permission.DEVICE_POWER" />
+    <uses-permission android:name="android.permission.READ_LOGS" />
+    <application
+        android:icon="@drawable/intel_launcher"
+        android:label="@string/app_name">
+        <activity
+            android:name=".PreferencesActivity"
+            android:label="@string/set_preferences">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name=".AlertDialogActivity"
+            android:icon="@drawable/intel_notification"
+            android:theme="@style/Theme.Transparent" >
+        </activity>
+        <receiver
+            android:name=".EventReceiver"
+            android:enabled="true">
+            <intent-filter>
+                <action android:name="com.msm.android.MSMClientLib.modemState"></action>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.intel.action.CORE_DUMP_WARNING"></action>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.intel.action.CORE_DUMP_COMPLETE"></action>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.intel.action.MODEM_WARM_RESET"></action>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.intel.action.MODEM_COLD_RESET"></action>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.intel.action.MODEM_OUT_OF_SERVICE"></action>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.intel.action.PLATFORM_REBOOT"></action>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.intel.action.MODEM_UNSOLICITED_RESET"></action>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.intel.action.MODEM_NOT_RESPONSIVE"></action>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.intel.action.MODEM_FW_BAD_FAMILY"></action>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.intel.action.MODEM_FW_SECURITY_CORRUPTED"></action>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.intel.action.MODEM_FW_OUTDATED"></action>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.intel.action.MODEM_FW_RESTRICTED"></action>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.intel.action.MODEM_FW_UPDATE_FAILURE"></action>
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

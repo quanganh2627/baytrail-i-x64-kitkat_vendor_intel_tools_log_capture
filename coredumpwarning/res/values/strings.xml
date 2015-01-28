@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+   Copyright (C) 2012 Intel Corporation, All rights Reserved.
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+-->
+<!-- DO NOT LOCALIZE - this is just a test app -->
+<resources>
+    <string name="app_name" translatable="false">Telephony event notifier</string>
+    <string name="set_preferences" translatable="false">Telephony event notifier preferences</string>
+    <string name="menu_notification_type" translatable="false">Notifications type</string>
+
+    <string name="prefs_shared_restore_settings_title">AT command Sent</string>
+    <string name="dialog_restore_settings_title">Would you like to restore default settings ?</string>    
+    <string name="dialog_restore_settings_yes">Yes</string>    
+    <string name="dialog_restore_settings_no">No</string>
+    <string name="prefs_shared_restore_settings_key">prefs_shared_restore_settings_key</string>
+
+    <string name="alert_notification" translatable="false">Notification</string>
+    <string name="notification_config" translatable="false">Notification options</string>
+    <string name="notification_sound" translatable="false">Sound</string>
+    <string name="notification_vibrator" translatable="false">Vibrate</string>
+    <string name="alert_popup" translatable="false">Pop-up</string>
+
+
+    <string name="menu_modem_events" translatable="false">Modem events</string>
+    <string name="menu_modem_exception" translatable="false">Modem exceptions</string>
+    <string name="menu_fw_exception" translatable="false">Modem firmware exceptions</string>
+    <string name="core_dump_start" translatable="false">Modem core dump start</string>
+    <string name="core_dump_stop" translatable="false">Modem core dump complete</string>
+    <string name="unsolicited_reset" translatable="false">Modem unsolicited reset</string>
+    <string name="not_responsive" translatable="false">Modem not responsive</string>
+    <string name="menu_modem_recovery" translatable="false">Modem recovery policy</string>
+    <string name="warm_reset" translatable="false">Modem warm reset</string>
+    <string name="cold_reset" translatable="false">Modem cold reset</string>
+    <string name="cold_boot" translatable="false">Platform cold boot</string>
+    <string name="modem_out" translatable="false">Modem unrecoverable</string>
+    <string name="fw_bad_family" translatable="false">Bad family</string>
+    <string name="fw_security" translatable="false">Security corrupted</string>
+    <string name="fw_outdated" translatable="false">Outdated</string>
+    <string name="fw_restricted" translatable="false">Restricted</string>
+    <string name="fw_update" translatable="false">Modem Update</string>
+
+    <string name="notify_core_dump_start" translatable="false">Modem exception: modem core dump start</string>
+    <string name="notify_core_dump_stop" translatable="false">Modem exception: modem core dump complete</string>
+    <string name="notify_unsolicited_reset" translatable="false">Modem exception: modem unsolicited reset</string>
+    <string name="notify_not_responsive" translatable="false">Modem exception: modem not responsive</string>
+
+    <string name="notify_warm_reset" translatable="false">Modem recovery policy: modem warm reset</string>
+    <string name="notify_cold_reset" translatable="false">Modem recovery policy: modem cold reset</string>
+    <string name="notify_modem_reboot" translatable="false">Modem recovery policy: platform cold boot</string>
+    <string name="notify_modem_out" translatable="false">Modem recovery policy: modem unrecoverable</string>
+
+    <string name="notify_bad_fw_family" translatable="false">Modem firmware: bad family</string>
+    <string name="notify_fw_outdated" translatable="false">Modem firmware: outdated</string>
+    <string name="notify_fw_security_corrupted" translatable="false">Modem firmware: security corrupted</string>
+    <string name="notify_fw_restricted" translatable="false">Modem firmware: restricted</string>
+    <string name="notify_fw_update_failure" translatable="false">Modem firmware: update failure</string>
+
+    <string name="dialog_core_dump_start" translatable="false">&lt;b>Modem exception: modem core dump start&lt;/b>&lt;br>&lt;br>A modem crash happened. The core dump retrieval is in progress. It takes from 1 to 10 minutes maximum.</string>
+    <string name="dialog_core_dump_stop" translatable="false">&lt;b>Modem exception: modem core dump complete&lt;/b>&lt;br>&lt;br>The core dump retrieval has finished.</string>
+    <string name="dialog_unsolicited_reset" translatable="false">&lt;b>Modem exception: modem unsolicited reset&lt;/b>&lt;br>&lt;br>A modem unsolicited reset happened. Modem escalation receovery is in progress.</string>
+    <string name="dialog_not_responsive" translatable="false">&lt;b>Modem exception: modem not responsive&lt;/b>&lt;br>&lt;br>A modem is not responsive. Modem escalation receovery is in progress.</string>
+
+    <string name="dialog_warm_reset" translatable="false">&lt;b>Modem recovery policy: modem warm reset&lt;/b>&lt;br>&lt;br>An automatic modem warm reset will be performed to recover the modem.</string>
+    <string name="dialog_cold_reset" translatable="false">&lt;b>Modem recovery policy: modem cold reset&lt;/b>&lt;br>&lt;br>An automatic modem cold reset will be performed to recover the modem.</string>
+    <string name="dialog_modem_reboot" translatable="false">&lt;b>Modem recovery policy: platform cold boot&lt;/b>&lt;br>&lt;br>An automatic platform reboot will be performed to recover the modem.</string>
+    <string name="dialog_modem_out" translatable="false">&lt;b>Modem recovery policy: modem unrecoverable&lt;/b>&lt;br>&lt;br>The modem has encountered an unrecoverable error. Please, reboot your phone manually.</string>
+
+    <string name="dialog_bad_fw_family" translatable="false">&lt;b>Modem firmware incorrect: bad family&lt;/b>&lt;br>&lt;br>Please, apply a firmware compatible with your platform then reboot your phone.</string>
+    <string name="dialog_fw_outdated" translatable="false">&lt;b>Modem firmware incorrect: outdated&lt;/b>&lt;br>&lt;br>Please, apply a more recent firmware then reboot your phone.</string>
+    <string name="dialog_fw_security_corrupted" translatable="false">&lt;b>Modem firmware incorrect: security corrupted&lt;/b>&lt;br>&lt;br>Please, apply a RnD certificate compatible with your platform then reboot your phone.</string>
+    <string name="dialog_fw_restricted" translatable="false">&lt;b>Modem firmware: restricted mode&lt;/b>&lt;br>&lt;br>Your modem is currently running in restricted mode.</string>
+    <string name="dialog_fw_update_failure" translatable="false">&lt;b>Modem firmware: update failure&lt;/b>&lt;br>&lt;br>Due to an error your modem firmware has not been updated.</string>
+
+    <style name="Theme.Transparent" parent="android:Theme.Holo.Dialog">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowIsFloating">true</item>
+        <item name="android:backgroundDimEnabled">false</item>
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+    </style>
+</resources>
