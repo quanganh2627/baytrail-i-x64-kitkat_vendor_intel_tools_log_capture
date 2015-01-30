@@ -24,6 +24,7 @@
 #include "crashutils.h"
 #include "fsutils.h"
 #include "privconfig.h"
+#include "tcs_wrapper.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -194,6 +195,10 @@ int process_log_event(char *rootdir, char *triggername, int mode) {
         }
         /* When a new crashlog dir is created per packet, send an event per dir */
         if( newdirperpacket && (dir != -1) ) {
+            snprintf(destination,sizeof(destination),"%s%d/user_comment", logrootdir, dir);
+            snprintf(path, sizeof(path),"%s/%s",rootdir, triggername);
+            do_copy_tail(path, destination, 0);
+
             snprintf(destination,sizeof(destination),"%s%d/", logrootdir, dir);
             compress_aplog_folder(destination);
             key = raise_event(event, type, NULL, destination);
@@ -222,9 +227,17 @@ int process_log_event(char *rootdir, char *triggername, int mode) {
             do_copy_tail(path,destination,0);
 
             /* In case of bz_trigger with BPLOG=1, copy bplog file(s) */
-            if( bplogFlag == 1 )
-                copy_bplogs(BZ_DIR, "", dir, 0);
+            if( bplogFlag == 1 ) {
+                int instance = get_modem_count();
+                while (instance--)
+                    copy_bplogs(BZ_DIR, "", dir, 0, instance);
+            }
         }
+
+        snprintf(destination,sizeof(destination),"%s%d/user_comment", logrootdir, dir);
+        snprintf(path, sizeof(path),"%s/%s",rootdir, triggername);
+        do_copy_tail(path, destination, 0);
+
         snprintf(destination,sizeof(destination),"%s%d/", logrootdir,dir);
         if (do_screenshot) {
             do_screenshot_copy(path, destination);
@@ -251,7 +264,7 @@ int process_log_event(char *rootdir, char *triggername, int mode) {
 int process_aplog_event(struct watch_entry *entry, struct inotify_event *event) {
 
     return process_log_event(entry->eventpath, event->name,
-            ( (event->name[0] == 'b' && event->name[1] == 'z') ? MODE_BZ : MODE_APLOGS ));/*event->name necessary not null*/
+            ((event->name && strncmp(event->name,"bz",2) == 0 ) ? MODE_BZ : MODE_APLOGS ));/*event->name necessary not null*/
 }
 
 int process_stat_event(struct watch_entry *entry, struct inotify_event *event) {

@@ -31,15 +31,21 @@
 #include <stdlib.h>
 #include "mmgr_cli.h"
 
-void init_mmgr_cli_source(void);
-void close_mmgr_cli_source(void);
-int mmgr_get_fd(void);
-int mmgr_handle(void);
+int mmgr_get_fd(unsigned int mdm_inst);
+void init_mmgr_cli_source(unsigned int mdm_inst);
+void close_mmgr_cli_source(unsigned int mdm_inst);
+int mmgr_handle(unsigned int mdm_inst);
 #else
-static inline void init_mmgr_cli_source(void) {}
-static inline void close_mmgr_cli_source(void) {}
-static inline int mmgr_get_fd(void) { return 0; }
-static inline int mmgr_handle(void) { return 0; }
+static inline void init_mmgr_cli_source(unsigned int __attribute((unused))
+                                        mdm_inst) {}
+static inline void close_mmgr_cli_source(unsigned int __attribute((unused))
+                                         mdm_inst) {}
+static inline int mmgr_get_fd(unsigned int __attribute((unused)) mdm_inst) {
+    return 0;
+}
+static inline int mmgr_handle(unsigned int __attribute((unused)) mdm_inst) {
+    return 0;
+}
 #endif
 
 #endif

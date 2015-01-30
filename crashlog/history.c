@@ -37,15 +37,16 @@
 #include <string.h>
 #include <fcntl.h>
 #include <stdio.h>
-#include <sys/sha1.h>
+#include <openssl/sha.h>
 
 #define HISTORY_FIRST_LINE_FMT  "#V1.0 " UPTIME_EVNAME "   %-24s\n"
 #define HISTORY_BLANK_LINE1     "#V1.0 " UPTIME_EVNAME "   0000:00:00              \n"
 #define HISTORY_BLANK_LINE2     "#EVENT  ID                    DATE                 TYPE\n"
+#define HISTORY_PERMISSION      "640"
 
 static char *historycache[MAX_RECORDS];
 static int nextline = -1;
-static int fileentries = -1;
+static unsigned int fileentries = 0;
 static int loop_uptime_event = 1;
 /* last uptime value set at device boot only */
 static char lastbootuptime[24] = "0000:00:00";
@@ -94,16 +95,16 @@ static int get_timed_firstline(char *buffer, int *hours, char lastuptime[24], in
     if (!refresh && saved_lastuptime[0] != 0) {
         *hours = saved_hours;
         lastuptime = saved_lastuptime;
-        return (sprintf(buffer, HISTORY_FIRST_LINE_FMT, lastuptime) > 0 ? 0 : -errno);
+        return (snprintf(buffer, MAXLINESIZE, HISTORY_FIRST_LINE_FMT, lastuptime) > 0 ? 0 : -errno);
     }
     /* not initialized yet or to refresh */
     if (get_uptime_string(lastuptime, hours) != 0)
         return -errno;
 
-    if (sprintf(buffer, HISTORY_FIRST_LINE_FMT, lastuptime) > 0) {
+    if (snprintf(buffer, MAXLINESIZE, HISTORY_FIRST_LINE_FMT, lastuptime) > 0) {
         /* save to static variables for next call without refreshing */
         saved_hours = *hours;
-        strcpy(saved_lastuptime, lastuptime);
+        strncpy(saved_lastuptime, lastuptime, sizeof(saved_lastuptime));
         return 0;
     }
     else {
@@ -123,7 +124,7 @@ static int cache_history_file() {
         FILE *to = fopen(HISTORY_FILE, "w");
         if (to == NULL) return -errno;
 
-        do_chmod(HISTORY_FILE, "644");
+        do_chmod(HISTORY_FILE, HISTORY_PERMISSION);
         do_chown(HISTORY_FILE, PERM_USER, PERM_GROUP);
         get_timed_firstline(firstline, &tmp, lastuptime, 1);
         fprintf(to, "%s", firstline);
@@ -136,7 +137,7 @@ static int cache_history_file() {
 
     res = count_lines_in_file(HISTORY_FILE);
     if ( res < 0 ) {
-        LOGE("%s: Cannot cache the contents of %s - %s.\n",
+        LOGE("%s: Cannot count the number of lines in %s - %s.\n",
             __FUNCTION__, HISTORY_FILE, strerror(-res));
         return res;
     }
@@ -186,6 +187,7 @@ static void entry_to_history_line(struct history_entry *entry,
         char *ptr;
         char tmp[MAXLINESIZE];
         strncpy(tmp, entry->log, MAXLINESIZE);
+        tmp[MAXLINESIZE-1] = 0;
         ptr = strrchr(tmp,'/');
         if (ptr && ptr[1] == 0) ptr[0] = 0;
         snprintf(newline, MAXLINESIZE, "%-8s%-22s%-20s%s %s\n",
@@ -226,6 +228,9 @@ int update_history_file(struct history_entry *entry) {
         LOGE("%s: Cannot cache %s - %s.\n", __FUNCTION__,
             HISTORY_FILE, strerror(-res));
         return res;
+    } else if ( nextline < 0 ) {
+        /* should never enter this case - added for KW */
+        nextline = 0;
     }
 
     entry_to_history_line(entry, newline);
@@ -248,8 +253,7 @@ int update_history_file(struct history_entry *entry) {
     }
 
     nextline = (nextline + 1) % MAX_RECORDS;
-    fileentries = (fileentries + 1) % MAX_RECORDS_HIST_FILE;
-    if (fileentries != 0){
+    if (++fileentries < MAX_RECORDS_HIST_FILE) {
         /* We can just write the new line at the end of the file */
         res = append_file(HISTORY_FILE, newline);
         if (res > 0) return 0;
@@ -266,7 +270,7 @@ int update_history_file(struct history_entry *entry) {
     /* We need to recreate a new file and write the full buffer
      * costly!!!
      */
-    fd = open(HISTORY_FILE, O_RDWR | O_TRUNC | O_CREAT, S_IRUSR | S_IWUSR);
+    fd = open(HISTORY_FILE, O_RDWR | O_TRUNC | O_CREAT, get_mode(HISTORY_PERMISSION));
     if (fd < 0) {
         LOGE("%s: Cannot create %s\n", HISTORY_FILE, strerror(errno));
         return -errno;
@@ -306,6 +310,7 @@ int update_history_file(struct history_entry *entry) {
             return -errno;
         }
     }
+    fileentries = MAX_RECORDS;
     close(fd);
     return 0;
 }
@@ -356,6 +361,9 @@ int reset_uptime_history() {
             HISTORY_FILE, strerror(errno));
         return -errno;
     }
+    // if we start from an empty file, need to ensure the permission
+    do_chmod(HISTORY_FILE, HISTORY_PERMISSION);
+    do_chown(HISTORY_FILE, PERM_USER, PERM_GROUP);
 
     to = fopen(HISTORY_FILE, "w");
     if (to == NULL) {
@@ -453,7 +461,7 @@ int add_uptime_event() {
 
     /* Update history file first line (uptime line) */
     errno = 0;
-    fprintf(fd, firstline, &hours);
+    fputs(firstline, fd);
     fclose(fd);
     if (errno != 0) {
         return -errno;
@@ -486,7 +494,7 @@ int add_uptime_event() {
 *   char *events          -> chain containing events separated by comma
 **/
 int update_history_on_cmd_delete(char *events) {
-    char **events_list = NULL, crashdir[MAXLINESIZE], line[MAXLINESIZE], eventid[SHA1_DIGEST_LENGTH+1];
+    char **events_list = NULL, crashdir[MAXLINESIZE], line[MAXLINESIZE], eventid[SHA_DIGEST_LENGTH+1];
     int nbpatterns, maxpatterns = 10, maxpatternsize = 48, res, idx;
     FILE *fd;
     fd = fopen(HISTORY_FILE, "r+");
@@ -497,7 +505,7 @@ int update_history_on_cmd_delete(char *events) {
     }
     /* Get events list from input events comma chain*/
     events_list = commachain_to_fixedarray(events, maxpatternsize, maxpatterns, &nbpatterns);
-    if (nbpatterns <= 0) {
+    if (nbpatterns <= 0 || !events_list) {
         LOGE("%s: Not patterns found in %s... stop the operation\n",
             __FUNCTION__, events);
         fclose(fd);

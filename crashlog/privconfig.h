@@ -28,6 +28,14 @@
 #define LOG_TAG                 "CRASHLOG"
 #include "log.h"
 
+#ifndef MAX
+#define MAX(a,b)                (((a)>(b))?(a):(b))
+#endif
+
+#ifndef MIN
+#define MIN(a,b)                (((a)<(b))?(a):(b))
+#endif
+
 /* CONSTRAINTS */
 #define KB                      (1024)
 #define MB                      (KB*KB)
@@ -74,7 +82,6 @@
 #define IPANIC_CORRUPTED        "IPANIC_CORRUPTED"
 #define KDUMP_CRASH             "KDUMP"
 #define RAMDUMP_EVENT           "RAMDUMP"
-#define MODEM_SHUTDOWN          "MSHUTDOWN"
 #define BZTRIGGER               "bz_trigger"
 #define SCREENSHOT_PATTERN      "SCREENSHOT="
 #define APLOG_DEPTH_DEF         "5"
@@ -102,8 +109,6 @@
 #define CMDTRIG_EVNAME          "CMDTRIG"
 #define UPTIME_EVNAME           "CURRENTUPTIME"
 #define MDMCRASH_EVNAME         "MPANIC"
-#define APIMR_EVNAME            "APIMR"
-#define MRST_EVNAME             "MRESET"
 #define EXTRA_NAME              "EXTRA"
 #define NOTIFY_CONF_PATTERN     "INOTIFY"
 #define GENERAL_CONF_PATTERN    "GENERAL"
@@ -133,9 +138,6 @@ enum {
     APLOGTRIG_TYPE,
     CMDTRIG_TYPE,
     UPTIME_TYPE,
-    MDMCRASH_TYPE,
-    APIMR_TYPE,
-    MRST_TYPE,
     EVENT_TYPE_NUMBER, /* !!! Take care this enum item is always the last one */
 };
 
@@ -158,10 +160,7 @@ static const char* print_eventtype[EVENT_TYPE_NUMBER] = {
     "ERRORTRIG_TYPE",
     "APLOGTRIG_TYPE",
     "CMDTRIG_TYPE",
-    "UPTIME_TYPE",
-    "MDMCRASH_TYPE",
-    "APIMR_TYPE",
-    "MRST_TYPE"
+    "UPTIME_TYPE"
 };
 
 enum {
@@ -211,13 +210,13 @@ struct mode_config {
 static const struct mode_config get_mode_configs[] = {
     [ NOMINAL_MODE ] = {
         .name = "NOMINAL MODE",
-        .sdcard_storage = TRUE,
+        .sdcard_storage = CONFIG_USE_SD,
         .notifs_crashreport = TRUE,
         .monitor_crashenv = TRUE,
         .watched_event_types = {
             [ LOST_TYPE ... JAVACRASH_TYPE2 ] = TRUE,
             [ APCORE_TYPE ... HPROF_TYPE ] = COREDUMP_WATCHED,
-            [ STATTRIG_TYPE ... MRST_TYPE ] = TRUE },
+            [ STATTRIG_TYPE ... UPTIME_TYPE ] = TRUE },
         .mmgr_enabled = TRUE,
     },
     [ RAMDUMP_MODE ] = {
@@ -225,18 +224,18 @@ static const struct mode_config get_mode_configs[] = {
         .sdcard_storage = FALSE,
         .notifs_crashreport = FALSE,
         .monitor_crashenv = FALSE,
-        .watched_event_types = { [ LOST_TYPE ... MRST_TYPE ] = FALSE, }, /* No directories are watched */
+        .watched_event_types = { [ LOST_TYPE ... UPTIME_TYPE ] = FALSE, }, /* No directories are watched */
         .mmgr_enabled = FALSE,
     },
     [ MINIMAL_MODE ] = {
         .name = "MINIMAL MODE",
-        .sdcard_storage = TRUE,
+        .sdcard_storage = CONFIG_USE_SD,
         .notifs_crashreport = FALSE,
         .monitor_crashenv = FALSE,
         .watched_event_types = {
             [ LOST_TYPE ... HPROF_TYPE ] = FALSE, /* Watch only stat directory */
             [ STATTRIG_TYPE  ] = TRUE,
-            [ INFOTRIG_TYPE ... MRST_TYPE ] = FALSE },
+            [ INFOTRIG_TYPE ... UPTIME_TYPE ] = FALSE },
         .mmgr_enabled = FALSE,
     },
 };
@@ -251,7 +250,7 @@ static const struct mode_config get_mode_configs[] = {
 #define CRASHLOG_MODE_MONITOR_CRASHENV(mode) \
     ((mode > MINIMAL_MODE) ? 0 : get_mode_configs[mode].monitor_crashenv)
 #define CRASHLOG_MODE_EVENT_TYPE_ENABLED(mode, type) \
-    ((mode > MINIMAL_MODE || type > MRST_TYPE) ? \
+    ((mode > MINIMAL_MODE || type > UPTIME_TYPE) ? \
      0 : get_mode_configs[mode].watched_event_types[type])
 #define CRASHLOG_MODE_MMGR_ENABLED(mode) \
     ((mode > MINIMAL_MODE) ? 0 : get_mode_configs[mode].mmgr_enabled)
@@ -266,6 +265,7 @@ extern enum crashlog_mode g_crashlog_mode;
 #define PROP_LOGS_ROOT          "persist.crashlogd.root"
 #define PROP_CRASH_MODE         "persist.sys.crashlogd.mode"
 #define PROP_PROFILE            "persist.service.profile.enable"
+#define PROP_PROC_ONGOING       "crashlogd.processing.ongoing"
 #define PROP_BOOTREASON         "ro.boot.bootreason"
 #define PROP_BOOT_STATUS        "sys.boot_completed"
 #define PROP_BUILD_FIELD        "ro.build.version.incremental"
@@ -280,8 +280,9 @@ extern enum crashlog_mode g_crashlog_mode;
 #define VALHOOKS_VERSION        "sys.valhooks.version"
 #define FINGERPRINT_FIELD       "ro.build.fingerprint"
 #define MODEM_FIELD             "gsm.version.baseband"
-#define MODEM_FIELD2            "gsm.version.baseband2"
+#define MODEM_FIELD2            "gsm.version.baseband1"
 #define IMEI_FIELD              "persist.radio.device.imei"
+#define MODEM_SCENARIO          "persist.radio.multisim.config"
 #define OPERATOR_FIELD          "gsm.operator.alpha"
 #define PROP_COREDUMP           "persist.core.enabled"
 #define PROP_CRASH_MODE         "persist.sys.crashlogd.mode"
@@ -295,6 +296,7 @@ extern enum crashlog_mode g_crashlog_mode;
 #define PROP_SOC_VERSION        "ro.board.platform"
 #define PROP_REPORT_FAKE        "crashreport.events.fake"
 #define PROP_REPORT_COUNTDOWN   "crashreport.events.countdown"
+#define PROP_FORCE_MDM_V_DET    "persist.crashlogd.modem.ver.detect"
 
 /* DIRECTORIES */
 #ifndef __LINUX__
@@ -339,6 +341,7 @@ extern enum crashlog_mode g_crashlog_mode;
 #define EVENTS_DIR              LOGS_DIR "/events"
 #define EFI_DIR                 SYS_DIR "/firmware/efi"
 #define EFIVARS_DIR             EFI_DIR "/efivars"
+#define FACTORY_PARTITION_DIR   RESDIR "/factory"
 
 /* FILES */
 #define SYS_PROP                SYSTEM_DIR "/build.prop"
@@ -350,7 +353,7 @@ extern enum crashlog_mode g_crashlog_mode;
 #define APLOGS_CURRENT_LOG      LOGS_DIR "/currentaplogslog"
 #define LOG_UUID                LOGS_DIR "/uuid.txt"
 #define LOG_BUILDID             LOGS_DIR "/buildid.txt"
-#define LOG_MODEM_VERSION       LOGS_DIR "/modem_version.txt"
+#define LOG_MODEM_VERSION_BASE  LOGS_DIR "/modem_version"
 #define MODEM_UUID              LOGS_DIR "/modemid.txt"
 #define MODEM_UUID2             LOGS_DIR "/modemid2.txt"
 #define APLOG_FILE_0            LOGS_DIR "/aplog"
@@ -370,7 +373,6 @@ extern enum crashlog_mode g_crashlog_mode;
 #define LOGS_GPS_DIR            LOGS_DIR "/gps"
 #define APLOG_FILE_BOOT         LOGS_DIR "/aplog_boot"
 #define BLANKPHONE_FILE         LOGS_DIR "/flashing/blankphone_file"
-#define MODEM_SHUTDOWN_TRIGGER  LOGS_DIR "/modemcrash/mshutdown.txt"
 #define LOG_SPID                LOGS_DIR "/spid.txt"
 #define LOG_PANICTEMP           LOGS_DIR "/panic_temp"
 #define LOG_FABRICTEMP           LOGS_DIR "/fabric_temp"
@@ -386,6 +388,7 @@ extern enum crashlog_mode g_crashlog_mode;
 #define FABRIC_ERROR_NAME       "ipanic_fabric_err"
 #define FABRIC_RECOV_NAME       "ipanic_fabric_recv_err"
 #define OFFLINE_SCU_LOG_NAME    "offline_scu_log"
+#define ONLINE_SCU_LOG_NAME     "online_scu_log"
 #define GBUFFER_NAME            "emmc_ipanic_gbuffer"
 #define CMDLINE_NAME            "cmdline"
 #define CRASHFILE_NAME          "crashfile"
@@ -399,6 +402,7 @@ extern enum crashlog_mode g_crashlog_mode;
 #define PROC_FABRIC_ERROR_NAME  PROC_DIR "/" FABRIC_ERROR_NAME
 #define PROC_FABRIC_RECOV_NAME  PROC_DIR "/" FABRIC_RECOV_NAME
 #define PROC_OFFLINE_SCU_LOG_NAME PROC_DIR "/" OFFLINE_SCU_LOG_NAME
+#define PROC_ONLINE_SCU_LOG_NAME PROC_DIR "/" ONLINE_SCU_LOG_NAME
 #define KERNEL_CMDLINE          PROC_DIR "/" CMDLINE_NAME
 #define PROC_UUID               PROC_DIR "/emmc0_id_entry"
 #define SYS_BLK_MMC0_CID        SYS_DIR "/block/mmcblk0/device/cid"
@@ -431,9 +435,19 @@ extern enum crashlog_mode g_crashlog_mode;
 #define FW_UPDATE_STATUS_PATH   "/sys/firmware/osnib/fw_update_status"
 #define INGREDIENTS_CONFIG      SYSTEM_DIR "/etc/ingredients.conf"
 #define INGREDIENTS_FILE        LOGS_DIR "/ingredients.txt"
+#define FACTORY_SUM_FILE        LOGS_DIR "/factory_sum"
+#define BINDER_TRANSACTIONS     DEBUGFS_DIR "/binder/transactions"
+#define BINDER_TRANSACTION_LOG  DEBUGFS_DIR "/binder/transaction_log"
+#define BINDER_FAILED_TRANSACTION_LOG   DEBUGFS_DIR "/binder/failed_transaction_log"
 
 /* SYSTEM COMMANDS */
 #define SDSIZE_SYSTEM_CMD "du -sk " SDCARD_LOGS_DIR "/ > " LOGS_DIR "/currentsdsize"
+
+#ifndef CONFIG_NUM_MODEMS
+#define MAX_MMGR_INST     (2)
+#else
+#define MAX_MMGR_INST     (CONFIG_NUM_MODEMS)
+#endif
 
 extern char *CRASH_DIR;
 extern char *STATS_DIR;
@@ -443,6 +457,7 @@ extern char CURRENT_PANIC_CONSOLE_NAME[PATHMAX];
 extern char CURRENT_PANIC_HEADER_NAME[PATHMAX];
 extern char CURRENT_PROC_FABRIC_ERROR_NAME[PATHMAX];
 extern char CURRENT_PROC_OFFLINE_SCU_LOG_NAME[PATHMAX];
+extern char CURRENT_PROC_ONLINE_SCU_LOG_NAME[PATHMAX];
 extern char CURRENT_KERNEL_CMDLINE[PATHMAX];
 extern int gmaxfiles;
 

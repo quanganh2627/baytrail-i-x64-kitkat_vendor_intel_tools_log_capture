@@ -117,3 +117,12 @@ char *get_next_section_name (char *base_section, pconfig_handle conf_handle);
 
 int cmp_config(pconfig_handle h1, pconfig_handle h2);
 int dump_config(char *filename, pconfig_handle conf_handle);
+
+/*
+* Name          : find_section
+* Description   : This function searches through all sections for matching section_name
+* Parameters    :
+*   char *section_name -> char *section_name corresponds to the section searched
+*   pconfig_handle  conf_handle -> handle to search section
+*/
+psection find_section(char *section_name, pconfig_handle conf_handle);

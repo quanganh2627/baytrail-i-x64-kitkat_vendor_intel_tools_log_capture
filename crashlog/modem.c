@@ -27,12 +27,12 @@
 #include "fsutils.h"
 #include "privconfig.h"
 #include "config_handler.h"
+#include "tcs_wrapper.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <dirent.h>
 #include <stdlib.h>
-#include <sys/sha1.h>
 
 extern pconfig g_first_modem_config;
 
@@ -76,88 +76,22 @@ static int copy_modemcoredump(char *spath, char *dpath) {
 
 }
 
-int process_modem_event(struct watch_entry *entry, struct inotify_event *event) {
-    int dir;
-    char path[PATHMAX];
-    char destion[PATHMAX];
-    const char *dateshort = get_current_time_short(1);
-    char *key;
-
-    snprintf(path, sizeof(path),"%s/%s", entry->eventpath, event->name);
-    dir = find_new_crashlog_dir(MODE_CRASH);
-    if (dir < 0) {
-        LOGE("%s: find_new_crashlog_dir failed\n", __FUNCTION__);
-        key = raise_event(CRASHEVENT, entry->eventname, NULL, NULL);
-        LOGE("%-8s%-22s%-20s%s\n", CRASHEVENT, key, get_current_time_long(0), entry->eventname);
-        rmfr(path);
-        free(key);
-        return -1;
-    }
-
-    snprintf(destion,sizeof(destion),"%s%d", CRASH_DIR,dir);
-    /*Copy Coredump only if event is a modem crash*/
-    if (entry->eventtype == MDMCRASH_TYPE ) {
-        int status = copy_modemcoredump(entry->eventpath, destion);
-        if (status != 0)
-            LOGE("backup modem core dump status: %d.\n", status);
-    }
-    snprintf(destion,sizeof(destion),"%s%d/%s", CRASH_DIR, dir, event->name);
-    do_copy_tail(path, destion, MAXFILESIZE);
-    snprintf(destion,sizeof(destion),"%s%d", CRASH_DIR, dir);
-    usleep(TIMEOUT_VALUE);
-    do_log_copy(entry->eventname, dir, dateshort, APLOG_TYPE);
-    do_log_copy(entry->eventname, dir, dateshort, BPLOG_TYPE);
-    key = raise_event(CRASHEVENT, entry->eventname, NULL, destion);
-    LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, get_current_time_long(0), entry->eventname, destion);
-    rmfr(path);
-    free(key);
-    return 0;
-}
-
-int crashlog_check_modem_shutdown() {
-    const char *dateshort = get_current_time_short(1);
-    char destion[PATHMAX];
-    int dir;
-    char *key;
-
-    if ( !file_exists(MODEM_SHUTDOWN_TRIGGER) ) {
-        /* Nothing to do */
-        return 0;
-    }
-
-    dir = find_new_crashlog_dir(MODE_CRASH);
-    if (dir < 0) {
-        LOGE("%s: find_new_crashlog_dir failed\n", __FUNCTION__);
-        key = raise_event(CRASHEVENT, MODEM_SHUTDOWN, NULL, NULL);
-        LOGE("%-8s%-22s%-20s%s\n", CRASHEVENT, key, get_current_time_long(0), MODEM_SHUTDOWN);
-        remove(MODEM_SHUTDOWN_TRIGGER);
-        free(key);
-        return -1;
-    }
-
-    destion[0] = '\0';
-    snprintf(destion, sizeof(destion), "%s%d/", CRASH_DIR, dir);
-
-    usleep(TIMEOUT_VALUE);
-    do_log_copy(MODEM_SHUTDOWN, dir, dateshort, APLOG_TYPE);
-    do_last_kmsg_copy(dir);
-    key = raise_event(CRASHEVENT, MODEM_SHUTDOWN, NULL, destion);
-    LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, get_current_time_long(0), MODEM_SHUTDOWN, destion);
-    free(key);
-    remove(MODEM_SHUTDOWN_TRIGGER);
-
-    return 0;
-}
-
 int crashlog_check_mpanic_abort(){
     char destion[PATHMAX];
     int dir;
     char *key;
     const char *dateshort = get_current_time_short(1);
+    char bplogs_copied = 0;
+    int mdm_inst = get_modem_count();
+    mdm_inst = (mdm_inst<0) ? 0 : mdm_inst;
 
-    if (file_exists(MCD_PROCESSING)) {
-        remove(MCD_PROCESSING);
+    while (--mdm_inst >= 0) {
+        snprintf(destion, sizeof(destion), "%s-%d", MCD_PROCESSING, mdm_inst);
+        if (file_exists(destion))
+            break;
+    }
 
+    if (mdm_inst >= 0) {
         dir = find_new_crashlog_dir(MODE_CRASH);
         if (dir < 0) {
             LOGE("%s: find_new_crashlog_dir failed\n", __FUNCTION__);
@@ -168,7 +102,16 @@ int crashlog_check_mpanic_abort(){
         }
 
         do_log_copy(MDMCRASH_EVNAME,dir,dateshort,APLOG_TYPE);
-        do_log_copy(MDMCRASH_EVNAME,dir,dateshort,BPLOG_TYPE_OLD);
+        do {
+            snprintf(destion, sizeof(destion), "%s-%d", MCD_PROCESSING, mdm_inst);
+            if (file_exists(destion)) {
+                if ((cfg_collection_mode_modem() != COLLECT_BPLOG_CRASHING_ALL) ||
+                    !bplogs_copied)
+                    do_bplog_copy(MDMCRASH_EVNAME,dir,dateshort,BPLOG_TYPE_OLD, mdm_inst);
+                remove(destion);
+                bplogs_copied = 1;
+            }
+        } while (--mdm_inst >= 0);
 
         snprintf(destion,sizeof(destion),"%s%d/", CRASH_DIR,dir);
 

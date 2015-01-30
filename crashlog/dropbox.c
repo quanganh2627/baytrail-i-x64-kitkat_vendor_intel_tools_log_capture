@@ -29,17 +29,21 @@
 #include <errno.h>
 #include <stdio.h>
 #include <ctype.h>
-#include <sys/sha1.h>
+#include <openssl/sha.h>
 
 #include "crashutils.h"
 #include "privconfig.h"
 #include "fsutils.h"
 #include "dropbox.h"
 
-static char gcurrent_key[2][SHA1_DIGEST_LENGTH+1] = {{0,},{0,}};
+static char gcurrent_key[2][SHA_DIGEST_LENGTH+1] = {{0,},{0,}};
 static int index_prod = 0;
 static int index_cons = 0;
 static int  gfile_monitor_fd = -1;
+
+struct arg_cmd {
+    char key[SHA_DIGEST_LENGTH+1];
+};
 
 void dropbox_set_file_monitor_fd(int file_monitor_fd) {
     gfile_monitor_fd = file_monitor_fd;
@@ -72,16 +76,35 @@ int start_dumpstate_srv(char* crash_dir, int crashidx, char *key) {
             dumpstate_dir, strerror(errno));
         return -1;
     }
-    strncpy(gcurrent_key[index_prod],key,SHA1_DIGEST_LENGTH+1);
+    strncpy(gcurrent_key[index_prod],key,SHA_DIGEST_LENGTH+1);
     index_prod = (index_prod + 1) % 2;
     return 1;
+}
+
+void finalize_dropbox_system_thread(void *param) {
+    char cmd[512];
+    struct arg_cmd *args = (struct arg_cmd *)param;
+
+    snprintf(cmd,sizeof(cmd)-1,"am broadcast -n com.intel.crashreport"
+        "/.specific.NotificationReceiver -a com.intel.crashreport.intent.CRASH_LOGS_COPY_FINISHED "
+        "-c android.intent.category.ALTERNATIVE --es com.intel.crashreport.extra.EVENT_ID %s",
+        args->key);
+    free(args);
+    int status = system(cmd);
+    if (status == -1) {
+        LOGI("%s: Notify crashreport failed for command \"%s\".\n", __FUNCTION__, cmd);
+    } else {
+        LOGI("%s: Notify crashreport status(%d) for command \"%s\".\n", __FUNCTION__, status, cmd);
+    }
+
 }
 
 /* TODO, change the current key with a list of keys and compare with the
  * event to retreive the one */
 int finalize_dropbox_pending_event(const struct inotify_event __attribute__((unused)) *event) {
-    char cmd[512];
     char boot_state[PROPERTY_VALUE_MAX];
+    int ret = 0;
+    pthread_t thread;
 
     /* gcurrent_key is in provision */
     if (gcurrent_key[index_cons][0] == 0) {
@@ -93,15 +116,13 @@ int finalize_dropbox_pending_event(const struct inotify_event __attribute__((unu
     if (strcmp(boot_state, "1"))
         return -1;
 
-
-    snprintf(cmd,sizeof(cmd)-1,"am broadcast -n com.intel.crashreport"
-        "/.specific.NotificationReceiver -a com.intel.crashreport.intent.CRASH_LOGS_COPY_FINISHED "
-        "-c android.intent.category.ALTERNATIVE --es com.intel.crashreport.extra.EVENT_ID %s",
-        gcurrent_key[index_cons]);
-
-    int status = system(cmd);
-    if (status != 0)
-        LOGI("%s: Notify crashreport status(%d) for command \"%s\".\n", __FUNCTION__, status, cmd);
+    struct arg_cmd * args_thread =  malloc(sizeof(struct arg_cmd));
+    strncpy(args_thread->key,gcurrent_key[index_cons],sizeof(args_thread->key));
+    ret = pthread_create(&thread, NULL, (void *)finalize_dropbox_system_thread, args_thread);
+    if (ret < 0) {
+        LOGE("%s: finalize_dropbox thread error", __FUNCTION__);
+        free(args_thread);
+    }
 
     gcurrent_key[index_cons][0] = 0;
     index_cons = (index_cons + 1) % 2;
@@ -146,7 +167,7 @@ int convert_dropbox_timestamp(char* dropboxname, char *timestamp) {
 long extract_dropbox_timestamp(char* filename)
 {
     char *ptr_timestamp_start,*ptr_timestamp_end;
-    char timestamp[TIMESTAMP_MAX_SIZE+1] = { '\0', };
+    char timestamp[TIMESTAMP_MAX_SIZE];
     unsigned int i;
     LOGD("%s\n", __FUNCTION__);
     //DropBox log filename format is : 'error/log type' + '@' + 'timestamp' + '.' + 'file suffix'
@@ -159,12 +180,13 @@ long extract_dropbox_timestamp(char* filename)
         ptr_timestamp_start++;
         ptr_timestamp_end = strchr(ptr_timestamp_start, '.');
         if (ptr_timestamp_end) {
+            int size_timestamp = ptr_timestamp_end - ptr_timestamp_start - 3;
             //checks timestamp size
-            if ( ((ptr_timestamp_end - ptr_timestamp_start - 3) <= TIMESTAMP_MAX_SIZE ) && ((ptr_timestamp_end - ptr_timestamp_start - 3) >= 0 )) {
-                strncpy(timestamp, ptr_timestamp_start, ptr_timestamp_end - ptr_timestamp_start - 3);
+            if ( (size_timestamp <= TIMESTAMP_MAX_SIZE ) && (size_timestamp > 0 )) {
+                strncpy(timestamp, ptr_timestamp_start, size_timestamp);
                 //checks timestamp consistency
-                for(i=0; i <strlen(timestamp); i++) {
-                    if (!isdigit(timestamp[i]))
+                while(size_timestamp--) {
+                    if (!isdigit(timestamp[size_timestamp]))
                         return -1;
                 }
                 //checks timestamp value compatibility with 'long' type
@@ -256,7 +278,11 @@ int manage_duplicate_dropbox_events(struct inotify_event *event)
             struct tm *time;
             memset(&time, 0, sizeof(time));
             time = localtime(&timestamp_value);
-            PRINT_TIME(human_readable_date, DUPLICATE_TIME_FORMAT , time);
+            if (time) {
+                PRINT_TIME(human_readable_date, DUPLICATE_TIME_FORMAT , time);
+            } else {
+                LOGE("%s Could not print human readable timestamp\n", __FUNCTION__);
+            }
         }
         /*
          * Generates the INFO event with the previous and the new

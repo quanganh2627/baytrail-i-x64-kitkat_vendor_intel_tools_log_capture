@@ -46,10 +46,11 @@
 #include "iptrak.h"
 #include "spid.h"
 #include "ingredients.h"
+#include "checksum.h"
 #include "mmgr_source.h"
 
 #include <sys/types.h>
-#include <sys/sha1.h>
+#include <openssl/sha.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <pthread.h>
@@ -84,6 +85,7 @@ char CURRENT_PANIC_CONSOLE_NAME[PATHMAX]={PANIC_CONSOLE_NAME};
 char CURRENT_PANIC_HEADER_NAME[PATHMAX]={PANIC_HEADER_NAME};
 char CURRENT_PROC_FABRIC_ERROR_NAME[PATHMAX]={PROC_FABRIC_ERROR_NAME};
 char CURRENT_PROC_OFFLINE_SCU_LOG_NAME[PATHMAX]={PROC_OFFLINE_SCU_LOG_NAME};
+char CURRENT_PROC_ONLINE_SCU_LOG_NAME[PATHMAX]={PROC_ONLINE_SCU_LOG_NAME};
 char CURRENT_KERNEL_CMDLINE[PATHMAX]={KERNEL_CMDLINE};
 
 int partition_notified = 1;
@@ -132,9 +134,11 @@ static int check_mounted_partitions()
         match = fscanf(fd, "%255s %255s %255s %255s %d %d\n",
                        mount_dev, mount_dir, mount_type,
                        mount_opts, &mount_freq, &mount_passno);
-         if (strstr(mount_dev, "by-label") && check_mounted_partition(mount_dir)) {
+         if (strstr(mount_dev, "by-name") && check_mounted_partition(mount_dir)) {
+             int max_append_size = sizeof(list_partition) - strlen(list_partition) - 1;
              nb_partition++;
-             strncat(list_partition, mount_dir, sizeof(list_partition) - 1);
+             if (max_append_size > 0)
+                 strncat(list_partition, mount_dir, max_append_size);
              if (((strncmp(mount_dir, "/logs", 5)) == 0) && strstr(mount_opts, "ro,"))
                   output = notify_partition_error(ERROR_LOGS_RO);
          }
@@ -150,6 +154,70 @@ static int check_mounted_partitions()
 
     return output;
 }
+
+#ifdef CONFIG_FACTORY_CHECKSUM
+static void check_factory_checksum_callback(const char * file, mode_t st_mode) {
+    char *reason = NULL;
+
+    switch (st_mode & S_IFMT) {
+        case S_IFBLK:  reason = "block device";     break;
+        case S_IFCHR:  reason = "character device"; break;
+        case S_IFDIR:  reason = "directory";        break;
+        case S_IFIFO:  reason = "FIFO/pipe";        break;
+        case S_IFLNK:  reason = "symlink";          break;
+        case S_IFREG:  reason = "regular file";     break;
+        case S_IFSOCK: reason = "socket";           break;
+        default:       reason = "unknown";          break;
+    }
+
+    LOGE("%s: file skipped. encountered: %s for %s\n", __FUNCTION__, reason, file);
+}
+
+static void check_factory_partition_checksum() {
+    unsigned char checksum[CRASHLOG_CHECKSUM_SIZE];
+
+    if (!directory_exists(FACTORY_PARTITION_DIR)) {
+        LOGD("%s: Factory partition not present on current build. Skipping checksum verification\n", __FUNCTION__);
+        return;
+    }
+
+    LOGD("%s: performing factory partition checksum calculation\n", __FUNCTION__);
+    if (calculate_checksum_directory(FACTORY_PARTITION_DIR, checksum, check_factory_checksum_callback) != 0) {
+        LOGE("%s: failed to calculate factory partition checksum\n", __FUNCTION__);
+        return;
+    }
+
+    if (file_exists(FACTORY_SUM_FILE)) {
+        unsigned char old_checksum[CRASHLOG_CHECKSUM_SIZE+1];
+        if (read_binary_file(FACTORY_SUM_FILE, old_checksum, CRASHLOG_CHECKSUM_SIZE) < 0) {
+            LOGE("%s: failed in reading checksum from file: %s\n", __FUNCTION__, FACTORY_SUM_FILE);
+        }
+
+        if (memcmp(checksum, old_checksum, CRASHLOG_CHECKSUM_SIZE) != 0) {
+            /* send event that something has changed */
+            char *key = raise_event(INFOEVENT, "FACTORY_SUM", NULL, NULL);
+            free(key);
+            if (write_binary_file(FACTORY_SUM_FILE, checksum, CRASHLOG_CHECKSUM_SIZE) < 0) {
+                LOGE("%s: failed in writing checksum to file: %s\n", __FUNCTION__, FACTORY_SUM_FILE);
+                return;
+            }
+            LOGD("%s: %s file updated\n", __FUNCTION__, FACTORY_SUM_FILE);
+        }
+        else {
+            LOGD("%s: no changes detected\n", __FUNCTION__);
+        }
+    }
+    else {
+        if (write_binary_file(FACTORY_SUM_FILE, checksum, CRASHLOG_CHECKSUM_SIZE) < 0) {
+            LOGE("%s: failed in writing checksum to file: %s\n", __FUNCTION__, FACTORY_SUM_FILE);
+            return;
+        }
+        LOGD("%s: %s file created\n", __FUNCTION__, FACTORY_SUM_FILE);
+    }
+}
+#else
+static inline void check_factory_partition_checksum() {}
+#endif
 
 int process_command_event(struct watch_entry *entry, struct inotify_event *event) {
     char path[PATHMAX];
@@ -200,25 +268,29 @@ int process_command_event(struct watch_entry *entry, struct inotify_event *event
  *  - = 0: if the file was up-to-date
  *  - > 0: if the file was updated successfully
  */
-static int update_modem_name() {
+static int update_modem_name(int instance) {
     FILE *fd = NULL;
     int res = 0;
     char modem_name[PROPERTY_VALUE_MAX] = "";
     char previous_modem_name[PROPERTY_VALUE_MAX] = "";
+    char *modem_version_file;
 
+    modem_version_file =
+        malloc((strlen(LOG_MODEM_VERSION_BASE) + 10) * sizeof(char));
+    sprintf(modem_version_file, "%s%d.txt", LOG_MODEM_VERSION_BASE, instance);
     /*
      * Retrieve modem name
      */
-    res = get_modem_name(modem_name);
+    res = get_modem_name(modem_name,instance);
     if(res < 0) {
-        LOGE("%s: Could not retrieve modem name, file %s will not be written.\n", __FUNCTION__, LOG_MODEM_VERSION);
+        LOGE("%s: Could not retrieve modem name, file %s will not be written.\n", __FUNCTION__, modem_version_file);
         return res;
     }
 
     /*
      * Check the modem version file.
      */
-    if ( (fd = fopen(LOG_MODEM_VERSION, "r")) != NULL) {
+    if ( (fd = fopen(modem_version_file, "r")) != NULL) {
         res = fscanf(fd, "%s", previous_modem_name);
         fclose(fd);
         /* Check whether there is something to do or not */
@@ -231,28 +303,29 @@ static int update_modem_name() {
     /*
      * Update file
      */
-    if ( (fd = fopen(LOG_MODEM_VERSION, "w")) == NULL) {
+    if ( (fd = fopen(modem_version_file, "w")) == NULL) {
         LOGE("%s: Could not open file %s for writing.\n",
             __FUNCTION__,
-            LOG_MODEM_VERSION);
+            modem_version_file);
         return -1;
     }
     fprintf(fd, "%s", modem_name);
     fclose(fd);
 
     /* Change file ownership and permissions */
-    if(chmod(LOG_MODEM_VERSION, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH) < 0) {
+    if(chmod(modem_version_file, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH) < 0) {
         LOGE("%s: Cannot change %s file permissions %s\n",
             __FUNCTION__,
-            LOG_MODEM_VERSION,
+            modem_version_file,
             strerror(errno));
         return -1;
     }
-    do_chown(LOG_MODEM_VERSION, "root", "log");
+    do_chown(modem_version_file, "root", "log");
 
     /*
      * Return the result
      */
+    free(modem_version_file);
     return res;
 }
 
@@ -390,6 +463,7 @@ static void early_check(char *encryptstate, int test) {
     const char *datelong;
     char *key;
     struct stat info;
+    int i, num_modems;
 
     if (swupdated(gbuildversion) == 1) {
         strcpy(startupreason,"SWUPDATE");
@@ -408,7 +482,6 @@ static void early_check(char *encryptstate, int test) {
     crashlog_check_fabric_events(startupreason, watchdog, test);
     crashlog_check_panic_events(startupreason, watchdog, test);
     crashlog_check_kdump(startupreason, test);
-    crashlog_check_modem_shutdown();
     crashlog_check_mpanic_abort();
     crashlog_check_startupreason(startupreason, watchdog);
     crashlog_check_recovery();
@@ -433,14 +506,20 @@ static void early_check(char *encryptstate, int test) {
     free(key);
 
 #ifdef CRASHLOGD_MODULE_MODEM
-    if(cfg_check_modem_version()) {
-        modem_name_check_result = update_modem_name();
-        if(modem_name_check_result < 0) {
-            LOGI("%s: An error occurred when read/writing %s.", __FUNCTION__, LOG_MODEM_VERSION);
-        } else if (modem_name_check_result == 0) {
-            LOGI("%s: The file %s was up-to-date.", __FUNCTION__, LOG_MODEM_VERSION);
-        } else {
-            LOGI("%s: File %s updated successfully.", __FUNCTION__, LOG_MODEM_VERSION);
+    num_modems = get_modem_count();
+    for (i = 0; i < num_modems; i++) {
+        if (cfg_check_modem_version(i)) {
+            modem_name_check_result = update_modem_name(i);
+            if (modem_name_check_result < 0) {
+                LOGI("%s: An error occurred when read/writing %s%d.txt.",
+                     __FUNCTION__, LOG_MODEM_VERSION_BASE, i);
+            } else if (modem_name_check_result == 0) {
+                LOGI("%s: The file %s%d.txt was up-to-date.", __FUNCTION__,
+                     LOG_MODEM_VERSION_BASE, i);
+            } else {
+                LOGI("%s: File %s%d.txt updated successfully.", __FUNCTION__,
+                     LOG_MODEM_VERSION_BASE, i);
+            }
         }
     }
 #endif
@@ -459,9 +538,9 @@ static void early_check(char *encryptstate, int test) {
  */
 static int get_mmc_id(char* id) {
     int ret, i;
-    SHA1_CTX ctx;
+    SHA_CTX ctx;
     char buf[50] = { '\0', };
-    unsigned char sha1[SHA1_DIGEST_LENGTH];
+    unsigned char sha1[SHA_DIGEST_LENGTH];
     char *id_tmp = id;
 
     if (!id)
@@ -471,11 +550,11 @@ static int get_mmc_id(char* id) {
     if (ret <= 0)
         return ret;
 
-    SHA1Init(&ctx);
-    SHA1Update(&ctx, (unsigned char*)buf, strlen(buf));
-    SHA1Final(sha1, &ctx);
+    SHA1_Init(&ctx);
+    SHA1_Update(&ctx, (unsigned char*)buf, strlen(buf));
+    SHA1_Final(sha1, &ctx);
 
-    for (i = 0; i < SHA1_DIGEST_LENGTH; i++, id_tmp += 2)
+    for (i = 0; i < SHA_DIGEST_LENGTH; i++, id_tmp += 2)
         sprintf(id_tmp, "%02x", sha1[i]);
     *id_tmp = '\0';
 
@@ -590,11 +669,14 @@ int get_inotify_fd() {
 }
 
 int do_monitor() {
+    check_factory_partition_checksum();
+
     fd_set read_fds; /**< file descriptor set watching data availability from sources */
     int max = 0; /**< select max fd value +1 {@see man select(2) nfds} */
     int select_result; /**< select result */
     int file_monitor_fd = get_inotify_fd();
     dropbox_set_file_monitor_fd(file_monitor_fd);
+    int i,num_modems;
 
     if ( file_monitor_fd < 0 ) {
         LOGE("%s: failed to initialize the inotify handler - %s\n",
@@ -623,11 +705,10 @@ int do_monitor() {
     set_watch_entry_callback(APLOGTRIG_TYPE,    process_aplog_event);
     set_watch_entry_callback(LOST_TYPE,         process_lost_event);
     set_watch_entry_callback(UPTIME_TYPE,       process_uptime_event);
-    set_watch_entry_callback(MDMCRASH_TYPE,     process_modem_event);
-    set_watch_entry_callback(APIMR_TYPE,        process_modem_event);
-    set_watch_entry_callback(MRST_TYPE,         process_modem_event);
 
-    init_mmgr_cli_source();
+    num_modems = get_modem_count();
+    for (i = 0; i < num_modems; i++)
+        init_mmgr_cli_source(i);
 
     kct_netlink_init_comm();
 
@@ -645,10 +726,12 @@ int do_monitor() {
         }
 
         //mmgr fd setup
-        if (mmgr_get_fd() > 0) {
-            FD_SET(mmgr_get_fd(), &read_fds);
-            if (mmgr_get_fd() > max)
-                max = mmgr_get_fd();
+        for (i = 0; i < num_modems; i++) {
+            if (mmgr_get_fd(i) > 0) {
+                FD_SET(mmgr_get_fd(i), &read_fds);
+                if (mmgr_get_fd(i) > max)
+                    max = mmgr_get_fd(i);
+            }
         }
 
         //kct fd setup
@@ -665,8 +748,13 @@ int do_monitor() {
                 max = lct_link_get_fd();
         }
 
+        /*Allow reboot if not doing anything on main thread */
+        property_set(PROP_PROC_ONGOING, "0");
+
         // Wait for events
         select_result = select(max+1, &read_fds, NULL, NULL, NULL);
+
+        property_set(PROP_PROC_ONGOING, "1");
 
         if (select_result == -1 && errno == EINTR) // Interrupted, need to recycle
             continue;
@@ -676,27 +764,36 @@ int do_monitor() {
             /* clean children to avoid zombie processes */
             while(waitpid(-1, NULL, WNOHANG) > 0){};
             // File monitor
-            if (FD_ISSET(file_monitor_fd, &read_fds)) {
+            if (file_monitor_fd > 0 &&
+                FD_ISSET(file_monitor_fd, &read_fds)) {
                 receive_inotify_events(file_monitor_fd);
             }
             // mmgr monitor
-            if (FD_ISSET(mmgr_get_fd(), &read_fds)) {
-                LOGD("mmgr fd set");
-                mmgr_handle();
+            for (i = 0; i < num_modems; i++) {
+                if (mmgr_get_fd(i) > 0 &&
+                    FD_ISSET(mmgr_get_fd(i), &read_fds)) {
+                    LOGD("mmgr fd instance %i set", i);
+                    mmgr_handle(i);
+                }
             }
             // kct monitor
-            if (FD_ISSET(kct_netlink_get_fd(), &read_fds)) {
+            if (kct_netlink_get_fd() > 0 &&
+                FD_ISSET(kct_netlink_get_fd(), &read_fds)) {
                 LOGD("kct fd set");
                 kct_netlink_handle_msg();
             }
             // lct monitor
-            if (FD_ISSET(lct_link_get_fd(), &read_fds)) {
+            if (lct_link_get_fd() > 0 &&
+                FD_ISSET(lct_link_get_fd(), &read_fds)) {
                 LOGD("lct fd set");
                 lct_link_handle_msg();
             }
         }
     }
-    close_mmgr_cli_source();
+
+    for (i = 0; i < num_modems; i++)
+        close_mmgr_cli_source(i);
+
     free_config(g_first_modem_config);
     LOGE("Exiting main monitor loop\n");
     return -1;
@@ -809,6 +906,8 @@ int main(int argc, char **argv) {
         }
     }
 
+    property_set(PROP_PROC_ONGOING, "1");
+
     /* first thing to do : load configuration */
     load_config();
 
@@ -835,15 +934,16 @@ int main(int argc, char **argv) {
         return do_monitor();
 
     case NOMINAL_MODE :
-        /* DECRYPTED by default */
-        strcpy(encryptstate,"DECRYPTED");
 
-        if (!strcmp(crypt_state, "unencrypted") && encrypt_progress[0]) {
+        if (encrypt_progress[0] && !strcmp(crypt_state, "unencrypted")) {
             /* Encrypting unencrypted device... */
             LOGI("phone enter state: encrypting.\n");
+            strcpy(encryptstate,"ENCRYPTING");
+            early_check(encryptstate, test_flag);
         } else if (!strcmp(crypt_state, "unencrypted") && !alreadyran) {
             /* Unencrypted device */
             LOGI("phone enter state: normal start.\n");
+            strcpy(encryptstate,"DECRYPTED");
             early_check(encryptstate, test_flag);
         } else if (!strcmp(crypt_state, "encrypted") &&
                    !strcmp(decrypt, "trigger_restart_framework") && !alreadyran) {

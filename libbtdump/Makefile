@@ -15,23 +15,18 @@
 # limitations under the License.
 #
 
-# crashlogd test configuration file
+EXENAME = btdump
+CFLAGS = -c -Werror -g -DUSE_LIBUNWIND -Iinc
+LFLAGS = -g
+LLIBS = -lunwind-x86_64 -lunwind-ptrace -lrt
 
-# Options
+all: CProcInfo.cpp btdump.cpp libbtdump.cpp
+	g++ $(CFLAGS) CProcInfo.cpp
+	g++ $(CFLAGS) CThreadInfo.cpp
+	g++ $(CFLAGS) CFrameInfo.cpp
+	g++ $(CFLAGS) btdump.cpp
+	g++ $(CFLAGS) libbtdump.cpp
+	g++ $(LFLAGS) -o $(EXENAME) *.o $(LLIBS)
 
-# CRASHLOGD_FULL_REPORT := true
-# CRASHLOGD_COREDUMP := true
-# CRASHLOGD_EFILINUX := true
-# CRASHLOGD_FDK := true
-# CRASHLOGD_LOGS_PATH := "/data/logs"
-
-# Modules
-
-# CRASHLOGD_MODULE_IPTRAK := true
-# CRASHLOGD_MODULE_SPID := true
-# CRASHLOGD_MODULE_BTDUMP := true
-# CRASHLOGD_MODULE_KCT := true
-# CRASHLOGD_MODULE_MODEM := true
-# CRASHLOGD_MODULE_FABRIC := true
-# CRASHLOGD_MODULE_FW_UPDATE := true
-# CRASHLOGD_MODULE_RAMDUMP := true
+clean:
+	rm *.o $(EXENAME)
