@@ -3,10 +3,20 @@ include $(CLEAR_VARS)
 
 LOCAL_MODULE_TAGS := optional
 
-LOCAL_STATIC_JAVA_LIBRARIES := com.intel.internal.telephony.MmgrClient
+ifneq ($(findstring sofia3g, $(TARGET_BOARD_PLATFORM)),)
+    LOCAL_JAVA_LIBRARIES := com.msm.android.MSMClientLib
+else
+    LOCAL_STATIC_JAVA_LIBRARIES := com.intel.internal.telephony.MmgrClient
+endif
 
-# Only compile source java files in this apk.
 LOCAL_SRC_FILES := $(call all-java-files-under, src)
+# Only compile source java files in this apk.
+
+ifneq ($(findstring sofia3g, $(TARGET_BOARD_PLATFORM)),)
+    LOCAL_SRC_FILES += $(call all-java-files-under, src_msm)
+else
+    LOCAL_SRC_FILES += $(call all-java-files-under, src_mmgr)
+endif
 
 LOCAL_PACKAGE_NAME := Amtl
 

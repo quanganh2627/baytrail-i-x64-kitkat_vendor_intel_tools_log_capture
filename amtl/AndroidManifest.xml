@@ -18,18 +18,18 @@
         android:required="true" />
 
     <application
-        android:name="com.intel.amtl.AMTLApplication"
+        android:name="com.intel.amtl.common.AMTLApplication"
         android:allowBackup="true"
         android:icon="@drawable/ic_launcher"
         android:label="@string/app_name"
         android:theme="@style/AppBaseTheme">
 
         <activity
-            android:name="com.intel.amtl.gui.AMTLSettings"
+            android:name="com.intel.amtl.common.gui.AMTLSettings"
             android:label="@string/app_name" />
 
         <activity
-            android:name="com.intel.amtl.gui.AMTLTabLayout"
+            android:name="com.intel.amtl.common.gui.AMTLTabLayout"
             android:launchMode="singleInstance"
             android:configChanges="orientation|screenSize"
             android:label="@string/app_name">
@@ -41,7 +41,7 @@
             </intent-filter>
         </activity>
 
-        <receiver android:name="com.android.amtl.boot.BootCompletedReceiver">
+        <receiver android:name="com.android.amtl.common.boot.BootCompletedReceiver">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>

@@ -35,8 +35,8 @@
 #define TTY_CLOSED -1
 #define UNUSED __attribute__((__unused__))
 
-JNIEXPORT jint JNICALL Java_com_intel_amtl_modem_Gsmtty_OpenSerial(JNIEnv *env, UNUSED jobject obj,
-        jstring jtty_name, jint baudrate)
+JNIEXPORT jint JNICALL Java_com_intel_amtl_common_modem_Gsmtty_OpenSerial(JNIEnv *env,
+        UNUSED jobject obj, jstring jtty_name, jint baudrate)
 {
     int fd = TTY_CLOSED;
     const char *tty_name = (*env)->GetStringUTFChars(env, jtty_name, 0);
@@ -94,7 +94,7 @@ open_serial_success:
     return fd;
 }
 
-JNIEXPORT jint JNICALL Java_com_intel_amtl_modem_Gsmtty_CloseSerial(UNUSED JNIEnv *env,
+JNIEXPORT jint JNICALL Java_com_intel_amtl_common_modem_Gsmtty_CloseSerial(UNUSED JNIEnv *env,
         UNUSED jobject obj, jint fd)
 {
     ALOGI("CloseSerial: closing file descriptor (%d)", fd);
