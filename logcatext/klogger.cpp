@@ -31,6 +31,7 @@
 #define NSEC_IN_SEC (NSEC_IN_USEC * USEC_IN_SEC)
 #define SEC_FROM_USEC(a) ((a)/(USEC_IN_SEC))
 #define EXTRA_NSEC(a)    (((a)%(USEC_IN_SEC))*NSEC_IN_USEC)
+#define EXTRA_USEC(a)    ((a)%(USEC_IN_SEC))
 
 #define POLL_TIMEOUT 100000
 
@@ -135,7 +136,8 @@ int klogger_read(struct log_msg *log_msg) {
             /*fill the header */
             update_header_data(usec, prio);
             payload_length += sprintf(log_msg->msg() + payload_length + 1,
-                                      "%s", msg_start);
+                                      "[%5llu.%06llu] %s", SEC_FROM_USEC(usec),
+                                      EXTRA_USEC(usec), msg_start);
         } else {
             payload_length += sprintf(log_msg->msg() + payload_length + 1,
                                       "<pe> %s", msg_start);
