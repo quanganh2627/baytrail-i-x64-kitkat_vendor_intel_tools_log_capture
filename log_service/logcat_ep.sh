@@ -1,7 +1,7 @@
 #!/system/bin/sh
 #
 #
-# Copyright (C) Intel 2014
+# Copyright (C) Intel 2015
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,21 +17,20 @@
 # limitations under the License.
 #
 
-start_log() {
-    local logprop=$1
-    local logservice=$2
+# This script is meant to serve as a domain entrypoint for ap[k]_logfs
+# servicis
 
-    #need to check vold status for encryption case
-    vold=$(getprop vold.post_fs_data_done)
-    if [ "$vold" != "1" ]; then
-        return
-    fi
-    logstatus=$(getprop $logprop)
-    if [ "$logstatus" = "1" ]; then
-        start $logservice
-        exit
-    fi
-}
+case "$1" in
+    *logcat)
+       "$@"
+    ;;
 
-start_log persist.service.aplogfs.enable ap_logfs
-start_log persist.service.apklogfs.enable apk_logfs
+    *logcatext)
+        "$@"
+    ;;
+
+    *)
+        echo "$0 should only be used for logcat[ext]"
+    ;;
+esac
+
