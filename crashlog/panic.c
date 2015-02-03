@@ -257,6 +257,9 @@ static int crashlog_check_console_file(char *reason)
         do_copy(SAVED_PANIC_RAM, destination, MAXFILESIZE);
 
         destination[0] = '\0';
+        snprintf(destination, sizeof(destination), "%s%d/%s_%s.txt", CRASH_DIR, dir,
+                APLOGEVENT, dateshort);
+		do_copy(APLOG_FILE_0, destination, MAXFILESIZE);
         snprintf(destination, sizeof(destination), "%s%d/", CRASH_DIR, dir);
         key = raise_event(CRASHEVENT, crashtype, NULL, destination);
         LOGE("%-8s%-22s%-20s%s %s\n", CRASHEVENT, key, get_current_time_long(0), crashtype, destination);
