@@ -53,12 +53,10 @@ public class PreferencesActivity extends PreferenceActivity implements OnPrefere
     private GsmttyManager ttyManager;
 
     public void onCreate(Bundle savedInstanceState) {
-		Log.e(mLogTag, "3");
         super.onCreate(savedInstanceState);
         addPreferencesFromResource(R.xml.preferences);
         Preference restoreSettings = findPreference(this.getString(R.string.prefs_shared_restore_settings_key));
         if (restoreSettings != null) {
-			Log.e(mLogTag, "8");
 				
 	        restoreSettings.setOnPreferenceClickListener(this);
     	}
@@ -67,12 +65,9 @@ public class PreferencesActivity extends PreferenceActivity implements OnPrefere
 	
     @Override
     public boolean onPreferenceClick(Preference preference) {
-		Log.e(mLogTag, "5");
         String thisKey = preference.getKey();
         String restoreSettingsKey = this.getString(R.string.prefs_shared_restore_settings_key);
-		Log.e(mLogTag, "1");
         if (thisKey.contentEquals(restoreSettingsKey)) {
-			Log.e(mLogTag, "2");
             showDialog(DIALOG_RESTORE_SETTINGS);
             return true;
         } else
@@ -140,7 +135,6 @@ public class PreferencesActivity extends PreferenceActivity implements OnPrefere
     @Override
     protected void onResume() {
         super.onResume();
-		Log.e(mLogTag, "4");
 
         PreferenceReader reader = new PreferenceReader(this);
         reader.updateDefaultValues();
@@ -150,12 +144,9 @@ public class PreferencesActivity extends PreferenceActivity implements OnPrefere
     }
 	public void openTty() {
         try {
-	        if (this.ttyManager != null) {
-				Log.i(mLogTag, "OPEN tty is not null");
-				ttyManager.close();
-			    Thread.sleep(500);
+			if (this.ttyManager == null) {
+            	this.ttyManager = new GsmttyManager();
            	}
-            this.ttyManager = new GsmttyManager();
         } catch (ModemControlException ex) {
            	Log.e(mLogTag, "there is an issue with tty opening");
     	} catch (Exception e) {

@@ -58,7 +58,9 @@ public class GsmttyManager implements Closeable {
     public String writeToModemControl(String atCommand) throws ModemControlException {
 
         String atResponse = "";
+		String atResponse1 = "";
         byte[] responseBuffer = new byte[10240];
+		int readCount1;
 
         try {
             this.file.writeBytes(atCommand);
@@ -75,12 +77,28 @@ public class GsmttyManager implements Closeable {
             if (readCount >= 0) {
                 atResponse = new String(responseBuffer, 0, readCount);
                 Log.i(TAG, MODULE + " : response from modem " + atResponse);
-				if (readCount >= 100) {
+				if (readCount >= 1000) {
 					writeFileSdcard("/sdcard/logs/coredump.txt", atResponse);
-					atResponse = "response is too big, pls see /sdcard/logs/coredump.txt";
+					//atResponse = "response is too big, pls see /sdcard/logs/coredump.txt";
+					if (atCommand.contains("at+xlog=0") ==true) {
+						do {
+							
+							this.file.writeBytes("at");
+							Log.i(TAG, MODULE + ": sending to modem " + "at");
+							readCount1 = this.file.read(responseBuffer);
+							Log.i(TAG, MODULE + " : read count1 " + readCount1);
+							if (readCount1 == 2) {
+								break;
+							}
+							atResponse1= new String(responseBuffer, 0, readCount1);
+							atResponse = atResponse + atResponse1;
+							Log.i(TAG, MODULE + " : response from modem " + atResponse1);
+							writeFileSdcard("/sdcard/logs/coredump.txt", atResponse1);
+						} while ( readCount1>=0 );
+					}
 				}
 			} else {
-                throw new ModemControlException("Unable to read response from the modem.");
+            throw new ModemControlException("Unable to read response from the modem.");
             }
         }
         catch (IOException ex) {
@@ -107,15 +125,16 @@ public class GsmttyManager implements Closeable {
     }
 
 	public void writeFileSdcard(String fileName,String message){ 
-       try { 
-	       FileOutputStream fout = new FileOutputStream(fileName);
-	       byte [] bytes = message.getBytes(); 
-	       fout.write(bytes); 
-	       fout.close(); 
+	   try { 
+		   RandomAccessFile rf=new RandomAccessFile(fileName,"rw");
+		   rf.seek(rf.length());
+		   byte [] bytes = message.getBytes(); 
+		   rf.write(bytes); 
+		   rf.close(); 
 	   } 
-       catch(IOException e){ 
+	   catch(IOException e){ 
 		   e.printStackTrace(); 
-       } 
-}
+	   } 
+	}
 
 }
