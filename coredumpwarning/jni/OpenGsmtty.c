@@ -22,7 +22,7 @@
 #include <termios.h>
 #include <errno.h>
 #include <strings.h>
-#include <cutils/log.h>
+#include <utils/Log.h>
 
 #include "OpenGsmtty.h"
 
@@ -32,13 +32,6 @@
 
 #define LOG_TAG "TelephonyEventsNotifier"
 #include <stdio.h>
-#define LOG(_p, ...) \
-      fprintf(stderr, _p "/" LOG_TAG ": " __VA_ARGS__)
-#define LOGV(...)   LOG("V", __VA_ARGS__)
-#define LOGD(...)   LOG("D", __VA_ARGS__)
-#define LOGI(...)   LOG("I", __VA_ARGS__)
-#define LOGW(...)   LOG("W", __VA_ARGS__)
-#define LOGE(...)   LOG("E", __VA_ARGS__)
 
 #define TTY_CLOSED -1
 
@@ -49,42 +42,13 @@ JNIEXPORT jint JNICALL Java_com_intel_internal_telephony_TelephonyEventsNotifier
     const char *tty_name = (*env)->GetStringUTFChars(env, jtty_name, 0);
 
     struct termios tio;
-    LOGI("OpenSerial: opening %s", tty_name);
+    ALOGD("OpenSerial: opening %s", "atc");
 
-    fd = open(tty_name, O_RDWR | CLOCAL | O_NOCTTY);
+    fd = open("/dev/mvpipe-atc" , O_RDWR);
     if (fd < 0) {
-        LOGE("OpenSerial: %s (%d)", strerror(errno), errno);
+       ALOGD("OpenSerial: %s (%d)", strerror(errno), errno);
         goto open_serial_failure;
     }
-
-    struct termios terminalParameters;
-    if (tcgetattr(fd, &terminalParameters)) {
-        LOGE("OpenSerial: %s (%d)", strerror(errno), errno);
-        goto open_serial_failure;
-    }
-
-    cfmakeraw(&terminalParameters);
-    if (tcsetattr(fd, TCSANOW, &terminalParameters)) {
-        LOGE("OpenSerial: %s (%d)", strerror(errno), errno);
-        goto open_serial_failure;
-    }
-
-    if (fcntl(fd, F_SETFL, O_NONBLOCK) < 0 ) {
-        LOGE("OpenSerial: %s (%d)", strerror(errno), errno);
-        goto open_serial_failure;
-    }
-
-    memset(&tio, 0, sizeof(tio));
-    tio.c_cflag = B115200;
-    tio.c_cflag |= CS8 | CLOCAL | CREAD;
-    tio.c_iflag &= ~(INPCK | IGNPAR | PARMRK | ISTRIP | IXANY | ICRNL);
-    tio.c_oflag &= ~OPOST;
-    tio.c_cc[VMIN] = 1;
-    tio.c_cc[VTIME] = 10;
-
-    tcflush(fd, TCIFLUSH);
-    cfsetispeed(&tio, baudrate);
-    tcsetattr(fd, TCSANOW, &tio);
 
     goto open_serial_success;
 
@@ -96,7 +60,7 @@ open_serial_failure:
 
 open_serial_success:
     if (fd != TTY_CLOSED)
-       LOGI("OpenSerial: %s opened (%d)", tty_name, fd);
+       ALOGD("OpenSerial: %s opened (%d)", "atc", fd);
     (*env)->ReleaseStringUTFChars(env, jtty_name, tty_name);
     return fd;
 }
@@ -104,14 +68,14 @@ open_serial_success:
 JNIEXPORT jint JNICALL Java_com_intel_internal_telephony_TelephonyEventsNotifier_Gsmtty_CloseSerial(JNIEnv *env,
         jobject obj, jint fd)
 {
-    LOGI("CloseSerial: closing file descriptor (%d)", fd);
+    ALOGD("CloseSerial: closing file descriptor (%d)", fd);
     if (fd >= 0) {
         close(fd);
         fd = TTY_CLOSED;
-        LOGD("CloseSerial: closed");
+        ALOGD("CloseSerial: closed");
     }
     else {
-        LOGD("CloseSerial: already closed");
+        ALOGD("CloseSerial: already closed");
     }
     return 0;
 }
