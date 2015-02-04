@@ -47,7 +47,7 @@ public class MtsProperties {
 
     public static String getRotateSize() {
         return (AMTLApplication.getServiceToStart().equals("mts2"))
-                ? "persist.sys.mts2.rotate_size" : "persist.service.mts.rotat_size";
+                ? "persist.sys.mts2.rotate_size" : "persist.service.mts.rotate_size";
     }
 
     public static String getInterface() {
