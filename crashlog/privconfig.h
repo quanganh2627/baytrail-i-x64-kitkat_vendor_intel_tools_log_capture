@@ -343,7 +343,8 @@ extern enum crashlog_mode g_crashlog_mode;
 #define REBOOT_DIR              DEBUGFS_DIR "/intel_scu_osnib"
 #define EVENTS_DIR              LOGS_DIR "/events"
 #define EFI_DIR                 SYS_DIR "/firmware/efi"
-#define EFIVARS_DIR             EFI_DIR "/efivars"
+#define EFI_EFIVARS_DIR         EFI_DIR "/efivars"
+#define EFI_VARS_DIR            EFI_DIR "/vars"
 #define FACTORY_PARTITION_DIR   RESDIR "/factory"
 
 /* FILES */
