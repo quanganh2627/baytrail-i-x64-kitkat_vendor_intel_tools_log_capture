@@ -52,7 +52,7 @@ public class GsmttyManager implements Closeable {
     }
 
     private String getTtyFileName() {
-        return "/dev/mvpipe-fttool";
+        return "/dev/mvpipe-at3";
     }
 
     public String writeToModemControl(String atCommand) throws ModemControlException {

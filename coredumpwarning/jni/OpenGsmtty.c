@@ -38,7 +38,7 @@
 JNIEXPORT jint JNICALL Java_com_intel_internal_telephony_TelephonyEventsNotifier_Gsmtty_OpenSerial(JNIEnv *env, jobject obj,
         jstring jtty_name, jint baudrate)
 {
-/*    int fd = TTY_CLOSED;
+    int fd = TTY_CLOSED;
     const char *tty_name = (*env)->GetStringUTFChars(env, jtty_name, 0);
 
     struct termios tio;
@@ -62,14 +62,13 @@ open_serial_success:
     if (fd != TTY_CLOSED)
        ALOGD("OpenSerial: %s opened (%d)", "atc", fd);
     (*env)->ReleaseStringUTFChars(env, jtty_name, tty_name);
-    return fd;*/
-    return 1;
+    return fd;
 }
 
 JNIEXPORT jint JNICALL Java_com_intel_internal_telephony_TelephonyEventsNotifier_Gsmtty_CloseSerial(JNIEnv *env,
         jobject obj, jint fd)
 {
-   /* ALOGD("CloseSerial: closing file descriptor (%d)", fd);
+    ALOGD("CloseSerial: closing file descriptor (%d)", fd);
     if (fd >= 0) {
         close(fd);
         fd = TTY_CLOSED;
@@ -77,6 +76,6 @@ JNIEXPORT jint JNICALL Java_com_intel_internal_telephony_TelephonyEventsNotifier
     }
     else {
         ALOGD("CloseSerial: already closed");
-    }*/
+    }
     return 0;
 }
