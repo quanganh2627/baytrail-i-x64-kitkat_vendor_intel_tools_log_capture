@@ -53,6 +53,12 @@
 #define MMGRMAXSTRING           (20)
 #define MMGRMAXEXTRA            (512)
 
+/* Percentage of guaranteed available space checked by crashlogd
+ * to determine whether to generate new crash logs
+ */
+#define EMMC_MINIMUN_FREEMEM_PERCENT        20
+#define SDCARD_MINIMUN_FREEMEM_PERCENT      20
+
 /* FIELDS DEFINITIONS */
 #define PERM_USER               "system"
 #define PERM_GROUP              "log"
