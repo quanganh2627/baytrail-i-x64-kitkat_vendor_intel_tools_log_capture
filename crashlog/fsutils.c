@@ -37,6 +37,8 @@
 #include <fcntl.h>
 
 #include <cutils/log.h>
+#include <sys/statfs.h>
+
 #ifndef __TEST__
 #include <private/android_filesystem_config.h>
 #endif
@@ -45,6 +47,26 @@ long current_sd_size_limit = LONG_MAX;
 
 /* No header in bionic... */
 ssize_t sendfile(int out_fd, int in_fd, off_t *offset, size_t count);
+
+static int checkMemAvailable(const char* path, unsigned int req )
+{
+    struct statfs st;
+    unsigned long long reserved;
+
+    if (statfs(path, &st) < 0) {
+        LOGE("%s: warn: statfs failed on %s, err:%s!!!", __FUNCTION__, path, strerror(errno));
+        return 0;
+    }
+
+    reserved = st.f_blocks / 100 * req;
+    if( st.f_bavail < reserved) {
+        LOGE("%s: warn: no space avail in %s,  only %llu of %llu free!", __FUNCTION__, path, st.f_bavail, st.f_blocks);
+        return -1;
+    }
+
+   return 0;
+}
+
 
 int readline(int fd, char buffer[MAXLINESIZE]) {
     int size = 0, res;
@@ -286,6 +308,11 @@ int get_sdcard_paths(int mode) {
     if (!file_exists(SDCARD_LOGS_DIR))
         mkdir(SDCARD_LOGS_DIR, 0777);
 
+    /* check whether there's extra available space for new logs in the SD card */
+    if (checkMemAvailable(SDCARD_LOGS_DIR, SDCARD_MINIMUN_FREEMEM_PERCENT) < 0) {
+        return 0;
+     }
+
     if ( (d = opendir(SDCARD_LOGS_DIR)) != NULL ){
         CRASH_DIR = SDCARD_CRASH_DIR;
         STATS_DIR = SDCARD_STATS_DIR;
@@ -330,6 +357,13 @@ int find_new_crashlog_dir(int mode) {
         default:
             LOGE("%s: Invalid mode %d\n", __FUNCTION__, mode);
             return -1;
+    }
+
+    /* check whether there's extra available space for new logs */
+    if (!strncmp(dir, LOGS_DIR, strlen(LOGS_DIR))) {
+        if( checkMemAvailable(LOGS_DIR, EMMC_MINIMUN_FREEMEM_PERCENT) < 0){
+            return -1;
+         }
     }
 
     if ( (fd = fopen(path, "r")) != NULL ) {
