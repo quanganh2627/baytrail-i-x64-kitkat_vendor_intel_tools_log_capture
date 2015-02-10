@@ -36,6 +36,7 @@ import com.intel.amtl.common.log.AlogMarker;
 import com.intel.amtl.common.models.config.ExpertConfig;
 import com.intel.amtl.common.models.config.ModemConf;
 import com.intel.amtl.common.modem.ModemController;
+import com.intel.amtl.common.mts.MtsManager;
 import com.intel.amtl.R;
 
 import java.io.IOException;
@@ -101,11 +102,17 @@ public class ModemTraces implements GeneralTracing {
 
     public void cleanTemp() {
         AlogMarker.tAB("ModemTraces.cleanTemp", "0");
-        /* would it seem a bit dumb to delete files based on a wildcard ? */
-        /*if (isRunning())
-            stop();
+        if (MtsManager.getMtsState().equals("running")
+                && MtsManager.getMtsOutputType().equals("f")) {
+            MtsManager.stopServices();
+            FileOperations.removeFiles(FileOperations.BP_LOG_PATH,
+                FileOperations.BP_LOG_FILE_NAME_MATCH);
+            MtsManager.startService("persistent");
+        } else {
+            FileOperations.removeFiles(FileOperations.BP_LOG_PATH,
+                FileOperations.BP_LOG_FILE_NAME_MATCH);
+        }
 
-        start();*/
         AlogMarker.tAE("ModemTraces.cleanTemp", "0");
     }
 

@@ -172,11 +172,16 @@ public class LogcatTraces implements GeneralTracing, OnCheckedChangeListener {
     }
 
     public void cleanTemp() {
-        if (isRunning()) {
+        boolean isRunning = isRunning();
+        if (isRunning) {
             stop();
         }
 
         FileOperations.removeFiles(FileOperations.TEMP_OUTPUT_FOLDER, TEMP);
+
+        if (isRunning) {
+            start();
+        }
     }
 
     public void saveTemp(String path) {

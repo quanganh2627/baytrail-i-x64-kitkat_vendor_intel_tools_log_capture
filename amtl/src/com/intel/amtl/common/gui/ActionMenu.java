@@ -111,13 +111,8 @@ public class ActionMenu implements OnClickListener, GeneralTracing {
         Runnable ok = new Runnable() {
             @Override
             public void run() {
-                boolean running = false;
                 for (GeneralTracing gc : tracers) {
-                    running = gc.isRunning();
                     gc.cleanTemp();
-                    if (running) {
-                        gc.start();
-                    }
                 }
             }
         };

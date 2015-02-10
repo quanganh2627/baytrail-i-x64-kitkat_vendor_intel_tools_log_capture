@@ -40,6 +40,8 @@ public class FileOperations {
     private static final String TAG = "AMTL";
     private static final String MODULE = "FileOperations";
     public static final String TEMP_OUTPUT_FOLDER = AMTLApplication.getApLoggingPath() + "/";
+    public static String BP_LOG_PATH = AMTLApplication.getBpLoggingPath() + "/";
+    public static String BP_LOG_FILE_NAME_MATCH = "bplog";
 
     public static boolean pathExists(String path) {
 
