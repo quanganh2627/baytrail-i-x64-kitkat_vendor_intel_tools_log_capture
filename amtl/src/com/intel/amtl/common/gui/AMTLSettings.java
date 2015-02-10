@@ -77,14 +77,42 @@ public class AMTLSettings extends PreferenceActivity {
         EditTextPreference savePath
                 = (EditTextPreference) findPreference(getString(R.string.settings_save_path_key));
         if (null != savePath) {
+            savePath.setSummary(savePath.getText());
             savePath.setOnPreferenceChangeListener(generalPathUpdated);
+        }
+
+        final ListPreference logsCount
+                = (ListPreference) findPreference("settings_logcat_file_count_key");
+        if (null != logsCount) {
+            logsCount.setSummary(logsCount.getValue());
+            logsCount.setOnPreferenceChangeListener(generalListUpdated);
+        }
+
+        final ListPreference logsSize
+                = (ListPreference) findPreference("settings_logcat_size_key");
+        if (null != logsSize) {
+            int i = logsSize.findIndexOfValue(logsSize.getValue().toString());
+            CharSequence[] entries = logsSize.getEntries();
+            logsSize.setSummary(entries[i]);
+            logsSize.setOnPreferenceChangeListener(generalListUpdated);
         }
         AlogMarker.tAE("AMTLSettings.onCreate", "0");
     }
 
+    private final OnPreferenceChangeListener generalListUpdated = new OnPreferenceChangeListener() {
+        @Override
+        public boolean onPreferenceChange(Preference preference, Object newValue) {
+            int i = ((ListPreference) preference).findIndexOfValue(newValue.toString());
+            CharSequence[] entries = ((ListPreference) preference).getEntries();
+            preference.setSummary(entries[i]);
+            return true;
+        }
+    };
+
     private final OnPreferenceChangeListener generalPathUpdated = new OnPreferenceChangeListener() {
         @Override
         public boolean onPreferenceChange(Preference preference, Object newValue) {
+            preference.setSummary(newValue.toString());
             return true;
         }
     };
