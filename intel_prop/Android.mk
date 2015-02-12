@@ -11,7 +11,7 @@ LOCAL_STATIC_LIBRARIES := \
 	libc \
 	liblog
 
-ifeq ($(TARGET_BIOS_TYPE),"uefi")
+ifeq ($(INTEL_PROP_LIBDMI),true)
 LOCAL_CFLAGS += -DENABLE_DMI
 LOCAL_STATIC_LIBRARIES += libdmi
 LOCAL_C_INCLUDES += \
