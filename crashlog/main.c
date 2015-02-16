@@ -94,6 +94,9 @@ int partition_notified = 1;
 /* to store if the pytimechart-record file is present */
 bool pytimechartrecord_filepresent;
 
+/* to store if logsystemstate service is available */
+bool logsystemstate_available;
+
 static const char * const mountpoints[] = {
     "/system",
     "/cache",
@@ -927,6 +930,10 @@ int main(int argc, char **argv) {
     get_crash_env(boot_mode, crypt_state, encrypt_progress, decrypt, token);
 
     pytimechartrecord_filepresent = file_exists(PYTIMECHART_FILE);
+
+    logsystemstate_available = file_exists(DUMPSTATE_DROPBOX_FILE);
+    if (!logsystemstate_available)
+        LOGW("logsystemstate service not available\n");
 
     alreadyran = (token[0] != 0);
 
