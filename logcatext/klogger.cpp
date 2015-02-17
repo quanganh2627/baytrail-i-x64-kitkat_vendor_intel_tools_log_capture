@@ -1,4 +1,4 @@
-/* * Copyright (C) Intel 2014
+/* * Copyright (C) Intel 2014-2015
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,7 +35,7 @@
 
 #define POLL_TIMEOUT 100000
 
-static int fd = 0;
+static int fd = -1;
 static struct timespec ts;
 static unsigned char priority;
 
@@ -53,24 +53,58 @@ static void setup_msg_header(struct logger_entry_v3 *hdr, unsigned int len) {
     hdr->msg[0] = priority;
 };
 
-static void update_header_data(unsigned long long usec, unsigned int prio) {
-    struct timespec ts_real, ts_mono;
-
-    clock_gettime(CLOCK_REALTIME, &ts_real);
-    clock_gettime(CLOCK_MONOTONIC, &ts_mono);
-
-    ts.tv_sec = ts_real.tv_sec - ts_mono.tv_sec;
-    if (ts_real.tv_nsec < ts_mono.tv_nsec) {
-        ts_real.tv_nsec += NSEC_IN_SEC;
-        ts.tv_sec--;
+static void ts_norm(struct timespec *pts, time_t sec, long long nsec) {
+    /* Carry over available seconds */
+    if (nsec >= NSEC_IN_SEC || nsec <= -NSEC_IN_SEC) {
+        sec += nsec / NSEC_IN_SEC;
+        nsec %= NSEC_IN_SEC;
     }
-    ts.tv_nsec = ts_real.tv_nsec - ts_mono.tv_nsec;
 
-    ts.tv_sec += SEC_FROM_USEC(usec);
-    ts.tv_nsec += EXTRA_NSEC(usec);
+    /*Try to keep the same sign*/
+    if (sec < 0 && nsec > 0) {
+        nsec -= NSEC_IN_SEC;
+        sec++;
+    }
 
-    ts.tv_sec += (ts.tv_nsec / NSEC_IN_SEC);
-    ts.tv_nsec = (ts.tv_nsec % NSEC_IN_SEC);
+    if (sec > 0 && nsec < 0) {
+        nsec += NSEC_IN_SEC;
+        sec--;
+    }
+
+    pts->tv_sec = sec;
+    pts->tv_nsec = nsec;
+}
+
+static struct timespec ts_add(struct timespec ts1, struct timespec ts2) {
+    struct timespec ret;
+    ts_norm(&ret, ts1.tv_sec + ts2.tv_sec, ts1.tv_nsec + ts2.tv_nsec);
+    return ret;
+}
+
+static struct timespec ts_sub(struct timespec ts1, struct timespec ts2) {
+    struct timespec ret;
+    ts_norm(&ret, ts1.tv_sec - ts2.tv_sec, ts1.tv_nsec - ts2.tv_nsec);
+    return ret;
+}
+
+static struct timespec ts_add_us(struct timespec ts1, unsigned long long usec) {
+    struct timespec ret;
+    ts_norm(&ret, ts1.tv_sec, ts1.tv_nsec + (usec * NSEC_IN_USEC));
+    return ret;
+}
+
+static void update_header_data(unsigned long long usec, unsigned int prio) {
+    struct timespec ts_real, ts_ref;
+    clock_gettime(CLOCK_REALTIME, &ts_real);
+    /*
+    * Time calculations proved to be very tricky. Apparently the closest userspace
+    * time source to the one used by the kernel logger is boottime. But even with
+    * this one, some drifts could be observed in long time running use cases.
+    */
+    clock_gettime(CLOCK_BOOTTIME, &ts_ref);
+
+    ts = ts_sub(ts_real, ts_ref);
+    ts = ts_add_us(ts, usec);
 
     switch (prio & 7) {
     case 0:                    /*KERN_EMERG */
@@ -98,11 +132,12 @@ bool klogger_init() {
     fd = open(FPATH, O_RDONLY | O_NONBLOCK);
     if (fd < 0)
         return false;
+
     return true;
 }
 
 void klogger_destroy() {
-    if (fd > 0)
+    if (fd >= 0)
         close(fd);
     return;
 }
@@ -120,11 +155,11 @@ int klogger_read(struct log_msg *log_msg) {
     if (ret <= 0) {
         return ret;
     }
-    /*just make shure we are null terminated*/
-    if(ret<LOGGER_ENTRY_MAX_LEN)
+    /*just make shure we are null terminated */
+    if (ret < LOGGER_ENTRY_MAX_LEN)
         line_buffer[ret] = 0;
     else
-        line_buffer[LOGGER_ENTRY_MAX_LEN-1] = 0;
+        line_buffer[LOGGER_ENTRY_MAX_LEN - 1] = 0;
 
     msg_start = strchr(line_buffer, ';');
     /*the first char will contain the priority */
@@ -152,7 +187,7 @@ int klogger_read(struct log_msg *log_msg) {
 
 int klogger_wait() {
     struct pollfd pfd;
-    pfd.fd=fd;
+    pfd.fd = fd;
     pfd.events = POLLIN | POLLPRI;
-    return poll(&pfd,1,POLL_TIMEOUT);
+    return poll(&pfd, 1, POLL_TIMEOUT);
 }
