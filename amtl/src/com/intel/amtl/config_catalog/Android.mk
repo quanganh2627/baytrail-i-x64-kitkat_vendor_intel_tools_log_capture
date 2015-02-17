@@ -41,6 +41,22 @@ LOCAL_SRC_FILES := $(LOCAL_MODULE)
 include $(BUILD_PREBUILT)
 
 include $(CLEAR_VARS)
+LOCAL_MODULE := amtl_cherrytrail_XMM_7360.cfg
+LOCAL_MODULE_TAGS := optional
+LOCAL_MODULE_CLASS := ETC
+LOCAL_MODULE_PATH := $(TARGET_OUT_ETC)/telephony
+LOCAL_SRC_FILES := $(LOCAL_MODULE)
+include $(BUILD_PREBUILT)
+
+include $(CLEAR_VARS)
+LOCAL_MODULE := amtl_gmin_XMM_7360.cfg
+LOCAL_MODULE_TAGS := optional
+LOCAL_MODULE_CLASS := ETC
+LOCAL_MODULE_PATH := $(TARGET_OUT_ETC)/telephony
+LOCAL_SRC_FILES := $(LOCAL_MODULE)
+include $(BUILD_PREBUILT)
+
+include $(CLEAR_VARS)
 LOCAL_MODULE := amtl_clovertrail_XMM_6360.cfg
 LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE_CLASS := ETC
@@ -137,6 +153,8 @@ LOCAL_REQUIRED_MODULES :=\
     amtl_cherrytrail_XMM_7260_ssic.cfg \
     amtl_gmin_XMM_7260.cfg \
     amtl_gmin_XMM_7260_ssic.cfg \
+    amtl_cherrytrail_XMM_7360.cfg \
+    amtl_gmin_XMM_7360.cfg \
     amtl_clovertrail_XMM_6360.cfg \
     amtl_clovertrail_XMM_7160.cfg \
     amtl_merrifield_XMM_6360.cfg \
