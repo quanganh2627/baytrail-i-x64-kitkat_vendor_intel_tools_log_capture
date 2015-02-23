@@ -39,6 +39,8 @@ public class AMTLApplication extends Application {
     private static boolean traceLegacy = false;
     private static boolean useMmgr = false;
     private static String serviceToStart;
+    private static String apLoggingPath = "/logs";
+    private static String bpLoggingPath = "/logs";
     private static ArrayList<String> modemNameList = new ArrayList<String>();
     private static AlogMarker m = new AlogMarker();
 
@@ -174,4 +176,31 @@ public class AMTLApplication extends Application {
         return modemNameList;
     }
 
+    public static void setApLoggingPath(String apPath) {
+        m.tAB("AMTLApplication.setApLoggingPath", "0");
+        if (apPath != null) {
+            apLoggingPath = apPath;
+        }
+        m.tAE("AMTLApplication.setApLoggingPath", "0");
+    }
+
+    public static String getApLoggingPath() {
+        m.tAB("AMTLApplication.getApLoggingPath", "0");
+        m.tAE("AMTLApplication.getApLoggingPath", "0");
+        return apLoggingPath;
+    }
+
+    public static void setBpLoggingPath(String bpPath) {
+        m.tAB("AMTLApplication.setBpLoggingPath", "0");
+        if (bpPath != null) {
+            bpLoggingPath = bpPath;
+        }
+        m.tAE("AMTLApplication.setBpLoggingPath", "0");
+    }
+
+    public static String getBpLoggingPath() {
+        m.tAB("AMTLApplication.getBpLoggingPath", "0");
+        m.tAE("AMTLApplication.getBpLoggingPath", "0");
+        return bpLoggingPath;
+    }
 }

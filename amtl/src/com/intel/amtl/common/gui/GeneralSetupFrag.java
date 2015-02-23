@@ -69,8 +69,6 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnChe
     private final String TAG = "AMTL";
     private final String MODULE = "GeneralSetupFrag";
     private final String BACKUP_LOG_PATH = "/data/amtl_logs_backup/";
-    private final String AP_LOG_PATH = "/mnt/sdcard/logs/";
-    private final String BP_LOG_PATH = "/logs/";
     private final int logTagId = 100;
     private final int genCDId = 200;
 

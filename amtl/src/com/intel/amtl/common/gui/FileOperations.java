@@ -21,6 +21,7 @@ package com.intel.amtl.common.gui;
 
 import android.os.Environment;
 
+import com.intel.amtl.common.AMTLApplication;
 import com.intel.amtl.common.log.AlogMarker;
 
 import java.io.File;
@@ -38,7 +39,7 @@ public class FileOperations {
 
     private static final String TAG = "AMTL";
     private static final String MODULE = "FileOperations";
-    public static String TEMP_OUTPUT_FOLDER = "/logs/";
+    public static final String TEMP_OUTPUT_FOLDER = AMTLApplication.getApLoggingPath() + "/";
 
     public static boolean pathExists(String path) {
 

@@ -59,13 +59,13 @@ public class ActionMenu implements OnClickListener, GeneralTracing {
     private ImageButton buttonSave = null;
     private ImageButton buttonClear = null;
 
-    private String OUTPUT_STORAGE_EMMC = "/logs";
+    private final String OUTPUT_STORAGE_EMMC = AMTLApplication.getApLoggingPath();
     private String outputFile = OUTPUT_STORAGE_EMMC;
     private boolean outputSDCard = false;
 
     private boolean running = false;
 
-    ActionMenu(Activity activity) {
+    public ActionMenu(Activity activity) {
         AlogMarker.tAB("ActionMenu.ActionMenu", "0");
         this.activity = activity;
         switchOutput();
@@ -154,7 +154,8 @@ public class ActionMenu implements OnClickListener, GeneralTracing {
             @Override
             public void run() {
                 String path = PreferenceManager.getDefaultSharedPreferences(activity).getString(
-                        activity.getString(R.string.settings_user_save_path_key), "/logs/");
+                        activity.getString(R.string.settings_user_save_path_key),
+                        AMTLApplication.getApLoggingPath() + "/");
                 boolean pathExists = false;
 
                 try {
@@ -185,7 +186,8 @@ public class ActionMenu implements OnClickListener, GeneralTracing {
         };
 
         path = PreferenceManager.getDefaultSharedPreferences(activity).getString(
-                activity.getString(R.string.settings_save_path_key), "/logs");
+                activity.getString(R.string.settings_save_path_key),
+                AMTLApplication.getApLoggingPath());
         path = FileOperations.getTimeStampedPath(path, "logs_");
 
         UIHelper.savePopupDialog(activity, "Save active logs",

@@ -174,6 +174,7 @@ public class AMTLTabLayout extends Activity implements GeneralSetupFrag.GSFCallB
         if (expConf.isExpertModeEnabled(modemNames.get(currentLoggingModem))) {
             ExpertConfig.setConfigSet(true);
         }
+        this.updateLoggingPreferences();
 
         AlogMarker.tAE("AMTLTabLayout.loadConfiguration", "0");
     }
@@ -211,6 +212,17 @@ public class AMTLTabLayout extends Activity implements GeneralSetupFrag.GSFCallB
         AMTLApplication.setServiceToStart(mdmLogOutput.getServiceToStart());
         AMTLApplication.setUseMmgr(mdmLogOutput.getUseMmgr());
         AlogMarker.tAE("AMTLTabLayout.setModemParameters", "0");
+    }
+
+    private void updateLoggingPreferences() {
+        AlogMarker.tAB("AMTLTabLayout.updateLoggingPreferences", "0");
+        Editor edit = PreferenceManager.getDefaultSharedPreferences(this).edit();
+        edit.putString(this.getString(R.string.settings_user_save_path_key),
+                AMTLApplication.getApLoggingPath());
+        edit.putString(this.getString(R.string.settings_save_path_key),
+                AMTLApplication.getApLoggingPath());
+        edit.commit();
+        AlogMarker.tAE("AMTLTabLayout.updateLoggingPreferences", "0");
     }
 
     public void initializeTab() {

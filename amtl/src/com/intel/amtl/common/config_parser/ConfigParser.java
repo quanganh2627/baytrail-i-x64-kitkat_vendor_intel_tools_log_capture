@@ -27,6 +27,7 @@ import android.content.SharedPreferences.Editor;
 import android.util.Log;
 import android.util.Xml;
 
+import com.intel.amtl.common.AMTLApplication;
 import com.intel.amtl.common.log.AlogMarker;
 import com.intel.amtl.common.models.config.LogOutput;
 import com.intel.amtl.common.models.config.Master;
@@ -81,8 +82,19 @@ public class ConfigParser {
 
             switch (eventType) {
                 case XmlPullParser.START_TAG:
-                    index++;
-                    configOutputs.add(this.handleModemElement(index, parser));
+                    if (isStartOf(parser, "general")) {
+                        AMTLApplication.setApLoggingPath(parser.getAttributeValue(null, "ap_path"));
+                        AMTLApplication.setBpLoggingPath(parser.getAttributeValue(null, "bp_path"));
+                        Log.d(TAG, MODULE + ": ap_path = "
+                                + parser.getAttributeValue(null, "ap_path") + ", bp_path = "
+                                + parser.getAttributeValue(null, "bp_path"));
+                    } else if (isStartOf(parser, "modem")) {
+                        ModemLogOutput modemOut = this.handleModemElement(index + 1, parser);
+                        if (modemOut != null) {
+                            configOutputs.add(modemOut);
+                            index++;
+                        }
+                    }
                     break;
             }
             eventType = parser.next();
@@ -179,7 +191,7 @@ public class ConfigParser {
             modConf.setMtsMode(mtsMode);
         }
         AlogMarker.tAE("ConfigParser.parseShortConfig", "0");
-        return (modConf);
+        return modConf;
     }
 
     private ModemLogOutput handleModemElement(int index, XmlPullParser parser)
@@ -187,69 +199,66 @@ public class ConfigParser {
         AlogMarker.tAB("ConfigParser.handleModemElement", "0");
         ModemLogOutput ret = null;
         int outIndex = -1;
-        if (isStartOf(parser, "modem")) {
-            Log.d(TAG, MODULE + ": Get element type MODEM, index: " + index
-                    + ", -> WILL PARSE IT.");
+        Log.d(TAG, MODULE + ": Get element type MODEM, index: " + index
+                + ", -> WILL PARSE IT.");
 
-            // default_flush_cmd is the flush ops that will be performed
-            // by default (if specified in xml) on all use case:
-            // log start, log stop and at command error.
+        // default_flush_cmd is the flush ops that will be performed
+        // by default (if specified in xml) on all use case:
+        // log start, log stop and at command error.
 
-            // default_flush_cmd have to be specified only once in whatever
-            // of the output type in the xml.
+        // default_flush_cmd have to be specified only once in whatever
+        // of the output type in the xml.
 
-            // default_flush_cmd can be overwritten by flush_cmd parameter
-            // flush_cmd will only by used on log start use case, and only
-            // for the output type where it is specified in xml.
-            // This implies that flush_cmd parameter does not have effect
-            // on log stop and at command error use cases.
+        // default_flush_cmd can be overwritten by flush_cmd parameter
+        // flush_cmd will only by used on log start use case, and only
+        // for the output type where it is specified in xml.
+        // This implies that flush_cmd parameter does not have effect
+        // on log stop and at command error use cases.
 
-            // TODO default flush cmd per modem
-            if (parser.getAttributeValue(null, "default_flush_cmd") != null
-                    && this.context != null) {
-                Editor editor = context.getSharedPreferences("AMTLPrefsData",
-                        Context.MODE_PRIVATE).edit();
-                editor.putString("default_flush_cmd",
-                        parser.getAttributeValue(null, "default_flush_cmd"));
-                editor.commit();
-            }
-
-            ret = new ModemLogOutput(index,
-                    parser.getAttributeValue(null, "name"),
-                    parser.getAttributeValue(null, "connection_id"),
-                    parser.getAttributeValue(null, "service_to_start"),
-                    parser.getAttributeValue(null, "default_flush_cmd"),
-                    parser.getAttributeValue(null, "at_legacy_cmd"),
-                    parser.getAttributeValue(null, "use_mmgr"),
-                    parser.getAttributeValue(null, "full_stop_cmd"),
-                    parser.getAttributeValue(null, "dft_cfg_onstop"),
-                    parser.getAttributeValue(null, "modem_interface"));
-
-            Log.d(TAG, MODULE + ": index = " + index
-                    + ", name = " + parser.getAttributeValue(null, "name")
-                    + ", connection_id = " + parser.getAttributeValue(null, "connection_id")
-                    + ", service_to_start = " + parser.getAttributeValue(null, "service_to_start")
-                    + ", default_flush_cmd = " + parser.getAttributeValue(null, "default_flush_cmd")
-                    + ", at_legacy_cmd = " + parser.getAttributeValue(null, "at_legacy_cmd")
-                    + ", use_mmgr = " + parser.getAttributeValue(null, "use_mmgr")
-                    + ", full_stop_cmd = " + parser.getAttributeValue(null, "full_stop_cmd")
-                    + ", dft_cfg_onstop = " + parser.getAttributeValue(null, "dft_cfg_onstop")
-                    + ", modem_interface = " + parser.getAttributeValue(null, "modem_interface")
-                    + ".");
-
-            while (!isEndOf(parser, "modem")) {
-                LogOutput out = this.handleOutputElement(outIndex + 1, parser);
-                if (out != null) {
-                    if (isDefaultConf) {
-                        ret.setDefaultConfig(out);
-                    }
-                    ret.addOutputToList(out);
-                    outIndex++;
-                }
-                parser.next();
-            }
-            Log.d(TAG, MODULE + ": Completed element type MODEM parsing.");
+        // TODO default flush cmd per modem
+        if (parser.getAttributeValue(null, "default_flush_cmd") != null && this.context != null) {
+            Editor editor = context.getSharedPreferences("AMTLPrefsData",
+                    Context.MODE_PRIVATE).edit();
+            editor.putString("default_flush_cmd",
+                    parser.getAttributeValue(null, "default_flush_cmd"));
+            editor.commit();
         }
+
+        ret = new ModemLogOutput(index,
+                parser.getAttributeValue(null, "name"),
+                parser.getAttributeValue(null, "connection_id"),
+                parser.getAttributeValue(null, "service_to_start"),
+                parser.getAttributeValue(null, "default_flush_cmd"),
+                parser.getAttributeValue(null, "at_legacy_cmd"),
+                parser.getAttributeValue(null, "use_mmgr"),
+                parser.getAttributeValue(null, "full_stop_cmd"),
+                parser.getAttributeValue(null, "dft_cfg_onstop"),
+                parser.getAttributeValue(null, "modem_interface"));
+
+        Log.d(TAG, MODULE + ": index = " + index
+                + ", name = " + parser.getAttributeValue(null, "name")
+                + ", connection_id = " + parser.getAttributeValue(null, "connection_id")
+                + ", service_to_start = " + parser.getAttributeValue(null, "service_to_start")
+                + ", default_flush_cmd = " + parser.getAttributeValue(null, "default_flush_cmd")
+                + ", at_legacy_cmd = " + parser.getAttributeValue(null, "at_legacy_cmd")
+                + ", use_mmgr = " + parser.getAttributeValue(null, "use_mmgr")
+                + ", full_stop_cmd = " + parser.getAttributeValue(null, "full_stop_cmd")
+                + ", dft_cfg_onstop = " + parser.getAttributeValue(null, "dft_cfg_onstop")
+                + ", modem_interface = " + parser.getAttributeValue(null, "modem_interface")
+                + ".");
+
+        while (!isEndOf(parser, "modem")) {
+            LogOutput out = this.handleOutputElement(outIndex + 1, parser);
+            if (out != null) {
+                if (isDefaultConf) {
+                    ret.setDefaultConfig(out);
+                }
+                ret.addOutputToList(out);
+                outIndex++;
+            }
+            parser.next();
+        }
+        Log.d(TAG, MODULE + ": Completed element type MODEM parsing.");
 
         AlogMarker.tAE("ConfigParser.handleModemElement", "0");
         return ret;
@@ -313,6 +322,13 @@ public class ConfigParser {
                 + ", sigusr1_to_send = " + parser.getAttributeValue(null, "sigusr1_to_send")
                 + ", default_flush_cmd = " + parser.getAttributeValue(null, "default_flush_cmd")
                 + ", flush_cmd = " + parser.getAttributeValue(null, "flush_cmd") + ".");
+
+        String mtsOutput = parser.getAttributeValue(null, "mts_output");
+        if (mtsOutput!= null && mtsOutput.contains("/bplog")) {
+            AMTLApplication.setBpLoggingPath(mtsOutput.substring(0, mtsOutput.indexOf("/bplog")));
+            Log.d(TAG, MODULE + " overriding BP logging path : "
+                    + AMTLApplication.getBpLoggingPath());
+        }
 
         while (!isEndOf(parser, "output") && !isEndOf(parser, "defaultconf")) {
             this.handleMasterElements(parser, ret);

@@ -57,7 +57,7 @@
     <string name="settings_user_save_path_key">settings_user_save_path_key</string>
     <string name="settings_user_save_path_default">/logs</string>
 
-    <string name="settings_save_path_key">/logs</string>
+    <string name="settings_save_path_key">settings_save_path_key</string>
     <string name="settings_save_path_title">Logs path</string>
     <string name="settings_save_path_summary">Default logs path</string>
     <string name="settings_save_path_default">/logs</string>

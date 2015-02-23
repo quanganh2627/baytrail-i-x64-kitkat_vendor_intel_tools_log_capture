@@ -23,6 +23,7 @@ package com.intel.amtl.common.helper;
 import android.os.FileObserver;
 import android.util.Log;
 
+import com.intel.amtl.common.AMTLApplication;
 import com.intel.amtl.common.log.AlogMarker;
 
 import java.io.BufferedWriter;
@@ -41,7 +42,7 @@ public class LogManager extends FileObserver {
 
     private final String TAG = "AMTL";
     private final String MODULE = "LogManager";
-    private final String APTRIGGER = "/logs/aplogs/aplog_trigger";
+    private final String APTRIGGER = AMTLApplication.getApLoggingPath() + "/aplogs/aplog_trigger";
     private final String NBAPFILE = "10";
     private String tag = null;
     private String aplogPath = null;

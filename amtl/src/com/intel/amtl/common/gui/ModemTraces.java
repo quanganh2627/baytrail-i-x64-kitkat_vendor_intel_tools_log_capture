@@ -29,6 +29,7 @@ import android.util.Log;
 import android.view.View;
 import android.widget.Switch;
 
+import com.intel.amtl.common.AMTLApplication;
 import com.intel.amtl.common.exceptions.ModemControlException;
 import com.intel.amtl.common.helper.LogManager;
 import com.intel.amtl.common.log.AlogMarker;
@@ -48,8 +49,8 @@ public class ModemTraces implements GeneralTracing {
 
     private final String CONFSETUP_TAG = "AMTL_modem_configuration_setup";
     private final int CONFSETUP_TARGETFRAG = 0;
-    private final String AP_LOG_PATH = "/mnt/sdcard/logs/";
-    private final String BP_LOG_PATH = "/logs/";
+    private final String AP_LOG_PATH = "/mnt/sdcard/" + AMTLApplication.getApLoggingPath() + "/";
+    private final String BP_LOG_PATH = AMTLApplication.getBpLoggingPath() + "/";
     private final int PTI_KILL_WAIT = 1000;
 
     private Runtime rtm = java.lang.Runtime.getRuntime();
