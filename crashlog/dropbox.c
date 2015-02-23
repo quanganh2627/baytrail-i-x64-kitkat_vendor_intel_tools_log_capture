@@ -51,7 +51,7 @@ void dropbox_set_file_monitor_fd(int file_monitor_fd) {
 
 int start_dumpstate_srv(char* crash_dir, int crashidx, char *key) {
     char dumpstate_dir[PROPERTY_VALUE_MAX];
-    if ( !crash_dir || !key ) return 0;
+    if (!crash_dir || !key || !logsystemstate_available) return 0;
 
     /* Check if a dumpstate is already running */
     property_get(PROP_LOGSYSTEMSTATE, dumpstate_dir, "stopped");

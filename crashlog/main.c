@@ -48,6 +48,7 @@
 #include "ingredients.h"
 #include "checksum.h"
 #include "mmgr_source.h"
+#include "watchdog.h"
 
 #include <sys/types.h>
 #include <openssl/sha.h>
@@ -89,6 +90,12 @@ char CURRENT_PROC_ONLINE_SCU_LOG_NAME[PATHMAX]={PROC_ONLINE_SCU_LOG_NAME};
 char CURRENT_KERNEL_CMDLINE[PATHMAX]={KERNEL_CMDLINE};
 
 int partition_notified = 1;
+
+/* to store if the pytimechart-record file is present */
+bool pytimechartrecord_filepresent;
+
+/* to store if logsystemstate service is available */
+bool logsystemstate_available;
 
 static const char * const mountpoints[] = {
     "/system",
@@ -674,6 +681,7 @@ int do_monitor() {
     fd_set read_fds; /**< file descriptor set watching data availability from sources */
     int max = 0; /**< select max fd value +1 {@see man select(2) nfds} */
     int select_result; /**< select result */
+    struct timeval select_timeout;
     int file_monitor_fd = get_inotify_fd();
     dropbox_set_file_monitor_fd(file_monitor_fd);
     int i,num_modems;
@@ -714,7 +722,11 @@ int do_monitor() {
 
     lct_link_init_comm();
 
+    enable_watchdog(CRASHLOG_WD_TIMEOUT);
+
     for(;;) {
+        kick_watchdog();
+
         // Clear fd set
         FD_ZERO(&read_fds);
 
@@ -751,8 +763,11 @@ int do_monitor() {
         /*Allow reboot if not doing anything on main thread */
         property_set(PROP_PROC_ONGOING, "0");
 
+        select_timeout.tv_sec = CRASHLOG_SELECT_TIMEOUT;
+        select_timeout.tv_usec = 0;
+
         // Wait for events
-        select_result = select(max+1, &read_fds, NULL, NULL, NULL);
+        select_result = select(max+1, &read_fds, NULL, NULL, &select_timeout);
 
         property_set(PROP_PROC_ONGOING, "1");
 
@@ -913,6 +928,12 @@ int main(int argc, char **argv) {
 
     /* Get the properties and read the local files to set properly the env variables */
     get_crash_env(boot_mode, crypt_state, encrypt_progress, decrypt, token);
+
+    pytimechartrecord_filepresent = file_exists(PYTIMECHART_FILE);
+
+    logsystemstate_available = file_exists(DUMPSTATE_DROPBOX_FILE);
+    if (!logsystemstate_available)
+        LOGW("logsystemstate service not available\n");
 
     alreadyran = (token[0] != 0);
 

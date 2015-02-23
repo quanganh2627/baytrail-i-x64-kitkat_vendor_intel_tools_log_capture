@@ -1513,13 +1513,24 @@ void save_startuplogs(const char *reboot_id) {
     char src_log_path[PATHMAX];
     int result;
 
-    result = find_matching_file(EFIVARS_DIR, "EfilinuxLogs", start_log_name);
+    result = find_matching_file(EFI_EFIVARS_DIR, "EfilinuxLogs", start_log_name);
     if (result == 1) {
         make_log_boot_backup();
-        snprintf(src_log_path, sizeof(src_log_path), PATH_PATTERN, EFIVARS_DIR, start_log_name);
+        snprintf(src_log_path, sizeof(src_log_path), PATH_PATTERN, EFI_EFIVARS_DIR, start_log_name);
         snprintf(dest_log_path, sizeof(dest_log_path), "%s/%s_%s", LOGS_DIR, LOG_BOOT, reboot_id);
         do_copy_utf16_to_utf8(src_log_path, dest_log_path);
         LOGI("%s: EFI boot logs found, converted and copied here : %s\n", __FUNCTION__, dest_log_path);
+        return;
+    }
+    //backup path for kernelflinger logs
+    result = find_matching_file(EFI_VARS_DIR, "KernelflingerLogs", start_log_name);
+    if (result == 1) {
+        make_log_boot_backup();
+        snprintf(src_log_path, sizeof(src_log_path), "%s/%s/data", EFI_VARS_DIR, start_log_name);
+        snprintf(dest_log_path, sizeof(dest_log_path), "%s/%s_%s", LOGS_DIR, LOG_BOOT, reboot_id);
+        do_copy_eof(src_log_path, dest_log_path);
+        LOGI("%s: EFI kernelflinger logs found and copied here : %s\n", __FUNCTION__, dest_log_path);
+        return;
     }
 }
 

@@ -517,6 +517,9 @@ void restart_profile_srv(int serveridx) {
     char expected;
     char *profile_srv;
 
+    if(!pytimechartrecord_filepresent)
+        return;
+
     switch (serveridx) {
         case 1:
             profile_srv = "profile1_rest";
