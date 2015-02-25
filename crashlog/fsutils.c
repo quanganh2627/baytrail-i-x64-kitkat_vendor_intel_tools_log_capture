@@ -27,6 +27,7 @@
 #include "crashutils.h"
 #include "config_handler.h"
 #include "tcs_wrapper.h"
+#include "history.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -499,6 +500,12 @@ int find_new_crashlog_dir(e_dir_mode_t mode) {
         return -1;
 
     snprintf(path, sizeof(path), "%s%d", dir, current);
+
+    /* Check if directory is already in history, and delete path */
+    if (directory_exists(path)) {
+        history_delete_first_existent_logcrashpath(path);
+    }
+
     /* Call rmfr which will fail if the path does not exist
      * but doesn't matter as we create it afterwards
      */

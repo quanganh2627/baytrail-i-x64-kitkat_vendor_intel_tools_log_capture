@@ -539,3 +539,49 @@ int process_uptime_event(struct watch_entry __attribute__((unused)) *entry, stru
     clean_fake_property();
     return add_uptime_event();
 }
+
+int history_delete_first_existent_logcrashpath(const char *path) {
+
+    char line[MAXLINESIZE] = {'\0'};
+    char crashdir_log[MAXLINESIZE] = {'\0'};
+    int i = 0;
+    int res;
+    FILE *fd = NULL;
+    char *char_i;
+
+    if ((fd = fopen(HISTORY_FILE, "r+")) == NULL) {
+       LOGE("history_event file is not opened.\n");
+       return -1;
+    }
+
+    while (freadline(fd, line) > 0) {
+        /* search line with crashdir name */
+        res = sscanf(line, "%*s %*s %*s %*s %s\n", crashdir_log);
+
+        /* match event crashdir name with history_event log crashdir name */
+        if (res != 1 || strcmp(path, crashdir_log))
+             continue;
+
+        fseek(fd, -strlen(line), SEEK_CUR);
+        /* delete crashdir name */
+        if ((char_i = strstr(line, path)) == NULL)
+             continue;
+
+        memset(char_i, ' ', strlen(crashdir_log));
+
+        fwrite(line, sizeof(char), strlen(line), fd);
+
+        for (i = 0 ; i < MAX_RECORDS ; i++) {
+            if (historycache[i] && (char_i = strstr(historycache[i], path))) {
+                *char_i++ = '\n';
+                *char_i = '\0';
+                break;
+            }
+        }
+        break;
+    }
+
+    fclose(fd);
+
+    return 1;
+}

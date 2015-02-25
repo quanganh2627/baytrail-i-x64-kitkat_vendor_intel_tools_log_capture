@@ -50,5 +50,6 @@ int reset_history_cache();
 int add_uptime_event();
 int update_history_on_cmd_delete(char *events);
 int process_uptime_event(struct watch_entry *entry, struct inotify_event *event);
+int history_delete_first_existent_logcrashpath(const char *path);
 
 #endif /* __HISTORY__H__ */
