@@ -46,9 +46,12 @@ int calculate_checksum_buffer(const char *buffer, ssize_t size, unsigned char *r
  * @param callback function invoked when encountering a file for which checksum is not
  *        performed on the content of a file. Parameters passed through the callback
  *        represent the file and reason for why it was skipped.
+ * @param exceptions points to a NULL terminated array of file paths on which checksum
+          will not be performed.
  * @return 0 on succes, -1 otherwise
  */
-int calculate_checksum_directory(const char *path, unsigned char *result, calculate_checksum_callback callback);
+int calculate_checksum_directory(const char *path, unsigned char *result,
+        calculate_checksum_callback callback, const char *exceptions[]);
 
 /**
  * Computes a checksum on a file passed as parameter

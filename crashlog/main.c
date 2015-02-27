@@ -106,6 +106,11 @@ static const char * const mountpoints[] = {
     "/factory",
 };
 
+static char *checksum_ex_paths[] = {
+    "/factory/userdata_footer",
+    NULL
+};
+
 static int check_mounted_partition(const char *partition_name)
 {
     unsigned int i;
@@ -191,7 +196,8 @@ static void check_factory_partition_checksum() {
     }
 
     LOGD("%s: performing factory partition checksum calculation\n", __FUNCTION__);
-    if (calculate_checksum_directory(FACTORY_PARTITION_DIR, checksum, check_factory_checksum_callback) != 0) {
+    if (calculate_checksum_directory(FACTORY_PARTITION_DIR, checksum,
+            check_factory_checksum_callback, (const char**)checksum_ex_paths) != 0) {
         LOGE("%s: failed to calculate factory partition checksum\n", __FUNCTION__);
         return;
     }

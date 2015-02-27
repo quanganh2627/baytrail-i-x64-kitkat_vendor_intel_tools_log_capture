@@ -29,6 +29,7 @@
 /* used by calculate_checksum_directory! */
 static SHA_CTX g_sha1_context_dir_sum;
 static calculate_checksum_callback callback_dir = NULL;
+static const char **file_exceptions = NULL;
 
 int calculate_checksum_buffer(const char *buffer, ssize_t buffer_size, unsigned char *result) {
     ssize_t nread;
@@ -138,12 +139,26 @@ static int calculate_checksum_buffer_feed(const char *buffer, int buffer_size) {
     return 0;
 }
 
+static char priv_filter_path(const char *path, const char **file_exceptions) {
+    unsigned int entries = 0;
+
+    while (file_exceptions[entries] != NULL) {
+        if (!strcmp(path, file_exceptions[entries++])) {
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
 static int calculate_checksum_path(const char *fpath, const struct stat *sb, int tflag, struct FTW __unused *ftwbuf) {
 
     /* if file, calculate the checksum */
     if (tflag == FTW_F) {
         if ((sb->st_mode & S_IFMT) == S_IFREG) {
-            calculate_checksum_file_feed(fpath);
+            if (file_exceptions == NULL || !priv_filter_path(fpath, file_exceptions)) {
+                calculate_checksum_file_feed(fpath);
+            }
         } else if (callback_dir != NULL) {
             /* return the reason why a path tagged as a file was skipped */
             callback_dir(fpath, sb->st_mode & S_IFMT);
@@ -157,13 +172,15 @@ static int calculate_checksum_path(const char *fpath, const struct stat *sb, int
     return 0;
 }
 
-int calculate_checksum_directory(const char *path, unsigned char *result, calculate_checksum_callback callback) {
+int calculate_checksum_directory(const char *path, unsigned char *result,
+        calculate_checksum_callback callback, const char *path_exceptions[]) {
     /* mutex used to protect g_sha1_context_dir_sum */
     static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
     callback_dir = callback;
 
     pthread_mutex_lock(&lock);
     SHA1_Init(&g_sha1_context_dir_sum);
+    file_exceptions = path_exceptions;
 
     if (nftw(path, calculate_checksum_path, CRASHLOG_CHECKSUM_SIZE, 0) == -1) {
         pthread_mutex_unlock(&lock);
