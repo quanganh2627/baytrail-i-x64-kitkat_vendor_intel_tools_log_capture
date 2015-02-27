@@ -30,6 +30,7 @@
 #include "fsutils.h"
 #include "log.h"
 #include "tcs_wrapper.h"
+#include "mdm_cli.h"
 #include "ingredients.h"
 
 #include <sys/types.h>
@@ -45,19 +46,20 @@
 /*Constants*/
 #define MODEMVERSION_CHK_FREQUENCY_MS (500)
 #define MODEMVERSION_CHK_TIMEOUT_SECONDS (3 * 60 * (1000 / MODEMVERSION_CHK_FREQUENCY_MS))
+#define NB_DATA 6
+#define ARRAY_SIZE(a) (sizeof(a) / sizeof(*a))
 
 /* private structure */
 struct mmgr_data {
     char string[MMGRMAXSTRING];     /* main string representing mmgr data content */
     int  extra_int;                 /* optional integer data (mailly used for error code) */
-    char extra_string[MMGRMAXEXTRA];/* optional string that could be used for any purpose */
     int  extra_nb_causes;                 /* optional integer data that could be used to store number of optionnal data */
-    char extra_tab_string[5][MMGRMAXEXTRA];/* optional string that could be used to store data1 to data5 */
+    char extra_tab_string[6][MMGRMAXEXTRA];/* optional string that could be used to store data0 to data5 */
 };
 
 struct mmgr_ct_context {
     unsigned char instance;
-    mmgr_cli_handle_t *mmgr_hdl;
+    mdm_cli_hdle_t *mmgr_hdl;
     int mmgr_monitor_fd[2];
 };
 
@@ -82,42 +84,52 @@ static bool is_mmgr_fake_event() {
     return 0;
 }
 
-static void write_mmgr_monitor_with_extras(char *chain, char *extra_string,
-                                           int extra_string_len, int extra_int,
+static int write_mmgr_monitor_with_dbg_info(const char *chain, int fd,
+        const mdm_cli_dbg_info_t *dbg_info) {
+    struct mmgr_data cur_data;
+    int first_data = 0;
+
+    if (!dbg_info->data)
+        return -1;
+
+    // cur_data.extra_int is the merge of the type and the logging rules
+    cur_data.extra_int = (dbg_info->type & 0xFF) + (dbg_info->log_attached << 8);
+
+    if (chain) {
+        //APIMR and MPANIC case
+        snprintf(cur_data.string, sizeof(cur_data.string), chain);
+    } else {
+        snprintf(cur_data.string, sizeof(cur_data.string), dbg_info->data[0]);
+        first_data = 1;
+    }
+
+    cur_data.extra_nb_causes = dbg_info->nb_data - first_data;
+    if (dbg_info->nb_data > 1) {
+        int i;
+        for (i=0; i<cur_data.extra_nb_causes; i++) {
+            if (cur_data.extra_tab_string[i]) {
+                // MMGR guarantees that all strings are NULL terminated: No need to check the length
+                snprintf(cur_data.extra_tab_string[i], sizeof(cur_data.extra_tab_string[i]),
+                        dbg_info->data[first_data + i]);
+            } else {
+                cur_data.extra_tab_string[i][0] = '\0';
+            }
+        }
+
+    } else {
+        cur_data.extra_nb_causes = 0;
+    }
+
+    write(fd, &cur_data, sizeof(struct mmgr_data));
+    return 0;
+}
+
+static void write_mmgr_monitor_with_extras(char *chain,
+                                           int extra_int,
                                            struct mmgr_ct_context *ctx) {
     struct mmgr_data cur_data;
     strncpy(cur_data.string, chain, sizeof(cur_data.string));
-    if (extra_string_len > 0) {
-        int size = MIN(extra_string_len+1, (int)sizeof(cur_data.extra_string));
-        strncpy(cur_data.extra_string, extra_string, size);
-        cur_data.extra_string[size-1] = 0;
-    }
-    else cur_data.extra_string[0] = 0;
     cur_data.extra_int = extra_int;
-    write(ctx->mmgr_monitor_fd[1], &cur_data, sizeof(struct mmgr_data));
-}
-
-static void write_mmgr_monitor_with_extras_apimr(char *chain,
-                                                 char *extra_string[6],
-                                                 int nb_values,
-                                                 int extra_string_len[6],
-                                                 struct mmgr_ct_context *ctx) {
-    struct mmgr_data cur_data;
-    int i, size;
-    strncpy(cur_data.string, chain, sizeof(cur_data.string));
-
-    if (nb_values > 0) {
-        size = MIN(extra_string_len[0]+1, (int)sizeof(cur_data.extra_string));
-        strncpy(cur_data.extra_string, extra_string[0], size);
-        cur_data.extra_string[size-1] = 0;
-        for(i=1; i < nb_values; i++){
-            size = MIN(extra_string_len[i]+1, (int)sizeof(cur_data.extra_tab_string[i-1]));
-            strncpy(cur_data.extra_tab_string[i-1], extra_string[i], size);
-            cur_data.extra_tab_string[i-1][size-1] = 0;
-        }
-
-    }
-    cur_data.extra_nb_causes = nb_values - 1;
     write(ctx->mmgr_monitor_fd[1], &cur_data, sizeof(struct mmgr_data));
 }
 
@@ -168,8 +180,8 @@ void *monitor_modem_version(void *arguments) {
     return NULL;
 }
 
-int mdm_UP(mmgr_cli_event_t * ev) {
-    LOGD("Received E_MMGR_EVENT_MODEM_UP[%d]", ((struct mmgr_ct_context *)ev->context)->instance);
+int mdm_UP(const mdm_cli_callback_data_t * ev) {
+    LOGD("Received MDM_UP[%d]", ((struct mmgr_ct_context *)ev->context)->instance);
     pthread_t thread;
     int ret;
     unsigned char * instance =  malloc(sizeof(unsigned char));
@@ -186,133 +198,66 @@ int mdm_UP(mmgr_cli_event_t * ev) {
     return 0;
 }
 
-int mdm_SHUTDOWN(mmgr_cli_event_t * ev) {
-    LOGD("Received E_MMGR_NOTIFY_MODEM_SHUTDOWN[%d]", ((struct mmgr_ct_context *)ev->context)->instance);
-    write_mmgr_monitor_with_extras("MMODEMOFF", NULL, 0, 0,
+int mdm_SHUTDOWN(const mdm_cli_callback_data_t * ev) {
+    LOGD("Received MDM_SHUTDOWN[%d]", ((struct mmgr_ct_context *)ev->context)->instance);
+    write_mmgr_monitor_with_extras("MMODEMOFF", 0,
                                    (struct mmgr_ct_context *)ev->context);
     return 0;
 }
 
-int mdm_REBOOT(mmgr_cli_event_t * ev) {
-    LOGD("Received E_MMGR_NOTIFY_PLATFORM_REBOOT[%d]", ((struct mmgr_ct_context *)ev->context)->instance);
-    write_mmgr_monitor_with_extras("MSHUTDOWN", NULL, 0, 0,
+int mdm_REBOOT(const mdm_cli_callback_data_t * ev) {
+    LOGD("Received DBG_TYPE_PLATFORM_REBOOT[%d]", ((struct mmgr_ct_context *)ev->context)->instance);
+    write_mmgr_monitor_with_extras("MSHUTDOWN", 0,
                                    (struct mmgr_ct_context *)ev->context);
     return 0;
 }
 
 
-int mdm_OUT_OF_SERVICE(mmgr_cli_event_t * ev) {
-    LOGD("Received E_MMGR_EVENT_MODEM_OUT_OF_SERVICE[%d]", ((struct mmgr_ct_context *)ev->context)->instance);
-    write_mmgr_monitor_with_extras("MOUTOFSERVICE", NULL, 0, 0,
+int mdm_OOS(const mdm_cli_callback_data_t * ev) {
+    LOGD("Received MDM_OOS[%d]", ((struct mmgr_ct_context *)ev->context)->instance);
+    write_mmgr_monitor_with_extras("MOUTOFSERVICE", 0,
                                    (struct mmgr_ct_context *)ev->context);
     return 0;
 }
 
-int mdm_MRESET(mmgr_cli_event_t * ev) {
-    LOGD("Received E_MMGR_NOTIFY_SELF_RESET[%d]", ((struct mmgr_ct_context *)ev->context)->instance);
-    write_mmgr_monitor_with_extras("MRESET", NULL, 0, 0,
+int mdm_MRESET(const mdm_cli_callback_data_t * ev) {
+    LOGD("Received DBG_TYPE_SELF_RESET[%d]", ((struct mmgr_ct_context *)ev->context)->instance);
+    write_mmgr_monitor_with_extras("MRESET", 0,
                                    (struct mmgr_ct_context *)ev->context);
     return 0;
 }
 
-int mdm_CORE_DUMP_COMPLETE(mmgr_cli_event_t * ev) {
-    LOGD("Received E_MMGR_NOTIFY_CORE_DUMP_COMPLETE[%d]", ((struct mmgr_ct_context *)ev->context)->instance);
-    int extra_int = 0, extra_string_len = 0;
-    char *extra_string = NULL;
-    int copy_cd = 0;
+int mdm_DUMP_END(const mdm_cli_callback_data_t * ev) {
+    LOGD("Received DBG_TYPE_DUMP_END[%d]", ((struct mmgr_ct_context *)ev->context)->instance);
 
-    mmgr_cli_core_dump_t *cd = (mmgr_cli_core_dump_t *) ev->data;
-    if (cd == NULL) {
-        LOGE("%s: empty data", __FUNCTION__);
-        return -1;
-    }
-
-    switch (cd->state) {
-    case E_CD_TIMEOUT:
-        LOGW("COREDUMP_TIMEOUT");
-        // use 1 value to indicate timeout error
-        extra_int = 1;
-        break;
-    case E_CD_LINK_ERROR:
-        LOGW("COREDUMP_LINK_ERROR");
-        // use 2 value to indicate link error
-        extra_int = 2;
-        break;
-    case E_CD_PROTOCOL_ERROR:
-        LOGD("COREDUMP_PROTOCOL_ERROR");
-        // use 2 value to indicate protocole error
-        extra_int = 3;
-        break;
-    case E_CD_SELF_RESET:
-        LOGD("COREDUMP_SELF_RESET");
-        // use 2 value to indicate self reset
-        extra_int = 4;
-        break;
-    case E_CD_SUCCEED:
-        extra_int = 0;
-        copy_cd = 1;
-        break;
-    default:
-        LOGE("Unknown core dump state");
-        // use 5 value to indicate an unknown state to crashlogd
-        extra_int = 5;
-        break;
-    }
-    if ((cd->path_len < MMGRMAXEXTRA) && (copy_cd == 1) ) {
-        extra_string_len = cd->path_len;
-        extra_string = cd->path;
-        LOGD("core dump path: %s", extra_string);
-    }else if ((cd->reason_len < MMGRMAXEXTRA) && (copy_cd == 0) ){
-        extra_string_len = cd->reason_len;
-        if(cd->reason_len > 0) {
-            extra_string = cd->reason;
-            LOGE("mdm_CORE_DUMP error : %s", extra_string);
-        }
-    }
-
-    write_mmgr_monitor_with_extras("MPANIC", extra_string, extra_string_len,
-                                   extra_int,
-                                   (struct mmgr_ct_context *)ev->context);
-    return 0;
-}
-
-int mdm_AP_RESET(mmgr_cli_event_t * ev) {
-    LOGD("Received E_MMGR_NOTIFY_AP_RESET[%d]", ((struct mmgr_ct_context *)ev->context)->instance);
-    char *extra_string[6];
-    int extra_string_len[6] = {0,};
-    int i;
-    mmgr_cli_ap_reset_t *ap = (mmgr_cli_ap_reset_t *)ev->data;
-
-    if (ap == NULL) {
+    mdm_cli_dbg_info_t *dbg_info = (mdm_cli_dbg_info_t *)ev->data;
+    if (!dbg_info || !dbg_info->data) {
         LOGE("%s: empty data", __FUNCTION__);
     } else {
-        LOGD("%s: AP reset asked by: %s (len: %lu)", __FUNCTION__, ap->name, (unsigned long)ap->len);
-        if (ap->len < MMGRMAXEXTRA) {
-            extra_string[0] = ap->name;
-            extra_string_len[0] = ap->len;
-            if(ap->num_causes > 0) {
-                for(i=0; i < (int)ap->num_causes; i++) {
-                    if(ap->recovery_causes[i].len < MMGRMAXEXTRA) {
-                        extra_string_len[i+1] = ap->recovery_causes[i].len;
-                        extra_string[i+1] = ap->recovery_causes[i].cause;
-                    }
-                    else {
-                        LOGE("%s: cause length error : %lu", __FUNCTION__, (unsigned long)ap->recovery_causes[i].len);
-                    }
-                }
-            }
-        } else {
-            LOGE("%s: length error : %lu", __FUNCTION__, (unsigned long)ap->len);
-        }
+        struct mmgr_ct_context *ctx = (struct mmgr_ct_context *)ev->context;
+        write_mmgr_monitor_with_dbg_info("MPANIC", ctx->mmgr_monitor_fd[1], dbg_info);
     }
-    write_mmgr_monitor_with_extras_apimr("APIMR", extra_string,
-                                         ap->num_causes + 1, extra_string_len,
-                                         (struct mmgr_ct_context *)ev->context);
+
     return 0;
 }
 
-int mdm_CORE_DUMP(mmgr_cli_event_t * ev) {
-    LOGD("Received E_MMGR_NOTIFY_CORE_DUMP[%d]", ((struct mmgr_ct_context *)ev->context)->instance);
+int mdm_APIMR(const mdm_cli_callback_data_t * ev) {
+    LOGD("Received DBG_TYPE_APIMR[%d]", ((struct mmgr_ct_context *)ev->context)->instance);
+
+    mdm_cli_dbg_info_t *dbg_info = (mdm_cli_dbg_info_t *)ev->data;
+    if ((!dbg_info || !dbg_info->data)) {
+        LOGE("%s: empty data", __FUNCTION__);
+    } else {
+        struct mmgr_ct_context *ctx = (struct mmgr_ct_context *)ev->context;
+        LOGD("%s: AP reset asked by: %s", __FUNCTION__, dbg_info->data[0]);
+        write_mmgr_monitor_with_dbg_info("APIMR", ctx->mmgr_monitor_fd[1], dbg_info);
+    }
+
+    return 0;
+}
+
+int mdm_DUMP_START(const mdm_cli_callback_data_t * ev) {
+    LOGD("Received DBG_TYPE_DUMP_START[%d]", ((struct mmgr_ct_context *)ev->context)->instance);
     struct mmgr_data cur_data;
     struct mmgr_ct_context *ctx = (struct mmgr_ct_context *)ev->context;
     strncpy(cur_data.string, "START_CD\0", sizeof(cur_data.string));
@@ -322,46 +267,42 @@ int mdm_CORE_DUMP(mmgr_cli_event_t * ev) {
     return 0;
 }
 
-int mdm_TFT_EVENT(mmgr_cli_event_t * ev) {
-    LOGD("Received E_MMGR_NOTIFY_TFT_EVENT[%d]", ((struct mmgr_ct_context *)ev->context)->instance);
-    struct mmgr_data cur_data;
-    mmgr_cli_tft_event_t *tft_ev = (mmgr_cli_tft_event_t *) ev->data;
-    struct mmgr_ct_context *ctx = (struct mmgr_ct_context *)ev->context;
-    size_t i;
+int mdm_DBG_INFO(const mdm_cli_callback_data_t * ev) {
+    LOGD("Received MDM_DBG_INFO[%d]", ((struct mmgr_ct_context *)ev->context)->instance);
+    mdm_cli_dbg_info_t *dbg_info = (mdm_cli_dbg_info_t *) ev->data;
 
-    // Add "TFT" in top of cur_data.string to recognize the type of event in the next
-    snprintf(cur_data.string, sizeof(cur_data.string), "TFT%s", tft_ev->name);
-
-    // cur_data.extra_int is the merge of the type and the logging rules
-    cur_data.extra_int = (tft_ev->type & 0xFF) + (tft_ev->log << 8);
-
-    if (tft_ev->num_data > 0) {
-        if (tft_ev->data[0].len > 0) {
-            LOGD("len of data 0: %d", tft_ev->data[0].len);
-            strncpy(cur_data.extra_string, tft_ev->data[0].value, sizeof(cur_data.extra_string));
-            cur_data.extra_string[MIN(tft_ev->data[0].len, sizeof(cur_data.extra_string))] = '\0';
-        } else {
-            cur_data.extra_string[0] = '\0';
-        }
-
-        for (i=0; i<tft_ev->num_data-1; i++) {
-            LOGD("len of data %d: %d", i+1, tft_ev->data[i+1].len);
-            if (tft_ev->data[i+1].len > 0) {
-                strncpy(cur_data.extra_tab_string[i], tft_ev->data[i+1].value,
-                        sizeof(cur_data.extra_tab_string[i]));
-                cur_data.extra_tab_string[i][MIN(tft_ev->data[i+1].len,
-                        sizeof(cur_data.extra_tab_string[i]))] = '\0';
-            } else {
-                cur_data.extra_tab_string[i][0] = '\0';
-            }
-        }
-
-        cur_data.extra_nb_causes = tft_ev->num_data - 1;
-    } else {
-        cur_data.extra_nb_causes = 0;
+    if (dbg_info == NULL) {
+        LOGE("%s: empty data", __FUNCTION__);
+        return -1;
     }
 
-    write(ctx->mmgr_monitor_fd[1], &cur_data, sizeof(struct mmgr_data));
+    switch (dbg_info->type) {
+        case DBG_TYPE_DUMP_START:
+            mdm_DUMP_START(ev);
+            break;
+        case DBG_TYPE_DUMP_END:
+            mdm_DUMP_END(ev);
+            break;
+        case DBG_TYPE_PLATFORM_REBOOT:
+            mdm_REBOOT(ev);
+            break;
+        case DBG_TYPE_APIMR:
+            mdm_APIMR(ev);
+            break;
+        case DBG_TYPE_SELF_RESET:
+            mdm_MRESET(ev);
+            break;
+        case DBG_TYPE_STATS:
+        case DBG_TYPE_INFO: {
+            struct mmgr_ct_context *ctx = (struct mmgr_ct_context *)ev->context;
+            write_mmgr_monitor_with_dbg_info(NULL, ctx->mmgr_monitor_fd[1], dbg_info);
+            }
+            break;
+        default:
+            /* Not handled */
+            break;
+    }
+
     return 0;
 }
 
@@ -374,6 +315,15 @@ void init_mmgr_cli_source(unsigned int mdm_inst) {
     char clientname[25];
     char v_detect_prop[PROPERTY_VALUE_MAX];
 
+    mdm_cli_register_t evts[] = {
+        { MDM_OOS, mdm_OOS, (void *)&mmgr_ctx[mdm_inst]},
+        { MDM_SHUTDOWN, mdm_SHUTDOWN, (void *)&mmgr_ctx[mdm_inst]},
+        { MDM_DBG_INFO, mdm_DBG_INFO, (void *)&mmgr_ctx[mdm_inst]},
+        { MDM_UP, mdm_UP, (void *)&mmgr_ctx[mdm_inst]},
+    };
+    /* As MDM_UP is optional, it must be the last one */
+
+    int nb_evts = ARRAY_SIZE(evts);
     property_get(PROP_FORCE_MDM_V_DET, v_detect_prop, "0");
 
     if (!CRASHLOG_MODE_MMGR_ENABLED(g_crashlog_mode)) {
@@ -389,34 +339,12 @@ void init_mmgr_cli_source(unsigned int mdm_inst) {
     }
     sprintf(clientname, "crashlogd_%d", mdm_inst);
 
-    mmgr_ctx[mdm_inst].mmgr_hdl = NULL;
     // telephony chooses to count from 1 rather than 0,
     // while our structures are starting from 0.
     mmgr_ctx[mdm_inst].instance = mdm_inst + 1;
 
-    mmgr_cli_create_handle(&mmgr_ctx[mdm_inst].mmgr_hdl, clientname,
-                           (void *)&mmgr_ctx[mdm_inst]);
-    mmgr_cli_set_instance(mmgr_ctx[mdm_inst].mmgr_hdl, mmgr_ctx[mdm_inst].instance);
-    if(v_detect_prop[0]=='1')
-        mmgr_cli_subscribe_event(mmgr_ctx[mdm_inst].mmgr_hdl, mdm_UP,
-                                 E_MMGR_EVENT_MODEM_UP);
-    mmgr_cli_subscribe_event(mmgr_ctx[mdm_inst].mmgr_hdl, mdm_CORE_DUMP,
-                             E_MMGR_NOTIFY_CORE_DUMP);
-    mmgr_cli_subscribe_event(mmgr_ctx[mdm_inst].mmgr_hdl, mdm_SHUTDOWN,
-                             E_MMGR_NOTIFY_MODEM_SHUTDOWN);
-    mmgr_cli_subscribe_event(mmgr_ctx[mdm_inst].mmgr_hdl, mdm_REBOOT,
-                             E_MMGR_NOTIFY_PLATFORM_REBOOT);
-    mmgr_cli_subscribe_event(mmgr_ctx[mdm_inst].mmgr_hdl, mdm_OUT_OF_SERVICE,
-                             E_MMGR_EVENT_MODEM_OUT_OF_SERVICE);
-    mmgr_cli_subscribe_event(mmgr_ctx[mdm_inst].mmgr_hdl, mdm_MRESET,
-                             E_MMGR_NOTIFY_SELF_RESET);
-    mmgr_cli_subscribe_event(mmgr_ctx[mdm_inst].mmgr_hdl,
-                             mdm_CORE_DUMP_COMPLETE,
-                             E_MMGR_NOTIFY_CORE_DUMP_COMPLETE);
-    mmgr_cli_subscribe_event(mmgr_ctx[mdm_inst].mmgr_hdl, mdm_AP_RESET,
-                             E_MMGR_NOTIFY_AP_RESET);
-    mmgr_cli_subscribe_event(mmgr_ctx[mdm_inst].mmgr_hdl, mdm_TFT_EVENT,
-                             E_MMGR_NOTIFY_TFT_EVENT);
+    if(v_detect_prop[0]!='1')
+        nb_evts--;
 
     uint32_t iMaxTryConnect =
         MAX_WAIT_MMGR_CONNECT_SECONDS * 1000 / MMGR_CONNECT_RETRY_TIME_MS;
@@ -424,14 +352,15 @@ void init_mmgr_cli_source(unsigned int mdm_inst) {
     while (iMaxTryConnect-- != 0) {
 
         /* Try to connect */
-        ret = mmgr_cli_connect(mmgr_ctx[mdm_inst].mmgr_hdl);
+        mmgr_ctx[mdm_inst].mmgr_hdl = mdm_cli_connect(clientname,mmgr_ctx[mdm_inst].instance,
+                nb_evts, evts);
 
-        if (ret == E_ERR_CLI_SUCCEED) {
+        if (mmgr_ctx[mdm_inst].mmgr_hdl) {
 
             break;
         }
 
-        LOGE("%s: Delaying mmgr_cli_connect[%d] %d", __FUNCTION__, mdm_inst, ret);
+        LOGE("%s: Delaying connection to MMGR[%d] %d", __FUNCTION__, mdm_inst, ret);
 
         /* Wait */
         usleep(MMGR_CONNECT_RETRY_TIME_MS * 1000);
@@ -448,8 +377,8 @@ void close_mmgr_cli_source(unsigned int mdm_inst) {
     if (!CRASHLOG_MODE_MMGR_ENABLED(g_crashlog_mode))
         return;
 
-    mmgr_cli_disconnect(mmgr_ctx[mdm_inst].mmgr_hdl);
-    mmgr_cli_delete_handle(mmgr_ctx[mdm_inst].mmgr_hdl);
+    mdm_cli_disconnect(mmgr_ctx[mdm_inst].mmgr_hdl);
+    mmgr_ctx[mdm_inst].mmgr_hdl = NULL;
 }
 
 /**
@@ -542,12 +471,7 @@ int mmgr_handle(unsigned int mdm_inst) {
     int bplog_mode = BPLOG_TYPE;
     char *event_dir, *key;
     char event_name[MMGRMAXSTRING];
-    char data0[MMGRMAXEXTRA];
-    char data1[MMGRMAXEXTRA];
-    char data2[MMGRMAXEXTRA];
-    char data3[MMGRMAXEXTRA];
-    char data4[MMGRMAXEXTRA];
-    char data5[MMGRMAXEXTRA];
+    char data[NB_DATA][MMGRMAXEXTRA];
     char modem_version[MMGRMAXEXTRA];
     char cd_path[MMGRMAXEXTRA];
     char destion[PATHMAX];
@@ -556,15 +480,12 @@ int mmgr_handle(unsigned int mdm_inst) {
     int nbytes, copy_aplog = 0, copy_bplog = 0;
     struct mmgr_data cur_data;
     const char *dateshort = get_current_time_short(1);
+    int i;
 
     // Initialize stack strings to empty strings
     event_name[0] = 0;
-    data0[0] = 0;
-    data1[0] = 0;
-    data2[0] = 0;
-    data3[0] = 0;
-    data4[0] = 0;
-    data5[0] = 0;
+    for (i =0; i <NB_DATA; i++)
+        data[i][0] = 0;
     modem_version[0] = 0;
     cd_path[0] = 0;
     destion[0] = 0;
@@ -589,21 +510,20 @@ int mmgr_handle(unsigned int mdm_inst) {
     // For "TFT" event, parameters are given by the data themselves
     if (strstr(type, "TFT")) {
         switch (cur_data.extra_int & 0xFF) {
-             case E_EVENT_ERROR:
-                 sprintf(event_name, "%s", ERROREVENT);
+             case DBG_TYPE_INFO:
+                 sprintf(event_name, "%s", INFOEVENT);
                  break;
-             case E_EVENT_STATS:
+             case DBG_TYPE_STATS:
                  sprintf(event_name, "%s", STATSEVENT);
                  break;
-             case E_EVENT_INFO:
              default:
-                 sprintf(event_name, "%s", INFOEVENT);
+                 break;
         }
         event_mode = MODE_STATS;
         aplog_mode = APLOG_STATS_TYPE;
         bplog_mode = BPLOG_STATS_TYPE;
-        copy_aplog = (cur_data.extra_int >> 8) & MMGR_CLI_TFT_AP_LOG_MASK;
-        copy_bplog = ((cur_data.extra_int >> 8) & MMGR_CLI_TFT_BP_LOG_MASK)
+        copy_aplog = (cur_data.extra_int >> 8) & DBG_ATTACH_AP_LOG;
+        copy_bplog = ((cur_data.extra_int >> 8) & DBG_ATTACH_BP_LOG)
                 && check_running_modem_trace();
     } else {
        if (compute_mmgr_param(type, &event_mode, event_name, &copy_aplog, &copy_bplog,
@@ -611,83 +531,28 @@ int mmgr_handle(unsigned int mdm_inst) {
            return -1;
        }
     }
-    //set DATA0/1 value
     if (strstr(type, "MPANIC" )) {
-        LOGD("Extra int value : %d ",cur_data.extra_int);
-        if (cur_data.extra_int == 0){
-            snprintf(data0,sizeof(data0),"%s", "CD_SUCCEED");
-            snprintf(cd_path,sizeof(cd_path),"%s", cur_data.extra_string);
-        }else if(cur_data.extra_int >= 1 && cur_data.extra_int <= 5) {
-            if (cur_data.extra_int == 1){
-                snprintf(data0,sizeof(data0),"%s", "CD_TIMEOUT");
-            }else if (cur_data.extra_int == 2){
-                snprintf(data0,sizeof(data0),"%s", "CD_LINK_ERROR");
-            }else if (cur_data.extra_int == 3){
-                snprintf(data0,sizeof(data0),"%s", "CD_PROTOCOL_ERROR");
-            }else if (cur_data.extra_int == 4){
-                snprintf(data0,sizeof(data0),"%s", "CD_SELF_RESET");
-            }else if (cur_data.extra_int == 5){
-                snprintf(data0,sizeof(data0),"%s", "OTHER");
-            }
-            snprintf(data1,sizeof(data1),"%s", cur_data.extra_string);
-        }
-        LOGD("Extra string value : %s ",cur_data.extra_string);
-        snprintf(destion, sizeof(destion), "%s-%d", MCD_PROCESSING, mdm_inst);
-        if (file_exists(destion))
-            remove(destion);
-    } else if (strstr(type, "APIMR" )){
-        if(!cur_data.extra_nb_causes) {
-            LOGD("Extra string value : %s ",cur_data.extra_string);
-            //need to put it in DATA3 to avoid conflict with parser
-            snprintf(data3,sizeof(data3),"%s", cur_data.extra_string);
-        }
-        else if(cur_data.extra_nb_causes > 0) {
-            LOGD("Extra string value : %s ",cur_data.extra_string);
-            snprintf(data0,sizeof(data0),"%s", cur_data.extra_string);
-            LOGD("Extra tab string value 0: %s ",cur_data.extra_tab_string[0]);
-            snprintf(data1,sizeof(data1),"%s", cur_data.extra_tab_string[0]);
-            if(cur_data.extra_nb_causes > 1) {
-                LOGD("Extra tab string value 1: %s ",cur_data.extra_tab_string[1]);
-                snprintf(data2,sizeof(data2),"%s", cur_data.extra_tab_string[1]);
-            }
-            if(cur_data.extra_nb_causes > 2) {
-                LOGD("Extra tab string value 2: %s ",cur_data.extra_tab_string[2]);
-                snprintf(data3,sizeof(data3),"%s", cur_data.extra_tab_string[2]);
-            }
-            if(cur_data.extra_nb_causes > 3) {
-                LOGD("Extra tab string value 3: %s ",cur_data.extra_tab_string[3]);
-                snprintf(data4,sizeof(data4),"%s", cur_data.extra_tab_string[3]);
-            }
-            if(cur_data.extra_nb_causes > 4) {
-                LOGD("Extra tab string value 4 %s ",cur_data.extra_tab_string[4]);
-                snprintf(data5,sizeof(data5),"%s", cur_data.extra_tab_string[4]);
-            }
-        }
-    } else if (strstr(type, "TFT")) {
-        LOGD("Extra string value : %s ",cur_data.extra_string);
-        snprintf(data0,sizeof(data0),"%s", cur_data.extra_string);
+        //set DATA0/1 value
+        LOGD("Extra nb causes: %d", cur_data.extra_nb_causes);
+        if (2 == cur_data.extra_nb_causes) {
+            snprintf(data[0], sizeof(data[0]), cur_data.extra_tab_string[0]);
+            if (!strcmp(cur_data.extra_tab_string[0], DUMP_STR_SUCCEED))
+                snprintf(cd_path, sizeof(cd_path),"%s", cur_data.extra_tab_string[1]);
+            else
+                snprintf(data[1], sizeof(data[1]), cur_data.extra_tab_string[1]);
+
+            snprintf(destion, sizeof(destion), "%s-%d", MCD_PROCESSING, mdm_inst);
+            if (file_exists(destion))
+                remove(destion);
+        } else
+            LOGE("MPANIC: wrong data");
+    } else if (strstr(type, "APIMR" ) || strstr(type, "TFT")){
         if(cur_data.extra_nb_causes > 0) {
-            LOGD("Extra tab string value 0: %s ",cur_data.extra_tab_string[0]);
-            snprintf(data1,sizeof(data1),"%s", cur_data.extra_tab_string[0]);
-            if(cur_data.extra_nb_causes > 1) {
-                LOGD("Extra tab string value 1: %s ",cur_data.extra_tab_string[1]);
-                snprintf(data2,sizeof(data2),"%s", cur_data.extra_tab_string[1]);
-            }
-            if(cur_data.extra_nb_causes > 2) {
-                LOGD("Extra tab string value 2: %s ",cur_data.extra_tab_string[2]);
-                snprintf(data3,sizeof(data3),"%s", cur_data.extra_tab_string[2]);
-            }
-            if(cur_data.extra_nb_causes > 3) {
-                LOGD("Extra tab string value 3: %s ",cur_data.extra_tab_string[3]);
-                snprintf(data4,sizeof(data4),"%s", cur_data.extra_tab_string[3]);
-            }
-            if(cur_data.extra_nb_causes > 4) {
-                LOGD("Extra tab string value 4 %s ",cur_data.extra_tab_string[4]);
-                snprintf(data5,sizeof(data5),"%s", cur_data.extra_tab_string[4]);
+            for (i = 0; i<cur_data.extra_nb_causes; i++) {
+                snprintf(data[i], sizeof(data[i]), cur_data.extra_tab_string[i]);
+                LOGD("Extra tab string value %d %s", i, data[i]);
             }
         }
-        // Remove the "TFT" tag added in top of cur_data.string
-        strcpy(type, &cur_data.string[3]);
     } else if (strstr(type, "START_CD" )){
         snprintf(destion, sizeof(destion), "%s-%d", MCD_PROCESSING, mdm_inst);
         if (write_binary_file(destion, (const unsigned char*)&mdm_inst, sizeof(mdm_inst))) {
@@ -727,7 +592,7 @@ int mmgr_handle(unsigned int mdm_inst) {
         rmfr(cd_path);
     }
     // generating extra DATA (if required)
-    if ((strlen(data0) > 0) || (strlen(data1) > 0) || (strlen(data2) > 0) || (strlen(data3) > 0) || (strlen(modem_version) > 0)){
+    if ((strlen(data[0]) > 0) || (strlen(data[1]) > 0) || (strlen(data[2]) > 0) || (strlen(data[3]) > 0) || (strlen(modem_version) > 0)){
         FILE *fp;
         char fullpath[PATHMAX];
         if (strstr(event_name , ERROREVENT)) {
@@ -745,18 +610,10 @@ int mmgr_handle(unsigned int mdm_inst) {
             LOGE("%s: Cannot create file %s - %s\n", __FUNCTION__, fullpath, strerror(errno));
         } else {
             //Fill DATA fields
-            if (strlen(data0) > 0)
-                fprintf(fp,"DATA0=%s\n", data0);
-            if (strlen(data1) > 0)
-                fprintf(fp,"DATA1=%s\n", data1);
-            if (strlen(data2) > 0)
-                fprintf(fp,"DATA2=%s\n", data2);
-            if (strlen(data3) > 0)
-                fprintf(fp,"DATA3=%s\n", data3);
-            if (strlen(data4) > 0)
-                fprintf(fp,"DATA4=%s\n", data4);
-            if (strlen(data5) > 0)
-                fprintf(fp,"DATA5=%s\n", data5);
+            for (i=0; i<NB_DATA; i++) {
+                if (strlen(data[i]) > 0)
+                    fprintf(fp,"DATA%d=%s\n", i, data[i]);
+            }
             if (strlen(modem_version) > 0)
                 fprintf(fp,"MODEMVERSIONUSED=%s\n", modem_version);
             fprintf(fp,"_END\n");

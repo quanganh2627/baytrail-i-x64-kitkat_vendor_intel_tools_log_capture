@@ -29,7 +29,6 @@
 
 #ifdef CRASHLOGD_MODULE_MODEM
 #include <stdlib.h>
-#include "mmgr_cli.h"
 
 int mmgr_get_fd(unsigned int mdm_inst);
 void init_mmgr_cli_source(unsigned int mdm_inst);

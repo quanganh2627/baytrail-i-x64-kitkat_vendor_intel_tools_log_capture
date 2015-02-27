@@ -134,11 +134,8 @@ endif
 ifeq ($(CRASHLOGD_MODULE_MODEM),true)
 ifeq ($(BOARD_HAVE_MODEM),true)
 LOCAL_CFLAGS += -DCRASHLOGD_MODULE_MODEM
-LOCAL_C_INCLUDES += \
-    $(TARGET_OUT_HEADERS)/IFX-modem \
-    $(TARGET_OUT_HEADERS)/libtcs
 LOCAL_SHARED_LIBRARIES += \
-    libmmgrcli \
+    libmdmcli \
     libtcs
 LOCAL_SRC_FILES += \
     modem.c \
