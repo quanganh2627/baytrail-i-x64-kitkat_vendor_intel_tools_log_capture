@@ -433,6 +433,13 @@ static void timeup_thread_mainloop()
     }
 }
 
+static void crashlog_check_fw_events(char *reason, char *watchdog, int test) {
+
+    if (crashlog_check_fabric(reason, test) == 1)
+        if (strstr(reason, "HWWDT_"))
+            strcpy(watchdog, "HWWDT_UNHANDLED");
+}
+
 static void early_check_nomain(char *boot_mode, int test) {
 
     char startupreason[32] = { '\0', };
@@ -444,7 +451,7 @@ static void early_check_nomain(char *boot_mode, int test) {
 
     strcpy(watchdog,"WDT");
 
-    crashlog_check_fabric_events(startupreason, watchdog, test);
+    crashlog_check_fw_events(startupreason, watchdog, test);
     crashlog_check_panic_events(startupreason, watchdog, test);
     crashlog_check_startupreason(startupreason, watchdog);
 
@@ -486,7 +493,7 @@ static void early_check(char *encryptstate, int test) {
 
     strcpy(watchdog,"WDT");
 
-    crashlog_check_fabric_events(startupreason, watchdog, test);
+    crashlog_check_fw_events(startupreason, watchdog, test);
     crashlog_check_panic_events(startupreason, watchdog, test);
     crashlog_check_kdump(startupreason, test);
     crashlog_check_mpanic_abort();

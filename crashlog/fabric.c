@@ -156,10 +156,3 @@ int crashlog_check_fabric(char *reason, int test) {
         return 0;
     }
 }
-
-void crashlog_check_fabric_events(char *reason, char *watchdog, int test) {
-
-     if (crashlog_check_fabric(reason, test) == 1)
-        if (strstr(reason, "HWWDT_"))
-            strcpy(watchdog, "HWWDT_UNHANDLED");
-}

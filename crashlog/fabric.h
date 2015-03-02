@@ -25,11 +25,10 @@
 #define __FABRIC__H__
 
 #ifdef CRASHLOGD_MODULE_FABRIC
-void crashlog_check_fabric_events(char *reason, char *watchdog, int test);
+int crashlog_check_fabric(char *reason, int test);
 #else
-static inline void crashlog_check_fabric_events(char *reason __unused,
-                                                char *watchdog __unused,
-                                                int test __unused) {}
+static inline int crashlog_check_fabric(char *reason __unused,
+                                        int test __unused){return 1;}
 #endif
 
 #endif /* __FABRIC__H__ */
