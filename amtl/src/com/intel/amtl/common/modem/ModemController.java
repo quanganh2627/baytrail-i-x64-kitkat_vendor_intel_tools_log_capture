@@ -19,8 +19,12 @@
 
 package com.intel.amtl.common.modem;
 
+import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.os.SystemClock;
 import android.preference.PreferenceManager;
+import android.util.Log;
 
 import com.intel.amtl.common.AMTLApplication;
 import com.intel.amtl.common.exceptions.ModemControlException;
@@ -113,6 +117,29 @@ public abstract class ModemController {
         String modName = modemNames.get(readModemIndex);
         AlogMarker.tAE("ModemController.getCurrentModemName", "0");
         return modName;
+    }
+
+    public void sendFlushCmd(ModemConf curModConf) throws ModemControlException {
+        // if flush command available for this configuration, let s use it.
+        if (!curModConf.getFlCmd().equalsIgnoreCase("")) {
+            Log.d(TAG, MODULE + ": Config has flush_cmd defined.");
+            flush(curModConf);
+            // give time to the modem to sync - 1 second
+            SystemClock.sleep(1000);
+        } else {
+            // fall back - check if a default flush cmd is set
+            Log.d(TAG, MODULE + ": Fall back - check default_flush_cmd");
+            SharedPreferences prefs = AMTLApplication.getContext()
+                    .getSharedPreferences("AMTLPrefsData", Context.MODE_PRIVATE);
+            if (prefs != null) {
+                String flCmd = prefs.getString("default_flush_cmd", "");
+                if (!flCmd.equalsIgnoreCase("")) {
+                    sendCommand(flCmd + "\r\n");
+                    // give time to the modem to sync - 1 second
+                    SystemClock.sleep(1000);
+                }
+            }
+        }
     }
 
     public void closeModemInterface() {

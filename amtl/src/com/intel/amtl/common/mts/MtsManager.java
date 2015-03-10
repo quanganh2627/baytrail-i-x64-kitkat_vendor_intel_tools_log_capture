@@ -145,7 +145,7 @@ public class MtsManager {
     /* Stop the current service */
     public static void stopServices() {
         AlogMarker.tAB("MtsManager.stopServices", "0");
-        if (getMtsState().equals("running")) {
+        if (!getMtsState().equals("stopped")) {
             stopMtsPersistent();
             stopMtsOneshot();
         }

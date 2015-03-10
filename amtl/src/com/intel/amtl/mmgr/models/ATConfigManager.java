@@ -19,7 +19,6 @@
 
 package com.intel.amtl.mmgr.models;
 
-import android.content.SharedPreferences;
 import android.os.SystemClock;
 import android.util.Log;
 
@@ -42,8 +41,8 @@ public class ATConfigManager implements ConfigManager {
     private final String TAG = "AMTL";
     private final String MODULE = "ATConfigManager";
 
-    public int applyConfig(SharedPreferences prefs, ModemConf mdmConf, ModemController modemCtrl)
-            throws ModemControlException {
+    public int applyConfig(ModemConf mdmConf, ModemController modemCtrl)
+        throws ModemControlException {
         AlogMarker.tAB("ATConfigManager.applyConfig", "0");
         if (modemCtrl != null) {
             if (mdmConf != null) {
@@ -51,22 +50,7 @@ public class ATConfigManager implements ConfigManager {
                 modemCtrl.confTraceAndModemInfo(mdmConf);
                 mdmConf = checkProfileSent(mdmConf);
                 modemCtrl.switchTrace(mdmConf);
-                // if flush command available for this configuration, let s use it.
-                if (!mdmConf.getFlCmd().equalsIgnoreCase("")) {
-                    Log.d(TAG, MODULE + ": Config has flush_cmd defined.");
-                    modemCtrl.flush(mdmConf);
-                    // give time to the modem to sync - 1 second
-                    SystemClock.sleep(1000);
-                } else {
-                    // fall back - check if a default flush cmd is set
-                    Log.d(TAG, MODULE + ": Fall back - check default_flush_cmd");
-                    String flCmd = prefs.getString("default_flush_cmd", "");
-                    if (!flCmd.equalsIgnoreCase("")) {
-                        modemCtrl.sendCommand(flCmd + "\r\n");
-                        // give time to the modem to sync - 1 second
-                        SystemClock.sleep(1000);
-                    }
-                }
+                modemCtrl.sendFlushCmd(mdmConf);
 
                 MtsManager.stopServices();
                 // set mts parameters through mts properties
@@ -106,77 +90,74 @@ public class ATConfigManager implements ConfigManager {
         return mdmCf;
     }
 
+    private int resetConf(ModemController mdmCtrl, ModemConf conf)
+            throws ModemControlException {
+        mdmCtrl.switchOffTrace();
+        mdmCtrl.sendFlushCmd(conf);
+        return -1;
+    }
+
     public int updateCurrentIndex(ModemConf curModConf, int currentIndex, String modemName,
             ModemController modemCtrl, ArrayList<LogOutput> configArray) {
         AlogMarker.tAB("ATConfigManager.updateCurrentIndex", "0");
         boolean confReset = false;
         int updatedIndex = currentIndex;
 
-        if (updatedIndex == -2) {
-            LogOutput defaultConf = AMTLApplication.getDefaultConf();
-            if (defaultConf != null && defaultConf.getXsio() != null
-                    && defaultConf.getOct() != null) {
-                if (defaultConf.getXsio().equals(curModConf.getXsio())
-                        && defaultConf.getOct().equals(curModConf.getOctMode())) {
-                    updatedIndex = defaultConf.getIndex();
-                } else {
-                    try {
-                        modemCtrl.switchOffTrace();
+        try {
+            if (updatedIndex == -2) {
+                LogOutput defaultConf = AMTLApplication.getDefaultConf();
+                if (defaultConf != null && defaultConf.getXsio() != null
+                       && defaultConf.getOct() != null) {
+                    if (defaultConf.getXsio().equals(curModConf.getXsio())
+                            && defaultConf.getOct().equals(curModConf.getOctMode())) {
+                        updatedIndex = defaultConf.getIndex();
+                    } else {
+                        updatedIndex = this.resetConf(modemCtrl, curModConf);
                         confReset = true;
-                        updatedIndex = -1;
-                    } catch (ModemControlException ex) {
-                        Log.e(TAG, MODULE + " : an error occured while stopping logs " + ex);
                     }
-                }
-            } else {
-                if (configArray != null) {
-                    for (LogOutput o: configArray) {
-                        if (o != null && o.getXsio() != null && o.getMtsOutput() != null
-                                && o.getOct() != null) {
-                            if (o.getXsio().equals(curModConf.getXsio())
-                                    && o.getMtsOutput().equals(curModConf.getMtsConf().getOutput())
-                                    && o.getOct().equals(curModConf.getOctMode())) {
-                                updatedIndex = o.getIndex();
+                } else {
+                    if (configArray != null) {
+                        for (LogOutput o: configArray) {
+                            if (o != null && o.getXsio() != null && o.getMtsOutput() != null
+                                    && o.getOct() != null) {
+                                if (o.getXsio().equals(curModConf.getXsio())
+                                        && o.getMtsOutput().equals(curModConf.getMtsConf()
+                                        .getOutput()) && o.getOct()
+                                        .equals(curModConf.getOctMode())) {
+                                    updatedIndex = o.getIndex();
+                                }
                             }
                         }
+                    } else {
+                        updatedIndex = this.resetConf(modemCtrl, curModConf);
+                        confReset = true;
+                    }
+                }
+            }
+            if (updatedIndex >= 0 || ExpertConfig.isExpertModeEnabled(modemName)) {
+                if (curModConf.confTraceEnabled()) {
+                    if (curModConf.isMtsRequired() && !MtsManager.getMtsState().equals("running")) {
+                        MtsManager.startService(curModConf.getMtsMode());
+                    } else if (!curModConf.isMtsRequired() && !MtsManager.getMtsState()
+                            .equals("stopped")) {
+                        MtsManager.stopServices();
                     }
                 } else {
-                    try {
-                        modemCtrl.switchOffTrace();
-                        confReset = true;
-                        updatedIndex = -1;
-                    } catch (ModemControlException ex) {
-                        Log.e(TAG, MODULE + " : an error occured while stopping logs " + ex);
-                    }
+                    ExpertConfig.setExpertMode(modemName, false);
+                    updatedIndex = -1;
                 }
             }
-        }
-        if (updatedIndex >= 0 || ExpertConfig.isExpertModeEnabled(modemName)) {
-            if (curModConf.confTraceEnabled()) {
-                if (curModConf.isMtsRequired() && !MtsManager.getMtsState().equals("running")) {
-                    MtsManager.startService(curModConf.getMtsMode());
-                } else if (!curModConf.isMtsRequired() && MtsManager.getMtsState()
-                        .equals("running")) {
+
+            if (updatedIndex == -1 && !ExpertConfig.isExpertModeEnabled(modemName)) {
+                if (curModConf.confTraceEnabled() && !confReset) {
+                    updatedIndex = this.resetConf(modemCtrl, curModConf);
+                }
+                if (!MtsManager.getMtsState().equals("stopped")) {
                     MtsManager.stopServices();
                 }
-            } else {
-                ExpertConfig.setExpertMode(modemName, false);
-                updatedIndex = -1;
             }
-        }
-
-        if (updatedIndex == -1 && !ExpertConfig.isExpertModeEnabled(modemName)) {
-            if (curModConf.confTraceEnabled() && !confReset) {
-                try {
-                    modemCtrl.switchOffTrace();
-                    updatedIndex = -1;
-                } catch (ModemControlException ex) {
-                    Log.e(TAG, MODULE + " : an error occured while stopping logs " + ex);
-                }
-            }
-            if (MtsManager.getMtsState().equals("running")) {
-                MtsManager.stopServices();
-            }
+        } catch (ModemControlException ex) {
+            Log.e(TAG, MODULE + " : an error occured while stopping logs " + ex);
         }
         AlogMarker.tAE("ATConfigManager.updateCurrentIndex", "0");
         return updatedIndex;

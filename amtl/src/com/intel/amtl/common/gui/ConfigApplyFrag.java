@@ -204,8 +204,7 @@ public class ConfigApplyFrag extends DialogFragment {
             int indexApplied = -1;
             try {
                 modemCtrl = ModemController.getInstance();
-                indexApplied = modemCtrl.getConfigManager()
-                        .applyConfig(prefs, modConfToApply, modemCtrl);
+                indexApplied = modemCtrl.getConfigManager().applyConfig(modConfToApply, modemCtrl);
             } catch (ModemControlException ex) {
                 exceptReason = ex.getMessage();
                 Log.e(TAG, MODULE + ": cannot change modem configuration " + ex);
@@ -221,7 +220,7 @@ public class ConfigApplyFrag extends DialogFragment {
                         Log.d(TAG, MODULE + ": stopping logging");
                     }
                     indexApplied = modemCtrl.getConfigManager()
-                            .applyConfig(prefs, modConfToApply, modemCtrl);
+                            .applyConfig(modConfToApply, modemCtrl);
                     // Everything went right, so let s commit trace configuration.
                 } catch (ModemControlException mcex) {
                     Log.e(TAG, MODULE + ": failed to apply config " + mcex);

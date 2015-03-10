@@ -19,7 +19,6 @@
 
 package com.intel.amtl.msm.models;
 
-import android.content.SharedPreferences;
 import android.util.Log;
 
 import com.intel.amtl.common.exceptions.ModemControlException;
@@ -39,7 +38,7 @@ public class SofiaConfigManager implements ConfigManager {
     private final String MODULE = "SofiaConfigManager";
 
 
-    public int applyConfig(SharedPreferences prefs, ModemConf mdmConf, ModemController modemCtrl)
+    public int applyConfig(ModemConf mdmConf, ModemController modemCtrl)
             throws ModemControlException {
         AlogMarker.tAB("SofiaConfigManager.applyConfig", "0");
         if (modemCtrl != null) {

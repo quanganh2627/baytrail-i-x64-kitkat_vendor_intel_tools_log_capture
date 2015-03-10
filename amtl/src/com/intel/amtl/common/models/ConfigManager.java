@@ -29,7 +29,7 @@ import com.intel.amtl.common.modem.ModemController;
 import java.util.ArrayList;
 
 public interface ConfigManager {
-    public int applyConfig(SharedPreferences prefs, ModemConf mdmConf, ModemController modemCtrl)
+    public int applyConfig(ModemConf mdmConf, ModemController modemCtrl)
             throws ModemControlException;
     public int updateCurrentIndex(ModemConf curModConf, int currentIndex, String modemName,
             ModemController modemCtrl, ArrayList<LogOutput> configArray);
