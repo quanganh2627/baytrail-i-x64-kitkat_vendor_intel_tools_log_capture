@@ -24,7 +24,7 @@
 #include <strings.h>
 #include <cutils/log.h>
 
-#include "OpenGsmtty.h"
+#include "ModemInterface.h"
 
 #ifdef LOG_TAG
 #undef LOG_TAG
@@ -32,13 +32,13 @@
 
 #define LOG_TAG "AMTL"
 
-#define TTY_CLOSED -1
+#define INTERFACE_CLOSED -1
 #define UNUSED __attribute__((__unused__))
 
-JNIEXPORT jint JNICALL Java_com_intel_amtl_common_modem_Gsmtty_OpenSerial(JNIEnv *env,
+JNIEXPORT jint JNICALL Java_com_intel_amtl_mmgr_modem_ModemInterface_OpenSerialTty(JNIEnv *env,
         UNUSED jobject obj, jstring jtty_name, jint baudrate)
 {
-    int fd = TTY_CLOSED;
+    int fd = INTERFACE_CLOSED;
     const char *tty_name = (*env)->GetStringUTFChars(env, jtty_name, 0);
 
     struct termios tio;
@@ -84,23 +84,23 @@ JNIEXPORT jint JNICALL Java_com_intel_amtl_common_modem_Gsmtty_OpenSerial(JNIEnv
 open_serial_failure:
     if (fd >= 0) {
         close(fd);
-        fd = TTY_CLOSED;
+        fd = INTERFACE_CLOSED;
     }
 
 open_serial_success:
-    if (fd != TTY_CLOSED)
+    if (fd != INTERFACE_CLOSED)
         ALOGI("OpenSerial: %s opened (%d)", tty_name, fd);
     (*env)->ReleaseStringUTFChars(env, jtty_name, tty_name);
     return fd;
 }
 
-JNIEXPORT jint JNICALL Java_com_intel_amtl_common_modem_Gsmtty_CloseSerial(UNUSED JNIEnv *env,
-        UNUSED jobject obj, jint fd)
+JNIEXPORT jint JNICALL Java_com_intel_amtl_mmgr_modem_ModemInterface_CloseSerial(
+        UNUSED JNIEnv *env, UNUSED jobject obj, jint fd)
 {
     ALOGI("CloseSerial: closing file descriptor (%d)", fd);
     if (fd >= 0) {
         close(fd);
-        fd = TTY_CLOSED;
+        fd = INTERFACE_CLOSED;
         ALOGD("CloseSerial: closed");
     }
     else {

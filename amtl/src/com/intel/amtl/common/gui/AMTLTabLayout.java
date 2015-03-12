@@ -218,7 +218,7 @@ public class AMTLTabLayout extends Activity implements GeneralSetupFrag.GSFCallB
         AMTLApplication.setModemInterface(mdmLogOutput.getModemInterface());
         AMTLApplication.setTraceLegacy(mdmLogOutput.getAtLegacyCmd());
         AMTLApplication.setServiceToStart(mdmLogOutput.getServiceToStart());
-        AMTLApplication.setUseMmgr(mdmLogOutput.getUseMmgr());
+        AMTLApplication.setModemInfo(mdmLogOutput.getModemInfo());
         AlogMarker.tAE("AMTLTabLayout.setModemParameters", "0");
     }
 

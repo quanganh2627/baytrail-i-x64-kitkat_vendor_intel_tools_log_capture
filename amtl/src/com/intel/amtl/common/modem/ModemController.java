@@ -34,9 +34,12 @@ import com.intel.amtl.common.models.config.Master;
 import com.intel.amtl.common.models.config.ModemConf;
 import com.intel.amtl.mmgr.models.ATConfigManager;
 import com.intel.amtl.mmgr.modem.ATParser;
+import com.intel.amtl.mmgr.modem.MMGRModemInterfaceMgr;
 import com.intel.amtl.modem.MMGController;
 import com.intel.amtl.modem.MSMController;
+import com.intel.amtl.modem.StubController;
 import com.intel.amtl.msm.models.SofiaConfigManager;
+import com.intel.amtl.msm.modem.SofiaModemInterfaceMgr;
 import com.intel.amtl.msm.modem.SofiaParser;
 import com.intel.amtl.R;
 
@@ -48,7 +51,7 @@ public abstract class ModemController {
     private final String MODULE = "ModemController";
 
     private static String currentModemStatus = "NONE";
-    protected ModemInterfaceMgr modIfMgr;
+    protected static ModemInterfaceMgr modIfMgr;
     private CommandParser cmdParser;
     private ConfigManager confManager;
     private static ModemController mdmCtrl;
@@ -80,15 +83,22 @@ public abstract class ModemController {
 
     public ModemController() {
         AlogMarker.tAB("ModemController.ModemController", "0");
-        cmdParser = (AMTLApplication.getUseMmgr()) ? new ATParser() : new SofiaParser();
-        confManager = (AMTLApplication.getUseMmgr()) ? new ATConfigManager()
+        cmdParser = (AMTLApplication.getModemInfo().equals("mmgr")) ? new ATParser()
+                : new SofiaParser();
+        confManager = (AMTLApplication.getModemInfo().equals("mmgr")) ? new ATConfigManager()
                 : new SofiaConfigManager();
         AlogMarker.tAE("ModemController.ModemController", "0");
     }
 
     public static synchronized ModemController getInstance() throws ModemControlException {
         AlogMarker.tAB("ModemController.getInstance", "0");
-        mdmCtrl = (AMTLApplication.getUseMmgr()) ? MMGController.get() : MSMController.get();
+        if (AMTLApplication.getModemInfo().equals("mmgr")) {
+            mdmCtrl = MMGController.get();
+        } else if (AMTLApplication.getModemInfo().equals("msm")) {
+            mdmCtrl = MSMController.get();
+        } else {
+            mdmCtrl = StubController.get();
+        }
         AlogMarker.tAE("ModemController.getInstance", "0");
         return mdmCtrl;
     }
@@ -154,7 +164,8 @@ public abstract class ModemController {
     public void openModemInterface() throws ModemControlException {
         AlogMarker.tAB("ModemController.openModemInterface", "0");
         if (this.modIfMgr == null) {
-            this.modIfMgr = new GsmttyManager();
+            this.modIfMgr = (AMTLApplication.getModemInfo().equals("mmgr"))
+                ? new MMGRModemInterfaceMgr() : new SofiaModemInterfaceMgr();
         }
         AlogMarker.tAE("ModemController.closeModemInterface", "0");
     }

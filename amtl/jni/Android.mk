@@ -1,7 +1,7 @@
 LOCAL_PATH:= $(call my-dir)
 include $(CLEAR_VARS)
 
-LOCAL_SRC_FILES := OpenGsmtty.c
+LOCAL_SRC_FILES := ModemInterface.c
 # @TODO: add -Wall. This flag is missing because
 # it seems to hide all the warnings.
 LOCAL_CFLAGS := -Werror

@@ -37,7 +37,7 @@ public class AMTLApplication extends Application {
     private static String modemInterface;
     private static int modConnectionId;
     private static boolean traceLegacy = false;
-    private static boolean useMmgr = false;
+    private static String modemInfo = "none";
     private static String serviceToStart;
     private static boolean isAliasUsed = false;
     private static ArrayList<String> modemNameList = new ArrayList<String>();
@@ -139,16 +139,16 @@ public class AMTLApplication extends Application {
         return traceLegacy;
     }
 
-    public static void setUseMmgr(String mmgr) {
-        m.tAB("AMTLApplication.setUseMmgr", "0");
-        useMmgr = (mmgr.equals("true")) ? true : false;
-        m.tAE("AMTLApplication.setUseMmgr", "0");
+    public static void setModemInfo(String info) {
+        m.tAB("AMTLApplication.setModemInfo", "0");
+        modemInfo = info;
+        m.tAE("AMTLApplication.setModemInfo", "0");
     }
 
-    public static boolean getUseMmgr() {
-        m.tAB("AMTLApplication.getUseMmgr", "0");
-        m.tAE("AMTLApplication.getUseMmgr", "0");
-        return useMmgr;
+    public static String getModemInfo() {
+        m.tAB("AMTLApplication.getModemInfo", "0");
+        m.tAE("AMTLApplication.getModemInfo", "0");
+        return modemInfo;
     }
 
     public static void setServiceToStart(String service) {

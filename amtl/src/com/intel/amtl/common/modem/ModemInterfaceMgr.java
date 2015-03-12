@@ -1,4 +1,4 @@
-/* Android AMTL
+/* Android Modem Traces and Logs
  *
  * Copyright (C) Intel 2015
  *
@@ -22,8 +22,10 @@ package com.intel.amtl.common.modem;
 import com.intel.amtl.common.exceptions.ModemControlException;
 
 public interface ModemInterfaceMgr {
+
     public String getModemInterface();
     public void writeToModemControl(String command) throws ModemControlException;
     public String readFromModemControl() throws ModemControlException;
+    public void close();
     public void closeModemInterface();
 }

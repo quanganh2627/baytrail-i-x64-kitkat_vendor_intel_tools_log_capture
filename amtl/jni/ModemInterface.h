@@ -16,8 +16,8 @@
  *
  */
 
-#ifndef __OPENGSMTTY_JNI_H__
-#define __OPENGSMTTY_JNI_H__
+#ifndef __MODEMINTERFACE_JNI_H__
+#define __MODEMINTERFACE_JNI_H__
 
 #include <jni.h>
 
@@ -26,22 +26,23 @@ extern "C" {
 #endif
 
 /*
- * Class:     com_intel_amtl_modem_Gsmtty
- * Method:    OpenSerial
+ * Class:     com_intel_amtl_mmgr_modem_ModemInterface
+ * Method:    OpenSerialTty
  * Signature: (Ljava/lang/String;I)I;
  */
 
-JNIEXPORT jint JNICALL Java_com_intel_amtl_common_modem_Gsmtty_OpenSerial(JNIEnv *,
+JNIEXPORT jint JNICALL Java_com_intel_amtl_mmgr_modem_ModemInterface_OpenSerialTty(JNIEnv *,
         jobject, jstring, jint);
+
 /*
- * Class:     com_intel_amtl_modem_Gsmtty
+ * Class:     com_intel_amtl_mmgr_modem_ModemInterface
  * Method:    CloseSerial
  * Signature: (I)I;
  */
-JNIEXPORT jint JNICALL Java_com_intel_amtl_common_modem_Gsmtty_CloseSerial(JNIEnv *, jobject, jint);
-
+JNIEXPORT jint JNICALL Java_com_intel_amtl_mmgr_modem_ModemInterface_CloseSerial(
+        JNIEnv *, jobject, jint);
 #ifdef __cplusplus
 }
 #endif
 
-#endif //__OPENGSMTTY_JNI_H_
+#endif //__MODEMINTERFACE_JNI_H_

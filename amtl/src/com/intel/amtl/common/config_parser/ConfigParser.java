@@ -238,7 +238,7 @@ public class ConfigParser {
                 parser.getAttributeValue(null, "service_to_start"),
                 parser.getAttributeValue(null, "default_flush_cmd"),
                 parser.getAttributeValue(null, "at_legacy_cmd"),
-                parser.getAttributeValue(null, "use_mmgr"),
+                parser.getAttributeValue(null, "modem_info"),
                 parser.getAttributeValue(null, "full_stop_cmd"),
                 parser.getAttributeValue(null, "dft_cfg_onstop"),
                 parser.getAttributeValue(null, "modem_interface"));
@@ -249,7 +249,7 @@ public class ConfigParser {
                 + ", service_to_start = " + parser.getAttributeValue(null, "service_to_start")
                 + ", default_flush_cmd = " + parser.getAttributeValue(null, "default_flush_cmd")
                 + ", at_legacy_cmd = " + parser.getAttributeValue(null, "at_legacy_cmd")
-                + ", use_mmgr = " + parser.getAttributeValue(null, "use_mmgr")
+                + ", modem_info = " + parser.getAttributeValue(null, "modem_info")
                 + ", full_stop_cmd = " + parser.getAttributeValue(null, "full_stop_cmd")
                 + ", dft_cfg_onstop = " + parser.getAttributeValue(null, "dft_cfg_onstop")
                 + ", modem_interface = " + parser.getAttributeValue(null, "modem_interface")

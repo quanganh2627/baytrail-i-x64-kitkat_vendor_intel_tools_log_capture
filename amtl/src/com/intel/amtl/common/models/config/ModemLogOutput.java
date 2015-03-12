@@ -37,7 +37,7 @@ public class ModemLogOutput {
     private String serviceToStart = null;
     private String dftFlCmd = null;
     private String atLegacyCmd = null;
-    private String useMmgr = null;
+    private String modemInfo = null;
     private String fullStopCmd = null;
     private String dftCfgOnStop = null;
     private String modemInterface = null;
@@ -52,7 +52,7 @@ public class ModemLogOutput {
     }
 
     public ModemLogOutput(int index, String name, String conId, String serviceToStart, String flCmd,
-            String atLegacyCmd, String useMmgr, String fullStopCmd, String dftCfgOnStop,
+            String atLegacyCmd, String info, String fullStopCmd, String dftCfgOnStop,
             String modemInterface) {
         AlogMarker.tAB("ModemLogOutput.ModemLogOutput", "0");
         this.setIndex(index);
@@ -61,7 +61,7 @@ public class ModemLogOutput {
         this.setServiceToStart(serviceToStart);
         this.setFlCmd(flCmd);
         this.setAtLegacyCmd(atLegacyCmd);
-        this.setUseMmgr(useMmgr);
+        this.setModemInfo(info);
         this.setFullStopCmd(fullStopCmd);
         this.setDftCfgOnStop(dftCfgOnStop);
         this.setModemInterface(modemInterface);
@@ -143,16 +143,16 @@ public class ModemLogOutput {
         return this.atLegacyCmd;
     }
 
-    public void setUseMmgr(String useMmgr) {
-        AlogMarker.tAB("ModemLogOutput.setUseMmgr", "0");
-        this.useMmgr = (null == useMmgr) ? "false" : useMmgr;
-        AlogMarker.tAE("ModemLogOutput.setUseMmgr", "0");
+    public void setModemInfo(String info) {
+        AlogMarker.tAB("ModemLogOutput.setModemInfo", "0");
+        this.modemInfo = (null == info) ? "none" : info;
+        AlogMarker.tAE("ModemLogOutput.setModemInfo", "0");
     }
 
-    public String getUseMmgr() {
-        AlogMarker.tAB("ModemLogOutput.getUseMmgr", "0");
-        AlogMarker.tAE("ModemLogOutput.getUseMmgr", "0");
-        return this.useMmgr;
+    public String getModemInfo() {
+        AlogMarker.tAB("ModemLogOutput.getModemInfo", "0");
+        AlogMarker.tAE("ModemLogOutput.getModemInfo", "0");
+        return this.modemInfo;
     }
 
     public void setFullStopCmd(String cmd) {
@@ -217,11 +217,13 @@ public class ModemLogOutput {
                 + ", connection id = " + this.connectionId
                 + ", service to start = " + this.serviceToStart
                 + ", default flush command = " + this.dftFlCmd
-                + ", use mmgr = " + this.useMmgr
+                + ", modem info = " + this.modemInfo
                 + ", modem interface = " + this.modemInterface+ ".");
-        for (LogOutput o: outputList) {
-            o.printToLog();
-            Log.d(TAG, MODULE + ": ---------------------------------------");
+        if (outputList != null) {
+            for (LogOutput o: outputList) {
+                o.printToLog();
+                Log.d(TAG, MODULE + ": ---------------------------------------");
+            }
         }
         Log.d(TAG, MODULE + ": =======================================");
         AlogMarker.tAE("ModemLogOutput.printToLog", "0");

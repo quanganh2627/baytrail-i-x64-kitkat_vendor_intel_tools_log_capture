@@ -27,147 +27,148 @@ import com.intel.amtl.common.modem.ModemController;
 
 import java.util.ArrayList;
 
-public class MSMController extends ModemController {
+public class StubController extends ModemController {
 
     private final String TAG = "AMTL";
-    private final String MODULE = "MMGController";
+    private final String MODULE = "StubController";
+
     private static String currModemStatus = "DOWN";
 
-    public static MSMController get() throws ModemControlException {
-        AlogMarker.tAB("MSMController.get", "0");
-        AlogMarker.tAE("MSMController.get", "0");
-        throw new ModemControlException("MSMController doesn't exist on this platform");
+    public static StubController get() throws ModemControlException {
+        AlogMarker.tAB("StubController.get", "0");
+        AlogMarker.tAE("StubController.get", "0");
+        throw new ModemControlException("StubController doesn't exist on this platform");
     }
 
     public void connectToModem() throws ModemControlException {
-        AlogMarker.tAB("MSMController.connectToModem", "0");
-        AlogMarker.tAE("MSMController.connectToMode", "0");
+        AlogMarker.tAB("StubController.connectToModem", "0");
+        AlogMarker.tAE("StubController.connectToMode", "0");
     }
 
     public String getModemStatus() {
-        AlogMarker.tAB("MSMController.getModemStatus", "0");
-        AlogMarker.tAE("MSMController.getModemStatus", "0");
+        AlogMarker.tAB("StubController.getModemStatus", "0");
+        AlogMarker.tAE("StubController.getModemStatus", "0");
         return currModemStatus;
     }
 
     public void restartModem() throws ModemControlException {
-        AlogMarker.tAB("MSMController.restartModem", "0");
-        AlogMarker.tAE("MSMController.restartModem", "0");
+        AlogMarker.tAB("StubController.restartModem", "0");
+        AlogMarker.tAE("StubController.restartModem", "0");
     }
 
     public String sendCommand(String command) throws ModemControlException {
-        AlogMarker.tAB("MSMController.sendCommand", "0");
-        AlogMarker.tAE("MSMController.sendCommand", "0");
+        AlogMarker.tAB("StubController.sendCommand", "0");
+        AlogMarker.tAE("StubController.sendCommand", "0");
         return "OK";
     }
 
     public String flush(ModemConf mdmConf) throws ModemControlException {
-        AlogMarker.tAB("MSMController.flush", "0");
-        AlogMarker.tAE("MSMController.flush", "0");
+        AlogMarker.tAB("StubController.flush", "0");
+        AlogMarker.tAE("StubController.flush", "0");
         return "OK";
     }
 
     public String confTraceAndModemInfo(ModemConf mdmConf) throws ModemControlException {
-        AlogMarker.tAB("MSMController.confTraceAndModemInfo", "0");
-        AlogMarker.tAE("MSMController.confTraceAndModemInfo", "0");
+        AlogMarker.tAB("StubController.confTraceAndModemInfo", "0");
+        AlogMarker.tAE("StubController.confTraceAndModemInfo", "0");
         return "OK";
     }
 
     public String checkAtXsioState() throws ModemControlException {
-        AlogMarker.tAB("MSMController.checkAtXsioState", "0");
-        AlogMarker.tAE("MSMController.checkAtXsioState", "0");
+        AlogMarker.tAB("StubController.checkAtXsioState", "0");
+        AlogMarker.tAE("StubController.checkAtXsioState", "0");
         return "";
     }
 
     public String checkAtXsystraceState() throws ModemControlException {
-        AlogMarker.tAB("MSMController.checkAtXsystraceState", "0");
-        AlogMarker.tAE("MSMController.checkAtXsystraceState", "0");
+        AlogMarker.tAB("StubController.checkAtXsystraceState", "0");
+        AlogMarker.tAE("StubController.checkAtXsystraceState", "0");
         return "OK";
     }
 
     public ArrayList<Master> checkAtXsystraceState(ArrayList<Master> masterList)
             throws ModemControlException {
-        AlogMarker.tAB("MSMController.checkAtXsystraceState", "0");
-        AlogMarker.tAE("MSMController.checkAtXsystraceState", "0");
+        AlogMarker.tAB("StubController.checkAtXsystraceState", "0");
+        AlogMarker.tAE("StubController.checkAtXsystraceState", "0");
         return null;
     }
 
     public String checkOct() throws ModemControlException {
-        AlogMarker.tAB("MSMController.checkOct", "0");
-        AlogMarker.tAE("MSMController.checkOct", "0");
+        AlogMarker.tAB("StubController.checkOct", "0");
+        AlogMarker.tAE("StubController.checkOct", "0");
         return "0";
     }
 
     public String checkProfileName() throws ModemControlException {
-        AlogMarker.tAB("MSMController.checkProfileName", "0");
-        AlogMarker.tAE("MSMController.checkProfileName", "0");
+        AlogMarker.tAB("StubController.checkProfileName", "0");
+        AlogMarker.tAE("StubController.checkProfileName", "0");
         return getCmdParser().parseProfileName(sendCommand("at+xsystrace=pn#\r\n"));
     }
 
     public String generateModemCoreDump() throws ModemControlException {
-        AlogMarker.tAB("MSMController.generateModemCoreDump", "0");
-        AlogMarker.tAE("MSMController.generateModemCoreDump", "0");
+        AlogMarker.tAB("StubController.generateModemCoreDump", "0");
+        AlogMarker.tAE("StubController.generateModemCoreDump", "0");
         return "OK";
     }
 
     public void releaseResource() {
-        AlogMarker.tAB("MSMController.releaseResource", "0");
-        AlogMarker.tAE("MSMController.releaseResource", "0");
+        AlogMarker.tAB("StubController.releaseResource", "0");
+        AlogMarker.tAE("StubController.releaseResource", "0");
     }
 
     public boolean isModemAcquired() {
-        AlogMarker.tAB("MSMController.isModemAcquired", "0");
-        AlogMarker.tAE("MSMController.isModemAcquired", "0");
+        AlogMarker.tAB("StubController.isModemAcquired", "0");
+        AlogMarker.tAE("StubController.isModemAcquired", "0");
         return false;
     }
 
     public void acquireResource() throws ModemControlException {
-        AlogMarker.tAB("MSMController.acquireResource", "0");
-        AlogMarker.tAE("MSMController.acquireResource", "0");
+        AlogMarker.tAB("StubController.acquireResource", "0");
+        AlogMarker.tAE("StubController.acquireResource", "0");
     }
 
     public void cleanBeforeExit() {
-        AlogMarker.tAB("MSMController.cleanBeforeExit", "0");
-        AlogMarker.tAE("MSMController.cleanBeforeExit", "0");
+        AlogMarker.tAB("StubController.cleanBeforeExit", "0");
+        AlogMarker.tAE("StubController.cleanBeforeExit", "0");
     }
 
     public boolean isModemUp() {
-        AlogMarker.tAB("MSMController.isModemUp", "0");
-        AlogMarker.tAE("MSMController.isModemUp", "0");
+        AlogMarker.tAB("StubController.isModemUp", "0");
+        AlogMarker.tAE("StubController.isModemUp", "0");
         return false;
     }
 
     @Override
     public ModemConf getNoLoggingConf() {
-        AlogMarker.tAB("MSMController.getNoLoggingConf", "0");
-        AlogMarker.tAE("MSMController.getNoLoggingConf", "0");
+        AlogMarker.tAB("StubController.getNoLoggingConf", "0");
+        AlogMarker.tAE("StubController.getNoLoggingConf", "0");
         return null;
     }
 
     @Override
     public boolean queryTraceState() throws ModemControlException {
-        AlogMarker.tAB("MSMController.queryTraceState", "0");
-        AlogMarker.tAE("MSMController.queryTraceState", "0");
+        AlogMarker.tAB("StubController.queryTraceState", "0");
+        AlogMarker.tAE("StubController.queryTraceState", "0");
         return false;
     }
 
     @Override
     public String switchOffTrace() throws ModemControlException {
-        AlogMarker.tAB("MSMController.switchOffTrace", "0");
-        AlogMarker.tAE("MSMController.switchOffTrace", "0");
+        AlogMarker.tAB("StubController.switchOffTrace", "0");
+        AlogMarker.tAE("StubController.switchOffTrace", "0");
         return "OK";
     }
 
     @Override
     public void switchTrace(ModemConf mdmConf) throws ModemControlException {
-        AlogMarker.tAB("MSMController.switchTrace", "0");
-        AlogMarker.tAE("MSMController.switchTrace", "0");
+        AlogMarker.tAB("StubController.switchTrace", "0");
+        AlogMarker.tAE("StubController.switchTrace", "0");
     }
 
     @Override
     public String checkAtTraceState() throws ModemControlException {
-        AlogMarker.tAB("MSMController.checkAtTraceState", "0");
-        AlogMarker.tAE("MSMController.checkAtTraceState", "0");
+        AlogMarker.tAB("StubController.checkAtTraceState", "0");
+        AlogMarker.tAE("StubController.checkAtTraceState", "0");
         return "";
     }
 }

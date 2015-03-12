@@ -3,8 +3,12 @@ include $(CLEAR_VARS)
 
 LOCAL_MODULE_TAGS := optional
 
+STUB := 1
+
 ifneq ($(findstring sofia3g, $(TARGET_BOARD_PLATFORM)),)
-    LOCAL_JAVA_LIBRARIES := com.msm.android.MSMClientLib
+    ifneq ($(STUB), 1)
+        LOCAL_JAVA_LIBRARIES := com.msm.android.MSMClientLib
+    endif
 else
     LOCAL_STATIC_JAVA_LIBRARIES := com.intel.internal.telephony.MmgrClient
 endif
@@ -13,7 +17,11 @@ LOCAL_SRC_FILES := $(call all-java-files-under, src)
 # Only compile source java files in this apk.
 
 ifneq ($(findstring sofia3g, $(TARGET_BOARD_PLATFORM)),)
-    LOCAL_SRC_FILES += $(call all-java-files-under, src_msm)
+    ifneq ($(STUB), 1)
+        LOCAL_SRC_FILES += $(call all-java-files-under, src_msm)
+    else
+        LOCAL_SRC_FILES += $(call all-java-files-under, src_stub)
+    endif
 else
     LOCAL_SRC_FILES += $(call all-java-files-under, src_mmgr)
 endif

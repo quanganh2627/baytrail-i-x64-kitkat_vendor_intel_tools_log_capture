@@ -21,6 +21,7 @@ package com.intel.amtl.mmgr.models;
 
 import android.os.SystemClock;
 import android.util.Log;
+import android.widget.Toast;
 
 import com.intel.amtl.common.AMTLApplication;
 import com.intel.amtl.common.exceptions.ModemControlException;
@@ -75,7 +76,7 @@ public class ATConfigManager implements ConfigManager {
     }
 
     private ModemConf checkProfileSent(ModemConf mdmCf) {
-        AlogMarker.tAB("ATConfigManager.checkProfileSend", "0");
+        AlogMarker.tAB("ATConfigManager.checkProfileSent", "0");
         if (AMTLApplication.getIsAliasUsed()) {
             String currModemProfile = mdmCf.getProfileName();
             if (!currModemProfile.equals("all_off")) {
@@ -86,14 +87,19 @@ public class ATConfigManager implements ConfigManager {
                 }
             }
         }
-        AlogMarker.tAE("ATConfigManager.checkProfileSend", "0");
+        AlogMarker.tAE("ATConfigManager.checkProfileSent", "0");
         return mdmCf;
     }
 
     private int resetConf(ModemController mdmCtrl, ModemConf conf)
             throws ModemControlException {
+        AlogMarker.tAB("ATConfigManager.resetConf", "0");
         mdmCtrl.switchOffTrace();
         mdmCtrl.sendFlushCmd(conf);
+        Toast toast = Toast.makeText(AMTLApplication.getContext(), "Configuration not recognized, "
+                + "stopping traces", Toast.LENGTH_LONG);
+        toast.show();
+        AlogMarker.tAE("ATConfigManager.resetConf", "0");
         return -1;
     }
 
@@ -117,6 +123,7 @@ public class ATConfigManager implements ConfigManager {
                     }
                 } else {
                     if (configArray != null) {
+                        boolean confChanged = false;
                         for (LogOutput o: configArray) {
                             if (o != null && o.getXsio() != null && o.getMtsOutput() != null
                                     && o.getOct() != null) {
@@ -125,8 +132,13 @@ public class ATConfigManager implements ConfigManager {
                                         .getOutput()) && o.getOct()
                                         .equals(curModConf.getOctMode())) {
                                     updatedIndex = o.getIndex();
+                                    confChanged = true;
                                 }
                             }
+                        }
+                        if (!confChanged) {
+                            updatedIndex = this.resetConf(modemCtrl, curModConf);
+                            confReset = true;
                         }
                     } else {
                         updatedIndex = this.resetConf(modemCtrl, curModConf);
