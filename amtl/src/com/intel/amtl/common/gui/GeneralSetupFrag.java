@@ -79,6 +79,8 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnChe
     private TextView tvModemStatus;
     private TextView tvMtsStatus;
     private TextView tvOctStatus;
+    private TextView tvProfileName;
+    private TextView tvProfileNameValue;
 
     // Callback object pointer. Active only when associated to Main layout.
     private GSFCallBack gsfCb = nullCb;
@@ -182,14 +184,19 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnChe
         } else if (updatedId <= -1) {
             this.setSwitchesChecked(false);
         } else {
-            for (LogOutput o: configArray) {
-                o.getConfSwitch().setChecked(configArray.indexOf(o) == updatedId);
+            if (configArray != null) {
+                for (LogOutput o: configArray) {
+                    o.getConfSwitch().setChecked(configArray.indexOf(o) == updatedId);
+                }
             }
         }
 
         if (AMTLApplication.getUseMmgr()) {
             this.updateText(curModConf.getOctMode(), tvOctStatus);
             this.updateText(MtsManager.getMtsState(), tvMtsStatus);
+            if (AMTLApplication.getIsAliasUsed()) {
+                this.updateText(curModConf.getProfileName(), tvProfileNameValue);
+            }
         }
         AlogMarker.tAE("GeneralSetupFrag.upddateUi", "0");
     }
@@ -269,6 +276,9 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnChe
                     this.currentModemConf = checkModemConfig(mdmCtrl);
                     this.currentModemConf.setMtsConf(checkMtsConfig());
                     this.currentModemConf.setMtsMode(MtsManager.getMtsMode());
+                    if (AMTLApplication.getIsAliasUsed()) {
+                        this.currentModemConf.setProfileName(mdmCtrl.checkProfileName());
+                    }
                     if (this.currentModemConf != null) {
                         this.updateUi(this.currentModemConf);
                     }
@@ -304,6 +314,8 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnChe
             this.tvModemStatus = (TextView) view.findViewById(R.id.modemStatusValueTxt);
             this.tvMtsStatus = (TextView) view.findViewById(R.id.mtsStatusValueTxt);
             this.tvOctStatus = (TextView) view.findViewById(R.id.octStatusValueTxt);
+            this.tvProfileName = (TextView) view.findViewById(R.id.profileNameTxt);
+            this.tvProfileNameValue = (TextView) view.findViewById(R.id.profileNameValueTxt);
             this.ll = (LinearLayout) view.findViewById(R.id.generalsetupfraglayout);
 
             // definition of switch listeners
@@ -316,6 +328,10 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnChe
             this.defineLogTagButton(view);
             if (AMTLApplication.getUseMmgr()) {
                 this.defineCoreDumpButton(view);
+            }
+            if (!AMTLApplication.getIsAliasUsed()) {
+                this.tvProfileName.setVisibility(View.GONE);
+                this.tvProfileNameValue.setVisibility(View.GONE);
             }
         } else {
 
@@ -371,6 +387,9 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnChe
                             currentModemConf = checkModemConfig(mdmCtrl);
                             currentModemConf.setMtsConf(checkMtsConfig());
                             currentModemConf.setMtsMode(MtsManager.getMtsMode());
+                            if (AMTLApplication.getIsAliasUsed()) {
+                                currentModemConf.setProfileName(mdmCtrl.checkProfileName());
+                            }
                             if (currentModemConf != null) {
                                 updateUi(currentModemConf);
                             }

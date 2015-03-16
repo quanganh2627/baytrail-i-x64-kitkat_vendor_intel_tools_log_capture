@@ -41,6 +41,7 @@ public class AMTLApplication extends Application {
     private static String serviceToStart;
     private static String apLoggingPath = "/logs";
     private static String bpLoggingPath = "/logs";
+    private static boolean isAliasUsed = false;
     private static ArrayList<String> modemNameList = new ArrayList<String>();
     private static AlogMarker m = new AlogMarker();
 
@@ -202,5 +203,17 @@ public class AMTLApplication extends Application {
         m.tAB("AMTLApplication.getBpLoggingPath", "0");
         m.tAE("AMTLApplication.getBpLoggingPath", "0");
         return bpLoggingPath;
+    }
+
+    public static void setIsAliasUsed(boolean alias) {
+        m.tAB("AMTLApplication.setBpLoggingPath", "0");
+        isAliasUsed = alias;
+        m.tAE("AMTLApplication.setBpLoggingPath", "0");
+    }
+
+    public static boolean getIsAliasUsed() {
+        m.tAB("AMTLApplication.getBpLoggingPath", "0");
+        m.tAE("AMTLApplication.getBpLoggingPath", "0");
+        return isAliasUsed;
     }
 }

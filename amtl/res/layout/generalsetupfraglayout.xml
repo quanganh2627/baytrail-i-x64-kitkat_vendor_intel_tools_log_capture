@@ -77,6 +77,27 @@
                 android:textAppearance="?android:attr/textAppearanceMedium" />
         </TableRow>
 
+        <TableRow
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content">
+
+            <TextView
+                android:id="@+id/profileNameTxt"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginRight="10dp"
+                android:text="@string/label_profile_name"
+                android:textAppearance="?android:attr/textAppearanceMedium" />
+
+            <TextView
+                android:id="@+id/profileNameValueTxt"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/label_unknown"
+                android:textStyle="bold"
+                android:textAppearance="?android:attr/textAppearanceMedium" />
+        </TableRow>
+
         <View
             android:id="@+id/View0"
             android:layout_width="fill_parent"

@@ -32,6 +32,7 @@ import com.intel.amtl.common.models.config.LogOutput;
 import com.intel.amtl.common.models.config.ModemConf;
 import com.intel.amtl.common.modem.ModemController;
 import com.intel.amtl.common.mts.MtsManager;
+import com.intel.amtl.common.StoredSettings;
 
 import java.util.ArrayList;
 
@@ -48,6 +49,7 @@ public class ATConfigManager implements ConfigManager {
             if (mdmConf != null) {
                 // send the commands to set the new configuration
                 modemCtrl.confTraceAndModemInfo(mdmConf);
+                mdmConf = checkProfileSent(mdmConf);
                 modemCtrl.switchTrace(mdmConf);
                 // if flush command available for this configuration, let s use it.
                 if (!mdmConf.getFlCmd().equalsIgnoreCase("")) {
@@ -88,11 +90,28 @@ public class ATConfigManager implements ConfigManager {
         return mdmConf.getIndex();
     }
 
+    private ModemConf checkProfileSent(ModemConf mdmCf) {
+        AlogMarker.tAB("ATConfigManager.checkProfileSend", "0");
+        if (AMTLApplication.getIsAliasUsed()) {
+            String currModemProfile = mdmCf.getProfileName();
+            if (!currModemProfile.equals("all_off")) {
+                StoredSettings privatePrefs = new StoredSettings(AMTLApplication.getContext());
+                String profileName = privatePrefs.getModemProfile();
+                if (!profileName.equals(currModemProfile)) {
+                    mdmCf.updateProfileName(profileName);
+                }
+            }
+        }
+        AlogMarker.tAE("ATConfigManager.checkProfileSend", "0");
+        return mdmCf;
+    }
+
     public int updateCurrentIndex(ModemConf curModConf, int currentIndex, String modemName,
             ModemController modemCtrl, ArrayList<LogOutput> configArray) {
         AlogMarker.tAB("ATConfigManager.updateCurrentIndex", "0");
         boolean confReset = false;
         int updatedIndex = currentIndex;
+
         if (updatedIndex == -2) {
             LogOutput defaultConf = AMTLApplication.getDefaultConf();
             if (defaultConf != null && defaultConf.getXsio() != null

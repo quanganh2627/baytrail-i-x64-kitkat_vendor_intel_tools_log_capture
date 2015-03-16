@@ -91,4 +91,7 @@ public class SofiaParser implements CommandParser {
         AlogMarker.tAE("SofiaParser.parseOct", "0");
         return oct;
     }
+    public String parseProfileName(String xsystrace) {
+        return "UNKNOWN";
+    }
 }

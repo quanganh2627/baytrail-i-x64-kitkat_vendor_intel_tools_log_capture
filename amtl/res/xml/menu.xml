@@ -52,12 +52,21 @@
     </PreferenceCategory>
 
     <PreferenceCategory
-        android:title="@string/settings_modem">
+        android:title="@string/settings_modem"
+        android:key="@string/settings_modem_key">
 
         <ListPreference
             android:key="@string/settings_modem_name_key"
             android:summary="@string/settings_modem_name_summary"
             android:title="@string/settings_modem_name_title" />
+
+        <ListPreference
+            android:title="@string/settings_modem_profile_title"
+            android:summary="@string/settings_modem_profile_summary"
+            android:key="@string/settings_modem_profile_key"
+            android:defaultValue="@string/settings_modem_profile_default"
+            android:entries="@array/modemProfileText"
+            android:entryValues="@array/modemProfileValues" />
 
     </PreferenceCategory>
 

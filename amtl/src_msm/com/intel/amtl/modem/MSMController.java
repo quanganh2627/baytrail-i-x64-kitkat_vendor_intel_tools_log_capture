@@ -169,6 +169,12 @@ public class MSMController extends ModemController {
         AlogMarker.tAE("MSMController.cleanBeforeExit", "0");
     }
 
+    public String checkProfileName() throws ModemControlException {
+        AlogMarker.tAB("MSMController.checkProfileName", "0");
+        AlogMarker.tAE("MSMController.checkProfileName", "0");
+        return "UNKNOWN";
+    }
+
     public boolean isModemUp() {
         AlogMarker.tAB("MSMController.isModemUp", "0");
         AlogMarker.tAE("MSMController.isModemUp", "0");

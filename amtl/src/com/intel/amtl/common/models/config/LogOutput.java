@@ -60,6 +60,7 @@ public class LogOutput {
     private Switch confSwitch = null;
     private String flcmd = null;
     private String sigusr1ToSend = null;
+    private Alias alias = null;
 
     public LogOutput() {
         AlogMarker.tAB("LogOutput.LogOutput", "0");
@@ -409,6 +410,34 @@ public class LogOutput {
         AlogMarker.tAE("LogOutput.removeMasterFromList", "0");
     }
 
+    public void setAlias(Alias alias) {
+        AlogMarker.tAB("LogOutput.setAlias", "0");
+        this.alias = alias;
+        AlogMarker.tAE("LogOutput.setAlias", "0");
+    }
+
+    public Alias getAlias() {
+        AlogMarker.tAB("LogOutput.getAlias", "0");
+        AlogMarker.tAE("LogOutput.getAlias", "0");
+        return this.alias;
+    }
+
+    public String concatAlias() {
+        AlogMarker.tAB("LogOutput.concatAlias", "0");
+        String ret = "";
+        if (alias != null) {
+            String profileName = alias.getProfileName();
+            if (profileName != null) {
+                ret = "\"" + alias.getProfileName() +  "\"";
+                if (alias.getDestination() != null) {
+                    ret += "," + "\"proute=" + alias.getDestination() +  "\"";
+                }
+            }
+        }
+        AlogMarker.tAE("LogOutput.concatAlias", "0");
+        return ret;
+    }
+
     public Switch setConfigSwitch(LinearLayout ll, int index, Context ctx, View view) {
         AlogMarker.tAB("LogOutput.setConfigSwitch", "0");
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
@@ -461,6 +490,9 @@ public class LogOutput {
                 + ", pti1 = " + this.pti1 + ", pti2 = " + this.pti2
                 + ", sigusr1_to_send = " + this.sigusr1ToSend
                 + ", flush_command = " + this.flcmd + ".");
+        if (alias != null) {
+            alias.printToLog();
+        }
         while (it.hasNext()) {
             Master master = it.next();
             master.printToLog();

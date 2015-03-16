@@ -7,6 +7,7 @@
     <string name="label_modem_status">Modem status:</string>
     <string name="label_mts_status">Modem Trace Server state:</string>
     <string name="label_oct_status">Modem internal logging:</string>
+    <string name="label_profile_name">Profile name:</string>
     <string name="expert_mode">Expert Mode</string>
     <string name="logcat_log">Android log</string>
     <string name="apply_conf_text">Validate masters</string>
@@ -52,6 +53,7 @@
     <string name="settings_logcat">Logcat Settings</string>
     <string name="settings_general">General Settings</string>
     <string name="settings_modem">Modem Settings</string>
+    <string name="settings_modem_key">settings_modem_key</string>
 
 
     <string name="settings_user_save_path_key">settings_user_save_path_key</string>
@@ -75,5 +77,10 @@
     <string name="settings_modem_name_key">settings_modem_name_key</string>
     <string name="settings_modem_name_title">Modem name</string>
     <string name="settings_modem_name_summary">Default modem</string>
+
+    <string name="settings_modem_profile_key">settings_modem_profile_key</string>
+    <string name="settings_modem_profile_title">Modem profile</string>
+    <string name="settings_modem_profile_summary">Default profile</string>
+    <string name="settings_modem_profile_default">0</string>
 
 </resources>

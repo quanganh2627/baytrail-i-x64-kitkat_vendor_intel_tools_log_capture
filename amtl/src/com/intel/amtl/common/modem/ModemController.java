@@ -71,6 +71,7 @@ public abstract class ModemController {
     public abstract ArrayList<Master> checkAtXsystraceState(ArrayList<Master> masterList)
             throws ModemControlException;
     public abstract String checkOct() throws ModemControlException;
+    public abstract String checkProfileName() throws ModemControlException;
     public abstract String generateModemCoreDump() throws ModemControlException;
 
     public ModemController() {

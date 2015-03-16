@@ -100,6 +100,12 @@ public class MSMController extends ModemController {
         return "0";
     }
 
+    public String checkProfileName() throws ModemControlException {
+        AlogMarker.tAB("MSMController.checkProfileName", "0");
+        AlogMarker.tAE("MSMController.checkProfileName", "0");
+        return "UNKNOWN";
+    }
+
     public String generateModemCoreDump() throws ModemControlException {
         AlogMarker.tAB("MSMController.generateModemCoreDump", "0");
         AlogMarker.tAE("MSMController.generateModemCoreDump", "0");

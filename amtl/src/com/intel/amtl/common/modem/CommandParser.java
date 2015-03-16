@@ -30,4 +30,5 @@ public interface CommandParser {
             ArrayList<Master> masterArray);
     public String parseTraceResponse(String trace);
     public String parseOct(String xsystrace);
+    public String parseProfileName(String xsystrace);
 }

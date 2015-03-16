@@ -93,4 +93,17 @@ public class ATParser implements CommandParser {
         AlogMarker.tAE("ATParser.parseOct", "0");
         return oct;
     }
+
+    public String parseProfileName(String xsystrace) {
+        AlogMarker.tAB("ATParser.parseProfileName", "0");
+        String profileName = "";
+
+        if (xsystrace != null) {
+            int indexOfProfileName = xsystrace.indexOf("Active profile is:");
+            String sub = xsystrace.substring(indexOfProfileName + 23);
+            profileName = sub.substring(0, sub.indexOf("\r\n"));
+        }
+        AlogMarker.tAE("ATParser.parseProfileName", "0");
+        return profileName;
+    }
 }

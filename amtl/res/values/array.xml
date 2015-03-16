@@ -47,4 +47,17 @@
         <item>5120</item>
         <item>10240</item>
     </string-array>
+
+    <string-array name="modemProfileText">
+        <item>default</item>
+        <item>intel_common_error_only</item>
+        <item>intel_common_normal</item>
+        <item>intel_common_full_debug</item>
+    </string-array>
+    <string-array name="modemProfileValues">
+        <item>0</item>
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+    </string-array>
 </resources>

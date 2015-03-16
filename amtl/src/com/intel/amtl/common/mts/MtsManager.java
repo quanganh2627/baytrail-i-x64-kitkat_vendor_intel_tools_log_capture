@@ -30,49 +30,50 @@ public class MtsManager {
 
     private static final String TAG = "AMTL";
     private static final String MODULE = "MtsManager";
+    private static final String EMPTY_STRING = "";
 
     public static final Runtime rtm = java.lang.Runtime.getRuntime();
 
     public static String getMtsInput() {
         AlogMarker.tAB("MtsManager.getMtsInput", "0");
         AlogMarker.tAE("MtsManager.getMtsInput", "0");
-        return SystemProperties.get(MtsProperties.getInput());
+        return SystemProperties.get(MtsProperties.getInput(), EMPTY_STRING);
     }
 
     public static String getMtsOutput() {
         AlogMarker.tAB("MtsManager.getMtsOutput", "0");
         AlogMarker.tAE("MtsManager.getMtsOutput", "0");
-        return SystemProperties.get(MtsProperties.getOutput());
+        return SystemProperties.get(MtsProperties.getOutput(), EMPTY_STRING);
     }
 
     public static String getMtsOutputType() {
         AlogMarker.tAB("MtsManager.getMtsOutputType", "0");
         AlogMarker.tAE("MtsManager.getMtsOutputType", "0");
-        return SystemProperties.get(MtsProperties.getOutputType());
+        return SystemProperties.get(MtsProperties.getOutputType(), EMPTY_STRING);
     }
 
     public static String getMtsRotateNum() {
         AlogMarker.tAB("MtsManager.getMtsRotateNum", "0");
         AlogMarker.tAE("MtsManager.getMtsRotateNum", "0");
-        return SystemProperties.get(MtsProperties.getRotateNum());
+        return SystemProperties.get(MtsProperties.getRotateNum(), EMPTY_STRING);
     }
 
     public static String getMtsRotateSize() {
         AlogMarker.tAB("MtsManager.getMtsRotateSize", "0");
         AlogMarker.tAE("MtsManager.getMtsRotateSize", "0");
-        return SystemProperties.get(MtsProperties.getRotateSize());
+        return SystemProperties.get(MtsProperties.getRotateSize(), EMPTY_STRING);
     }
 
     public static String getMtsInterface() {
         AlogMarker.tAB("MtsManager.getMtsInterface", "0");
         AlogMarker.tAE("MtsManager.getMtsInterface", "0");
-        return SystemProperties.get(MtsProperties.getInterface());
+        return SystemProperties.get(MtsProperties.getInterface(), EMPTY_STRING);
     }
 
     public static String getMtsBufferSize() {
         AlogMarker.tAB("MtsManager.getMtsBufferSize", "0");
         AlogMarker.tAE("MtsManager.getMtsBufferSize", "0");
-        return SystemProperties.get(MtsProperties.getBufferSize());
+        return SystemProperties.get(MtsProperties.getBufferSize(), EMPTY_STRING);
     }
 
     public static void printMtsProperties() {

@@ -25,6 +25,7 @@ import android.util.Log;
 import com.intel.amtl.common.AMTLApplication;
 import com.intel.amtl.common.log.AlogMarker;
 import com.intel.amtl.common.mts.MtsConf;
+import com.intel.amtl.mmgr.models.config.AliasModemConf;
 import com.intel.amtl.mmgr.models.config.OctModemConf;
 import com.intel.amtl.mmgr.models.config.TraceLegacyModemConf;
 
@@ -35,6 +36,7 @@ public abstract class ModemConf {
     private String atXsio = "";
     private String atXsystrace = "";
     private String mtsMode = "";
+    private String profileName = "UNKNOWN";
     private String flCmd = "";
     private String octMode = "";
     private boolean mtsRequired = false;
@@ -42,6 +44,7 @@ public abstract class ModemConf {
 
     private LogOutput config = null;
     private MtsConf mtsConf = null;
+    private Alias alias = null;
 
     protected String atTrace = "";
 
@@ -61,6 +64,8 @@ public abstract class ModemConf {
         AlogMarker.tAE("ModemConf.getInstance", "0");
         return (AMTLApplication.getTraceLegacy())
                 ? new TraceLegacyModemConf(xsio, trace, xsystrace, flcmd, octMode)
+                : (AMTLApplication.getIsAliasUsed())
+                ? new AliasModemConf(xsio, trace, xsystrace, flcmd, octMode)
                 : new OctModemConf(xsio, trace, xsystrace, flcmd, octMode);
     }
 
@@ -68,7 +73,12 @@ public abstract class ModemConf {
         AlogMarker.tAB("ModemConf.ModemConf", "0");
         this.config = config;
         this.confIndex = this.config.getIndex();
-        this.atXsystrace = "AT+XSYSTRACE=1," + this.config.concatMasterPort();
+        this.alias = this.config.getAlias();
+        if (alias != null) {
+            this.atXsystrace = "AT+XSYSTRACE=" + this.config.concatAlias();
+        } else {
+            this.atXsystrace = "AT+XSYSTRACE=1," + this.config.concatMasterPort();
+        }
 
         if (this.config.getFlCmd() != null) {
             this.flCmd = this.config.getFlCmd() + "\r\n";
@@ -128,10 +138,20 @@ public abstract class ModemConf {
         if (!octMode.equals("")) {
             this.octMode = octMode;
         }
+
+        if (AMTLApplication.getIsAliasUsed()) {
+            String allOff = "all_off";
+            String xsystraceProf = "AT+XSYSTRACE=pn";
+            if (xsystrace.contains(allOff)) {
+                setProfileName(allOff);
+            } else if (xsystrace.contains(xsystraceProf)) {
+                setProfileName(xsystrace.substring(xsystraceProf.length(), xsystrace.indexOf(",")));
+            }
+        }
         AlogMarker.tAE("ModemConf.ModemConf", "0");
     }
 
-    public void setMtsConf (MtsConf conf) {
+    public void setMtsConf(MtsConf conf) {
         AlogMarker.tAB("ModemConf.setMtsConf", "0");
         if (conf != null) {
             this.mtsConf = conf;
@@ -139,7 +159,7 @@ public abstract class ModemConf {
         AlogMarker.tAE("ModemConf.setMtsConf", "0");
     }
 
-    public MtsConf getMtsConf () {
+    public MtsConf getMtsConf() {
         AlogMarker.tAB("ModemConf.getMtsConf", "0");
         AlogMarker.tAE("ModemConf.getMtsConf", "0");
         return this.mtsConf;
@@ -193,6 +213,18 @@ public abstract class ModemConf {
         this.mtsMode = mode;
     }
 
+    public String getProfileName() {
+        AlogMarker.tAB("ModemConf.getProfileName", "0");
+        AlogMarker.tAE("ModemConf.getProfileName", "0");
+        return this.profileName;
+    }
+
+    public void setProfileName(String name) {
+        AlogMarker.tAB("ModemConf.setProfileName", "0");
+        AlogMarker.tAE("ModemConf.setProfileName", "0");
+        this.profileName = name;
+    }
+
     public void applyMtsParameters() {
         AlogMarker.tAB("ModemConf.applyMtsParameters", "0");
         if (this.mtsConf != null) {
@@ -223,6 +255,15 @@ public abstract class ModemConf {
         AlogMarker.tAB("ModemConf.getOctMode", "0");
         AlogMarker.tAE("ModemConf.getOctMode", "0");
         return this.octMode;
+    }
+
+    public void updateProfileName(String profile) {
+        AlogMarker.tAB("ModemConf.updateModemProfile", "0");
+        String xsystrace = "AT+XSYSTRACE=";
+        String previousProfile = this.atXsystrace.substring(xsystrace.length(),
+                this.atXsystrace.indexOf(","));
+        this.atXsystrace = this.atXsystrace.replace(previousProfile, "pn" + profile);
+        AlogMarker.tAE("ModemConf.updateModemProfile", "0");
     }
 
     public void printMtsToLog() {

@@ -110,6 +110,12 @@ public abstract class MMGController extends ModemController {
         return "OK";
     }
 
+    public String checkProfileName() throws ModemControlException {
+        AlogMarker.tAB("MMGController.checkProfileName", "0");
+        AlogMarker.tAE("MMGController.checkProfileName", "0");
+        return "UNKNOWN";
+    }
+
     public String generateModemCoreDump() throws ModemControlException {
         AlogMarker.tAB("MMGController.generateModemCoreDump", "0");
         AlogMarker.tAE("MMGController.generateModemCoreDump", "0");

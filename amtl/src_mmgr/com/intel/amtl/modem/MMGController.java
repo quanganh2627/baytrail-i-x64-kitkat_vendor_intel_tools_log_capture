@@ -29,6 +29,7 @@ import com.intel.amtl.common.log.AlogMarker;
 import com.intel.amtl.common.models.config.Master;
 import com.intel.amtl.common.models.config.ModemConf;
 import com.intel.amtl.common.modem.ModemController;
+import com.intel.amtl.mmgr.modem.AliasController;
 import com.intel.amtl.mmgr.modem.OctController;
 import com.intel.amtl.mmgr.modem.TraceLegacyController;
 import com.intel.internal.telephony.MmgrClientException;
@@ -78,7 +79,8 @@ public abstract class MMGController extends ModemController implements ModemEven
 
         if (null == mmgCtrl) {
             mmgCtrl = (AMTLApplication.getTraceLegacy())
-                    ? new TraceLegacyController() : new OctController();
+                    ? new TraceLegacyController() : (AMTLApplication.getIsAliasUsed())
+                    ? new AliasController() : new OctController();
         }
         AlogMarker.tAE("MMGController.get", "0");
         return mmgCtrl;
@@ -168,7 +170,8 @@ public abstract class MMGController extends ModemController implements ModemEven
                 do {
                     //Response may return in two lines.
                     ret += modIfMgr.readFromModemControl();
-                } while (!ret.contains("OK") && !ret.contains("ERROR"));
+                } while (!ret.contains("OK") && !ret.contains("ERROR")
+                        && !command.equals("at+xsystrace=pn#\r\n"));
 
                 if (ret.contains("ERROR")) {
                     throw new ModemControlException("Modem has answered" + ret
@@ -216,6 +219,12 @@ public abstract class MMGController extends ModemController implements ModemEven
         AlogMarker.tAB("MMGController.checkOct", "0");
         AlogMarker.tAE("MMGController.checkOct", "0");
         return getCmdParser().parseOct(sendCommand("at+xsystrace=11\r\n"));
+    }
+
+    public String checkProfileName() throws ModemControlException {
+        AlogMarker.tAB("MMGController.checkProfileName", "0");
+        AlogMarker.tAE("MMGController.checkProfileName", "0");
+        return getCmdParser().parseProfileName(sendCommand("at+xsystrace=pn#\r\n"));
     }
 
     public String generateModemCoreDump() throws ModemControlException {

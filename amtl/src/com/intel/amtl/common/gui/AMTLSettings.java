@@ -27,7 +27,9 @@ import android.preference.Preference;
 import android.preference.Preference.OnPreferenceChangeListener;
 import android.preference.Preference.OnPreferenceClickListener;
 import android.preference.PreferenceActivity;
+import android.preference.PreferenceCategory;
 
+import com.intel.amtl.common.AMTLApplication;
 import com.intel.amtl.common.log.AlogMarker;
 import com.intel.amtl.R;
 
@@ -96,6 +98,27 @@ public class AMTLSettings extends PreferenceActivity {
             logsSize.setSummary(entries[i]);
             logsSize.setOnPreferenceChangeListener(generalListUpdated);
         }
+
+
+        final ListPreference modemProfile
+                = (ListPreference) findPreference("settings_modem_profile_key");
+        if (AMTLApplication.getIsAliasUsed()) {
+            if (null != modemProfile) {
+                int i = modemProfile.findIndexOfValue(modemProfile.getValue().toString());
+                if (i == -1) {
+                    modemProfile.setSummary("not_defined");
+                } else {
+                    CharSequence[] entries = modemProfile.getEntries();
+                    modemProfile.setSummary(entries[i]);
+                    modemProfile.setOnPreferenceChangeListener(generalListUpdated);
+                }
+            }
+        } else {
+            PreferenceCategory notifCategory
+                    = (PreferenceCategory) findPreference("settings_modem_key");
+            notifCategory.removePreference(getPreferenceScreen()
+                    .findPreference("settings_modem_profile_key"));
+        }
         AlogMarker.tAE("AMTLSettings.onCreate", "0");
     }
 
@@ -118,7 +141,7 @@ public class AMTLSettings extends PreferenceActivity {
     };
 
     protected static void setListPreferenceModem(ListPreference listPreference,
-            ArrayList <String> names ) {
+            ArrayList <String> names) {
 
         AlogMarker.tAB("AMTLSettings.setListPreferenceModem", "0");
         ArrayList<String> listItem = new ArrayList<String>();

@@ -29,6 +29,7 @@ import android.util.Xml;
 
 import com.intel.amtl.common.AMTLApplication;
 import com.intel.amtl.common.log.AlogMarker;
+import com.intel.amtl.common.models.config.Alias;
 import com.intel.amtl.common.models.config.LogOutput;
 import com.intel.amtl.common.models.config.Master;
 import com.intel.amtl.common.models.config.ModemConf;
@@ -348,12 +349,12 @@ public class ConfigParser {
     private void handleMasterElements(XmlPullParser parser, LogOutput output)
             throws XmlPullParserException, IOException {
         AlogMarker.tAB("ConfigParser.handleMasterElement", "0");
-        String name = null;
-        String defaultPort = null;
-        String defaultConf = null;
-        Master master = null;
 
         if (isStartOf(parser, "master")) {
+            String name = null;
+            String defaultPort = null;
+            String defaultConf = null;
+            Master master = null;
 
             Log.d(TAG, MODULE + ": Get element type MASTER -> WILL PARSE IT.");
             name = parser.getAttributeValue(null, "name");
@@ -368,6 +369,24 @@ public class ConfigParser {
                 output.addMasterToList(name, master);
             }
             Log.d(TAG, MODULE + ": Completed element type MASTER parsing.");
+
+        } else if (isStartOf(parser, "alias")) {
+            String profileName = null;
+            String destination = null;
+            Alias alias = null;
+
+            Log.d(TAG, MODULE + ": Get element type ALIAS -> WILL PARSE IT.");
+            profileName = parser.getAttributeValue(null, "profile_name");
+            destination = parser.getAttributeValue(null, "destination");
+
+            Log.d(TAG, MODULE + ": Element ALIAS, profile_name = " + profileName
+                    + ", destination = " + destination + ".");
+
+            alias = new Alias(profileName, destination);
+            output.setAlias(alias);
+            AMTLApplication.setIsAliasUsed(true);
+
+            Log.d(TAG, MODULE + ": Completed element type ALIAS parsing.");
         }
         AlogMarker.tAE("ConfigParser.handleMasterElement", "0");
     }

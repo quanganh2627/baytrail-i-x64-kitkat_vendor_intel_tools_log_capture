@@ -59,4 +59,25 @@ public class StoredSettings {
                 mCtx.getString(R.string.settings_save_path_key),
                 mCtx.getString(R.string.settings_save_path_default));
     }
+
+    public String getModemProfile() {
+        String mdmProfile = getProfileName(appSharedPrefs.getString(
+                mCtx.getString(R.string.settings_modem_profile_key),
+                mCtx.getString(R.string.settings_modem_profile_default)));
+        return mdmProfile;
+    }
+
+    private String getProfileName(String index) {
+        String profName = "default";
+        int id = Integer.parseInt(index);
+        String[] modemProfile = AMTLApplication.getContext().getResources()
+                .getStringArray(R.array.modemProfileText);
+
+        if (null != modemProfile) {
+            if (id != -1) {
+                profName = modemProfile[id];
+            }
+        }
+        return profName;
+    }
 }

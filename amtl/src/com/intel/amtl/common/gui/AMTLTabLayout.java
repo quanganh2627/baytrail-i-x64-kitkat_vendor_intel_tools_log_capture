@@ -77,7 +77,7 @@ import org.xmlpull.v1.XmlPullParserException;
 // @default_flush_cmd (string) if populated, the command to execute to flush to NVM
 
 public class AMTLTabLayout extends Activity implements GeneralSetupFrag.GSFCallBack,
-        MasterSetupFrag.OnModeChanged, LogcatTraces.OnLogcatTraceModeApplied,
+        LogcatTraces.OnLogcatTraceModeApplied,
         SystemStatsTraces.OnSystemStatsTraceModeApplied {
 
     private final String TAG = "AMTL";
@@ -171,7 +171,8 @@ public class AMTLTabLayout extends Activity implements GeneralSetupFrag.GSFCallB
             }
         }
         this.setConfigArray();
-        if (expConf.isExpertModeEnabled(modemNames.get(currentLoggingModem))) {
+        if (modemNames != null
+                && expConf.isExpertModeEnabled(modemNames.get(currentLoggingModem))) {
             ExpertConfig.setConfigSet(true);
         }
         this.updateLoggingPreferences();
@@ -186,19 +187,22 @@ public class AMTLTabLayout extends Activity implements GeneralSetupFrag.GSFCallB
         currentLoggingModem = Integer.parseInt(curModem);
         modemNames = new ArrayList<String>();
 
-        for (ModemLogOutput m: modemConfigOutputs) {
-            modemNames.add(modemConfigOutputs.indexOf(m), m.getName());
-        }
+        if (modemConfigOutputs != null) {
 
-        AMTLApplication.setModemNameList(modemNames);
+            for (ModemLogOutput m: modemConfigOutputs) {
+                modemNames.add(modemConfigOutputs.indexOf(m), m.getName());
+            }
 
-        ModemLogOutput currModemLogOut = new ModemLogOutput();
-        currModemLogOut = modemConfigOutputs.get(currentLoggingModem);
-        if (currModemLogOut != null) {
-            currModemLogOut.printToLog();
-            configOutputs = new ArrayList<LogOutput>();
-            configOutputs.addAll(currModemLogOut.getOutputList());
-            setModemParameters(currModemLogOut);
+            AMTLApplication.setModemNameList(modemNames);
+
+            ModemLogOutput currModemLogOut = new ModemLogOutput();
+            currModemLogOut = modemConfigOutputs.get(currentLoggingModem);
+            if (currModemLogOut != null) {
+                currModemLogOut.printToLog();
+                configOutputs = new ArrayList<LogOutput>();
+                configOutputs.addAll(currModemLogOut.getOutputList());
+                setModemParameters(currModemLogOut);
+            }
         }
         AlogMarker.tAE("AMTLTabLayout.setConfigArray", "0");
     }
@@ -269,7 +273,6 @@ public class AMTLTabLayout extends Activity implements GeneralSetupFrag.GSFCallB
                 tab1_frag.setFirstCreated(firstCreated);
             } else if (tabId.equals(TAB2_FRAG_NAME)) {
                 pushFragments(tabId, tab2_frag);
-                tab2_frag.setButtonChanged(buttonChanged);
             } else if(tabId.equals(TAB3_FRAG_NAME)) {
                 pushFragments(tabId, tab3_frag);
             }
@@ -328,9 +331,10 @@ public class AMTLTabLayout extends Activity implements GeneralSetupFrag.GSFCallB
                         + ex.getMessage());
             }
             this.firstCreated = true;
+            String modemName = (modemNames != null) ? modemNames.get(currentLoggingModem) : "";
+
             expConf = new ExpertConfig(this);
-            tab1_frag = new GeneralSetupFrag(this.configOutputs, expConf,
-                    modemNames.get(currentLoggingModem));
+            tab1_frag = new GeneralSetupFrag(this.configOutputs, expConf, modemName);
             tab2_frag = new MasterSetupFrag();
             tab3_frag = new LogcatTraceFrag();
             actionMenu = new ActionMenu(this);
@@ -482,15 +486,6 @@ public class AMTLTabLayout extends Activity implements GeneralSetupFrag.GSFCallB
         AlogMarker.tAB("AMTLTabLayout.onGeneralConfApplied", "0");
         this.generalModemConf = conf;
         AlogMarker.tAE("AMTLTabLayout.onGeneralConfApplied", "0");
-    }
-
-    @Override
-    public void onModeChanged(Boolean changed) {
-        AlogMarker.tAB("AMTLTabLayout.onModeChanged", "0");
-        if (changed != null) {
-            this.buttonChanged = changed;
-        }
-        AlogMarker.tAE("AMTLTabLayout.onModeChanged", "0");
     }
 
     @Override

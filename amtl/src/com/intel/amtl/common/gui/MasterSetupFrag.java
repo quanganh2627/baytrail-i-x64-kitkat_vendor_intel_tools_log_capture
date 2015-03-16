@@ -38,6 +38,7 @@ import android.widget.ArrayAdapter;
 import android.widget.AdapterView;
 import android.widget.Button;
 import android.widget.Spinner;
+import android.widget.Toast;
 
 import com.intel.amtl.common.AMTLApplication;
 import com.intel.amtl.common.exceptions.ModemControlException;
@@ -57,9 +58,6 @@ public class MasterSetupFrag extends Fragment
     private final String TAG = "AMTL";
     private final String MODULE = "MasterSetupFrag";
 
-    static final int CONFSETUP_MASTER_TARGETFRAG = 1;
-    static final String CONFSETUP_MASTER_TAG = "AMTL_master_modem_configuration_setup";
-
     private String[] masterValues = {"OFF", "OCT", "MIPI2"};
     private String[] masterNames = {"bb_sw", "3g_sw", "digrfx", "digrfx2", "lte_l1_sw", "3g_dsp",
             "tdscdma_l1_sw", "sig_mon"};
@@ -78,9 +76,9 @@ public class MasterSetupFrag extends Fragment
     private ArrayList<Master> masterArray = null;
     private ArrayList<Spinner> spinnerArray = null;
 
-    private Boolean buttonChanged = false;
+    private boolean buttonChanged = false;
+    private boolean firstClick = true;
 
-    private OnModeChanged modeChangedCallBack = nullModeCb;
     private ModemController mdmCtrl;
 
     // this counts how many spinners are on the UI
@@ -88,22 +86,6 @@ public class MasterSetupFrag extends Fragment
 
     // this counts how many spinners have been initialized
     private int spinnerInitializedCount = 0;
-
-    // Callback interface to detect if a button has been pressed
-    // since last reboot
-    public interface OnModeChanged {
-        public void onModeChanged(Boolean changed);
-    }
-
-    private static OnModeChanged nullModeCb = new OnModeChanged() {
-        public void onModeChanged(Boolean changed) { }
-    };
-
-    public void setButtonChanged(Boolean changed) {
-        AlogMarker.tAB("MasterSetupFrag.setButtonChanged", "0");
-        this.buttonChanged = changed;
-        AlogMarker.tAE("MasterSetupFrag.setButtonChanged", "0");
-    }
 
     private void setUIEnabled() {
         AlogMarker.tAB("MasterSetupFrag.setUIEnabled", "0");
@@ -148,6 +130,18 @@ public class MasterSetupFrag extends Fragment
         AlogMarker.tAE("MasterSetupFrag.updateUI", "0");
     }
 
+    private void checkConfig(ModemController modCtrl) throws ModemControlException {
+        AlogMarker.tAB("MasterSetupFrag.checkConfig", "0");
+        this.masterArray = modCtrl.checkAtXsystraceState(this.masterArray);
+        this.updateUi();
+        if (modCtrl.queryTraceState() && !AMTLApplication.getIsAliasUsed()) {
+            this.setUIEnabled();
+        } else {
+            this.setUIDisabled();
+        }
+        AlogMarker.tAE("MasterSetupFrag.checkConfig", "0");
+    }
+
     private void changeButtonColor(boolean changed) {
         AlogMarker.tAB("MasterSetupFrag.changeButtonColor", "0");
         if (changed) {
@@ -171,6 +165,10 @@ public class MasterSetupFrag extends Fragment
     @Override
     public void onDestroy() {
         AlogMarker.tAB("MasterSetupFrag.onDestroy", "0");
+        this.firstClick = true;
+        this.buttonChanged = false;
+        this.spinnerCount = 8;
+        this.spinnerInitializedCount = 0;
         this.getActivity().unregisterReceiver(mMessageReceiver);
         super.onDestroy();
         AlogMarker.tAE("MasterSetupFrag.onDestroy", "0");
@@ -239,19 +237,13 @@ public class MasterSetupFrag extends Fragment
         if (!AMTLApplication.getModemChanged()) {
             // update modem status when returning from another fragment
             try {
-                mdmCtrl = ModemController.getInstance();
+                this.mdmCtrl = ModemController.getInstance();
                 if (this.mdmCtrl.isModemUp()) {
                     this.masterArray = new ArrayList<Master>();
                     for (String s: masterNames) {
                         this.masterArray.add(new Master(s, "", ""));
                     }
-                    this.masterArray = mdmCtrl.checkAtXsystraceState(this.masterArray);
-                    this.updateUi();
-                    if (mdmCtrl.queryTraceState()) {
-                        this.setUIEnabled();
-                    } else {
-                        this.setUIDisabled();
-                    }
+                    this.checkConfig(this.mdmCtrl);
                 } else {
                     this.setUIDisabled();
                 }
@@ -266,8 +258,10 @@ public class MasterSetupFrag extends Fragment
     @Override
     public void onPause() {
         AlogMarker.tAB("MasterSetupFrag.onPause", "0");
-        mdmCtrl = null;
-        this.spinnerCount = 10;
+        this.mdmCtrl = null;
+        this.firstClick = true;
+        this.buttonChanged = false;
+        this.spinnerCount = 1;
         this.spinnerInitializedCount = 0;
         super.onPause();
         AlogMarker.tAE("MasterSetupFrag.onPause", "0");
@@ -275,11 +269,15 @@ public class MasterSetupFrag extends Fragment
 
     public void onItemSelected(AdapterView<?> parent, View view, int pos, long id) {
         AlogMarker.tAB("MasterSetupFrag.onItemSelected", "0");
-        if (spinnerInitializedCount < spinnerCount) {
-            spinnerInitializedCount++;
+        if (this.firstClick) {
+            if (spinnerInitializedCount < spinnerCount) {
+                spinnerInitializedCount++;
+            } else {
+                this.buttonChanged = true;
+                changeButtonColor(this.buttonChanged);
+            }
         } else {
             this.buttonChanged = true;
-            modeChangedCallBack.onModeChanged(this.buttonChanged);
             changeButtonColor(this.buttonChanged);
         }
         AlogMarker.tAE("MasterSetupFrag.onItemSelected", "0");
@@ -293,36 +291,26 @@ public class MasterSetupFrag extends Fragment
         AlogMarker.tAB("MasterSetupFrag.onClick", "0");
         switch (view.getId()) {
             case R.id.applyMasterConfButton:
+                this.firstClick = false;
                 this.buttonChanged = false;
-                modeChangedCallBack.onModeChanged(this.buttonChanged);
                 this.changeButtonColor(this.buttonChanged);
-                setChosenMasterValues();
-                setMasterStringToInt();
-                ModemConf sysConf = setModemConf();
+                this.setChosenMasterValues();
+                this.setMasterStringToInt();
+                ModemConf sysConf = this.setModemConf();
                 try {
-                    mdmCtrl.sendCommand(sysConf.getXsystrace());
+                    if (this.mdmCtrl != null) {
+                        this.mdmCtrl.sendCommand(sysConf.getXsystrace());
+                        Toast toast = Toast.makeText(this.getActivity(),
+                                "Masters have been updated", Toast.LENGTH_SHORT);
+                        toast.show();
+                        this.checkConfig(this.mdmCtrl);
+                    }
                 } catch (ModemControlException ex) {
                     Log.e(TAG, MODULE + ": fail to send command to the modem " + ex);
                 }
                 break;
         }
         AlogMarker.tAE("MasterSetupFrag.onClick", "0");
-    }
-
-    @Override
-    public void onAttach(Activity activity) {
-        AlogMarker.tAB("MasterSetupFrag.onAttach", "0");
-        super.onAttach(activity);
-        modeChangedCallBack = (OnModeChanged) activity;
-        AlogMarker.tAE("MasterSetupFrag.onAttach", "0");
-    }
-
-    @Override
-    public void onDetach() {
-        AlogMarker.tAB("MasterSetupFrag.onDetach", "0");
-        super.onDetach();
-        modeChangedCallBack = nullModeCb;
-        AlogMarker.tAE("MasterSetupFrag.onDetach", "0");
     }
 
     private ModemConf setModemConf() {
@@ -391,13 +379,8 @@ public class MasterSetupFrag extends Fragment
             String message = intent.getStringExtra("message");
             if (message != null && message.equals("UP")) {
                 try {
-                    String trace = mdmCtrl.checkAtTraceState();
-                    if (!mdmCtrl.queryTraceState()) {
-                        setUIDisabled();
-                    } else {
-                        masterArray = mdmCtrl.checkAtXsystraceState(masterArray);
-                        updateUi();
-                        setUIEnabled();
+                    if (mdmCtrl != null) {
+                        checkConfig(mdmCtrl);
                     }
                 } catch (ModemControlException ex) {
                     Log.e(TAG, MODULE + ": cannot send command to the modem");
