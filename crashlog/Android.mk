@@ -44,7 +44,7 @@ LOCAL_SRC_FILES := \
     checksum.c \
     ingredients.c
 
-LOCAL_SHARED_LIBRARIES := libcutils
+LOCAL_SHARED_LIBRARIES := libcutils libparse_stack
 
 # sys/sha1.h has been moved out of default bionic includes
 LOCAL_C_INCLUDES += \
@@ -52,9 +52,9 @@ LOCAL_C_INCLUDES += \
 
 # Options
 
-ifeq ($(CRASHLOGD_FULL_REPORT),true)
+#ifeq ($(CRASHLOGD_FULL_REPORT),true)
 LOCAL_CFLAGS += -DFULL_REPORT
-endif
+#endif
 
 ifeq ($(CRASHLOGD_FACTORY_CHECKSUM),true)
 LOCAL_CFLAGS += -DCONFIG_FACTORY_CHECKSUM

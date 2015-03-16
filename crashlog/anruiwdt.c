@@ -136,6 +136,8 @@ static void process_anruiwdt_tracefile(char *destion, int dir, int removeunparse
             if (unlink(tracefile) != 0) {
                 LOGE("%s: Failed to remove tracefile %s:%s\n", __FUNCTION__, tracefile, strerror(errno));
             }
+	    // parse
+	    backtrace_parse_tombstone_file(dest_path);
             if ( removeunparsed && unlink(dest_path)) {
                 LOGE("Failed to remove unparsed tracefile %s:%s\n", dest_path, strerror(errno));
             }
