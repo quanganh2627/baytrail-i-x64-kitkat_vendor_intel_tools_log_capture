@@ -32,10 +32,8 @@ import com.intel.amtl.common.modem.ModemController;
 import com.intel.amtl.mmgr.modem.AliasController;
 import com.intel.amtl.mmgr.modem.OctController;
 import com.intel.amtl.mmgr.modem.TraceLegacyController;
-import com.intel.internal.telephony.MmgrClientException;
+import com.intel.internal.telephony.ModemClientException;
 import com.intel.internal.telephony.ModemEventListener;
-import com.intel.internal.telephony.ModemNotification;
-import com.intel.internal.telephony.ModemNotificationArgs;
 import com.intel.internal.telephony.ModemStatus;
 import com.intel.internal.telephony.ModemStatusManager;
 
@@ -66,7 +64,8 @@ public abstract class MMGController extends ModemController implements ModemEven
         AlogMarker.tAB("MMGController.MMGController", "0");
         try {
             this.modemStatusManager = ModemStatusManager
-                    .getInstance(AMTLApplication.getModemConnectionId());
+                    .getInstance(AMTLApplication.getContext(),
+                            AMTLApplication.getModemConnectionId());
         } catch (InstantiationException ex) {
             throw new ModemControlException("Cannot instantiate Modem Status Manager");
         }
@@ -92,15 +91,14 @@ public abstract class MMGController extends ModemController implements ModemEven
         if (this.modemStatusManager != null) {
             try {
                 Log.d(TAG, MODULE + ": Subscribing to Modem Status Manager");
-                this.modemStatusManager.subscribeToEvent(this, ModemStatus.ALL,
-                        ModemNotification.ALL);
-            } catch (MmgrClientException ex) {
+                this.modemStatusManager.subscribeToEvent(this, ModemStatus.ALL);
+            } catch (ModemClientException ex) {
                 throw new ModemControlException("Cannot subscribe to Modem Status Manager " + ex);
             }
             try {
                 Log.d(TAG, MODULE + ": Connecting to Modem Status Manager");
                 this.modemStatusManager.connect("AMTL");
-            } catch (MmgrClientException ex) {
+            } catch (ModemClientException ex) {
                 throw new ModemControlException("Cannot connect to Modem Status Manager " + ex);
             }
             try {
@@ -108,7 +106,7 @@ public abstract class MMGController extends ModemController implements ModemEven
                 this.modemStatusManager.acquireModem();
                 this.modemAcquired = true;
                 this.firstAcquire = false;
-            } catch (MmgrClientException ex) {
+            } catch (ModemClientException ex) {
                 throw new ModemControlException("Cannot acquire modem resource " + ex);
             }
         }
@@ -141,8 +139,8 @@ public abstract class MMGController extends ModemController implements ModemEven
         if (this.modemStatusManager != null) {
             try {
                 Log.d(TAG, MODULE + ": Asking for modem restart");
-                this.modemStatusManager.restartModem();
-            } catch (MmgrClientException ex) {
+                this.modemStatusManager.updateModem();
+            } catch (ModemClientException ex) {
                 throw new ModemControlException("Cannot restart modem");
             }
         }
@@ -241,7 +239,7 @@ public abstract class MMGController extends ModemController implements ModemEven
                     this.modemStatusManager.releaseModem();
                     this.modemAcquired = false;
                 }
-            } catch (MmgrClientException ex) {
+            } catch (ModemClientException ex) {
                 Log.e(TAG, MODULE + ": Cannot release modem resource");
             }
         }
@@ -263,7 +261,7 @@ public abstract class MMGController extends ModemController implements ModemEven
                     this.modemAcquired = true;
                 }
             }
-        } catch (MmgrClientException ex) {
+        } catch (ModemClientException ex) {
             throw new ModemControlException("Could not acquire modem" + ex);
         }
         AlogMarker.tAE("MMGController.acquireResource", "0");
@@ -292,34 +290,6 @@ public abstract class MMGController extends ModemController implements ModemEven
         AlogMarker.tAB("MMGController.isModemUp", "0");
         AlogMarker.tAE("MMGController.isModemUp", "0");
         return (currentModemStatus == ModemStatus.UP) ? true : false;
-    }
-
-    @Override
-    public void onModemColdReset(ModemNotificationArgs args) {
-        AlogMarker.tAB("MMGController.onModemColdReset", "0");
-        Log.d(TAG, MODULE + ": Modem is performing a COLD RESET");
-        AlogMarker.tAE("MMGController.onModemColdReset", "0");
-    }
-
-    @Override
-    public void onModemShutdown(ModemNotificationArgs args) {
-        AlogMarker.tAB("MMGController.onModemShutdown", "0");
-        Log.d(TAG, MODULE + ": Modem is performing a SHUTDOWN");
-        AlogMarker.tAE("MMGController.onModemShutdown", "0");
-    }
-
-    @Override
-    public void onPlatformReboot(ModemNotificationArgs args) {
-        AlogMarker.tAB("MMGController.onPlatformReboot", "0");
-        Log.d(TAG, MODULE + ": Modem is performing a PLATFORM REBOOT");
-        AlogMarker.tAE("MMGController.onPlatformReboot", "0");
-    }
-
-    @Override
-    public void onModemCoreDump(ModemNotificationArgs args) {
-        AlogMarker.tAB("MMGController.onModemCoreDump", "0");
-        Log.d(TAG, MODULE + ": Modem is performing a COREDUMP");
-        AlogMarker.tAE("MMGController.onModemCoreDump", "0");
     }
 
     @Override

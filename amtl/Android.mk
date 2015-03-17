@@ -10,7 +10,7 @@ ifneq ($(findstring sofia3g, $(TARGET_BOARD_PLATFORM)),)
         LOCAL_JAVA_LIBRARIES := com.msm.android.MSMClientLib
     endif
 else
-    LOCAL_STATIC_JAVA_LIBRARIES := com.intel.internal.telephony.MmgrClient
+    LOCAL_STATIC_JAVA_LIBRARIES := com.intel.internal.telephony.ModemClient
 endif
 
 LOCAL_SRC_FILES := $(call all-java-files-under, src)
