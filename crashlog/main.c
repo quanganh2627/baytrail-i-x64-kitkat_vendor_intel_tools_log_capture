@@ -89,13 +89,14 @@ char CURRENT_PROC_OFFLINE_SCU_LOG_NAME[PATHMAX]={PROC_OFFLINE_SCU_LOG_NAME};
 char CURRENT_PROC_ONLINE_SCU_LOG_NAME[PATHMAX]={PROC_ONLINE_SCU_LOG_NAME};
 char CURRENT_KERNEL_CMDLINE[PATHMAX]={KERNEL_CMDLINE};
 
-int partition_notified = 1;
-
 /* to store if the pytimechart-record file is present */
 bool pytimechartrecord_filepresent;
 
 /* to store if logsystemstate service is available */
 bool logsystemstate_available;
+
+#ifdef CONFIG_PARTITIONS_CHECK
+int partition_notified = 1;
 
 static const char * const mountpoints[] = {
     "/system",
@@ -161,6 +162,7 @@ static int check_mounted_partitions()
 
     return output;
 }
+#endif
 
 #ifdef CONFIG_FACTORY_CHECKSUM
 static void check_factory_checksum_callback(const char * file, mode_t st_mode) {
@@ -405,11 +407,10 @@ static void timeup_thread_mainloop()
     char logenable[PROPERTY_VALUE_MAX];
 
     while (1) {
-        /*
-         * checks the mounted partitions ...
-         */
+#ifdef CONFIG_PARTITIONS_CHECK
         if (partition_notified && !check_mounted_partitions())
               partition_notified = 0;
+#endif
         /*
          * checks the logging services are still alive...
          * restart it if necessary
