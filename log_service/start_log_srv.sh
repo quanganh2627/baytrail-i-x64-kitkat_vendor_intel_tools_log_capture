@@ -21,16 +21,21 @@ start_log() {
     local logprop=$1
     local logservice=$2
 
-    #need to check vold status for encryption case
-    vold=$(getprop vold.post_fs_data_done)
-    if [ "$vold" != "1" ]; then
+    if [ "$(getprop vold.post_fs_data_done)" != "1" ]; then
+        # Verify that /data is mounted and ready (post-fs-data)
         return
     fi
-    logstatus=$(getprop $logprop)
-    if [ "$logstatus" = "1" ]; then
-        start $logservice
-        exit
+    if [ "$(getprop ro.crypto.state)" = "encrypted" ] &&
+        [ "$(getprop vold.decrypt)" != "trigger_restart_framework" ]; then
+        # If encrypted, /data is mounted twice, 1st as tmpfs, 2nd as
+        # decrypted. This part ensure framework start was triggered
+        # which means that we are decrypted.
+        return
     fi
+    if [ "$(getprop $logprop)" != "1" ]; then
+        return
+    fi
+    start $logservice
 }
 
 start_log persist.service.aplogfs.enable ap_logfs
