@@ -33,12 +33,20 @@
 
 /**
  * get the number of modems reported by tcs
- * @return negative if fails
+ * @return  zero if fails
  */
 int get_modem_count() {
+    #define PROP_TELEPHONY_OFF "persist.sys.telephony.off"
     tcs_handle_t *h = NULL;
     tcs_cfg_t *tcs_cfg = NULL;
-    int ret = -1;
+    int ret = 0;
+    char property_value[PROPERTY_VALUE_MAX];
+
+    property_get(PROP_TELEPHONY_OFF, property_value, "");
+    if (!strncmp(property_value, "1", 1)) {
+        LOGI("Telephony off : forcing count modem to 0.");
+        return ret;
+    }
 
     h = tcs_init();
     if (!h) {
