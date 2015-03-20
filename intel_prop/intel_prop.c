@@ -194,7 +194,7 @@ static void print_types() {
 
 static void usage(const char *app) {
 	char *base = basename(app);
-	printf("Usage: %s [-l | -f <path> ]\n", base);
+	printf("Usage: %s [-l | -f <path> ]\n", (!base) ? ((!app) ? "intel_prop" : app): base);
 	printf("\t-l\t-list available types\n");
 	printf("\t-f <path>\t-load config from <path>\n");
 	free(base);
