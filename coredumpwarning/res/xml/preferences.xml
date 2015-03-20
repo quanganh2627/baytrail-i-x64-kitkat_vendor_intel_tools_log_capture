@@ -15,94 +15,23 @@
    limitations under the License.
 -->
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
-    <PreferenceCategory
-        android:title="@string/menu_notification_type" >
-        <CheckBoxPreference
-            android:title="@string/alert_notification"
-            android:defaultValue="true"
-            android:key="checkboxNotification" />
-    <PreferenceScreen
-         android:title="@string/notification_config"
-         android:dependency="checkboxNotification" >
-        <CheckBoxPreference
-            android:title="@string/notification_sound"
-            android:defaultValue="false"
-            android:key="checkboxNotificationSound" />
-        <CheckBoxPreference
-            android:title="@string/notification_vibrator"
-            android:defaultValue="false"
-            android:key="checkboxNotificationVibrator" />
-    </PreferenceScreen>
-        <CheckBoxPreference
-            android:title="@string/alert_popup"
-            android:defaultValue="true"
-            android:key="checkboxPopup" />
-    </PreferenceCategory>
-    <PreferenceCategory
-        android:title="@string/menu_modem_events" >
-        <PreferenceScreen
-             android:title="@string/menu_modem_exception" >
-            <CheckBoxPreference
-                android:title="@string/core_dump_start"
-                android:defaultValue="true"
-                android:key="checkboxCoreDumpStart" />
-            <CheckBoxPreference
-                android:title="@string/core_dump_stop"
-                android:defaultValue="true"
-                android:key="checkboxCoreDumpStop" />
-            <CheckBoxPreference
-                android:title="@string/unsolicited_reset"
-                android:defaultValue="false"
-                android:key="checkboxUnsolicitedReset" />
-            <CheckBoxPreference
-                android:title="@string/not_responsive"
-                android:defaultValue="false"
-                android:key="checkboxNotResponsive" />
-        </PreferenceScreen>
-        <PreferenceScreen
-            android:title="@string/menu_modem_recovery" >
-            <CheckBoxPreference
-                android:title="@string/warm_reset"
-                android:defaultValue="false"
-                android:key="checkboxWarmReset" />
-            <CheckBoxPreference
-                android:title="@string/cold_reset"
-                android:defaultValue="false"
-                android:key="checkboxColdReset" />
-            <CheckBoxPreference
-                android:title="@string/cold_boot"
-                android:defaultValue="true"
-                android:key="checkboxModemReboot" />
-            <CheckBoxPreference
-                android:title="@string/modem_out"
-                android:defaultValue="true"
-                android:key="checkboxModemOut" />
-        </PreferenceScreen>
-        <PreferenceScreen
-            android:title="@string/menu_fw_exception" >
-            <CheckBoxPreference
-                android:title="@string/fw_bad_family"
-                android:defaultValue="false"
-                android:key="checkboxFwFamily" />
-            <CheckBoxPreference
-                android:title="@string/fw_security"
-                android:defaultValue="false"
-                android:key="checkboxFwSecurity" />
-            <CheckBoxPreference
-                android:title="@string/fw_outdated"
-                android:defaultValue="false"
-                android:key="checkboxFwOutdated" />
-            <CheckBoxPreference
-                android:title="@string/fw_restricted"
-                android:defaultValue="false"
-                android:key="checkboxFwRestricted" />
-            <CheckBoxPreference
-                android:title="@string/fw_update"
-                android:defaultValue="true"
-                android:key="checkboxFwUpdateFailure" />
-        </PreferenceScreen>
-    </PreferenceCategory>
-    <PreferenceScreen        
-    		android:key="@string/prefs_shared_restore_settings_key"
-    		android:title="@string/prefs_shared_restore_settings_title"/>    
-    </PreferenceScreen>
+	<PreferenceCategory
+	    android:title="@string/menu_modem_events" >
+	    <CheckBoxPreference
+	        android:title="@string/prefs_shared_coredump_settings_title"
+	        android:defaultValue="true"
+	        android:key="@string/prefs_shared_coredump_settings_key" />
+	    <CheckBoxPreference
+	        android:title="@string/prefs_shared_bplog_settings_title"
+	        android:defaultValue="false"
+	        android:key="@string/prefs_shared_bplog_settings_key" />
+	 </PreferenceCategory>
+	<PreferenceScreen        
+			android:key="@string/prefs_shared_restore_settings_key"
+			android:title="@string/prefs_shared_restore_settings_title"/>    
+	</PreferenceScreen>
+
+   
+
+
+
