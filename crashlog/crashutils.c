@@ -179,9 +179,17 @@ void do_last_kmsg_copy(int dir) {
 void do_last_fw_msg_copy(int dir) {
     char destion[PATHMAX];
 
-    if ( (dir >= 0) && file_exists(CURRENT_PROC_OFFLINE_SCU_LOG_NAME) ) {
+    if (dir < 0)
+        return;
+
+    if (file_exists(CURRENT_PROC_OFFLINE_SCU_LOG_NAME) ) {
         snprintf(destion, sizeof(destion), "%s%d/%s.txt", CRASH_DIR, dir, OFFLINE_SCU_LOG_NAME);
         do_copy_eof(CURRENT_PROC_OFFLINE_SCU_LOG_NAME, destion);
+    }
+
+    if (file_exists(LM_DUMP_FILE)) {
+        snprintf(destion, sizeof(destion), "%s%d/lkm.bin", CRASH_DIR, dir);
+        do_copy_eof(LM_DUMP_FILE, destion);
     }
 }
 

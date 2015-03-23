@@ -445,6 +445,7 @@ extern enum crashlog_mode g_crashlog_mode;
 #define BINDER_FAILED_TRANSACTION_LOG   DEBUGFS_DIR "/binder/failed_transaction_log"
 #define PYTIMECHART_FILE        SYSTEM_DIR "/bin/pytimechart-record"
 #define DUMPSTATE_DROPBOX_FILE  SYSTEM_DIR "/bin/dumpstate_dropbox.sh"
+#define LM_DUMP_FILE            DEBUGFS_DIR "/lm_dump/lkm_buf1"
 
 /* SYSTEM COMMANDS */
 #define SDSIZE_SYSTEM_CMD "du -sk " SDCARD_LOGS_DIR "/ > " LOGS_DIR "/currentsdsize"
