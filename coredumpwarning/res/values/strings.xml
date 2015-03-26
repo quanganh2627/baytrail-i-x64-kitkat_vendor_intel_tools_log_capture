@@ -17,7 +17,7 @@
 <!-- DO NOT LOCALIZE - this is just a test app -->
 <resources>
     <string name="app_name" translatable="false">Telephony event notifier</string>
-    <string name="set_preferences" translatable="false">Telephony Tool</string>
+    <string name="set_preferences" translatable="false">Telephony event notifier preferences</string>
     <string name="menu_notification_type" translatable="false">Notifications type</string>
 
     <string name="prefs_shared_restore_settings_title">AT command Sent</string>
@@ -25,10 +25,6 @@
     <string name="dialog_restore_settings_yes">Yes</string>    
     <string name="dialog_restore_settings_no">No</string>
     <string name="prefs_shared_restore_settings_key">prefs_shared_restore_settings_key</string>
-    <string name="prefs_shared_coredump_settings_key">prefs_shared_coredump_settings_key</string>
-    <string name="prefs_shared_coredump_settings_title">Coredump</string>
-    <string name="prefs_shared_bplog_settings_key">prefs_shared_bplog_settings_key</string>
-    <string name="prefs_shared_bplog_settings_title">Bplog</string>
 
     <string name="alert_notification" translatable="false">Notification</string>
     <string name="notification_config" translatable="false">Notification options</string>
@@ -37,7 +33,7 @@
     <string name="alert_popup" translatable="false">Pop-up</string>
 
 
-    <string name="menu_modem_events" translatable="false">Modem tool</string>
+    <string name="menu_modem_events" translatable="false">Modem events</string>
     <string name="menu_modem_exception" translatable="false">Modem exceptions</string>
     <string name="menu_fw_exception" translatable="false">Modem firmware exceptions</string>
     <string name="core_dump_start" translatable="false">Modem core dump start</string>
