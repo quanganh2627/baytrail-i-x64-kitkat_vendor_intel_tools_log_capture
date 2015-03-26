@@ -27,7 +27,9 @@ import android.widget.Switch;
 import android.widget.CompoundButton;
 import android.widget.CompoundButton.OnCheckedChangeListener;
 
+import com.intel.amtl.common.AMTLApplication;
 import com.intel.amtl.common.log.AlogMarker;
+import com.intel.amtl.common.StoredSettings;
 import com.intel.amtl.R;
 
 import java.io.IOException;
@@ -36,10 +38,6 @@ import java.util.ArrayList;
 public class SystemStatsTraces implements GeneralTracing, OnCheckedChangeListener {
     PeriodicTask task = null;
     SysLogger[] loggers;
-    String memInfoFile = FileOperations.TEMP_OUTPUT_FOLDER + "MemInfo_amtl";
-    String procrankFile = FileOperations.TEMP_OUTPUT_FOLDER + "Procrank_amtl";
-    String topLogFile = FileOperations.TEMP_OUTPUT_FOLDER + "TopLog_amtl";
-    String cpuLoadFile = FileOperations.TEMP_OUTPUT_FOLDER + "CpuLoad_amtl";
 
     private final String TAG = "AMTL";
     private final String MODULE = "SystemStatsTraces";
@@ -153,10 +151,38 @@ public class SystemStatsTraces implements GeneralTracing, OnCheckedChangeListene
         protected void onPostExecute(Long result) {}
     }
 
+    private String getMemInfoFile() {
+        AlogMarker.tAB("SystemStatsTraces.getMemInfoFile", "0");
+        StoredSettings privatePrefs = new StoredSettings(AMTLApplication.getContext());
+        AlogMarker.tAE("SystemStatsTraces.getMemInfoFile", "0");
+        return privatePrefs.getRelativeStorePath() + "/" + "MemInfo_amtl";
+    }
+
+    private String getProcrankFile() {
+        AlogMarker.tAB("SystemStatsTraces.getProcrankFile", "0");
+        StoredSettings privatePrefs = new StoredSettings(AMTLApplication.getContext());
+        AlogMarker.tAE("SystemStatsTraces.getProcrankFile", "0");
+        return privatePrefs.getRelativeStorePath() + "/" + "Procrank_amtl";
+    }
+
+    private String getTopLogFile() {
+        AlogMarker.tAB("SystemStatsTraces.getTopLogFile", "0");
+        StoredSettings privatePrefs = new StoredSettings(AMTLApplication.getContext());
+        AlogMarker.tAE("SystemStatsTraces.getTopLogFile", "0");
+        return privatePrefs.getRelativeStorePath() + "/" + "TopLog_amtl";
+    }
+
+    private String getCpuLoadFile() {
+        AlogMarker.tAB("SystemStatsTraces.getCpuLoadFile", "0");
+        StoredSettings privatePrefs = new StoredSettings(AMTLApplication.getContext());
+        AlogMarker.tAE("SystemStatsTraces.getCpuLoadFile", "0");
+        return privatePrefs.getRelativeStorePath() + "/" + "CpuLoad_amtl";
+    }
+
     private void outputMemoryInfo() {
         AlogMarker.tAB("SystemStatsTraces.outputMemoryInfo", "0");
 
-        String command = "/system/bin/cat /proc/meminfo >> " + memInfoFile;
+        String command = "/system/bin/cat /proc/meminfo >> " + getMemInfoFile();
         try {
             Runtime.getRuntime().exec(command);
         }
@@ -169,7 +195,7 @@ public class SystemStatsTraces implements GeneralTracing, OnCheckedChangeListene
     private void outputProcrank() {
         AlogMarker.tAB("SystemStatsTraces.outputProcrank", "0");
 
-        String command = "/system/xbin/procrank >> " + procrankFile;
+        String command = "/system/xbin/procrank >> " + getProcrankFile();
         try {
             Runtime.getRuntime().exec(command);
         } catch (IOException e) {
@@ -181,7 +207,7 @@ public class SystemStatsTraces implements GeneralTracing, OnCheckedChangeListene
     private void outputTopLog() {
         AlogMarker.tAB("SystemStatsTraces.outputTopLog", "0");
 
-        String command = "/system/bin/top -n 1 >> " + topLogFile;
+        String command = "/system/bin/top -n 1 >> " + getTopLogFile();
         try {
             Runtime.getRuntime().exec(command);
         } catch (IOException e) {
@@ -193,7 +219,7 @@ public class SystemStatsTraces implements GeneralTracing, OnCheckedChangeListene
     private void outputCPULoading() {
         AlogMarker.tAB("SystemStatsTraces.outputCPULoading", "0");
 
-        String command = "/system/bin/top -n 1 -s cpu >> " + cpuLoadFile;
+        String command = "/system/bin/top -n 1 -s cpu >> " + getCpuLoadFile();
         try {
             Runtime.getRuntime().exec(command);
         } catch (IOException e) {
@@ -239,10 +265,10 @@ public class SystemStatsTraces implements GeneralTracing, OnCheckedChangeListene
             stop();
         }
 
-        FileOperations.removeFile(memInfoFile);
-        FileOperations.removeFile(procrankFile);
-        FileOperations.removeFile(topLogFile);
-        FileOperations.removeFile(cpuLoadFile);
+        FileOperations.removeFile(getMemInfoFile());
+        FileOperations.removeFile(getProcrankFile());
+        FileOperations.removeFile(getTopLogFile());
+        FileOperations.removeFile(getCpuLoadFile());
         AlogMarker.tAE("SystemStatsTraces.cleanTemp", "0");
     }
 
@@ -253,22 +279,22 @@ public class SystemStatsTraces implements GeneralTracing, OnCheckedChangeListene
         }
 
         try {
-            FileOperations.copy(memInfoFile, path + "MemInfo");
+            FileOperations.copy(getMemInfoFile(), path + "MemInfo");
         } catch (IOException e) {
             Log.e(TAG, MODULE + ": Could not save MemInfo");
         }
         try {
-            FileOperations.copy(procrankFile, path + "Procrank");
+            FileOperations.copy(getProcrankFile(), path + "Procrank");
         } catch (IOException e) {
             Log.e(TAG, MODULE + ": Could not save Procrank");
         }
         try {
-            FileOperations.copy(topLogFile, path + "MemInfo");
+            FileOperations.copy(getTopLogFile(), path + "MemInfo");
         } catch (IOException e) {
             Log.e(TAG, MODULE + ": Could not save TopLog");
         }
         try {
-            FileOperations.copy(cpuLoadFile, path + "MemInfo");
+            FileOperations.copy(getCpuLoadFile(), path + "MemInfo");
         } catch (IOException e) {
             Log.e(TAG, MODULE + ": Could not save CpuLoad");
         }

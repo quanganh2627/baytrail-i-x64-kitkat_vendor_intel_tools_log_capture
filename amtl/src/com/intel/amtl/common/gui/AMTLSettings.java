@@ -28,6 +28,7 @@ import android.preference.Preference.OnPreferenceChangeListener;
 import android.preference.Preference.OnPreferenceClickListener;
 import android.preference.PreferenceActivity;
 import android.preference.PreferenceCategory;
+import android.util.Log;
 
 import com.intel.amtl.common.AMTLApplication;
 import com.intel.amtl.common.log.AlogMarker;
@@ -36,6 +37,8 @@ import com.intel.amtl.R;
 import java.util.ArrayList;
 
 public class AMTLSettings extends PreferenceActivity {
+    private final String TAG = "AMTL";
+    private final String MODULE = "AMTLSettings";
     private static Boolean gcmEnabled = null;
     private ArrayList <String> modemNames;
     private AlogMarker m = new AlogMarker();
@@ -80,7 +83,7 @@ public class AMTLSettings extends PreferenceActivity {
                 = (EditTextPreference) findPreference(getString(R.string.settings_save_path_key));
         if (null != savePath) {
             savePath.setSummary(savePath.getText());
-            savePath.setOnPreferenceChangeListener(generalPathUpdated);
+            savePath.setOnPreferenceChangeListener(editTextChanged);
         }
 
         final ListPreference logsCount
@@ -119,6 +122,73 @@ public class AMTLSettings extends PreferenceActivity {
             notifCategory.removePreference(getPreferenceScreen()
                     .findPreference("settings_modem_profile_key"));
         }
+
+        final EditTextPreference bpPath
+                = (EditTextPreference) findPreference(getString(R.string.settings_bp_path_key));
+        if (null != bpPath) {
+            bpPath.setSummary(bpPath.getText());
+        }
+
+        bpPath.setOnPreferenceChangeListener(new OnPreferenceChangeListener() {
+            @Override
+            public boolean onPreferenceChange(Preference preference, Object newValue) {
+                if (((String) newValue).startsWith("/")) {
+                    bpPath.setSummary(newValue.toString());
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+        });
+
+        final EditTextPreference bpLogCount = (EditTextPreference) findPreference(
+                getString(R.string.settings_bp_file_count_key));
+        if (null != bpLogCount) {
+            bpLogCount.setSummary(bpLogCount.getText());
+        }
+
+        bpLogCount.setOnPreferenceChangeListener(new OnPreferenceChangeListener() {
+            @Override
+            public boolean onPreferenceChange(Preference preference, Object newValue) {
+                try {
+                    if (Long.parseLong((String) newValue) > 0
+                            && Long.parseLong((String) newValue) < 65000) {
+                       bpLogCount.setSummary(newValue.toString());
+                       return true;
+                    } else {
+                        return false;
+                    }
+                } catch (NumberFormatException ex) {
+                    Log.e(TAG, MODULE + " value entered is not an integer " + ex);
+                    return false;
+                }
+            }
+        });
+
+        final EditTextPreference bpLogSize
+                = (EditTextPreference) findPreference(getString(R.string.settings_bp_size_key));
+        if (null != bpLogSize) {
+            bpLogSize.setSummary(bpLogSize.getText());
+        }
+
+        bpLogSize.setOnPreferenceChangeListener(new OnPreferenceChangeListener() {
+            @Override
+            public boolean onPreferenceChange(Preference preference, Object newValue) {
+                try {
+                    if (Integer.parseInt((String) newValue) > 0
+                            && Integer.parseInt((String) newValue) < 4000000) {
+                        bpLogSize.setSummary(newValue.toString());
+                        return true;
+                    } else {
+                        return false;
+                    }
+                } catch (NumberFormatException ex) {
+                    Log.e(TAG, MODULE + " value entered is not an integer " + ex);
+                    return false;
+                }
+            }
+        });
+
         AlogMarker.tAE("AMTLSettings.onCreate", "0");
     }
 
@@ -132,7 +202,7 @@ public class AMTLSettings extends PreferenceActivity {
         }
     };
 
-    private final OnPreferenceChangeListener generalPathUpdated = new OnPreferenceChangeListener() {
+    private final OnPreferenceChangeListener editTextChanged = new OnPreferenceChangeListener() {
         @Override
         public boolean onPreferenceChange(Preference preference, Object newValue) {
             preference.setSummary(newValue.toString());

@@ -31,6 +31,7 @@ import android.widget.CompoundButton;
 import android.widget.CompoundButton.OnCheckedChangeListener;
 
 import com.intel.amtl.common.AMTLApplication;
+import com.intel.amtl.common.StoredSettings;
 import com.intel.amtl.R;
 
 import java.io.File;
@@ -40,7 +41,6 @@ import java.io.IOException;
 public class LogcatTraces implements GeneralTracing, OnCheckedChangeListener {
     Process logcatProc = null;
     String TEMP = "logcat_amtl";
-    String tempFile = FileOperations.TEMP_OUTPUT_FOLDER + TEMP;
 
     private final String TAG = "AMTL";
     private final String MODULE = "LogcatTraces";
@@ -131,12 +131,11 @@ public class LogcatTraces implements GeneralTracing, OnCheckedChangeListener {
             editor.putBoolean("system", true);
         }
 
-        if (tempFile != null) {
-            command += " -f " + tempFile;
-            command += " -r " + logsSize;
-        }
-
         editor.commit();
+
+        StoredSettings privatePrefs = new StoredSettings(AMTLApplication.getContext());
+        command += " -f " + privatePrefs.getRelativeStorePath() + "/" + TEMP;
+        command += " -r " + logsSize;
         command += " -n " + logsCount;
         command += " -v threadtime";
 
@@ -177,7 +176,8 @@ public class LogcatTraces implements GeneralTracing, OnCheckedChangeListener {
             stop();
         }
 
-        FileOperations.removeFiles(FileOperations.TEMP_OUTPUT_FOLDER, TEMP);
+        StoredSettings privatePrefs = new StoredSettings(AMTLApplication.getContext());
+        FileOperations.removeFiles(privatePrefs.getRelativeStorePath() + "/", TEMP);
 
         if (isRunning) {
             start();
@@ -190,7 +190,8 @@ public class LogcatTraces implements GeneralTracing, OnCheckedChangeListener {
         }
 
         try {
-            FileOperations.copyFiles(FileOperations.TEMP_OUTPUT_FOLDER, path, TEMP);
+            StoredSettings privatePrefs = new StoredSettings(AMTLApplication.getContext());
+            FileOperations.copyFiles(privatePrefs.getRelativeStorePath() + "/", path, TEMP);
         } catch (IOException e) {
             Log.e(TAG, MODULE + ": Could not save logcat log");
         }

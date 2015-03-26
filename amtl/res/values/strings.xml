@@ -65,7 +65,7 @@
     <string name="settings_save_path_default">/logs</string>
 
     <string name="settings_logcat_file_count_key">settings_logcat_file_count_key</string>
-    <string name="settings_logcat_file_count_title">Logs Count</string>
+    <string name="settings_logcat_file_count_title">Logs count</string>
     <string name="settings_logcat_file_count_summary">Default trace count</string>
     <string name="settings_logcat_file_count_default">16</string>
 
@@ -82,5 +82,20 @@
     <string name="settings_modem_profile_title">Modem profile</string>
     <string name="settings_modem_profile_summary">Default profile</string>
     <string name="settings_modem_profile_default">0</string>
+
+    <string name="settings_bp_path_key">settings_bp_path_key</string>
+    <string name="settings_bp_path_title">BP logs path</string>
+    <string name="settings_bp_path_summary">Default BP logs path</string>
+    <string name="settings_bp_path_default">/logs</string>
+
+    <string name="settings_bp_file_count_key">settings_bp_file_count_key</string>
+    <string name="settings_bp_file_count_title">BP logs count</string>
+    <string name="settings_bp_file_count_summary">Default BP logs count</string>
+    <string name="settings_bp_file_count_default">3</string>
+
+    <string name="settings_bp_size_key">settings_bp_size_key</string>
+    <string name="settings_bp_size_title">BP logs size in kB</string>
+    <string name="settings_bp_size_summary">Default BP logs size</string>
+    <string name="settings_bp_size_default">200000</string>
 
 </resources>

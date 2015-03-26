@@ -35,6 +35,7 @@ import com.intel.amtl.common.models.config.Master;
 import com.intel.amtl.common.models.config.ModemConf;
 import com.intel.amtl.common.models.config.ModemLogOutput;
 import com.intel.amtl.common.mts.MtsConf;
+import com.intel.amtl.common.StoredSettings;
 
 import java.io.File;
 import java.io.FileFilter;
@@ -84,11 +85,17 @@ public class ConfigParser {
             switch (eventType) {
                 case XmlPullParser.START_TAG:
                     if (isStartOf(parser, "general")) {
-                        AMTLApplication.setApLoggingPath(parser.getAttributeValue(null, "ap_path"));
-                        AMTLApplication.setBpLoggingPath(parser.getAttributeValue(null, "bp_path"));
-                        Log.d(TAG, MODULE + ": ap_path = "
-                                + parser.getAttributeValue(null, "ap_path") + ", bp_path = "
-                                + parser.getAttributeValue(null, "bp_path"));
+                        StoredSettings privatePrefs = new StoredSettings(AMTLApplication
+                                .getContext());
+                        String apPath = parser.getAttributeValue(null, "ap_path");
+                        String bpPath = parser.getAttributeValue(null, "bp_path");
+                        if (apPath != null) {
+                            privatePrefs.setAPLoggingPath(apPath);
+                        }
+                        if (bpPath != null) {
+                            privatePrefs.setBPLoggingPath(bpPath);
+                        }
+                        Log.d(TAG, MODULE + ": ap_path = " + apPath + ", bp_path = " + bpPath);
                     } else if (isStartOf(parser, "modem")) {
                         ModemLogOutput modemOut = this.handleModemElement(index + 1, parser);
                         if (modemOut != null) {
@@ -324,11 +331,23 @@ public class ConfigParser {
                 + ", default_flush_cmd = " + parser.getAttributeValue(null, "default_flush_cmd")
                 + ", flush_cmd = " + parser.getAttributeValue(null, "flush_cmd") + ".");
 
-        String mtsOutput = parser.getAttributeValue(null, "mts_output");
-        if (mtsOutput!= null && mtsOutput.contains("/bplog")) {
-            AMTLApplication.setBpLoggingPath(mtsOutput.substring(0, mtsOutput.indexOf("/bplog")));
-            Log.d(TAG, MODULE + " overriding BP logging path : "
-                    + AMTLApplication.getBpLoggingPath());
+        String mtsOutputType = parser.getAttributeValue(null, "mts_output_type");
+        if (mtsOutputType!= null && mtsOutputType.equals("f")) {
+            StoredSettings privatePrefs = new StoredSettings(AMTLApplication.getContext());
+            String mtsOutput = parser.getAttributeValue(null, "mts_output");
+            if (mtsOutput != null) {
+                String path = mtsOutput.substring(0, mtsOutput.indexOf("/bplog"));
+                Log.d(TAG, MODULE + " overriding BP logging path : " + path);
+                privatePrefs.setBPLoggingPath(path);
+            }
+            String mtsRotateNum = parser.getAttributeValue(null, "mts_rotate_num");
+            if (mtsRotateNum != null) {
+                privatePrefs.setBPFileCount(mtsRotateNum);
+            }
+            String mtsRotateSize = parser.getAttributeValue(null, "mts_rotate_size");
+            if (mtsRotateSize != null) {
+                privatePrefs.setBPTraceSize(mtsRotateSize);
+            }
         }
 
         while (!isEndOf(parser, "output") && !isEndOf(parser, "defaultconf")) {

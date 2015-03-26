@@ -25,6 +25,7 @@ import android.util.Log;
 
 import com.intel.amtl.common.AMTLApplication;
 import com.intel.amtl.common.log.AlogMarker;
+import com.intel.amtl.common.StoredSettings;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -42,7 +43,7 @@ public class LogManager extends FileObserver {
 
     private final String TAG = "AMTL";
     private final String MODULE = "LogManager";
-    private final String APTRIGGER = AMTLApplication.getApLoggingPath() + "/aplogs/aplog_trigger";
+    private final String APTRIGGER = "/aplogs/aplog_trigger";
     private final String NBAPFILE = "10";
     private String tag = null;
     private String aplogPath = null;
@@ -84,7 +85,9 @@ public class LogManager extends FileObserver {
         boolean ret = false;
         BufferedWriter out = null;
         try {
-            out = new BufferedWriter(new FileWriter(APTRIGGER));
+            StoredSettings privatePrefs = new StoredSettings(AMTLApplication.getContext());
+            out = new BufferedWriter(new FileWriter(privatePrefs.getRelativeStorePath()
+                    + APTRIGGER));
             out.write("APLOG=" + NBAPFILE);
             out.newLine();
             ret = true;

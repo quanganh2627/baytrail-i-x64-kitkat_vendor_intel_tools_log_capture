@@ -80,4 +80,42 @@ public class StoredSettings {
         }
         return profName;
     }
+
+    public String getBPLoggingPath() {
+        return appSharedPrefs.getString(
+                mCtx.getString(R.string.settings_bp_path_key),
+                mCtx.getString(R.string.settings_bp_path_default));
+    }
+
+    public String getBPFileCount() {
+        return appSharedPrefs.getString(
+                mCtx.getString(R.string.settings_bp_file_count_key),
+                mCtx.getString(R.string.settings_bp_file_count_default));
+    }
+
+    public String getBPTraceSize() {
+        return appSharedPrefs.getString(
+                mCtx.getString(R.string.settings_bp_size_key),
+                mCtx.getString(R.string.settings_bp_size_default));
+    }
+
+    public void setAPLoggingPath(String path) {
+        sharedPrefsEditor.putString(mCtx.getString(R.string.settings_save_path_key), path);
+        sharedPrefsEditor.commit();
+    }
+
+    public void setBPLoggingPath(String path) {
+        sharedPrefsEditor.putString(mCtx.getString(R.string.settings_bp_path_key), path);
+        sharedPrefsEditor.commit();
+    }
+
+    public void setBPFileCount(String count) {
+        sharedPrefsEditor.putString(mCtx.getString(R.string.settings_bp_file_count_key), count);
+        sharedPrefsEditor.commit();
+    }
+
+    public void setBPTraceSize(String size) {
+        sharedPrefsEditor.putString(mCtx.getString(R.string.settings_bp_size_key), size);
+        sharedPrefsEditor.commit();
+    }
 }

@@ -20,6 +20,7 @@
 package com.intel.amtl.common.gui;
 
 import android.os.Environment;
+import android.util.Log;
 
 import com.intel.amtl.common.AMTLApplication;
 import com.intel.amtl.common.log.AlogMarker;
@@ -39,8 +40,6 @@ public class FileOperations {
 
     private static final String TAG = "AMTL";
     private static final String MODULE = "FileOperations";
-    public static final String TEMP_OUTPUT_FOLDER = AMTLApplication.getApLoggingPath() + "/";
-    public static String BP_LOG_PATH = AMTLApplication.getBpLoggingPath() + "/";
     public static String BP_LOG_FILE_NAME_MATCH = "bplog";
 
     public static boolean pathExists(String path) {
@@ -58,7 +57,7 @@ public class FileOperations {
 
     public static boolean removeFile(String path) {
         AlogMarker.tAB("FileOperation.removeFile", "0");
-
+        Log.d(TAG, MODULE + ": starting removing " + path);
         File file = new File(path);
         if (null == file) {
             AlogMarker.tAE("FileOperation.removeFile", "0");
@@ -74,13 +73,14 @@ public class FileOperations {
             AlogMarker.tAE("FileOperation.removeFile", "0");
             return false;
         }
+        Log.d(TAG, MODULE + ": removing " + path + " succedeed");
         AlogMarker.tAE("FileOperation.removeFile", "0");
         return true;
     }
 
     public static void copy(String src, String dst) throws IOException {
         AlogMarker.tAB("FileOperation.copy", "0");
-
+        Log.d(TAG, MODULE + ": copying " + src + " to " + dst);
         InputStream in = new FileInputStream(src);
         OutputStream out = null;
         byte[] buf = new byte[1024];

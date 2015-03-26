@@ -37,6 +37,7 @@ import com.intel.amtl.common.models.config.ExpertConfig;
 import com.intel.amtl.common.models.config.ModemConf;
 import com.intel.amtl.common.modem.ModemController;
 import com.intel.amtl.common.mts.MtsManager;
+import com.intel.amtl.common.StoredSettings;
 import com.intel.amtl.R;
 
 import java.io.IOException;
@@ -50,8 +51,6 @@ public class ModemTraces implements GeneralTracing {
 
     private final String CONFSETUP_TAG = "AMTL_modem_configuration_setup";
     private final int CONFSETUP_TARGETFRAG = 0;
-    private final String AP_LOG_PATH = "/mnt/sdcard/" + AMTLApplication.getApLoggingPath() + "/";
-    private final String BP_LOG_PATH = AMTLApplication.getBpLoggingPath() + "/";
     private final int PTI_KILL_WAIT = 1000;
 
     private Runtime rtm = java.lang.Runtime.getRuntime();
@@ -102,15 +101,16 @@ public class ModemTraces implements GeneralTracing {
 
     public void cleanTemp() {
         AlogMarker.tAB("ModemTraces.cleanTemp", "0");
+        StoredSettings privatePrefs = new StoredSettings(AMTLApplication.getContext());
         if (MtsManager.getMtsState().equals("running")
                 && MtsManager.getMtsOutputType().equals("f")) {
             MtsManager.stopServices();
-            FileOperations.removeFiles(FileOperations.BP_LOG_PATH,
-                FileOperations.BP_LOG_FILE_NAME_MATCH);
+            FileOperations.removeFiles(privatePrefs.getBPLoggingPath() + "/",
+                    FileOperations.BP_LOG_FILE_NAME_MATCH);
             MtsManager.startService("persistent");
         } else {
-            FileOperations.removeFiles(FileOperations.BP_LOG_PATH,
-                FileOperations.BP_LOG_FILE_NAME_MATCH);
+            FileOperations.removeFiles(privatePrefs.getBPLoggingPath() + "/",
+                    FileOperations.BP_LOG_FILE_NAME_MATCH);
         }
 
         AlogMarker.tAE("ModemTraces.cleanTemp", "0");
@@ -119,7 +119,9 @@ public class ModemTraces implements GeneralTracing {
     public void saveTemp(String path) {
         AlogMarker.tAB("ModemTraces.saveTemp", "0");
 
-        LogManager snaplog = new LogManager(path, AP_LOG_PATH, BP_LOG_PATH);
+        StoredSettings privatePrefs = new StoredSettings(AMTLApplication.getContext());
+        LogManager snaplog = new LogManager(path, "/mnt/sdcard/"
+                + privatePrefs.getRelativeStorePath() + "/", privatePrefs.getBPLoggingPath() + "/");
         if (snaplog == null) {
             AlogMarker.tAE("ModemTraces.saveTemp", "0");
             return;

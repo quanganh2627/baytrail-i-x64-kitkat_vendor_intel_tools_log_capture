@@ -27,8 +27,10 @@ import android.preference.PreferenceManager;
 import android.util.Log;
 
 import com.intel.amtl.R;
+import com.intel.amtl.common.AMTLApplication;
 import com.intel.amtl.common.gui.FileOperations;
 import com.intel.amtl.common.log.AlogMarker;
+import com.intel.amtl.common.StoredSettings;
 
 import java.io.IOException;
 
@@ -37,10 +39,9 @@ public class BootCompletedReceiver extends BroadcastReceiver {
 
     private final String TAG = "AMTL";
     private final String MODULE = "BootCompletedReceiver";
-    private final String TEMP = "logcat_amtl";
-    private String tempFile = FileOperations.TEMP_OUTPUT_FOLDER + TEMP;
-    private String logsCount = "5";
-    private String logsSize = "16";
+    private final String TEMP = "/logcat_amtl";
+    private final String logsCount = "5";
+    private final String logsSize = "16";
     private AlogMarker m = new AlogMarker();
 
     @Override
@@ -107,25 +108,25 @@ public class BootCompletedReceiver extends BroadcastReceiver {
 
             SharedPreferences appSharedPrefs = PreferenceManager
                     .getDefaultSharedPreferences(context);
-            if (tempFile != null) {
-                command += " -f " + tempFile;
-
-                if (null == appSharedPrefs) {
-                    command += " -r " + logsSize;
-                } else {
-                    command += " -r " + appSharedPrefs.getString(
-                            context.getString(R.string.settings_logcat_size_key),
-                            context.getString(R.string.settings_logcat_size_default));
-                }
-            }
 
             if (null == appSharedPrefs) {
+                command += " -f " + "/logs" + TEMP;
+                command += " -r " + logsSize;
                 command += " -n " + logsCount;
             } else {
+                command += " -f " + appSharedPrefs.getString(
+                    context.getString(R.string.settings_save_path_key),
+                    context.getString(R.string.settings_save_path_default)) + TEMP;
+
+                command += " -r " + appSharedPrefs.getString(
+                        context.getString(R.string.settings_logcat_size_key),
+                        context.getString(R.string.settings_logcat_size_default));
+
                 command += " -n " + appSharedPrefs.getString(
                         context.getString(R.string.settings_logcat_file_count_key),
                         context.getString(R.string.settings_logcat_file_count_default));
             }
+
             command += " -v threadtime";
 
             try {

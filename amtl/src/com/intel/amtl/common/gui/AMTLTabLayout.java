@@ -60,6 +60,7 @@ import com.intel.amtl.common.models.config.ModemConf;
 import com.intel.amtl.common.models.config.ModemLogOutput;
 import com.intel.amtl.common.modem.ModemController;
 import com.intel.amtl.common.platform.Platform;
+import com.intel.amtl.common.StoredSettings;
 import com.intel.amtl.R;
 
 import java.io.FileInputStream;
@@ -142,6 +143,10 @@ public class AMTLTabLayout extends Activity implements GeneralSetupFrag.GSFCallB
         editor.remove("default_flush_cmd");
         editor.commit();
 
+        StoredSettings privatePrefs = new StoredSettings(AMTLApplication.getContext());
+        privatePrefs.setBPLoggingPath("/logs");
+        privatePrefs.setAPLoggingPath("/logs");
+
         try {
             // Use of getXmlPlatform
             AMTLApplication.setModemChanged(false);
@@ -175,7 +180,6 @@ public class AMTLTabLayout extends Activity implements GeneralSetupFrag.GSFCallB
                 && expConf.isExpertModeEnabled(modemNames.get(currentLoggingModem))) {
             ExpertConfig.setConfigSet(true);
         }
-        this.updateLoggingPreferences();
 
         AlogMarker.tAE("AMTLTabLayout.loadConfiguration", "0");
     }
@@ -216,17 +220,6 @@ public class AMTLTabLayout extends Activity implements GeneralSetupFrag.GSFCallB
         AMTLApplication.setServiceToStart(mdmLogOutput.getServiceToStart());
         AMTLApplication.setUseMmgr(mdmLogOutput.getUseMmgr());
         AlogMarker.tAE("AMTLTabLayout.setModemParameters", "0");
-    }
-
-    private void updateLoggingPreferences() {
-        AlogMarker.tAB("AMTLTabLayout.updateLoggingPreferences", "0");
-        Editor edit = PreferenceManager.getDefaultSharedPreferences(this).edit();
-        edit.putString(this.getString(R.string.settings_user_save_path_key),
-                AMTLApplication.getApLoggingPath());
-        edit.putString(this.getString(R.string.settings_save_path_key),
-                AMTLApplication.getApLoggingPath());
-        edit.commit();
-        AlogMarker.tAE("AMTLTabLayout.updateLoggingPreferences", "0");
     }
 
     public void initializeTab() {

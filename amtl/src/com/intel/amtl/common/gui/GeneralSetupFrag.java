@@ -57,6 +57,7 @@ import com.intel.amtl.common.models.config.ModemConf;
 import com.intel.amtl.common.modem.ModemController;
 import com.intel.amtl.common.mts.MtsConf;
 import com.intel.amtl.common.mts.MtsManager;
+import com.intel.amtl.common.StoredSettings;
 
 import java.io.File;
 import java.io.IOException;
@@ -169,7 +170,7 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnChe
     }
 
     private void updateUi(ModemConf curModConf) {
-        AlogMarker.tAB("GeneralSetupFrag.upddateUi", "0");
+        AlogMarker.tAB("GeneralSetupFrag.updateUi", "0");
         SharedPreferences prefs = this.getActivity().getSharedPreferences("AMTLPrefsData",
                 Context.MODE_PRIVATE);
         int id = prefs.getInt("index" + modemName, -2);
@@ -198,7 +199,7 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnChe
                 this.updateText(curModConf.getProfileName(), tvProfileNameValue);
             }
         }
-        AlogMarker.tAE("GeneralSetupFrag.upddateUi", "0");
+        AlogMarker.tAE("GeneralSetupFrag.updateUi", "0");
     }
 
     public void setFirstCreated(boolean created) {
@@ -427,6 +428,14 @@ public class GeneralSetupFrag extends Fragment implements OnClickListener, OnChe
                 MtsManager.getMtsOutputType(), MtsManager.getMtsRotateNum(),
                 MtsManager.getMtsRotateSize(), MtsManager.getMtsInterface(),
                 MtsManager.getMtsBufferSize());
+        if (MtsManager.getMtsOutputType().equals("f")) {
+            String output = MtsManager.getMtsOutput();
+            String path = output.substring(0, output.indexOf("/bplog"));
+            StoredSettings privatePrefs = new StoredSettings(AMTLApplication.getContext());
+            privatePrefs.setBPLoggingPath(path);
+            privatePrefs.setBPFileCount(MtsManager.getMtsRotateNum());
+            privatePrefs.setBPTraceSize(MtsManager.getMtsRotateSize());
+        }
         MtsManager.printMtsProperties();
         AlogMarker.tAE("GeneralSetupFrag.checkMtsConfig", "0");
         return conf;

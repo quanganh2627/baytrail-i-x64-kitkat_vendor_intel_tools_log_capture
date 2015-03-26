@@ -21,7 +21,9 @@ package com.intel.amtl.common.mts;
 
 import android.os.SystemProperties;
 
+import com.intel.amtl.common.AMTLApplication;
 import com.intel.amtl.common.log.AlogMarker;
+import com.intel.amtl.common.StoredSettings;
 
 public class MtsConf {
 
@@ -97,10 +99,19 @@ public class MtsConf {
     public void applyParameters() {
         AlogMarker.tAB("MtsConf.applyParameters", "0");
         SystemProperties.set(MtsProperties.getInput(), this.mtsInput);
-        SystemProperties.set(MtsProperties.getOutput(), this.mtsOutput);
         SystemProperties.set(MtsProperties.getOutputType(), this.mtsOutputType);
-        SystemProperties.set(MtsProperties.getRotateNum(), this.mtsRotateNum);
-        SystemProperties.set(MtsProperties.getRotateSize(), this.mtsRotateSize);
+        if (this.mtsOutputType.equals("f")) {
+            StoredSettings privatePrefs = new StoredSettings(AMTLApplication.getContext());
+            String oldPath = mtsOutput.substring(0, mtsOutput.indexOf("/bplog"));
+            String newPath = mtsOutput.replace(oldPath, privatePrefs.getBPLoggingPath());
+            SystemProperties.set(MtsProperties.getOutput(), newPath);
+            SystemProperties.set(MtsProperties.getRotateNum(), privatePrefs.getBPFileCount());
+            SystemProperties.set(MtsProperties.getRotateSize(), privatePrefs.getBPTraceSize());
+        } else {
+            SystemProperties.set(MtsProperties.getOutput(), this.mtsOutput);
+            SystemProperties.set(MtsProperties.getRotateNum(), this.mtsRotateNum);
+            SystemProperties.set(MtsProperties.getRotateSize(), this.mtsRotateSize);
+        }
         SystemProperties.set(MtsProperties.getInterface(), this.mtsInterface);
         SystemProperties.set(MtsProperties.getBufferSize(), this.mtsBufferSize);
         AlogMarker.tAE("MtsConf.applyParameters", "0");

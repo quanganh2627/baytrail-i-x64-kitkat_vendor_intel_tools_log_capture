@@ -68,6 +68,27 @@
             android:entries="@array/modemProfileText"
             android:entryValues="@array/modemProfileValues" />
 
+        <EditTextPreference
+            android:key="@string/settings_bp_path_key"
+            android:defaultValue="@string/settings_bp_path_default"
+            android:summary="@string/settings_bp_path_summary"
+            android:title="@string/settings_bp_path_title"
+            android:inputType="text|textNoSuggestions" />
+
+        <EditTextPreference
+            android:key="@string/settings_bp_file_count_key"
+            android:defaultValue="@string/settings_bp_file_count_default"
+            android:summary="@string/settings_bp_file_count_summary"
+            android:title="@string/settings_bp_file_count_title"
+            android:inputType="number" />
+
+        <EditTextPreference
+            android:key="@string/settings_bp_size_key"
+            android:defaultValue="@string/settings_bp_size_default"
+            android:summary="@string/settings_bp_size_summary"
+            android:title="@string/settings_bp_size_title"
+            android:inputType="number" />
+
     </PreferenceCategory>
 
 </PreferenceScreen>

@@ -59,8 +59,7 @@ public class ActionMenu implements OnClickListener, GeneralTracing {
     private ImageButton buttonSave = null;
     private ImageButton buttonClear = null;
 
-    private final String OUTPUT_STORAGE_EMMC = AMTLApplication.getApLoggingPath();
-    private String outputFile = OUTPUT_STORAGE_EMMC;
+    private String outputFile = getRelativeStorePath();
     private boolean outputSDCard = false;
 
     private boolean running = false;
@@ -114,6 +113,8 @@ public class ActionMenu implements OnClickListener, GeneralTracing {
                 for (GeneralTracing gc : tracers) {
                     gc.cleanTemp();
                 }
+                Toast toast = Toast.makeText(activity, "Clear temporary files", Toast.LENGTH_SHORT);
+                toast.show();
             }
         };
 
@@ -150,7 +151,7 @@ public class ActionMenu implements OnClickListener, GeneralTracing {
             public void run() {
                 String path = PreferenceManager.getDefaultSharedPreferences(activity).getString(
                         activity.getString(R.string.settings_user_save_path_key),
-                        AMTLApplication.getApLoggingPath() + "/");
+                        getRelativeStorePath() + "/");
                 boolean pathExists = false;
 
                 try {
@@ -181,8 +182,7 @@ public class ActionMenu implements OnClickListener, GeneralTracing {
         };
 
         path = PreferenceManager.getDefaultSharedPreferences(activity).getString(
-                activity.getString(R.string.settings_save_path_key),
-                AMTLApplication.getApLoggingPath());
+                activity.getString(R.string.settings_save_path_key), getRelativeStorePath());
         path = FileOperations.getTimeStampedPath(path, "logs_");
 
         UIHelper.savePopupDialog(activity, "Save active logs",
@@ -206,7 +206,7 @@ public class ActionMenu implements OnClickListener, GeneralTracing {
         if (toSDCard) {
             outputFile = FileOperations.getSDStoragePath();
         } else {
-            outputFile = OUTPUT_STORAGE_EMMC;
+            outputFile = getRelativeStorePath();
         }
 
         if (relativePath != "") {
@@ -286,7 +286,7 @@ public class ActionMenu implements OnClickListener, GeneralTracing {
 
     public void onClick(View v) {
         AlogMarker.tAB("ActionMenu.onClick", "0");
-        CharSequence text;
+        String text = null;
 
         switch (v.getId()) {
             case R.id.buttonStart:
@@ -306,7 +306,6 @@ public class ActionMenu implements OnClickListener, GeneralTracing {
                 String path = save();
                 return;
             case R.id.buttonClear:
-                text = "Clear temporary files";
                 cleanTemp();
                 break;
             default:
@@ -317,8 +316,11 @@ public class ActionMenu implements OnClickListener, GeneralTracing {
         if (toast != null) {
             toast.cancel();
         }
-        toast = Toast.makeText(v.getContext(), text, Toast.LENGTH_SHORT);
-        toast.show();
+
+        if (text != null) {
+            toast = Toast.makeText(v.getContext(), text, Toast.LENGTH_SHORT);
+            toast.show();
+        }
         AlogMarker.tAE("ActionMenu.onClick", "0");
     }
 
