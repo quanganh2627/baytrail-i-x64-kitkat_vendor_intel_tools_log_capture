@@ -262,6 +262,7 @@ int process_anruiwdt_event(struct watch_entry *entry, struct inotify_event *even
     const char *dateshort = get_current_time_short(1);
     char *key = NULL;
     int dir;
+    char br_command[PATHMAX];
 #ifdef CONFIG_BTDUMP
     struct bt_dump_arg *btd_param;
     pthread_t btd_thread;
@@ -287,7 +288,12 @@ int process_anruiwdt_event(struct watch_entry *entry, struct inotify_event *even
         free(key);
         return -1;
     }
-
+    if (strstr(event->name,"watchdog")) {
+        snprintf(br_command, sizeof(br_command),"/system/bin/bugreport > %s%d/bugreport.txt", CRASH_DIR,dir);
+        LOGE("[ZD]%s: event name %s bugreport start \n", __FUNCTION__, event->name);
+        system(br_command);
+        LOGE("[ZD]%s: event name %s bugreport done! See %s%d/bugreport.txt\n", __FUNCTION__, event->name,CRASH_DIR,dir);
+    }
     snprintf(destion,sizeof(destion),"%s%d/%s", CRASH_DIR, dir, event->name);
     do_copy_tail(path, destion, MAXFILESIZE);
     priv_prepare_anruiwdt(destion);
