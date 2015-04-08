@@ -290,6 +290,18 @@ void get_fdk_startupreason(char *startupreason)
 }
 #endif // CONFIG_FDK
 
+static struct {
+    const char * reason;
+    const char * crashtool_value;
+} boot_reason_array[] = {
+    {"WATCHDOG", "SWWDT_RESET"},
+    {"KERNEL_PANIC", "SWWDT_RESET"},
+    {"SECURITY_WATCHDOG", "HWWDT_RESET"},
+    {"PMC_WATCHDOG", "HWWDT_RESET"},
+    {"EC_WATCHDOG", "HWWDT_RESET"},
+    {"PLATFORM_WATCHDOG", "HWWDT_RESET"}
+};
+
 static void get_default_bootreason(char *bootreason) {
     int ret;
     unsigned int i;
@@ -299,14 +311,19 @@ static void get_default_bootreason(char *bootreason) {
     if (ret <= 0)
         return;
 
+    int entries = DIM(boot_reason_array);
+
     for (i = 0; i < strlen(bootreason_prop); i++)
         bootreason[i] = toupper(bootreason_prop[i]);
     bootreason[i] = '\0';
 
-    if (!strncmp(bootreason, "KERNEL_PANIC", 12))
-        strcpy(bootreason, "SWWDT_RESET");
-    else if (!strncmp(bootreason, "WATCHDOG", 8))
-        strcpy(bootreason, "HWWDT_RESET");
+    while (entries--) {
+        if (!strncmp(bootreason, boot_reason_array[entries].reason,
+                     strlen(boot_reason_array[entries].reason))) {
+            strcpy(bootreason, boot_reason_array[entries].crashtool_value);
+            break;
+        }
+    }
 }
 
 void read_startupreason(char *startupreason) {
