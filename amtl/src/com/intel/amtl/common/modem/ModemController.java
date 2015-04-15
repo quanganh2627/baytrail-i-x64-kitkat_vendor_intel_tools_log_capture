@@ -23,6 +23,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.SystemClock;
+import android.os.UserHandle;
 import android.preference.PreferenceManager;
 import android.util.Log;
 
@@ -174,7 +175,8 @@ public abstract class ModemController {
         AlogMarker.tAB("ModemController.sendMessage", "0");
         Intent intent = new Intent("modem-event");
         intent.putExtra("message", msg);
-        AMTLApplication.getContext().sendBroadcast(intent);
+        AMTLApplication.getContext().sendBroadcastAsUser(intent,
+                new UserHandle(UserHandle.USER_CURRENT));
         AlogMarker.tAE("ModemController.sendMessage", "0");
     }
 }
