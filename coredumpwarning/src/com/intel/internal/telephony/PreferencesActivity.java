@@ -41,6 +41,9 @@ import android.content.Intent;
 import android.net.Uri;
 import android.text.Html;
 import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.io.File;
+import java.io.FileNotFoundException;
 
 
 /**
@@ -52,6 +55,7 @@ public class PreferencesActivity extends PreferenceActivity implements OnPrefere
 
     public static final String KEY_RESTORE_SETTINGS = "prefs_shared_restore_settings_key";
     private static final int DIALOG_RESTORE_SETTINGS = 0;
+	private static final int DIALOG_BPLOG_ENABLE = 1;
     final private String mLogTag = "TelephonyEventsNotifier";
     private GsmttyManager ttyManager;
 	private CheckBoxPreference coredumpPreference;
@@ -73,7 +77,7 @@ public class PreferencesActivity extends PreferenceActivity implements OnPrefere
 			else
 				coredumpPreference.setChecked(false);			
 			coredumpPreference.setOnPreferenceClickListener(this);
-			Log.i(mLogTag, "coredump enable is "+coredumpPreference.isChecked());
+			Log.d(mLogTag, "coredump enable is "+coredumpPreference.isChecked());
 			
     	}
 
@@ -85,7 +89,7 @@ public class PreferencesActivity extends PreferenceActivity implements OnPrefere
 			else
 				bplogPreference.setChecked(false);
 			bplogPreference.setOnPreferenceClickListener(this);
-			Log.i(mLogTag, "bplog enable is "+bplogPreference.isChecked());
+			Log.d(mLogTag, "bplog enable is "+bplogPreference.isChecked());
     	}
     }
 
@@ -103,9 +107,8 @@ public class PreferencesActivity extends PreferenceActivity implements OnPrefere
 
 		//coredump box
 		if (thisKey.contentEquals(restoreCoredumpKey)) {
-			Log.i(mLogTag, "enter here coredump "+coredumpPreference.isChecked());
+			Log.d(mLogTag, "enter here coredump "+coredumpPreference.isChecked());
 			if (coredumpPreference.isChecked()) {
-				Log.i(mLogTag, "enter here coredump 2\n");
 				if(enableCoredump())
 					new AlertDialog.Builder(this)
 						.setTitle("result")
@@ -116,7 +119,6 @@ public class PreferencesActivity extends PreferenceActivity implements OnPrefere
 					coredumpPreference.setChecked(false);		
 			}
 			else {				
-				Log.i(mLogTag, "enter here coredump 3\n");				
 				if(disableCoredump())
 					new AlertDialog.Builder(this)
 						.setTitle("result")
@@ -130,28 +132,18 @@ public class PreferencesActivity extends PreferenceActivity implements OnPrefere
 
 		//bplog box
 		if (thisKey.contentEquals(restoreBplogKey)) {
-			Log.i(mLogTag, "enter here bplog "+bplogPreference.isChecked());
+			Log.d(mLogTag, "enter here bplog "+bplogPreference.isChecked());
 			if (bplogPreference.isChecked()) {
-				Log.i(mLogTag, "enter here 2\n");
-				if(enableBplog()) 
-					new AlertDialog.Builder(this)
-					.setTitle("result")
-					.setMessage("please reboot phone")
-					.setPositiveButton("yes",null)
-					.show();
-				else 
-					bplogPreference.setChecked(false);
-									
+				showDialog(DIALOG_BPLOG_ENABLE);
 			}
 			else {				
-				Log.i(mLogTag, "enter here bplog 3\n");				
 				if(disableBplog())
 					new AlertDialog.Builder(this)
 					.setTitle("result")
-					.setMessage("disable bplog ok")
+					.setMessage("Bplog disabled ok")
 					.setPositiveButton("yes",null)
 					.show();
-				else 
+				else
 					bplogPreference.setChecked(true);
 			}
         }
@@ -166,37 +158,46 @@ public class PreferencesActivity extends PreferenceActivity implements OnPrefere
 				this.openTty();
 				// open port
 				returnMsg = sendAtCommand("at@cdd:paramopen(CDD_SETTINGS_ACCESS_NVM)\r\n");
-				Log.i(mLogTag, "returnMsg is "+returnMsg);
+				Log.d(mLogTag, "returnMsg is "+returnMsg);
 				if (-1==returnMsg.indexOf("OK")) {
 					returnMsg = sendAtCommand("at@cdd:paramopen(CDD_SETTINGS_ACCESS_NVM)\r\n");
-					Log.i(mLogTag, "returnMsg2 is "+returnMsg);
-					if(-1==returnMsg.indexOf("OK"))
+					Log.d(mLogTag, "returnMsg2 is "+returnMsg);
+					if(-1==returnMsg.indexOf("OK")) {
+						this.closeTty();
 						return false;
+					}
 				}
-				if((handleValue=returnMsg.substring(returnMsg.lastIndexOf("(")+1,returnMsg.lastIndexOf(")")))==null)
+				if((handleValue=returnMsg.substring(returnMsg.lastIndexOf("(")+1,returnMsg.lastIndexOf(")")))==null) {
+					this.closeTty();
 					return false;
-				Log.i(mLogTag, "handle value is" + handleValue);
+				}
+				Log.d(mLogTag, "handle value is" + handleValue);
 
 				//write port£¬ 0 means silent rest off, which will enable coredump info
 				returnMsg = sendAtCommand("at@cdd:paramwrite("+handleValue+",ENABLESTATE,1)\r\n");
 				if (-1==returnMsg.indexOf("OK")) {
 					returnMsg = sendAtCommand("at@cdd:paramwrite("+handleValue+",ENABLESTATE,1)\r\n");
-					Log.i(mLogTag, "returnMsg2 is "+returnMsg);
-					if(-1==returnMsg.indexOf("OK"))
+					Log.d(mLogTag, "returnMsg2 is "+returnMsg);
+					if(-1==returnMsg.indexOf("OK")) {
+						this.closeTty();
 						return false;
+					}
 				}
 
 				//close port
 				returnMsg = sendAtCommand("at@cdd:paramclose("+handleValue+")\r\n");
 				if (-1==returnMsg.indexOf("OK")) {
 					returnMsg = sendAtCommand("at@cdd:paramclose("+handleValue+")\r\n");
-					Log.i(mLogTag, "returnMsg2 is "+returnMsg);
-					if(-1==returnMsg.indexOf("OK"))
+					Log.d(mLogTag, "returnMsg2 is "+returnMsg);
+					if(-1==returnMsg.indexOf("OK")) {
+						this.closeTty();
 						return false;
+					}
 				}
 
 			} catch(ModemControlException ex) {
 			}
+		this.closeTty();
 		return true;
 
 	}
@@ -209,69 +210,94 @@ public class PreferencesActivity extends PreferenceActivity implements OnPrefere
 				this.openTty();
 				// open port
 				returnMsg = sendAtCommand("at@cdd:paramopen(CDD_SETTINGS_ACCESS_NVM)\r\n");
-				Log.i(mLogTag, "returnMsg is "+returnMsg);
+				Log.d(mLogTag, "returnMsg is "+returnMsg);
 				if (-1==returnMsg.indexOf("OK")) {
 					returnMsg = sendAtCommand("at@cdd:paramopen(CDD_SETTINGS_ACCESS_NVM)\r\n");
-					Log.i(mLogTag, "returnMsg2 is "+returnMsg);
-					if(-1==returnMsg.indexOf("OK"))
+					Log.d(mLogTag, "returnMsg2 is "+returnMsg);
+					if(-1==returnMsg.indexOf("OK")) {
+						this.closeTty();
 						return false;
+					}
 				}
-				if((handleValue=returnMsg.substring(returnMsg.lastIndexOf("(")+1,returnMsg.lastIndexOf(")")))==null)
+				if((handleValue=returnMsg.substring(returnMsg.lastIndexOf("(")+1,returnMsg.lastIndexOf(")")))==null) {
+					this.closeTty();
 					return false;
-				Log.i(mLogTag, "handle value is" + handleValue);
+				}
+				Log.d(mLogTag, "handle value is" + handleValue);
 
 				//write port£¬ 1 means silent rest on, which will disable coredump info
 				returnMsg = sendAtCommand("at@cdd:paramwrite("+handleValue+",ENABLESTATE,0)\r\n");
 				if (-1==returnMsg.indexOf("OK")) {
 					returnMsg = sendAtCommand("at@cdd:paramwrite("+handleValue+",ENABLESTATE,0)\r\n");
-					Log.i(mLogTag, "returnMsg2 is "+returnMsg);
-					if(-1==returnMsg.indexOf("OK"))
+					Log.d(mLogTag, "returnMsg2 is "+returnMsg);
+					if(-1==returnMsg.indexOf("OK")) {
+						this.closeTty();
 						return false;
+					}
 				}
 
 				//close port
 				returnMsg = sendAtCommand("at@cdd:paramclose("+handleValue+")\r\n");
 				if (-1==returnMsg.indexOf("OK")) {
 					returnMsg = sendAtCommand("at@cdd:paramclose("+handleValue+")\r\n");
-					Log.i(mLogTag, "returnMsg2 is "+returnMsg);
-					if(-1==returnMsg.indexOf("OK"))
+					Log.d(mLogTag, "returnMsg2 is "+returnMsg);
+					if(-1==returnMsg.indexOf("OK")) {
+						this.closeTty();
 						return false;
+					}
 				}
 
 			} catch(ModemControlException ex) {
 			}
+		this.closeTty();
 		return true;
 	}
 	public boolean enableBplog() {
-		String returnMsg = "";
-		try {
-				this.openTty();
-				returnMsg = sendAtCommand("at+xsystrace=1,\"bb_sw=1;3g_sw=1;digrf=1\",\"digrf=0x84;bb_sw=sdl:th,tr,st,db,pr,lt,li,gt,ae,mo\",\"oct=4\"\r\n");
-				Log.i(mLogTag, "returnMsg enableBplog is "+returnMsg);
-				if (-1==returnMsg.indexOf("OK")) {
-					returnMsg = sendAtCommand("at+xsystrace=1,\"bb_sw=1;3g_sw=1;digrf=1\",\"digrf=0x84;bb_sw=sdl:th,tr,st,db,pr,lt,li,gt,ae,mo\",\"oct=4\"\r\n");
-					Log.i(mLogTag, "returnMsg2 is "+returnMsg);
-					if(-1==returnMsg.indexOf("OK"))
-						return false;
-				}
-			} catch(ModemControlException ex) {
-		}
-		return true;
+		try { 
+			   RandomAccessFile rf=new RandomAccessFile("/data/system/offlogcfg.txt","rw");
+			   rf.writeBytes("on_off        = 1\n");
+			   rf.writeBytes("offlog_path   = /data/logs/\n");
+			   rf.writeBytes("offlog_size   = 500000000\n");
+			   rf.writeBytes("offlog_number = 4");
+			   rf.close(); 
+		   } 
+		   catch(IOException e){ 
+		   	   Log.e(mLogTag,"Failed: " + e);
+			   return false; 
+		   }
+		   return true;
 	}
 	
 	public boolean disableBplog() {
 		
-		String returnMsg = "";
-		try {
-				this.openTty();
-				sendAtCommand("at+xsystrace=1,\"bb_sw=0;3g_sw=0;digrf=0\",\"digrf=0x84;bb_sw=sdl:th,tr,st,db,pr,lt,li,gt,ae,mo\",\"oct=4\"\r\n");
-				returnMsg = sendAtCommand("at+xsystrace=1,\"bb_sw=0;3g_sw=0;digrf=0\",\"digrf=0x84;bb_sw=sdl:th,tr,st,db,pr,lt,li,gt,ae,mo\",\"oct=4\"\r\n");
-				Log.i(mLogTag, "returnMsg disableBplog1 is "+returnMsg);
-				if (-1==returnMsg.indexOf("OK"))
-					return false;
-			} catch(ModemControlException ex) {
+		boolean result = false;
+		try { 
+			   // disable on_off parameter
+			RandomAccessFile rf=new RandomAccessFile("/data/system/offlogcfg.txt","rw");
+			rf.writeBytes("on_off        = 0\n");
+			rf.writeBytes("offlog_path   = /data/logs/\n");
+			rf.writeBytes("offlog_size   = 500000000\n");
+			rf.writeBytes("offlog_number = 4");
+			rf.close();
+
+			//at+xsystrace=0
+			this.openTty();
+			for(int i=0;i<2;i++) {
+				
+				String returnMsg = sendAtCommand("at+xsystrace=0\r\n");
+				Log.d(mLogTag, "returnMsg is "+returnMsg);
+				if (-1!=returnMsg.indexOf("OK")){
+					result=true;
+					break;
+				}
+			}
+				
+		} catch(IOException e) { 
+		   e.printStackTrace(); 
+		} catch(ModemControlException ex) {
 		}
-		return true;
+		this.closeTty();
+		return result;
 	}
 	
     protected Dialog onCreateDialog(int id) {
@@ -280,12 +306,47 @@ public class PreferencesActivity extends PreferenceActivity implements OnPrefere
         case DIALOG_RESTORE_SETTINGS:
             dialog = createRestoreSettingsDialog();
             break;
+		case DIALOG_BPLOG_ENABLE:
+			dialog = createBplogEnable();
+			break;
         default:
             dialog = null;
         }
         return dialog;
     }
 
+	private Dialog createBplogEnable() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+		builder.setTitle("Reminder");
+		builder.setIcon(android.R.drawable.ic_dialog_info);
+		builder.setMessage("Reboot phone?");
+        //builder.setMessage(R.string.dialog_restore_settings_title);
+        builder.setPositiveButton(R.string.dialog_restore_settings_yes, new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface dialog, int whichButton) {
+				if(enableBplog()) {
+					Intent intent2 = new Intent(Intent.ACTION_REBOOT);
+					intent2.putExtra("nowait", 1);
+					intent2.putExtra("interval", 1);
+					intent2.putExtra("window", 0);
+					sendBroadcast(intent2);
+				}
+				else
+					bplogPreference.setChecked(false);
+					
+            }
+        });
+        builder.setNegativeButton(R.string.dialog_restore_settings_no, new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface dialog, int whichButton) {
+				   bplogPreference.setChecked(false);
+			}
+        });
+        builder.setOnCancelListener(new DialogInterface.OnCancelListener() {
+            public void onCancel(DialogInterface dialog) {
+            }
+        });
+        return builder.create();
+		
+	}
     private Dialog createRestoreSettingsDialog() {
 		final EditText input = new EditText(this);
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
@@ -316,11 +377,10 @@ public class PreferencesActivity extends PreferenceActivity implements OnPrefere
             	this.openTty();
 				String inputMsg = input+ "\r\n";
 				dialogMsg = sendAtCommand(inputMsg);
-				
-				Log.i(mLogTag, "dialogMsg is "+dialogMsg);
+				Log.d(mLogTag, "dialogMsg is "+dialogMsg);
         	} catch(ModemControlException ex) {
     		}
-		
+		this.closeTty();
 		new AlertDialog.Builder(this)
 		.setTitle("result")
 		.setMessage(dialogMsg)
@@ -346,12 +406,26 @@ public class PreferencesActivity extends PreferenceActivity implements OnPrefere
 	@Override
     public void onBackPressed() {
         super.onBackPressed();
-		Log.i(mLogTag, "on back key press");
+		Log.d(mLogTag, "on back key press");
 		
 		try {
 			this.ttyManager.close();
 		} catch (Exception ex) {
            	Log.e(mLogTag, "there is an issue with tty opening");
+		}
+		
+    }
+
+	
+    public void closeTty() {
+		
+		try {
+			if (this.ttyManager != null) {
+				this.ttyManager.close();
+				this.ttyManager = null;
+			}
+		} catch (Exception ex) {
+           	Log.e(mLogTag, "there is an issue with tty closing");
 		}
 		
     }
@@ -371,11 +445,11 @@ public class PreferencesActivity extends PreferenceActivity implements OnPrefere
 	public String sendAtCommand(String command) throws ModemControlException {
         String ret = "NOK";
 		
-		Log.i(mLogTag, "sending to modem " + command);
+		Log.d(mLogTag, "sending to modem " + command);
         if (command != null) {
             if (!command.equals("")) {
                 ret = this.ttyManager.writeToModemControl(command);
-				Log.i(mLogTag, "ret is"+ret);
+				Log.d(mLogTag, "ret is"+ret);
             }
         }
         return ret;
@@ -383,17 +457,19 @@ public class PreferencesActivity extends PreferenceActivity implements OnPrefere
 
 	public boolean bplogEnabled() {
 
-		String returnMsg = "";
-		try {
-				if(false==this.openTty())
-					this.openTty();
-				returnMsg = sendAtCommand("at+xsystrace=10\r\n");
-				Log.i(mLogTag, "returnMsg is "+returnMsg);
-				if ((-1==returnMsg.indexOf("bb_sw: Oct"))||(-1==returnMsg.indexOf("3g_sw: Oct"))||(-1==returnMsg.indexOf("digrf: Oct")))
-					return false;
-			} catch(ModemControlException ex) {
+		boolean result = false;
+		File df=new File("/data/logs/bplog");
+		if(df.exists()){
+			long size1= df.length();
+			Log.i(mLogTag, "size1= "+size1);
+			try {
+				Thread.sleep(1000);
+			} catch(InterruptedException ie) {
+			}
+			if(df.length()!= size1)
+				result=true;
 		}
-		return true;
+		return result;
 	}
 
 	
@@ -407,12 +483,15 @@ public class PreferencesActivity extends PreferenceActivity implements OnPrefere
 					this.openTty();
 				}
 				returnMsg = sendAtCommand("at@cdd:getEnabled()\r\n");
-				Log.i(mLogTag, "returnMsg is "+returnMsg);
-				if (-1==returnMsg.indexOf("enabled"))
+				Log.d(mLogTag, "returnMsg is "+returnMsg);
+				if (-1==returnMsg.indexOf("enabled")) {
+					closeTty();
 					return false;
+				}
 			} catch(ModemControlException ex) {
 			} catch (InterruptedException ie) {
 			}
+		closeTty();	
 		return true;
 	}
 	

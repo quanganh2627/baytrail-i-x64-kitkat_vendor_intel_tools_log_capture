@@ -18,8 +18,9 @@
         android:label="@string/app_name">
         <activity
             android:name=".PreferencesActivity"
-            android:label="@string/set_preferences">
-            <intent-filter>
+            android:label="@string/set_preferences"
+            android:screenOrientation="portrait">     
+	<intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
