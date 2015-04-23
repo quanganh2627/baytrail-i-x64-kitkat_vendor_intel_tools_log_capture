@@ -129,6 +129,22 @@ LOCAL_SRC_FILES := $(LOCAL_MODULE)
 include $(BUILD_PREBUILT)
 
 include $(CLEAR_VARS)
+LOCAL_MODULE := amtl_cherrytrail_XMM_7160_M2.cfg
+LOCAL_MODULE_TAGS := optional
+LOCAL_MODULE_CLASS := ETC
+LOCAL_MODULE_PATH := $(TARGET_OUT_ETC)/telephony
+LOCAL_SRC_FILES := $(LOCAL_MODULE)
+include $(BUILD_PREBUILT)
+
+include $(CLEAR_VARS)
+LOCAL_MODULE := amtl_cherrytrail_XMM_7260_M2.cfg
+LOCAL_MODULE_TAGS := optional
+LOCAL_MODULE_CLASS := ETC
+LOCAL_MODULE_PATH := $(TARGET_OUT_ETC)/telephony
+LOCAL_SRC_FILES := $(LOCAL_MODULE)
+include $(BUILD_PREBUILT)
+
+include $(CLEAR_VARS)
 LOCAL_MODULE := AMTL.conf
 LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE_CLASS := ETC
@@ -156,6 +172,8 @@ LOCAL_REQUIRED_MODULES :=\
     amtl_moorefield_XMM_7160_M2.cfg \
     amtl_baytrail_XMM_7160_M2.cfg \
     amtl_moorefield_XMM_7260_DSDA.cfg \
+    amtl_cherrytrail_XMM_7160_M2.cfg \
+    amtl_cherrytrail_XMM_7260_M2.cfg \
     AMTL.conf
 
 include $(BUILD_PHONY_PACKAGE)
