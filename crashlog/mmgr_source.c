@@ -293,6 +293,7 @@ int mdm_DBG_INFO(const mdm_cli_callback_data_t * ev) {
             mdm_MRESET(ev);
             break;
         case DBG_TYPE_STATS:
+        case DBG_TYPE_ERROR:
         case DBG_TYPE_INFO: {
             struct mmgr_ct_context *ctx = (struct mmgr_ct_context *)ev->context;
             write_mmgr_monitor_with_dbg_info(NULL, ctx->mmgr_monitor_fd[1], dbg_info);
@@ -512,6 +513,9 @@ int mmgr_handle(unsigned int mdm_inst) {
         switch (cur_data.extra_int & 0xFF) {
              case DBG_TYPE_INFO:
                  sprintf(event_name, "%s", INFOEVENT);
+                 break;
+             case DBG_TYPE_ERROR:
+                 sprintf(event_name, "%s", ERROREVENT);
                  break;
              case DBG_TYPE_STATS:
                  sprintf(event_name, "%s", STATSEVENT);
