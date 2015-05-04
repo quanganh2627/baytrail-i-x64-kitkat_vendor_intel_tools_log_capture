@@ -377,18 +377,12 @@ static int swupdated(char *buildname) {
  *
  * @return void.
  */
-static void reset_logdir(char *path, int remove_dir) {
+static void reset_logdir(char *path, int remove_subdir) {
     struct stat info;
 
-    if (stat(path,&info)) {
+    if (stat(path,&info) || rmfr_specific(path, 0, remove_subdir)) {
         LOGE("%s: Cannot reset logdir %s - %s\n", __FUNCTION__,
             path, strerror(errno));
-        return;
-    }
-    rmfr_specific(path, remove_dir);
-    if (remove_dir) {
-        mkdir(path, info.st_mode);
-        chown(path, info.st_uid, info.st_gid);
     }
 }
 
@@ -667,9 +661,6 @@ static void get_crash_env(char * boot_mode, char *crypt_state, char *encrypt_pro
 
     /* Read SPID */
     read_sys_spid(LOG_SPID);
-
-    /* Update rights of folder containing logs */
-    update_logs_permission();
 }
 
 /**

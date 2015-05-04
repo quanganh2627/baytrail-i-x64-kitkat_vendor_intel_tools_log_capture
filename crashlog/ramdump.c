@@ -148,8 +148,6 @@ int do_ramdump_checks(int test) {
     read_startupreason(startupreason);
     /* Get the last UPTIME value and write current UPTIME one in history events file */
     uptime_history(lastuptime);
-    /* Change log directories permission rights */
-    update_logs_permission();
 
     /* Checks for panic */
     crashlog_check_panic_events(startupreason, watchdog, test);

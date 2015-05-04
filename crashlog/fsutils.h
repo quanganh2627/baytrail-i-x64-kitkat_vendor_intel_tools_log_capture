@@ -138,10 +138,20 @@ int do_copy(char *src, char *dest, int limit);
 int do_mv(char *src, char *dest);
 ssize_t do_read(int fd, void *buf, size_t len);
 int rmfr(char *path);
-int rmfr_specific(char *path, int remove_dir);
+/**
+ * Selectively removes files and folders within a given a path.
+ *
+ * @param path to the directory or file on which it should be acted upon
+ * @param remove_entry indicates whether the path passed should be removed
+ *        if it represents a directory
+ * @param remove_subdirs indicates whether subdirectories in the given path,
+ *        when if it is a directory, should be removed. Ignored if
+ *        remove_entry is 1
+ * @return 0 on success, -1 and errno set on failure
+ */
+int rmfr_specific(char *path, int remove_entry, int remove_subdirs);
 
 void copy_dir(void *arguments);
-void update_logs_permission(void);
 
 int str_simple_replace(char *str, char *search, char *replace);
 int get_parent_dir( char * dir, char *parent_dir );

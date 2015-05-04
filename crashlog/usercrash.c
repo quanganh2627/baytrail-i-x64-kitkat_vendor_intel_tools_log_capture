@@ -143,11 +143,23 @@ int process_usercrash_event(struct watch_entry *entry, struct inotify_event *eve
 }
 
 int process_hprof_event(struct watch_entry *entry, struct inotify_event *event) {
+    char value[PROPERTY_VALUE_MAX] = "0";
+
+    if (property_get(PROP_COREDUMP, value, "") <= 0 || value[0] != '1') {
+        LOGE("Core dump capture is disabled - %s: %s\n", PROP_COREDUMP, value);
+        return -1;
+    }
 
     return priv_process_usercrash_event(entry , event);
 }
 
 int process_apcore_event(struct watch_entry *entry, struct inotify_event *event) {
+    char value[PROPERTY_VALUE_MAX] = "0";
+
+    if (property_get(PROP_COREDUMP, value, "") <= 0 || value[0] != '1') {
+        LOGE("Core dump capture is disabled - %s: %s\n", PROP_COREDUMP, value);
+        return -1;
+    }
 
     return priv_process_usercrash_event(entry , event);
 }

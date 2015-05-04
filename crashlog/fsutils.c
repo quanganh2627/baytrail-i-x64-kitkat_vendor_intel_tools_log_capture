@@ -557,15 +557,18 @@ int find_matching_file(char *dir_to_search, char *pattern, char *filename_found)
 }
 
 int rmfr(char *path) {
-    return rmfr_specific(path, 1);
+    return rmfr_specific(path, 1, 1);
 }
 
-int rmfr_specific(char *path, int remove_dir) {
+int rmfr_specific(char *path, int remove_entry, int remove_subdirs) {
     DIR *d;
     struct dirent *de;
     char fsentry[PATHMAX];
     int subres = 0;
     unsigned char isFile = 0x8;
+    errno = 0;
+
+    remove_subdirs = (remove_entry != 0) ? remove_entry : remove_subdirs;
 
     /* Check for a simple file or link first */
     if ( !unlink(path) ) return 0;
@@ -573,36 +576,35 @@ int rmfr_specific(char *path, int remove_dir) {
     /* Failed; if the error was not EISDIR or ENOENT,
      * no need to pursue...
      */
-    if ( errno != EISDIR && errno != ENOENT ) return errno;
+    if ( errno != EISDIR && errno != ENOENT ) return -1;
 
     /* path is a directory, remove all the contents recursively
      * before deleting it
      */
     d = opendir(path);
     if ( d == NULL ) {
-        return errno;
+        return -1;
     }
     while ((de = readdir(d)) != NULL) {
         if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, ".."))
             continue;
         /* Remove file in every case and remove directory if required */
-        if ( de->d_type == isFile || (de->d_type != isFile && remove_dir) ) {
+        if ( de->d_type == isFile || (de->d_type != isFile && remove_subdirs) ) {
             snprintf(fsentry, sizeof(fsentry), "%s/%s", path, de->d_name);
             if ( unlink(path) ) {
                 if (errno == EISDIR)
-                    subres = rmfr(fsentry);
-                if (subres) return subres;
+                    subres = rmfr_specific(fsentry, 1, 1);
+                if (subres) return -1;
             }
         }
     }
     closedir(d);
-    if (remove_dir)
+    if (remove_entry)
         /* Finally delete the empty directory */
         return rmdir(path);
-    else
-        return 0;
-}
 
+    return 0;
+}
 
 mode_t get_mode(const char *s)
 {
@@ -1685,26 +1687,6 @@ int sdcard_allowed()
         return 1;
     }
 }
-
-/**
- * Updates rights of folders containing logs
- */
-#ifdef FULL_REPORT
-void update_logs_permission(void)
-{
-    char value[PROPERTY_VALUE_MAX] = "0";
-
-    if (property_get(PROP_COREDUMP, value, "") <= 0) {
-        LOGE("Property %s not readable - core dump capture is disabled\n", PROP_COREDUMP);
-    } else if ( value[0] == '1' ) {
-        LOGI("Folders " LOGS_DIR " and " LOGS_DIR "/core set to 0777\n");
-        chmod(LOGS_DIR,0777);
-        chmod(HISTORY_CORE_DIR,0777);
-    }
-}
-#else
-inline void update_logs_permission(void) {}
-#endif
 
 /**
  * Read a one word string from file
