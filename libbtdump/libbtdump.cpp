@@ -39,6 +39,8 @@ static void dump_file_header(FILE * output)
     fprintf(output, "*************************************************\n");
     fprintf(output, "* Warning: Kernel space stacks are dumped before*\n");
     fprintf(output, "*          attaching to the thread              *\n");
+    fprintf(output, "*   In case of different word size (ABI) all    *\n");
+    fprintf(output, "*   kernel stacks are printed before userspace  *\n");
     fprintf(output, "*************************************************\n");
     fprintf(output, "\n");
 }

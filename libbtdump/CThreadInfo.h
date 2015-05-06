@@ -30,6 +30,8 @@ class CFrameInfo;
 class CProcInfo;
 typedef std::vector<CFrameInfo *> VpFrameInfo;
 
+#define KTHREADD_PID 2
+
 class CThreadInfo {
 
 #if defined(USE_LIBUNWIND) || defined (USE_LIBBACKTRACE)
@@ -69,6 +71,7 @@ class CThreadInfo {
     CThreadInfo(CProcInfo * parent, unsigned int tid);
     virtual ~ CThreadInfo();
     unsigned int getTid() const;
+    unsigned int getPPid() const;
     void print(FILE * output);
 
 #if defined(USE_LIBUNWIND) || defined (USE_LIBBACKTRACE)

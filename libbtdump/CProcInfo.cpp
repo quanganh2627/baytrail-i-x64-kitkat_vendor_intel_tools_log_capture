@@ -25,6 +25,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <unistd.h>
+#include <cutils/debugger.h>
 
 #if defined(USE_LIBUNWIND) || defined (USE_LIBBACKTRACE)
 /*try values close to debuggerd*/
@@ -34,7 +35,7 @@
 
 #define NS_IN_S (1000*1000*1000)
 
-CProcInfo::CProcInfo(unsigned int pid)
+CProcInfo::CProcInfo(unsigned int pid):userspace(true)
 {
     this->pid = pid;
     cmdline = NULL;
@@ -44,13 +45,21 @@ CProcInfo::CProcInfo(unsigned int pid)
     clock_gettime(CLOCK_REALTIME, &start_ts);
     get_cmdline();
     get_threads();
+    /*if the first pid is not 2 and ppid is not 2 is userspace */
+    if (pid == KTHREADD_PID)
+        userspace = false;
+    else if (threads.size() && threads[0]->getPPid() == KTHREADD_PID)
+        userspace = false;
+    sameWordSize = same_wordSize();
 #if defined(USE_LIBUNWIND) || defined (USE_LIBBACKTRACE)
-    attach();
-    for (VpThreadInfo::iterator it = threads.begin();
-         it != threads.end(); it++) {
-        (*it)->readUserStack();
+    if (userspace && sameWordSize) {
+        attach();
+        for (VpThreadInfo::iterator it = threads.begin();
+             it != threads.end(); it++) {
+            (*it)->readUserStack();
+        }
+        detach();
     }
-    detach();
 #endif
     clock_gettime(CLOCK_REALTIME, &end_ts);
 }
@@ -128,10 +137,21 @@ void CProcInfo::print(FILE * output)
 
     fprintf(output, "\n----- pid %d at %s.%09ld -----\n", pid, time_str,
             start_ts.tv_nsec);
-    fprintf(output, "Cmd line: %s\n", cmdline);
-    for (VpThreadInfo::iterator it = threads.begin();
-         it != threads.end(); it++) {
+
+    if (userspace && !sameWordSize)
+        fprintf(output, "Kernelspace stacks:\n");
+    else
+        fprintf(output, "Cmd line: %s\n", cmdline);
+
+    for (VpThreadInfo::iterator it = threads.begin(); it != threads.end();
+         it++) {
         (*it)->print(output);
+    }
+    if (userspace && !sameWordSize) {
+        fprintf(output, "Userspace stacks (form debuggerd):\n");
+        fflush(output);
+        /*Get userstacks from debuggerd */
+        dump_backtrace_to_file(pid, fileno(output));
     }
     fprintf(output, "----- end %d (%ld ns)-----\n", pid,
             timeDiff(start_ts, end_ts));
@@ -183,4 +203,24 @@ long CProcInfo::timeDiff(struct timespec start_ts, struct timespec end_ts)
     time_dif = ((end_ts.tv_sec - start_ts.tv_sec) * NS_IN_S);
     time_dif += end_ts.tv_nsec - start_ts.tv_nsec;
     return time_dif;
+}
+
+bool CProcInfo::same_wordSize()
+{
+    /* check if we are on the same arch */
+    /* ELF header should be 0x7f,'E','L','F',[1,2]-length */
+    /* Checking this against sizeof(void*)/4 should tell us if we can do anything for it */
+    char temp[PATH_MAX];
+    FILE *fp;
+    snprintf(temp, PATH_MAX, "/proc/%d/exe", pid);
+    fp = fopen(temp, "r");
+    if (fp) {
+        fread(temp, 1, 5, fp);
+        fclose(fp);
+        return ((temp[0] == 0x7f) &&
+                (temp[1] == 'E') &&
+                (temp[2] == 'L') &&
+                (temp[3] == 'F') && (temp[4] == sizeof(void *) / 4));
+    }
+    return false;
 }

@@ -41,8 +41,6 @@
 #include "CFrameInfo.h"
 #include "CProcInfo.h"
 
-#define KTHREADD_PID 2
-
 CThreadInfo::CThreadInfo(CProcInfo * parent, unsigned int tid)
 {
     this->parent = parent;
@@ -68,6 +66,12 @@ CThreadInfo::CThreadInfo(CProcInfo * parent, unsigned int tid)
 unsigned int CThreadInfo::getTid() const
 {
     return tid;
+}
+
+
+unsigned int CThreadInfo::getPPid() const
+{
+    return ppid;
 }
 
 CThreadInfo::~CThreadInfo()

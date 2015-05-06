@@ -33,11 +33,14 @@ class CProcInfo {
     char *cmdline;
     struct timespec start_ts, end_ts;
     VpThreadInfo threads;
+    bool userspace;
+    bool sameWordSize;
 #ifdef USE_LIBUNWIND
     unw_addr_space_t as;
 #endif
     void get_cmdline();
     void get_threads();
+    bool same_wordSize();
 #if defined(USE_LIBUNWIND) || defined (USE_LIBBACKTRACE)
     void detach();
     void attach();

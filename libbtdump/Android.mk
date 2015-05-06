@@ -35,10 +35,10 @@ LOCAL_CPPFLAGS := \
     -DUSE_LIBBACKTRACE \
 
 LOCAL_STATIC_LIBRARIES := \
-    libcutils \
     libc
 
 LOCAL_SHARED_LIBRARIES := \
+    libcutils \
     libbacktrace
 
 include external/stlport/libstlport.mk
@@ -65,6 +65,7 @@ LOCAL_STATIC_LIBRARIES += \
     libbtdump
 
 LOCAL_SHARED_LIBRARIES += \
+    libcutils \
     libbacktrace
 
 include external/stlport/libstlport.mk
